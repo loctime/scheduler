@@ -171,6 +171,17 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     ? weekDays.find((d) => format(d, "yyyy-MM-dd") === selectedCell.date)
     : null
 
+  // Memoizar los valores pasados al diálogo para evitar re-renders infinitos
+  const selectedShiftIds = useMemo(() => {
+    if (!selectedCell) return []
+    return getEmployeeShifts(selectedCell.employeeId, selectedCell.date)
+  }, [selectedCell?.employeeId, selectedCell?.date, schedule?.assignments, getEmployeeShifts])
+
+  const selectedAssignments = useMemo(() => {
+    if (!selectedCell || !onAssignmentUpdate) return undefined
+    return getEmployeeAssignments(selectedCell.employeeId, selectedCell.date)
+  }, [selectedCell?.employeeId, selectedCell?.date, schedule?.assignments, onAssignmentUpdate, getEmployeeAssignments])
+
   return (
     <>
       <Card id="schedule-grid" className="overflow-hidden border border-border bg-card">
@@ -265,10 +276,8 @@ export const ScheduleGrid = memo(function ScheduleGrid({
           open={true}
           onOpenChange={(open) => !open && setSelectedCell(null)}
           shifts={shifts}
-          selectedShiftIds={getEmployeeShifts(selectedCell.employeeId, selectedCell.date)}
-          selectedAssignments={
-            onAssignmentUpdate ? getEmployeeAssignments(selectedCell.employeeId, selectedCell.date) : undefined
-          }
+          selectedShiftIds={selectedShiftIds}
+          selectedAssignments={selectedAssignments}
           onShiftChange={onShiftUpdate ? handleShiftUpdate : undefined}
           onAssignmentsChange={onAssignmentUpdate ? handleAssignmentUpdate : undefined}
           employeeName={selectedEmployee.name}

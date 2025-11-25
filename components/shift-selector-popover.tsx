@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import {
   Dialog,
   DialogContent,
@@ -59,9 +59,19 @@ export function ShiftSelectorPopover({
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null)
   const [adjustedTimes, setAdjustedTimes] = useState<Record<string, Partial<ShiftAssignment>>>({})
 
+  // Rastrear el estado anterior de 'open'
+  const prevOpenRef = useRef(false)
+
+  // Inicializar cuando el diálogo se abre (solo cuando cambia de false a true)
   useEffect(() => {
-    if (open) {
+    const justOpened = open && !prevOpenRef.current
+    
+    if (justOpened) {
+      console.log('[ShiftSelector] Dialog just opened, initializing with selectedShiftIds:', selectedShiftIds)
+      
+      // Inicializar el estado solo cuando se abre por primera vez
       setTempSelected(selectedShiftIds)
+      
       // Cargar horarios ajustados si existen
       const adjusted: Record<string, Partial<ShiftAssignment>> = {}
       selectedAssignments.forEach((assignment) => {
@@ -75,15 +85,24 @@ export function ShiftSelectorPopover({
       setAdjustedTimes(adjusted)
       setEditingShiftId(null)
     }
-  }, [selectedShiftIds, selectedAssignments, open])
+    
+    prevOpenRef.current = open
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]) // Solo ejecutar cuando 'open' cambia
+
+  // Log cuando cambia tempSelected
+  useEffect(() => {
+    console.log('[ShiftSelector] tempSelected changed:', tempSelected)
+  }, [tempSelected])
 
   const toggleShift = (shiftId: string) => {
+    console.log('[ShiftSelector] toggleShift called for:', shiftId)
     setTempSelected((prev) => {
-      if (prev.includes(shiftId)) {
-        return prev.filter((id) => id !== shiftId)
-      } else {
-        return [...prev, shiftId]
-      }
+      const newSelection = prev.includes(shiftId)
+        ? prev.filter((id) => id !== shiftId)
+        : [...prev, shiftId]
+      console.log('[ShiftSelector] toggleShift - prev:', prev, 'newSelection:', newSelection)
+      return newSelection
     })
   }
 
@@ -234,20 +253,87 @@ export function ShiftSelectorPopover({
                     <div
                       key={shift.id}
                       className={`border rounded-lg p-4 space-y-3 transition-colors ${
-                        isSelected ? "border-primary bg-primary/5" : "border-border"
+                        isSelected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
                       }`}
+                      onClick={(e) => {
+                        // Solo hacer toggle si el click NO fue en un elemento interactivo
+                        const target = e.target as HTMLElement
+                        const isInteractive = 
+                          target.closest('button') || 
+                          target.closest('input') || 
+                          target.closest('[data-slot="checkbox"]') ||
+                          target.closest('label') ||
+                          target.tagName === 'BUTTON' ||
+                          target.tagName === 'INPUT' ||
+                          target.tagName === 'LABEL'
+                        
+                        console.log(`[ShiftSelector] Row onClick - shiftId: ${shift.id}, target:`, target.tagName, 'isInteractive:', isInteractive, 'target.closest results:', {
+                          button: !!target.closest('button'),
+                          input: !!target.closest('input'),
+                          checkbox: !!target.closest('[data-slot="checkbox"]'),
+                          label: !!target.closest('label'),
+                          tagName: target.tagName
+                        })
+                        
+                        if (!isInteractive) {
+                          console.log(`[ShiftSelector] Row onClick - calling toggleShift for: ${shift.id}`)
+                          toggleShift(shift.id)
+                        } else {
+                          console.log(`[ShiftSelector] Row onClick - ignoring click (interactive element)`)
+                        }
+                      }}
                     >
                       {/* Checkbox y nombre del turno */}
-                      <div className="flex items-center justify-between">
+                      <div 
+                        className="flex items-center justify-between"
+                        onMouseDown={(e) => {
+                          console.log(`[ShiftSelector] Checkbox container onMouseDown - shiftId: ${shift.id}, stopping propagation`)
+                          // Prevenir que el mousedown en esta área active el toggle del div padre
+                          // El checkbox manejará su propio estado a través de onCheckedChange
+                          e.stopPropagation()
+                        }}
+                        onClick={(e) => {
+                          console.log(`[ShiftSelector] Checkbox container onClick - shiftId: ${shift.id}, stopping propagation`)
+                          // También prevenir el click por si acaso
+                          e.stopPropagation()
+                        }}
+                      >
                         <div className="flex items-center space-x-3 flex-1">
                           <Checkbox
                             id={`shift-${shift.id}`}
                             checked={isSelected}
-                            onCheckedChange={() => toggleShift(shift.id)}
+                            onCheckedChange={(checked) => {
+                              console.log(`[ShiftSelector] Checkbox onCheckedChange - shiftId: ${shift.id}, checked:`, checked, 'current isSelected:', isSelected)
+                              // Actualizar estado directamente basado en el valor del checkbox
+                              // Radix UI garantiza que checked será true o false
+                              setTempSelected((prev) => {
+                                console.log(`[ShiftSelector] Checkbox onCheckedChange - prev state:`, prev)
+                                let newState
+                                if (checked === true) {
+                                  // Asegurar que está en la lista
+                                  newState = prev.includes(shift.id) ? prev : [...prev, shift.id]
+                                } else {
+                                  // Remover de la lista
+                                  newState = prev.filter((id) => id !== shift.id)
+                                }
+                                console.log(`[ShiftSelector] Checkbox onCheckedChange - new state:`, newState)
+                                return newState
+                              })
+                            }}
+                            onMouseDown={(e) => {
+                              console.log(`[ShiftSelector] Checkbox onMouseDown - shiftId: ${shift.id}, stopping propagation`)
+                              // Prevenir que el mousedown llegue al div padre
+                              e.stopPropagation()
+                            }}
                           />
                           <label
                             htmlFor={`shift-${shift.id}`}
                             className="flex items-center gap-2 text-sm font-medium leading-none cursor-pointer flex-1"
+                            onMouseDown={(e) => {
+                              console.log(`[ShiftSelector] Label onMouseDown - shiftId: ${shift.id}, stopping propagation`)
+                              // Prevenir que el mousedown llegue al div padre
+                              e.stopPropagation()
+                            }}
                           >
                             <span
                               className="inline-block h-4 w-4 rounded-full"
@@ -258,7 +344,7 @@ export function ShiftSelectorPopover({
                         </div>
                         
                         {isSelected && (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             {hasAdj && (
                               <Badge variant="secondary" className="text-xs">
                                 Ajustado
@@ -267,7 +353,10 @@ export function ShiftSelectorPopover({
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => setEditingShiftId(isEditing ? null : shift.id)}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setEditingShiftId(isEditing ? null : shift.id)
+                              }}
                               className="h-8 w-8 p-0"
                             >
                               <Pencil className="h-3 w-3" />
@@ -291,7 +380,7 @@ export function ShiftSelectorPopover({
 
                       {/* Formulario para ajustar horarios */}
                       {isSelected && isEditing && (
-                        <div className="pl-7 space-y-4 mt-2 border-t pt-3">
+                        <div className="pl-7 space-y-4 mt-2 border-t pt-3" onClick={(e) => e.stopPropagation()}>
                           {/* Primera franja horaria */}
                           {(shift.startTime || shift.endTime) && (
                             <div className="space-y-2">
