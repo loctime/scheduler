@@ -58,6 +58,8 @@ export function ShiftSelectorPopover({
   const [tempSelected, setTempSelected] = useState<string[]>(selectedShiftIds)
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null)
   const [adjustedTimes, setAdjustedTimes] = useState<Record<string, Partial<ShiftAssignment>>>({})
+  // Estado para rastrear extensiones de +30 min
+  const [extensions, setExtensions] = useState<Record<string, { before: boolean; after: boolean }>>({})
 
   // Rastrear el estado anterior de 'open'
   const prevOpenRef = useRef(false)
@@ -84,6 +86,29 @@ export function ShiftSelectorPopover({
       })
       setAdjustedTimes(adjusted)
       setEditingShiftId(null)
+      
+      // Cargar estado de extensiones basado en horarios ajustados
+      const loadedExtensions: Record<string, { before: boolean; after: boolean }> = {}
+      selectedAssignments.forEach((assignment) => {
+        const shift = shifts.find((s) => s.id === assignment.shiftId)
+        if (shift && assignment.startTime && assignment.endTime) {
+          // Verificar si hay extensión de 30 min antes (startTime es 30 min antes del base)
+          const baseStart30MinBefore = adjustTime(shift.startTime || "", -30)
+          const hasBefore = assignment.startTime === baseStart30MinBefore
+          
+          // Verificar si hay extensión de 30 min después (endTime es 30 min después del base)
+          const baseEnd30MinAfter = adjustTime(shift.endTime || "", 30)
+          const hasAfter = assignment.endTime === baseEnd30MinAfter
+          
+          if (hasBefore || hasAfter) {
+            loadedExtensions[assignment.shiftId] = {
+              before: hasBefore,
+              after: hasAfter,
+            }
+          }
+        }
+      })
+      setExtensions(loadedExtensions)
     }
     
     prevOpenRef.current = open
@@ -162,6 +187,7 @@ export function ShiftSelectorPopover({
         // Solo incluir campos si fueron ajustados y son diferentes del turno base
         if (adjusted.startTime !== undefined && adjusted.startTime !== shift.startTime) {
           result.startTime = adjusted.startTime
+          console.log(`[ShiftSelector] Guardando horario ajustado - turno ${shift.name}, startTime: ${shift.startTime} -> ${adjusted.startTime}`)
         } else if (shift.startTime) {
           // Si no fue ajustado pero existe en el turno base, no incluirlo (se tomará del turno)
           // Dejamos undefined para que use el del turno base
@@ -169,6 +195,7 @@ export function ShiftSelectorPopover({
         
         if (adjusted.endTime !== undefined && adjusted.endTime !== shift.endTime) {
           result.endTime = adjusted.endTime
+          console.log(`[ShiftSelector] Guardando horario ajustado - turno ${shift.name}, endTime: ${shift.endTime} -> ${adjusted.endTime}`)
         }
         
         if (adjusted.startTime2 !== undefined && adjusted.startTime2 !== shift.startTime2) {
@@ -181,6 +208,7 @@ export function ShiftSelectorPopover({
         
         return result
       })
+      console.log('[ShiftSelector] Guardando asignaciones:', assignments)
       onAssignmentsChange(assignments)
     } else if (onShiftChange) {
       // Modo compatible: solo pasar IDs
@@ -367,13 +395,88 @@ export function ShiftSelectorPopover({
 
                       {/* Horarios base del turno */}
                       {(shift.startTime || shift.endTime) && (
-                        <div className="text-xs text-muted-foreground pl-7">
-                          <span className="font-medium">Base:</span>{" "}
-                          {shift.startTime && shift.endTime
-                            ? `${shift.startTime} - ${shift.endTime}`
-                            : "Sin horario"}
-                          {shift.startTime2 && shift.endTime2 && (
-                            <span> / {shift.startTime2} - {shift.endTime2}</span>
+                        <div className="pl-7 space-y-2">
+                          <div className="text-base font-semibold text-foreground">
+                            {shift.startTime && shift.endTime
+                              ? `${shift.startTime} - ${shift.endTime}`
+                              : "Sin horario"}
+                            {shift.startTime2 && shift.endTime2 && (
+                              <span className="text-base"> / {shift.startTime2} - {shift.endTime2}</span>
+                            )}
+                          </div>
+                          
+                          {/* Botones de extensión de 30 min (solo si está seleccionado) */}
+                          {isSelected && shift.startTime && shift.endTime && (
+                            <div className="flex gap-2">
+                              <Button
+                                type="button"
+                                variant={extensions[shift.id]?.before ? "default" : "outline"}
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  const currentExtension = extensions[shift.id]?.before || false
+                                  const newBeforeState = !currentExtension
+                                  
+                                  setExtensions((prev) => ({
+                                    ...prev,
+                                    [shift.id]: {
+                                      before: newBeforeState,
+                                      after: prev[shift.id]?.after || false,
+                                    },
+                                  }))
+                                  
+                                  // Ajustar horario automáticamente
+                                  const newStartTime = newBeforeState
+                                    ? adjustTime(shift.startTime || "", -30)
+                                    : shift.startTime
+                                  if (newStartTime && shift.startTime) {
+                                    if (newStartTime !== shift.startTime) {
+                                      updateAdjustedTime(shift.id, "startTime", newStartTime)
+                                    } else {
+                                      // Resetear a horario base
+                                      resetAdjustedTime(shift.id, "startTime")
+                                    }
+                                  }
+                                }}
+                                className="text-xs h-7 px-3"
+                              >
+                                +30 min antes
+                              </Button>
+                              <Button
+                                type="button"
+                                variant={extensions[shift.id]?.after ? "default" : "outline"}
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  const currentExtension = extensions[shift.id]?.after || false
+                                  const newAfterState = !currentExtension
+                                  
+                                  setExtensions((prev) => ({
+                                    ...prev,
+                                    [shift.id]: {
+                                      before: prev[shift.id]?.before || false,
+                                      after: newAfterState,
+                                    },
+                                  }))
+                                  
+                                  // Ajustar horario automáticamente
+                                  const newEndTime = newAfterState
+                                    ? adjustTime(shift.endTime || "", 30)
+                                    : shift.endTime
+                                  if (newEndTime && shift.endTime) {
+                                    if (newEndTime !== shift.endTime) {
+                                      updateAdjustedTime(shift.id, "endTime", newEndTime)
+                                    } else {
+                                      // Resetear a horario base
+                                      resetAdjustedTime(shift.id, "endTime")
+                                    }
+                                  }
+                                }}
+                                className="text-xs h-7 px-3"
+                              >
+                                +30 min después
+                              </Button>
+                            </div>
                           )}
                         </div>
                       )}

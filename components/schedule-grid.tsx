@@ -237,27 +237,35 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                             const shift = getShiftInfo(assignment.shiftId)
                             if (!shift) return null
                             const displayTime = getShiftDisplayTime(assignment.shiftId, assignment)
-                            const isAdjusted = hasAdjustedTimes(assignment, shift)
 
-                            return (
-                              <div key={assignment.shiftId} className="flex flex-col gap-0.5">
+                            // Si no hay horario para mostrar, mostrar el nombre del turno como fallback
+                            if (!displayTime) {
+                              return (
                                 <Badge
+                                  key={assignment.shiftId}
                                   className="justify-center text-xs"
                                   style={{
                                     backgroundColor: shift.color,
                                     color: "#ffffff",
                                   }}
-                                  title={displayTime || undefined}
                                 >
                                   {shift.name}
-                                  {isAdjusted && " *"}
                                 </Badge>
-                                {isAdjusted && displayTime && (
-                                  <span className="text-[10px] text-muted-foreground text-center">
-                                    {displayTime}
-                                  </span>
-                                )}
-                              </div>
+                              )
+                            }
+
+                            return (
+                              <Badge
+                                key={assignment.shiftId}
+                                className="justify-center text-xs"
+                                style={{
+                                  backgroundColor: shift.color,
+                                  color: "#ffffff",
+                                }}
+                                title={shift.name}
+                              >
+                                {displayTime}
+                              </Badge>
                             )
                           })
                         })()}
