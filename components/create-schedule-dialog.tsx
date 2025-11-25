@@ -15,15 +15,16 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { Empleado, Turno, Horario } from "@/lib/types"
 
 interface CreateScheduleDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: any) => void
+  onSubmit: (data: { nombre: string; assignments: Record<string, Record<string, string[]>> }) => void
   weekDays: Date[]
-  employees: any[]
-  shifts: any[]
-  existingSchedule?: any
+  employees: Empleado[]
+  shifts: Turno[]
+  existingSchedule?: Horario | null
 }
 
 export function CreateScheduleDialog({

@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import { signInWithPopup, GoogleAuthProvider } from "firebase/auth"
-import { auth } from "@/lib/firebase"
+import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore"
+import { auth, db, COLLECTIONS } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Calendar, Loader2 } from "lucide-react"
@@ -16,7 +17,36 @@ export function LoginForm() {
     try {
       setLoading(true)
       const provider = new GoogleAuthProvider()
-      await signInWithPopup(auth, provider)
+      const result = await signInWithPopup(auth, provider)
+      const user = result.user
+
+      // Crear o actualizar el documento del usuario en apps/controlschedule/users
+      const userRef = doc(db, COLLECTIONS.USERS, user.uid)
+      const userDoc = await getDoc(userRef)
+
+      if (!userDoc.exists()) {
+        // Si el usuario no existe en nuestra colección, crear el documento
+        await setDoc(userRef, {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
+      } else {
+        // Si ya existe, actualizar la información
+        await setDoc(
+          userRef,
+          {
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        )
+      }
     } catch (error: any) {
       toast({
         title: "Error al iniciar sesión",

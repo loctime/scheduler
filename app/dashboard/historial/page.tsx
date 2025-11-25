@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { onAuthStateChanged } from "firebase/auth"
 import { collection, query, orderBy, onSnapshot, limit, where } from "firebase/firestore"
-import { auth, db, isFirebaseConfigured } from "@/lib/firebase"
+import { auth, db, isFirebaseConfigured, COLLECTIONS } from "@/lib/firebase"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -16,19 +16,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Loader2, Calendar, GitCompare, Eye } from "lucide-react"
+import { Loader2, Calendar, GitCompare, Eye, ChevronLeft, ChevronRight } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 import { ScheduleGrid } from "@/components/schedule-grid"
+import { useData } from "@/contexts/data-context"
+import { HistorialItem, Horario } from "@/lib/types"
+
+const ITEMS_PER_PAGE = 20
 
 export default function HistorialPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
-  const [historial, setHistorial] = useState<any[]>([])
-  const [schedules, setSchedules] = useState<any[]>([])
-  const [employees, setEmployees] = useState<any[]>([])
-  const [shifts, setShifts] = useState<any[]>([])
+  const [historial, setHistorial] = useState<HistorialItem[]>([])
+  const [schedules, setSchedules] = useState<Horario[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const { employees, shifts } = useData()
   const [selectedVersion, setSelectedVersion] = useState<any>(null)
   const [compareVersions, setCompareVersions] = useState<{ v1: any | null; v2: any | null }>({
     v1: null,
@@ -43,44 +47,51 @@ export default function HistorialPage() {
       return
     }
 
+    let unsubscribeHistorial: (() => void) | null = null
+    let unsubscribeSchedules: (() => void) | null = null
+    let unsubscribeEmployees: (() => void) | null = null
+    let unsubscribeShifts: (() => void) | null = null
+
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
         router.push("/")
+        // Limpiar listeners si el usuario se desautentica
+        if (unsubscribeHistorial) unsubscribeHistorial()
+        if (unsubscribeSchedules) unsubscribeSchedules()
+        if (unsubscribeEmployees) unsubscribeEmployees()
+        if (unsubscribeShifts) unsubscribeShifts()
+        unsubscribeHistorial = null
+        unsubscribeSchedules = null
+        unsubscribeEmployees = null
+        unsubscribeShifts = null
       } else {
         setUser(currentUser)
         setLoading(false)
+        
+        // Solo crear los listeners cuando el usuario esté autenticado
+        // Obtener historial ordenado por fecha descendente
+        const historialQuery = query(collection(db, COLLECTIONS.HISTORIAL), orderBy("createdAt", "desc"), limit(50))
+        unsubscribeHistorial = onSnapshot(historialQuery, (snapshot) => {
+          setHistorial(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
+        }, (error) => {
+          console.error("Error en listener de historial:", error)
+        })
+
+        // Obtener horarios actuales
+        const schedulesQuery = query(collection(db, COLLECTIONS.SCHEDULES), orderBy("weekStart", "desc"))
+        unsubscribeSchedules = onSnapshot(schedulesQuery, (snapshot) => {
+          setSchedules(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
+        }, (error) => {
+          console.error("Error en listener de horarios:", error)
+        })
+
       }
-    })
-
-    // Obtener historial ordenado por fecha descendente
-    const historialQuery = query(collection(db, "historial"), orderBy("createdAt", "desc"), limit(50))
-    const unsubscribeHistorial = onSnapshot(historialQuery, (snapshot) => {
-      setHistorial(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
-    })
-
-    // Obtener horarios actuales
-    const schedulesQuery = query(collection(db, "schedules"), orderBy("weekStart", "desc"))
-    const unsubscribeSchedules = onSnapshot(schedulesQuery, (snapshot) => {
-      setSchedules(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
-    })
-
-    // Obtener empleados y turnos para mostrar en comparación
-    const employeesQuery = query(collection(db, "employees"), orderBy("name"))
-    const unsubscribeEmployees = onSnapshot(employeesQuery, (snapshot) => {
-      setEmployees(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
-    })
-
-    const shiftsQuery = query(collection(db, "shifts"), orderBy("name"))
-    const unsubscribeShifts = onSnapshot(shiftsQuery, (snapshot) => {
-      setShifts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
     })
 
     return () => {
       unsubscribeAuth()
-      unsubscribeHistorial()
-      unsubscribeSchedules()
-      unsubscribeEmployees()
-      unsubscribeShifts()
+      if (unsubscribeHistorial) unsubscribeHistorial()
+      if (unsubscribeSchedules) unsubscribeSchedules()
     }
   }, [router])
 
@@ -132,7 +143,7 @@ export default function HistorialPage() {
   }
 
   // Agrupar historial por horarioId
-  const historialBySchedule = historial.reduce((acc: any, item: any) => {
+  const historialBySchedule = historial.reduce((acc: Record<string, HistorialItem[]>, item: HistorialItem) => {
     const horarioId = item.horarioId || "sin-id"
     if (!acc[horarioId]) {
       acc[horarioId] = []
@@ -140,6 +151,12 @@ export default function HistorialPage() {
     acc[horarioId].push(item)
     return acc
   }, {})
+
+  // Paginación
+  const totalPages = Math.ceil(Object.keys(historialBySchedule).length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedSchedules = Object.entries(historialBySchedule).slice(startIndex, endIndex)
 
   return (
     <DashboardLayout user={user}>
@@ -166,7 +183,7 @@ export default function HistorialPage() {
           </Card>
         ) : (
           <div className="space-y-6">
-            {Object.entries(historialBySchedule).map(([horarioId, versions]: [string, any]) => {
+            {paginatedSchedules.map(([horarioId, versions]: [string, HistorialItem[]]) => {
               const schedule = schedules.find((s) => s.id === horarioId)
               const scheduleName = schedule?.nombre || versions[0]?.nombre || "Horario sin nombre"
 
@@ -244,6 +261,37 @@ export default function HistorialPage() {
                 </Card>
               )
             })}
+
+            {/* Paginación */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-border pt-4">
+                <div className="text-sm text-muted-foreground">
+                  Página {currentPage} de {totalPages}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    aria-label="Página anterior"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Anterior
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    aria-label="Página siguiente"
+                  >
+                    Siguiente
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

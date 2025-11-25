@@ -16,7 +16,7 @@ import {
   doc,
   serverTimestamp,
 } from "firebase/firestore"
-import { auth, db, isFirebaseConfigured } from "@/lib/firebase"
+import { auth, db, isFirebaseConfigured, COLLECTIONS } from "@/lib/firebase"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,14 +33,17 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useData } from "@/contexts/data-context"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Empleado } from "@/lib/types"
 
 export default function EmpleadosPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
-  const [employees, setEmployees] = useState<any[]>([])
+  const { employees, loading: dataLoading, refreshEmployees } = useData()
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingEmployee, setEditingEmployee] = useState<any>(null)
+  const [editingEmployee, setEditingEmployee] = useState<Empleado | null>(null)
   const [formData, setFormData] = useState({ name: "", email: "", phone: "" })
   const { toast } = useToast()
 
@@ -59,14 +62,8 @@ export default function EmpleadosPage() {
       }
     })
 
-    const q = query(collection(db, "employees"), orderBy("name"))
-    const unsubscribeEmployees = onSnapshot(q, (snapshot) => {
-      setEmployees(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
-    })
-
     return () => {
       unsubscribeAuth()
-      unsubscribeEmployees()
     }
   }, [router])
 
@@ -86,7 +83,7 @@ export default function EmpleadosPage() {
 
     try {
       if (editingEmployee) {
-        await updateDoc(doc(db, "employees", editingEmployee.id), {
+        await updateDoc(doc(db, COLLECTIONS.EMPLOYEES, editingEmployee.id), {
           ...formData,
           updatedAt: serverTimestamp(),
         })
@@ -95,7 +92,7 @@ export default function EmpleadosPage() {
           description: "Los datos del empleado se han actualizado correctamente",
         })
       } else {
-        await addDoc(collection(db, "employees"), {
+        await addDoc(collection(db, COLLECTIONS.EMPLOYEES), {
           ...formData,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -105,6 +102,8 @@ export default function EmpleadosPage() {
           description: "El empleado se ha creado correctamente",
         })
       }
+      // Refrescar datos del contexto
+      await refreshEmployees()
       setDialogOpen(false)
       setFormData({ name: "", email: "", phone: "" })
     } catch (error: any) {
@@ -120,7 +119,9 @@ export default function EmpleadosPage() {
     if (!confirm("¿Estás seguro de que quieres eliminar este empleado?")) return
 
     try {
-      await deleteDoc(doc(db, "employees", id))
+      await deleteDoc(doc(db, COLLECTIONS.EMPLOYEES, id))
+      // Refrescar datos del contexto
+      await refreshEmployees()
       toast({
         title: "Empleado eliminado",
         description: "El empleado se ha eliminado correctamente",
@@ -162,7 +163,18 @@ export default function EmpleadosPage() {
             <CardDescription className="text-muted-foreground">Total: {employees.length} empleados</CardDescription>
           </CardHeader>
           <CardContent>
-            {employees.length === 0 ? (
+            {dataLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-12 flex-1" />
+                    <Skeleton className="h-12 w-32" />
+                    <Skeleton className="h-12 w-32" />
+                    <Skeleton className="h-12 w-24" />
+                  </div>
+                ))}
+              </div>
+            ) : employees.length === 0 ? (
               <div className="py-12 text-center text-muted-foreground">
                 No hay empleados registrados. Agrega tu primer empleado.
               </div>

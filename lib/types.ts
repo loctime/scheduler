@@ -1,48 +1,63 @@
 export interface Empleado {
   id: string
-  nombre: string
-  apellido: string
-  cargo: string
-  activo: boolean
-  createdAt: Date
+  name: string
+  email?: string
+  phone?: string
+  createdAt?: any
+  updatedAt?: any
 }
 
 export interface Turno {
   id: string
-  nombre: string
-  horaInicio: string // formato "HH:mm"
-  horaFin: string // formato "HH:mm"
+  name: string
+  startTime?: string // formato "HH:mm"
+  endTime?: string // formato "HH:mm"
   color: string // código hex
-  createdAt: Date
+  createdAt?: any
+  updatedAt?: any
 }
 
 export interface Horario {
   id: string
   nombre: string
-  semanaInicio: Date
-  semanaFin: Date
-  asignaciones: {
-    [empleadoId: string]: {
-      [dia: string]: string[] // array de IDs de turnos
+  weekStart: string // formato "yyyy-MM-dd"
+  semanaInicio: string
+  semanaFin: string
+  assignments: {
+    [date: string]: {
+      [empleadoId: string]: string[] // array de IDs de turnos
     }
   }
-  createdAt: Date
-  modifiedAt: Date
-  createdBy: string
+  createdAt?: any
+  updatedAt?: any
+  createdBy?: string
+  createdByName?: string
+  modifiedBy?: string
+  modifiedByName?: string
 }
 
 export interface HistorialItem {
   id: string
   horarioId: string
   nombre: string
-  semanaInicio: Date
-  semanaFin: Date
-  asignaciones: {
-    [empleadoId: string]: {
-      [dia: string]: string[]
+  semanaInicio: string
+  semanaFin: string
+  weekStart?: string
+  assignments: {
+    [date: string]: {
+      [empleadoId: string]: string[]
     }
   }
-  createdAt: Date
-  createdBy: string
+  createdAt?: any
+  createdBy?: string
+  createdByName?: string
   accion: "creado" | "modificado"
+  versionAnterior?: boolean
+}
+
+export interface ShiftOverlap {
+  employeeId: string
+  date: string
+  shifts: string[]
+  message: string
 }

@@ -16,7 +16,7 @@ import {
   doc,
   serverTimestamp,
 } from "firebase/firestore"
-import { auth, db, isFirebaseConfigured } from "@/lib/firebase"
+import { auth, db, isFirebaseConfigured, COLLECTIONS } from "@/lib/firebase"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,6 +33,9 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useData } from "@/contexts/data-context"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Turno } from "@/lib/types"
 
 const PRESET_COLORS = [
   "#3b82f6", // blue
@@ -49,9 +52,9 @@ export default function TurnosPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
-  const [shifts, setShifts] = useState<any[]>([])
+  const { shifts, loading: dataLoading, refreshShifts } = useData()
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingShift, setEditingShift] = useState<any>(null)
+  const [editingShift, setEditingShift] = useState<Turno | null>(null)
   const [formData, setFormData] = useState({
     name: "",
     startTime: "",
@@ -75,14 +78,8 @@ export default function TurnosPage() {
       }
     })
 
-    const q = query(collection(db, "shifts"), orderBy("name"))
-    const unsubscribeShifts = onSnapshot(q, (snapshot) => {
-      setShifts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
-    })
-
     return () => {
       unsubscribeAuth()
-      unsubscribeShifts()
     }
   }, [router])
 
@@ -112,7 +109,7 @@ export default function TurnosPage() {
 
     try {
       if (editingShift) {
-        await updateDoc(doc(db, "shifts", editingShift.id), {
+        await updateDoc(doc(db, COLLECTIONS.SHIFTS, editingShift.id), {
           ...formData,
           updatedAt: serverTimestamp(),
         })
@@ -121,7 +118,7 @@ export default function TurnosPage() {
           description: "El turno se ha actualizado correctamente",
         })
       } else {
-        await addDoc(collection(db, "shifts"), {
+        await addDoc(collection(db, COLLECTIONS.SHIFTS), {
           ...formData,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -131,6 +128,8 @@ export default function TurnosPage() {
           description: "El turno se ha creado correctamente",
         })
       }
+      // Refrescar datos del contexto
+      await refreshShifts()
       setDialogOpen(false)
     } catch (error: any) {
       toast({
@@ -145,7 +144,9 @@ export default function TurnosPage() {
     if (!confirm("¿Estás seguro de que quieres eliminar este turno?")) return
 
     try {
-      await deleteDoc(doc(db, "shifts", id))
+      await deleteDoc(doc(db, COLLECTIONS.SHIFTS, id))
+      // Refrescar datos del contexto
+      await refreshShifts()
       toast({
         title: "Turno eliminado",
         description: "El turno se ha eliminado correctamente",
@@ -182,7 +183,21 @@ export default function TurnosPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {shifts.length === 0 ? (
+          {dataLoading ? (
+            <>
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="border-border bg-card">
+                  <CardHeader>
+                    <Skeleton className="h-6 w-32" />
+                    <Skeleton className="h-4 w-24 mt-2" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-10 w-full" />
+                  </CardContent>
+                </Card>
+              ))}
+            </>
+          ) : shifts.length === 0 ? (
             <Card className="col-span-full border-border bg-card">
               <CardContent className="py-12 text-center text-muted-foreground">
                 No hay turnos configurados. Agrega tu primer turno.

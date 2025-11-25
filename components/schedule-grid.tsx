@@ -1,29 +1,48 @@
 "use client"
 
+import { memo, useMemo, useCallback } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { Empleado, Turno, Horario, HistorialItem } from "@/lib/types"
 
 interface ScheduleGridProps {
   weekDays: Date[]
-  employees: any[]
-  shifts: any[]
-  schedule: any
+  employees: Empleado[]
+  shifts: Turno[]
+  schedule: Horario | HistorialItem | null
 }
 
-export function ScheduleGrid({ weekDays, employees, shifts, schedule }: ScheduleGridProps) {
-  const getEmployeeShifts = (employeeId: string, date: string) => {
-    if (!schedule?.assignments) return []
-    // El historial puede tener asignaciones con formato diferente
-    const dateAssignments = schedule.assignments[date] || {}
-    const shifts = dateAssignments[employeeId]
-    return Array.isArray(shifts) ? shifts : []
-  }
+export const ScheduleGrid = memo(function ScheduleGrid({
+  weekDays,
+  employees,
+  shifts,
+  schedule,
+}: ScheduleGridProps) {
+  // Memoizar mapa de turnos para búsqueda O(1)
+  const shiftMap = useMemo(() => {
+    return new Map(shifts.map((s) => [s.id, s]))
+  }, [shifts])
 
-  const getShiftInfo = (shiftId: string) => {
-    return shifts.find((s) => s.id === shiftId)
-  }
+  // Memoizar función de obtener turnos de empleado
+  const getEmployeeShifts = useCallback(
+    (employeeId: string, date: string): string[] => {
+      if (!schedule?.assignments) return []
+      const dateAssignments = schedule.assignments[date] || {}
+      const employeeShifts = dateAssignments[employeeId]
+      return Array.isArray(employeeShifts) ? employeeShifts : []
+    },
+    [schedule?.assignments],
+  )
+
+  // Memoizar función de obtener info de turno
+  const getShiftInfo = useCallback(
+    (shiftId: string): Turno | undefined => {
+      return shiftMap.get(shiftId)
+    },
+    [shiftMap],
+  )
 
   return (
     <Card id="schedule-grid" className="overflow-hidden border border-border bg-card">
@@ -91,4 +110,4 @@ export function ScheduleGrid({ weekDays, employees, shifts, schedule }: Schedule
       </div>
     </Card>
   )
-}
+})

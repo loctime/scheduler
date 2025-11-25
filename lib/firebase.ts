@@ -35,3 +35,16 @@ if (isFirebaseConfigured()) {
 }
 
 export { auth, db }
+
+// Helper functions for collection paths with apps/controlschedule/ prefix
+export const getCollectionPath = (collectionName: string) => {
+  return `apps/controlschedule/${collectionName}`
+}
+
+export const COLLECTIONS = {
+  USERS: getCollectionPath("users"),
+  EMPLOYEES: getCollectionPath("employees"),
+  SHIFTS: getCollectionPath("shifts"),
+  SCHEDULES: getCollectionPath("schedules"),
+  HISTORIAL: getCollectionPath("historial"),
+} as const
