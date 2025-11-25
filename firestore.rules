@@ -225,6 +225,56 @@ service cloud.firestore {
       allow delete: if isAuth() && isHorariosAdmin();
     }
     
+    // Colección: apps/horarios/config
+    match /apps/horarios/config/{configId} {
+      allow read: if isAuth() && isHorariosUser();
+      allow create: if isAuth() && isHorariosUser()
+        && isInt('mesInicioDia')
+        && request.resource.data.mesInicioDia >= 1
+        && request.resource.data.mesInicioDia <= 28
+        && isInt('horasMaximasPorDia')
+        && request.resource.data.horasMaximasPorDia >= 1
+        && request.resource.data.horasMaximasPorDia <= 24
+        && isInt('semanaInicioDia')
+        && request.resource.data.semanaInicioDia >= 0
+        && request.resource.data.semanaInicioDia <= 6
+        && isBool('mostrarFinesDeSemana')
+        && isBool('formatoHora24')
+        && isInt('minutosDescanso')
+        && request.resource.data.minutosDescanso >= 0
+        && request.resource.data.minutosDescanso <= 120
+        && (request.resource.data.horasMinimasParaDescanso is number)
+        && request.resource.data.horasMinimasParaDescanso >= 1
+        && request.resource.data.horasMinimasParaDescanso <= 12
+        && isTs('createdAt')
+        && isTs('updatedAt')
+        && (isStringOrNull('updatedBy') || request.resource.data.updatedBy == uid())
+        && isStringOrNull('updatedByName');
+      allow update: if isAuth() && isHorariosUser()
+        && isInt('mesInicioDia')
+        && request.resource.data.mesInicioDia >= 1
+        && request.resource.data.mesInicioDia <= 28
+        && isInt('horasMaximasPorDia')
+        && request.resource.data.horasMaximasPorDia >= 1
+        && request.resource.data.horasMaximasPorDia <= 24
+        && isInt('semanaInicioDia')
+        && request.resource.data.semanaInicioDia >= 0
+        && request.resource.data.semanaInicioDia <= 6
+        && isBool('mostrarFinesDeSemana')
+        && isBool('formatoHora24')
+        && isInt('minutosDescanso')
+        && request.resource.data.minutosDescanso >= 0
+        && request.resource.data.minutosDescanso <= 120
+        && (request.resource.data.horasMinimasParaDescanso is number)
+        && request.resource.data.horasMinimasParaDescanso >= 1
+        && request.resource.data.horasMinimasParaDescanso <= 12
+        && unchanged('createdAt')
+        && isTs('updatedAt')
+        && (isStringOrNull('updatedBy') || request.resource.data.updatedBy == uid())
+        && isStringOrNull('updatedByName');
+      allow delete: if isAuth() && isHorariosAdmin();
+    }
+    
     
 
     /* ========= DENY POR DEFECTO ========= */

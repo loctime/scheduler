@@ -47,4 +47,5 @@ export const COLLECTIONS = {
   SHIFTS: getCollectionPath("shifts"),
   SCHEDULES: getCollectionPath("schedules"),
   HISTORIAL: getCollectionPath("historial"),
+  CONFIG: getCollectionPath("config"),
 } as const

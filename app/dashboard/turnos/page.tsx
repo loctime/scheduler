@@ -10,6 +10,7 @@ import {
   deleteDoc,
   doc,
   serverTimestamp,
+  deleteField,
 } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { DashboardLayout } from "@/components/dashboard-layout"
@@ -26,6 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
@@ -51,25 +53,35 @@ export default function TurnosPage() {
     name: "",
     startTime: "",
     endTime: "",
+    startTime2: "",
+    endTime2: "",
     color: PRESET_COLORS[0],
   })
+  const [hasSecondShift, setHasSecondShift] = useState(false)
   const { toast } = useToast()
 
   const handleOpenDialog = (shift?: any) => {
     if (shift) {
       setEditingShift(shift)
+      const hasSecond = !!(shift.startTime2 || shift.endTime2)
+      setHasSecondShift(hasSecond)
       setFormData({
         name: shift.name,
         startTime: shift.startTime || "",
         endTime: shift.endTime || "",
+        startTime2: shift.startTime2 || "",
+        endTime2: shift.endTime2 || "",
         color: shift.color,
       })
     } else {
       setEditingShift(null)
+      setHasSecondShift(false)
       setFormData({
         name: "",
         startTime: "",
         endTime: "",
+        startTime2: "",
+        endTime2: "",
         color: PRESET_COLORS[0],
       })
     }
@@ -90,20 +102,50 @@ export default function TurnosPage() {
 
     try {
       if (editingShift) {
-        await updateDoc(doc(db, COLLECTIONS.SHIFTS, editingShift.id), {
-          ...formData,
+        const updateData: any = {
+          name: formData.name,
+          color: formData.color,
           updatedAt: serverTimestamp(),
-        })
+        }
+        
+        // Primera franja horaria
+        if (formData.startTime) updateData.startTime = formData.startTime
+        if (formData.endTime) updateData.endTime = formData.endTime
+        
+        // Segunda franja horaria (solo si está habilitada)
+        if (hasSecondShift) {
+          if (formData.startTime2) updateData.startTime2 = formData.startTime2
+          if (formData.endTime2) updateData.endTime2 = formData.endTime2
+        } else {
+          // Si se deshabilitó la segunda franja, eliminar los campos
+          updateData.startTime2 = deleteField()
+          updateData.endTime2 = deleteField()
+        }
+        
+        await updateDoc(doc(db, COLLECTIONS.SHIFTS, editingShift.id), updateData)
         toast({
           title: "Turno actualizado",
           description: "El turno se ha actualizado correctamente",
         })
       } else {
-        await addDoc(collection(db, COLLECTIONS.SHIFTS), {
-          ...formData,
+        const newShiftData: any = {
+          name: formData.name,
+          color: formData.color,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-        })
+        }
+        
+        // Primera franja horaria
+        if (formData.startTime) newShiftData.startTime = formData.startTime
+        if (formData.endTime) newShiftData.endTime = formData.endTime
+        
+        // Segunda franja horaria (solo si está habilitada)
+        if (hasSecondShift) {
+          if (formData.startTime2) newShiftData.startTime2 = formData.startTime2
+          if (formData.endTime2) newShiftData.endTime2 = formData.endTime2
+        }
+        
+        await addDoc(collection(db, COLLECTIONS.SHIFTS), newShiftData)
         toast({
           title: "Turno creado",
           description: "El turno se ha creado correctamente",
@@ -193,9 +235,22 @@ export default function TurnosPage() {
                     <div className="space-y-1">
                       <CardTitle className="text-card-foreground">{shift.name}</CardTitle>
                       <CardDescription className="text-muted-foreground">
-                        {shift.startTime && shift.endTime
-                          ? `${shift.startTime} - ${shift.endTime}`
-                          : "Sin horario definido"}
+                        {(() => {
+                          const firstShift = shift.startTime && shift.endTime
+                            ? `${shift.startTime} - ${shift.endTime}`
+                            : null
+                          const secondShift = shift.startTime2 && shift.endTime2
+                            ? `${shift.startTime2} - ${shift.endTime2}`
+                            : null
+                          
+                          if (firstShift && secondShift) {
+                            return `${firstShift} / ${secondShift}`
+                          } else if (firstShift) {
+                            return firstShift
+                          } else {
+                            return "Sin horario definido"
+                          }
+                        })()}
                       </CardDescription>
                     </div>
                     <Badge className="h-8 w-8 rounded-full" style={{ backgroundColor: shift.color }} />
@@ -247,32 +302,90 @@ export default function TurnosPage() {
                     className="border-input bg-background text-foreground"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="startTime" className="text-foreground">
-                      Hora Inicio
-                    </Label>
-                    <Input
-                      id="startTime"
-                      type="time"
-                      value={formData.startTime}
-                      onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                      className="border-input bg-background text-foreground"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="endTime" className="text-foreground">
-                      Hora Fin
-                    </Label>
-                    <Input
-                      id="endTime"
-                      type="time"
-                      value={formData.endTime}
-                      onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                      className="border-input bg-background text-foreground"
-                    />
+                <div className="space-y-3">
+                  <Label className="text-base font-medium text-foreground">Primera Franja Horaria</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="startTime" className="text-foreground">
+                        Hora Inicio
+                      </Label>
+                      <Input
+                        id="startTime"
+                        type="time"
+                        value={formData.startTime}
+                        onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                        className="border-input bg-background text-foreground"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="endTime" className="text-foreground">
+                        Hora Fin
+                      </Label>
+                      <Input
+                        id="endTime"
+                        type="time"
+                        value={formData.endTime}
+                        onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                        className="border-input bg-background text-foreground"
+                      />
+                    </div>
                   </div>
                 </div>
+                
+                <div className="flex items-center justify-between rounded-lg border border-border p-4">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="second-shift" className="text-foreground cursor-pointer">
+                      Turno cortado (Segunda franja horaria)
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Activa esta opción para agregar una segunda franja horaria
+                    </p>
+                  </div>
+                  <Switch
+                    id="second-shift"
+                    checked={hasSecondShift}
+                    onCheckedChange={(checked) => {
+                      setHasSecondShift(checked)
+                      if (!checked) {
+                        // Limpiar campos de segunda franja si se desactiva
+                        setFormData({ ...formData, startTime2: "", endTime2: "" })
+                      }
+                    }}
+                  />
+                </div>
+                
+                {hasSecondShift && (
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium text-foreground">Segunda Franja Horaria</Label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="startTime2" className="text-foreground">
+                          Hora Inicio
+                        </Label>
+                        <Input
+                          id="startTime2"
+                          type="time"
+                          value={formData.startTime2}
+                          onChange={(e) => setFormData({ ...formData, startTime2: e.target.value })}
+                          className="border-input bg-background text-foreground"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="endTime2" className="text-foreground">
+                          Hora Fin
+                        </Label>
+                        <Input
+                          id="endTime2"
+                          type="time"
+                          value={formData.endTime2}
+                          onChange={(e) => setFormData({ ...formData, endTime2: e.target.value })}
+                          className="border-input bg-background text-foreground"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="space-y-2">
                   <Label className="text-foreground">Color *</Label>
                   <div className="flex flex-wrap gap-2">

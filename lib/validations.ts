@@ -66,7 +66,83 @@ export function validateScheduleAssignments(
 }
 
 /**
+ * Calcula las horas trabajadas de un turno, considerando el descanso de 30 minutos
+ * Solo aplica descanso si el turno es continuo (no cortado) y tiene más de 6 horas
+ */
+export function calculateShiftHours(
+  shift: Turno,
+  minutosDescanso: number = 30,
+  horasMinimasParaDescanso: number = 6
+): number {
+  if (!shift.startTime || !shift.endTime) return 0
+
+  // Si tiene segunda franja (turno cortado), NO aplica descanso
+  if (shift.startTime2 || shift.endTime2) {
+    // Calcular ambas franjas sin descanso
+    let totalMinutes = 0
+    
+    // Primera franja
+    const [h1Start, m1Start] = shift.startTime.split(":").map(Number)
+    const [h1End, m1End] = shift.endTime.split(":").map(Number)
+    const start1 = h1Start * 60 + m1Start
+    const end1 = h1End * 60 + m1End
+    totalMinutes += end1 - start1
+    
+    // Segunda franja (si existe)
+    if (shift.startTime2 && shift.endTime2) {
+      const [h2Start, m2Start] = shift.startTime2.split(":").map(Number)
+      const [h2End, m2End] = shift.endTime2.split(":").map(Number)
+      const start2 = h2Start * 60 + m2Start
+      const end2 = h2End * 60 + m2End
+      totalMinutes += end2 - start2
+    }
+    
+    return totalMinutes / 60
+  }
+
+  // Turno continuo: calcular horas
+  const [hStart, mStart] = shift.startTime.split(":").map(Number)
+  const [hEnd, mEnd] = shift.endTime.split(":").map(Number)
+  const start = hStart * 60 + mStart
+  const end = hEnd * 60 + mEnd
+  const totalMinutes = end - start
+  const totalHours = totalMinutes / 60
+
+  // Solo aplicar descanso si el turno es >= horasMinimasParaDescanso
+  if (totalHours >= horasMinimasParaDescanso) {
+    const horasConDescanso = (totalMinutes - minutosDescanso) / 60
+    return Math.max(0, horasConDescanso) // No puede ser negativo
+  }
+
+  return totalHours
+}
+
+/**
+ * Calcula las horas trabajadas totales de un empleado en un día
+ * Considera todos los turnos asignados y aplica descanso cuando corresponde
+ */
+export function calculateDailyHours(
+  shiftIds: string[],
+  shifts: Turno[],
+  minutosDescanso: number = 30,
+  horasMinimasParaDescanso: number = 6
+): number {
+  const shiftMap = new Map(shifts.map((s) => [s.id, s]))
+  let totalHours = 0
+
+  shiftIds.forEach((shiftId) => {
+    const shift = shiftMap.get(shiftId)
+    if (shift) {
+      totalHours += calculateShiftHours(shift, minutosDescanso, horasMinimasParaDescanso)
+    }
+  })
+
+  return totalHours
+}
+
+/**
  * Valida que un empleado no tenga más de X horas por semana
+ * Actualizado para considerar descansos
  */
 export function validateWeeklyHours(
   assignments: {
@@ -77,25 +153,38 @@ export function validateWeeklyHours(
   employeeId: string,
   shifts: Turno[],
   maxHours: number = 48,
+  minutosDescanso: number = 30,
+  horasMinimasParaDescanso: number = 6
 ): { valid: boolean; hours: number; message?: string } {
-  const shiftMap = new Map(shifts.map((s) => [s.id, s]))
-  let totalMinutes = 0
+  let totalHours = 0
 
   Object.values(assignments).forEach((dateAssignments) => {
     const employeeShifts = dateAssignments[employeeId] || []
-    employeeShifts.forEach((shiftId) => {
-      const shift = shiftMap.get(shiftId)
-      if (shift?.startTime && shift?.endTime) {
-        const [hStart, mStart] = shift.startTime.split(":").map(Number)
-        const [hEnd, mEnd] = shift.endTime.split(":").map(Number)
-        const start = hStart * 60 + mStart
-        const end = hEnd * 60 + mEnd
-        totalMinutes += end - start
-      }
-    })
+    totalHours += calculateDailyHours(employeeShifts, shifts, minutosDescanso, horasMinimasParaDescanso)
   })
 
-  const hours = totalMinutes / 60
+  const valid = totalHours <= maxHours
+
+  return {
+    valid,
+    hours: totalHours,
+    message: valid
+      ? undefined
+      : `El empleado tiene ${totalHours.toFixed(1)} horas esta semana (máximo: ${maxHours}h)`,
+  }
+}
+
+/**
+ * Valida horas máximas por día considerando descansos
+ */
+export function validateDailyHours(
+  shiftIds: string[],
+  shifts: Turno[],
+  maxHours: number,
+  minutosDescanso: number = 30,
+  horasMinimasParaDescanso: number = 6
+): { valid: boolean; hours: number; message?: string } {
+  const hours = calculateDailyHours(shiftIds, shifts, minutosDescanso, horasMinimasParaDescanso)
   const valid = hours <= maxHours
 
   return {
@@ -103,7 +192,7 @@ export function validateWeeklyHours(
     hours,
     message: valid
       ? undefined
-      : `El empleado tiene ${hours.toFixed(1)} horas esta semana (máximo: ${maxHours}h)`,
+      : `El empleado tiene ${hours.toFixed(1)} horas este día (máximo: ${maxHours}h)`,
   }
 }
 

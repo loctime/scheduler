@@ -5,15 +5,15 @@ import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, serverT
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Plus, Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
-import { CreateScheduleDialog } from "@/components/create-schedule-dialog"
+import { Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { ScheduleGrid } from "@/components/schedule-grid"
 import { useToast } from "@/hooks/use-toast"
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns"
 import { es } from "date-fns/locale"
 import { useData } from "@/contexts/data-context"
-import { Horario } from "@/lib/types"
-import { validateScheduleAssignments } from "@/lib/validations"
+import { Horario, ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
+import { validateScheduleAssignments, validateDailyHours } from "@/lib/validations"
+import { useConfig } from "@/hooks/use-config"
 
 interface ScheduleCalendarProps {
   user: any
@@ -22,11 +22,11 @@ interface ScheduleCalendarProps {
 export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   const [schedules, setSchedules] = useState<Horario[]>([])
   const [currentWeek, setCurrentWeek] = useState(new Date())
-  const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedSchedule, setSelectedSchedule] = useState<Horario | null>(null)
   const [exporting, setExporting] = useState(false)
   const { toast } = useToast()
   const { employees, shifts, loading: dataLoading } = useData()
+  const { config } = useConfig()
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 })
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
@@ -67,127 +67,6 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
       if (unsubscribeSchedules) unsubscribeSchedules()
     }
   }, [weekStart, user, toast])
-
-  const handleCreateSchedule = useCallback(
-    async (scheduleData: { nombre: string; assignments: any }) => {
-      try {
-        // Validaciones
-        if (employees.length === 0) {
-          toast({
-            title: "Error de validación",
-            description: "Debes tener al menos un empleado registrado para crear horarios",
-            variant: "destructive",
-          })
-          return
-        }
-
-        if (shifts.length === 0) {
-          toast({
-            title: "Error de validación",
-            description: "Debes tener al menos un turno configurado para crear horarios",
-            variant: "destructive",
-          })
-          return
-        }
-
-        const weekStartStr = format(weekStart, "yyyy-MM-dd")
-        const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd")
-        const userName = user?.displayName || user?.email || "Usuario desconocido"
-        const userId = user?.uid || ""
-
-        // Validar solapamientos
-        const overlaps = validateScheduleAssignments(scheduleData.assignments, employees, shifts)
-        if (overlaps.length > 0) {
-          const overlapMessages = overlaps.map((o) => o.message).join("\n")
-          toast({
-            title: "Advertencia: Solapamientos detectados",
-            description: overlapMessages,
-            variant: "destructive",
-          })
-          // Continuar de todas formas, pero informar al usuario
-        }
-
-        // Check if schedule already exists
-        const existingSchedule = schedules.find((s) => s.weekStart === weekStartStr)
-
-        if (existingSchedule) {
-          // Guardar versión anterior en historial antes de actualizar
-          const historyData = {
-            horarioId: existingSchedule.id,
-            nombre: existingSchedule.nombre || `Semana del ${weekStartStr}`,
-            semanaInicio: existingSchedule.semanaInicio || weekStartStr,
-            semanaFin: existingSchedule.semanaFin || weekEndStr,
-            assignments: existingSchedule.assignments || {},
-            createdAt: existingSchedule.updatedAt || existingSchedule.createdAt || serverTimestamp(),
-            createdBy: existingSchedule.createdBy || existingSchedule.modifiedBy || userId,
-            createdByName: existingSchedule.createdByName || existingSchedule.modifiedByName || userName,
-            accion: "modificado" as const,
-            versionAnterior: true,
-          }
-
-          await addDoc(collection(db, COLLECTIONS.HISTORIAL), historyData)
-
-          // Update existing schedule
-          await updateDoc(doc(db, COLLECTIONS.SCHEDULES, existingSchedule.id), {
-            ...scheduleData,
-            nombre: scheduleData.nombre || existingSchedule.nombre || `Semana del ${weekStartStr}`,
-            semanaInicio: weekStartStr,
-            semanaFin: weekEndStr,
-            updatedAt: serverTimestamp(),
-            modifiedBy: userId,
-            modifiedByName: userName,
-          })
-
-          toast({
-            title: "Horario actualizado",
-            description: "El horario se ha actualizado correctamente. La versión anterior se guardó en el historial.",
-          })
-        } else {
-          // Create new schedule
-          const newScheduleData = {
-            ...scheduleData,
-            nombre: scheduleData.nombre || `Semana del ${weekStartStr}`,
-            weekStart: weekStartStr,
-            semanaInicio: weekStartStr,
-            semanaFin: weekEndStr,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-            createdBy: userId,
-            createdByName: userName,
-          }
-
-          const scheduleRef = await addDoc(collection(db, COLLECTIONS.SCHEDULES), newScheduleData)
-
-          // Guardar en historial como "creado"
-          await addDoc(collection(db, COLLECTIONS.HISTORIAL), {
-            horarioId: scheduleRef.id,
-            nombre: newScheduleData.nombre,
-            semanaInicio: weekStartStr,
-            semanaFin: weekEndStr,
-            assignments: scheduleData.assignments || {},
-            createdAt: serverTimestamp(),
-            createdBy: userId,
-            createdByName: userName,
-            accion: "creado" as const,
-            versionAnterior: false,
-          })
-
-          toast({
-            title: "Horario creado",
-            description: "El horario se ha creado correctamente",
-          })
-        }
-        setDialogOpen(false)
-      } catch (error: any) {
-        toast({
-          title: "Error",
-          description: error.message || "Ocurrió un error al guardar el horario",
-          variant: "destructive",
-        })
-      }
-    },
-    [employees, shifts, schedules, weekStart, user, toast],
-  )
 
   const handleExportImage = useCallback(async () => {
     const element = document.getElementById("schedule-grid")
@@ -257,6 +136,371 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     }
   }, [weekStart, toast])
 
+  const handleShiftUpdate = useCallback(
+    async (date: string, employeeId: string, shiftIds: string[]) => {
+      try {
+        // Validaciones básicas
+        if (employees.length === 0) {
+          toast({
+            title: "Error",
+            description: "Debes tener al menos un empleado registrado",
+            variant: "destructive",
+          })
+          return
+        }
+
+        if (shifts.length === 0) {
+          toast({
+            title: "Error",
+            description: "Debes tener al menos un turno configurado",
+            variant: "destructive",
+          })
+          return
+        }
+
+        const weekStartStr = format(weekStart, "yyyy-MM-dd")
+        const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd")
+        const userName = user?.displayName || user?.email || "Usuario desconocido"
+        const userId = user?.uid || ""
+
+        let scheduleId: string
+        let currentAssignments: Record<string, Record<string, string[]>> = {}
+        let scheduleNombre = `Semana del ${weekStartStr}`
+
+        // Si no existe horario, crearlo. Si existe, actualizarlo
+        if (!selectedSchedule) {
+          // Crear nuevo horario
+          currentAssignments = {
+            [date]: {
+              [employeeId]: shiftIds,
+            },
+          }
+
+          const newScheduleData = {
+            nombre: scheduleNombre,
+            weekStart: weekStartStr,
+            semanaInicio: weekStartStr,
+            semanaFin: weekEndStr,
+            assignments: currentAssignments,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            createdBy: userId,
+            createdByName: userName,
+          }
+
+          const scheduleRef = await addDoc(collection(db, COLLECTIONS.SCHEDULES), newScheduleData)
+          scheduleId = scheduleRef.id
+
+          // Guardar en historial como "creado"
+          await addDoc(collection(db, COLLECTIONS.HISTORIAL), {
+            horarioId: scheduleId,
+            nombre: scheduleNombre,
+            semanaInicio: weekStartStr,
+            semanaFin: weekEndStr,
+            assignments: currentAssignments,
+            createdAt: serverTimestamp(),
+            createdBy: userId,
+            createdByName: userName,
+            accion: "creado" as const,
+            versionAnterior: false,
+          })
+
+          toast({
+            title: "Horario creado",
+            description: "El horario se ha creado correctamente",
+          })
+        } else {
+          // Actualizar horario existente
+          scheduleId = selectedSchedule.id
+          scheduleNombre = selectedSchedule.nombre || scheduleNombre
+
+          // Guardar versión anterior en historial antes de actualizar
+          const historyData = {
+            horarioId: selectedSchedule.id,
+            nombre: scheduleNombre,
+            semanaInicio: selectedSchedule.semanaInicio || weekStartStr,
+            semanaFin: selectedSchedule.semanaFin || weekEndStr,
+            assignments: { ...selectedSchedule.assignments },
+            createdAt: selectedSchedule.updatedAt || selectedSchedule.createdAt || serverTimestamp(),
+            createdBy: selectedSchedule.createdBy || selectedSchedule.modifiedBy || userId,
+            createdByName: selectedSchedule.createdByName || selectedSchedule.modifiedByName || userName,
+            accion: "modificado" as const,
+            versionAnterior: true,
+          }
+
+          await addDoc(collection(db, COLLECTIONS.HISTORIAL), historyData)
+
+          // Actualizar assignments
+          currentAssignments = {
+            ...selectedSchedule.assignments,
+          }
+          if (!currentAssignments[date]) {
+            currentAssignments[date] = {}
+          }
+          currentAssignments[date] = {
+            ...currentAssignments[date],
+            [employeeId]: shiftIds,
+          }
+        }
+
+        // Validar solapamientos solo para este empleado y fecha
+        const overlaps = validateScheduleAssignments(currentAssignments, employees, shifts)
+        const relevantOverlaps = overlaps.filter(
+          (o) => o.employeeId === employeeId && o.date === date,
+        )
+        if (relevantOverlaps.length > 0) {
+          const overlapMessages = relevantOverlaps.map((o) => o.message).join("\n")
+          toast({
+            title: "Advertencia: Solapamientos detectados",
+            description: overlapMessages,
+            variant: "destructive",
+          })
+          // Continuar de todas formas, pero informar al usuario
+        }
+
+        // Validar horas máximas por día
+        if (config) {
+          const minutosDescanso = config.minutosDescanso || 30
+          const horasMinimasParaDescanso = config.horasMinimasParaDescanso || 6
+          const horasMaximasPorDia = config.horasMaximasPorDia || 8
+
+          const employeeShifts = currentAssignments[date]?.[employeeId] || []
+          if (employeeShifts.length > 0) {
+            const dailyValidation = validateDailyHours(
+              employeeShifts,
+              shifts,
+              horasMaximasPorDia,
+              minutosDescanso,
+              horasMinimasParaDescanso
+            )
+            if (!dailyValidation.valid) {
+              const employee = employees.find((e) => e.id === employeeId)
+              toast({
+                title: "Advertencia: Horas máximas por día excedidas",
+                description: `${employee?.name || "Empleado"} - ${dailyValidation.message}`,
+                variant: "destructive",
+              })
+            }
+          }
+        }
+
+        // Actualizar o crear en Firestore
+        if (selectedSchedule) {
+          // Actualizar existente
+          await updateDoc(doc(db, COLLECTIONS.SCHEDULES, scheduleId), {
+            assignments: currentAssignments,
+            updatedAt: serverTimestamp(),
+            modifiedBy: userId,
+            modifiedByName: userName,
+          })
+
+          toast({
+            title: "Turnos actualizados",
+            description: "Los turnos se han actualizado correctamente",
+          })
+        }
+        // Si no existe, ya se creó arriba
+      } catch (error: any) {
+        console.error("Error al actualizar turnos:", error)
+        toast({
+          title: "Error",
+          description: error.message || "Ocurrió un error al actualizar los turnos",
+          variant: "destructive",
+        })
+      }
+    },
+    [selectedSchedule, weekStart, user, employees, shifts, config, toast],
+  )
+
+  // Nueva función para manejar asignaciones con horarios ajustados
+  const handleAssignmentUpdate = useCallback(
+    async (date: string, employeeId: string, assignments: ShiftAssignment[]) => {
+      try {
+        // Validaciones básicas
+        if (employees.length === 0) {
+          toast({
+            title: "Error",
+            description: "Debes tener al menos un empleado registrado",
+            variant: "destructive",
+          })
+          return
+        }
+
+        if (shifts.length === 0) {
+          toast({
+            title: "Error",
+            description: "Debes tener al menos un turno configurado",
+            variant: "destructive",
+          })
+          return
+        }
+
+        if (!db) {
+          toast({
+            title: "Error",
+            description: "Firebase no está configurado",
+            variant: "destructive",
+          })
+          return
+        }
+
+        const weekStartStr = format(weekStart, "yyyy-MM-dd")
+        const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd")
+        const userName = user?.displayName || user?.email || "Usuario desconocido"
+        const userId = user?.uid || ""
+
+        let scheduleId: string
+        let currentAssignments: Record<string, Record<string, ShiftAssignmentValue>> = {}
+        let scheduleNombre = `Semana del ${weekStartStr}`
+
+        // Si no existe horario, crearlo. Si existe, actualizarlo
+        if (!selectedSchedule) {
+          // Crear nuevo horario con formato nuevo
+          currentAssignments = {
+            [date]: {
+              [employeeId]: assignments,
+            },
+          }
+
+          const newScheduleData = {
+            nombre: scheduleNombre,
+            weekStart: weekStartStr,
+            semanaInicio: weekStartStr,
+            semanaFin: weekEndStr,
+            assignments: currentAssignments,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            createdBy: userId,
+            createdByName: userName,
+          }
+
+          const scheduleRef = await addDoc(collection(db, COLLECTIONS.SCHEDULES), newScheduleData)
+          scheduleId = scheduleRef.id
+
+          // Guardar en historial como "creado"
+          await addDoc(collection(db, COLLECTIONS.HISTORIAL), {
+            horarioId: scheduleId,
+            nombre: scheduleNombre,
+            semanaInicio: weekStartStr,
+            semanaFin: weekEndStr,
+            assignments: currentAssignments,
+            createdAt: serverTimestamp(),
+            createdBy: userId,
+            createdByName: userName,
+            accion: "creado" as const,
+            versionAnterior: false,
+          })
+
+          toast({
+            title: "Horario creado",
+            description: "El horario se ha creado correctamente",
+          })
+        } else {
+          // Actualizar horario existente
+          scheduleId = selectedSchedule.id
+          scheduleNombre = selectedSchedule.nombre || scheduleNombre
+
+          // Guardar versión anterior en historial antes de actualizar
+          const historyData = {
+            horarioId: selectedSchedule.id,
+            nombre: scheduleNombre,
+            semanaInicio: selectedSchedule.semanaInicio || weekStartStr,
+            semanaFin: selectedSchedule.semanaFin || weekEndStr,
+            assignments: { ...selectedSchedule.assignments },
+            createdAt: selectedSchedule.updatedAt || selectedSchedule.createdAt || serverTimestamp(),
+            createdBy: selectedSchedule.createdBy || selectedSchedule.modifiedBy || userId,
+            createdByName: selectedSchedule.createdByName || selectedSchedule.modifiedByName || userName,
+            accion: "modificado" as const,
+            versionAnterior: true,
+          }
+
+          await addDoc(collection(db, COLLECTIONS.HISTORIAL), historyData)
+
+          // Actualizar assignments (convertir asignaciones antiguas al nuevo formato si es necesario)
+          currentAssignments = {
+            ...selectedSchedule.assignments,
+          }
+          if (!currentAssignments[date]) {
+            currentAssignments[date] = {}
+          }
+          currentAssignments[date] = {
+            ...currentAssignments[date],
+            [employeeId]: assignments,
+          }
+        }
+
+        // Validar solapamientos (necesita convertir a formato compatible)
+        // Por ahora mantenemos la validación básica
+        const shiftIds = assignments.map((a) => a.shiftId)
+        const overlaps = validateScheduleAssignments(
+          { [date]: { [employeeId]: shiftIds } },
+          employees,
+          shifts
+        )
+        const relevantOverlaps = overlaps.filter(
+          (o) => o.employeeId === employeeId && o.date === date,
+        )
+        if (relevantOverlaps.length > 0) {
+          const overlapMessages = relevantOverlaps.map((o) => o.message).join("\n")
+          toast({
+            title: "Advertencia: Solapamientos detectados",
+            description: overlapMessages,
+            variant: "destructive",
+          })
+        }
+
+        // Validar horas máximas por día (necesita adaptar para horarios ajustados)
+        if (config) {
+          const minutosDescanso = config.minutosDescanso || 30
+          const horasMinimasParaDescanso = config.horasMinimasParaDescanso || 6
+          const horasMaximasPorDia = config.horasMaximasPorDia || 8
+
+          // Por ahora validamos con los IDs de turnos (las validaciones necesitarán actualizarse)
+          const dailyValidation = validateDailyHours(
+            shiftIds,
+            shifts,
+            horasMaximasPorDia,
+            minutosDescanso,
+            horasMinimasParaDescanso
+          )
+          if (!dailyValidation.valid) {
+            const employee = employees.find((e) => e.id === employeeId)
+            toast({
+              title: "Advertencia: Horas máximas por día excedidas",
+              description: `${employee?.name || "Empleado"} - ${dailyValidation.message}`,
+              variant: "destructive",
+            })
+          }
+        }
+
+        // Actualizar o crear en Firestore
+        if (selectedSchedule) {
+          // Actualizar existente
+          await updateDoc(doc(db, COLLECTIONS.SCHEDULES, scheduleId), {
+            assignments: currentAssignments,
+            updatedAt: serverTimestamp(),
+            modifiedBy: userId,
+            modifiedByName: userName,
+          })
+
+          toast({
+            title: "Turnos actualizados",
+            description: "Los turnos se han actualizado correctamente",
+          })
+        }
+        // Si no existe, ya se creó arriba
+      } catch (error: any) {
+        console.error("Error al actualizar asignaciones:", error)
+        toast({
+          title: "Error",
+          description: error.message || "Ocurrió un error al actualizar los turnos",
+          variant: "destructive",
+        })
+      }
+    },
+    [selectedSchedule, weekStart, user, employees, shifts, config, toast],
+  )
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -301,10 +545,6 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
               </>
             )}
           </Button>
-          <Button onClick={() => setDialogOpen(true)} disabled={dataLoading || employees.length === 0 || shifts.length === 0} aria-label={selectedSchedule ? "Editar horario" : "Crear horario"}>
-            <Plus className="mr-2 h-4 w-4" />
-            {selectedSchedule ? "Editar Horario" : "Crear Horario"}
-          </Button>
         </div>
       </div>
 
@@ -323,19 +563,14 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
           <p className="text-muted-foreground">No hay turnos configurados. Agrega turnos para crear horarios.</p>
         </Card>
       ) : (
-        <ScheduleGrid weekDays={weekDays} employees={employees} shifts={shifts} schedule={selectedSchedule} />
+        <ScheduleGrid
+          weekDays={weekDays}
+          employees={employees}
+          shifts={shifts}
+          schedule={selectedSchedule}
+          onAssignmentUpdate={handleAssignmentUpdate}
+        />
       )}
-
-      {/* Create/Edit Schedule Dialog */}
-      <CreateScheduleDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        onSubmit={handleCreateSchedule}
-        weekDays={weekDays}
-        employees={employees}
-        shifts={shifts}
-        existingSchedule={selectedSchedule}
-      />
     </div>
   )
 }
