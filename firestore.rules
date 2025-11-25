@@ -115,13 +115,13 @@ service cloud.firestore {
         && isStringOrNull('email')
         && isStringOrNull('displayName')
         && isStringOrNull('photoURL')
-        && isStringOrNull('role')
+        && (isStringOrNull('role') || request.resource.data.role == 'user' || request.resource.data.role == 'admin' || request.resource.data.role == 'maxdev')
         && isTs('createdAt')
         && isTs('updatedAt');
-      // Usuario puede actualizar sus propios datos (pero no su role)
+      // Usuario puede actualizar sus propios datos (pero no cambiar su role si ya existe)
       allow update: if isAuth() && uid() == userId
         && unchanged('uid')
-        && unchanged('role')
+        && (unchanged('role') || (!('role' in resource.data) && request.resource.data.role == 'user'))
         && isStringOrNull('email')
         && isStringOrNull('displayName')
         && isStringOrNull('photoURL')

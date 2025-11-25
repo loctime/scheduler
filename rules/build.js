@@ -4,20 +4,18 @@ const path = require('path');
 const firestoreRulesDir = path.join(__dirname);
 const outputFile = path.join(__dirname, '..', 'firestore.rules');
 
-// Orden de los archivos a concatenar
-// Para testing local: solo base.rules y horarios.rules
-// Para CONTROLFILE (repositorio maestro): incluir todas las apps
+// Orden de los archivos a concatenar - CONTROLFILE (repositorio maestro)
+// Incluye todas las apps que comparten el Firestore
 const files = [
   'base.rules',
+  'controlFile.rules',
+  'controlbio.rules',
+  'controlciclo.rules',
+  'controlRemito.rules',
+  'controlgastos.rules',
+  'controllaudit.rules',
+  'controlstore.rules',
   'horarios.rules'
-  // Cuando se copie a CONTROLFILE, agregar aquí:
-  // 'controlFile.rules',
-  // 'controlbio.rules',
-  // 'controlciclo.rules',
-  // 'controlRemito.rules',
-  // 'controlgastos.rules',
-  // 'controllaudit.rules',
-  // 'controlstore.rules'
 ];
 
 // Encabezado del archivo

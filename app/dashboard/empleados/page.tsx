@@ -2,26 +2,22 @@
 
 import type React from "react"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { onAuthStateChanged } from "firebase/auth"
+import { useState } from "react"
 import {
   collection,
-  query,
-  orderBy,
-  onSnapshot,
   addDoc,
   updateDoc,
   deleteDoc,
   doc,
   serverTimestamp,
 } from "firebase/firestore"
-import { auth, db, isFirebaseConfigured, COLLECTIONS } from "@/lib/firebase"
+import { db, COLLECTIONS } from "@/lib/firebase"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
@@ -31,49 +27,33 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Pencil, Trash2, Loader2 } from "lucide-react"
+import { Plus, Pencil, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Empleado } from "@/lib/types"
 
 export default function EmpleadosPage() {
-  const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
-  const { employees, loading: dataLoading, refreshEmployees } = useData()
+  const { employees, loading: dataLoading, refreshEmployees, user } = useData()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<Empleado | null>(null)
-  const [formData, setFormData] = useState({ name: "", email: "", phone: "" })
+  const [formData, setFormData] = useState<{ name: string; email: string; phone: string }>({
+    name: "",
+    email: "",
+    phone: "",
+  })
+  const [bulkNames, setBulkNames] = useState("")
   const { toast } = useToast()
-
-  useEffect(() => {
-    if (!isFirebaseConfigured()) {
-      router.push("/")
-      return
-    }
-
-    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-      if (!currentUser) {
-        router.push("/")
-      } else {
-        setUser(currentUser)
-        setLoading(false)
-      }
-    })
-
-    return () => {
-      unsubscribeAuth()
-    }
-  }, [router])
 
   const handleOpenDialog = (employee?: any) => {
     if (employee) {
       setEditingEmployee(employee)
       setFormData({ name: employee.name, email: employee.email || "", phone: employee.phone || "" })
+      setBulkNames("")
     } else {
       setEditingEmployee(null)
       setFormData({ name: "", email: "", phone: "" })
+      setBulkNames("")
     }
     setDialogOpen(true)
   }
@@ -81,10 +61,30 @@ export default function EmpleadosPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (!db) {
+      toast({
+        title: "Error",
+        description: "Firebase no está configurado",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       if (editingEmployee) {
+        // Modo edición: actualizar un solo empleado
+        if (!formData.name.trim()) {
+          toast({
+            title: "Error",
+            description: "El nombre es requerido",
+            variant: "destructive",
+          })
+          return
+        }
         await updateDoc(doc(db, COLLECTIONS.EMPLOYEES, editingEmployee.id), {
-          ...formData,
+          name: formData.name.trim(),
+          email: formData.email.trim() || null,
+          phone: formData.phone.trim() || null,
           updatedAt: serverTimestamp(),
         })
         toast({
@@ -92,20 +92,47 @@ export default function EmpleadosPage() {
           description: "Los datos del empleado se han actualizado correctamente",
         })
       } else {
-        await addDoc(collection(db, COLLECTIONS.EMPLOYEES), {
-          ...formData,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        })
+        // Modo creación: agregar uno o múltiples empleados
+        const namesToAdd = bulkNames.trim()
+          ? bulkNames
+              .split("\n")
+              .map((name: string) => name.trim())
+              .filter((name: string) => name.length > 0)
+          : formData.name.trim()
+          ? [formData.name.trim()]
+          : []
+
+        if (namesToAdd.length === 0) {
+          toast({
+            title: "Error",
+            description: "Debes ingresar al menos un nombre",
+            variant: "destructive",
+          })
+          return
+        }
+
+        // Crear todos los empleados
+        const promises = namesToAdd.map((name: string) =>
+          addDoc(collection(db!, COLLECTIONS.EMPLOYEES), {
+            name,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          })
+        )
+
+        await Promise.all(promises)
+
         toast({
-          title: "Empleado creado",
-          description: "El empleado se ha creado correctamente",
+          title: "Empleados creados",
+          description: `Se ${namesToAdd.length === 1 ? "ha creado" : "han creado"} ${namesToAdd.length} empleado${namesToAdd.length === 1 ? "" : "s"} correctamente`,
         })
       }
       // Refrescar datos del contexto
       await refreshEmployees()
       setDialogOpen(false)
       setFormData({ name: "", email: "", phone: "" })
+      setBulkNames("")
+      setEditingEmployee(null)
     } catch (error: any) {
       toast({
         title: "Error",
@@ -117,6 +144,15 @@ export default function EmpleadosPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("¿Estás seguro de que quieres eliminar este empleado?")) return
+
+    if (!db) {
+      toast({
+        title: "Error",
+        description: "Firebase no está configurado",
+        variant: "destructive",
+      })
+      return
+    }
 
     try {
       await deleteDoc(doc(db, COLLECTIONS.EMPLOYEES, id))
@@ -135,14 +171,6 @@ export default function EmpleadosPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
-
   return (
     <DashboardLayout user={user}>
       <div className="space-y-6">
@@ -153,7 +181,7 @@ export default function EmpleadosPage() {
           </div>
           <Button onClick={() => handleOpenDialog()}>
             <Plus className="mr-2 h-4 w-4" />
-            Agregar Empleado
+            Agregar Empleados
           </Button>
         </div>
 
@@ -216,55 +244,81 @@ export default function EmpleadosPage() {
           <DialogContent className="bg-card">
             <DialogHeader>
               <DialogTitle className="text-card-foreground">
-                {editingEmployee ? "Editar Empleado" : "Agregar Empleado"}
+                {editingEmployee ? "Editar Empleado" : "Agregar Empleados"}
               </DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                {editingEmployee ? "Actualiza los datos del empleado" : "Ingresa los datos del nuevo empleado"}
+                {editingEmployee
+                  ? "Actualiza el nombre del empleado"
+                  : "Ingresa el nombre del empleado o múltiples nombres (uno por línea) para agregar varios a la vez"}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit}>
               <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name" className="text-foreground">
-                    Nombre *
-                  </Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                    className="border-input bg-background text-foreground"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-foreground">
-                    Email
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="border-input bg-background text-foreground"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone" className="text-foreground">
-                    Teléfono
-                  </Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="border-input bg-background text-foreground"
-                  />
-                </div>
+                {editingEmployee ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name" className="text-foreground">
+                        Nombre *
+                      </Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        required
+                        className="border-input bg-background text-foreground"
+                        placeholder="Nombre del empleado"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-foreground">
+                        Email
+                      </Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        className="border-input bg-background text-foreground"
+                        placeholder="email@ejemplo.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone" className="text-foreground">
+                        Teléfono
+                      </Label>
+                      <Input
+                        id="phone"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        className="border-input bg-background text-foreground"
+                        placeholder="+1234567890"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="bulkNames" className="text-foreground">
+                      Nombres de Empleados *
+                    </Label>
+                    <Textarea
+                      id="bulkNames"
+                      value={bulkNames}
+                      onChange={(e) => setBulkNames(e.target.value)}
+                      placeholder="Ingresa un nombre por línea. Ejemplo:&#10;Juan Pérez&#10;María García&#10;Carlos López"
+                      className="border-input bg-background text-foreground min-h-32"
+                      rows={6}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Escribe un nombre por línea para agregar múltiples empleados a la vez
+                    </p>
+                  </div>
+                )}
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit">{editingEmployee ? "Actualizar" : "Crear"}</Button>
+                <Button type="submit">{editingEmployee ? "Actualizar" : "Agregar"}</Button>
               </DialogFooter>
             </form>
           </DialogContent>

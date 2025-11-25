@@ -11,6 +11,7 @@ interface DataContextType {
   shifts: Turno[]
   loading: boolean
   error: string | null
+  user: any
   refreshEmployees: () => Promise<void>
   refreshShifts: () => Promise<void>
 }
@@ -174,7 +175,7 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
   }, [user, refreshEmployees, refreshShifts])
 
   return (
-    <DataContext.Provider value={{ employees, shifts, loading, error, refreshEmployees, refreshShifts }}>
+    <DataContext.Provider value={{ employees, shifts, loading, error, user, refreshEmployees, refreshShifts }}>
       {children}
     </DataContext.Provider>
   )

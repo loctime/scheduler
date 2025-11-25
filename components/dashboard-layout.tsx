@@ -17,7 +17,6 @@ import { Calendar, Users, Clock, History, LogOut } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { DataProvider } from "@/contexts/data-context"
 
 interface DashboardLayoutProps {
   children: ReactNode
@@ -104,7 +103,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
 
       {/* Main Content */}
       <main className="flex-1 p-6">
-        <DataProvider user={user}>{children}</DataProvider>
+        {children}
       </main>
     </div>
   )

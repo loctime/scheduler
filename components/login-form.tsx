@@ -37,16 +37,21 @@ export function LoginForm() {
         })
       } else {
         // Si ya existe, actualizar la información
-        await setDoc(
-          userRef,
-          {
-            email: user.email,
-            displayName: user.displayName,
-            photoURL: user.photoURL,
-            updatedAt: serverTimestamp(),
-          },
-          { merge: true }
-        )
+        // Si no tiene role, asignar 'user' por defecto
+        const userData = userDoc.data()
+        const updateData: any = {
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          updatedAt: serverTimestamp(),
+        }
+        
+        // Si no tiene role, asignar 'user' por defecto
+        if (!userData?.role) {
+          updateData.role = 'user'
+        }
+        
+        await setDoc(userRef, updateData, { merge: true })
       }
     } catch (error: any) {
       toast({

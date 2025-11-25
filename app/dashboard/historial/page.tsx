@@ -1,10 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { onAuthStateChanged } from "firebase/auth"
-import { collection, query, orderBy, onSnapshot, limit, where } from "firebase/firestore"
-import { auth, db, isFirebaseConfigured, COLLECTIONS } from "@/lib/firebase"
+import { collection, query, orderBy, onSnapshot, limit } from "firebase/firestore"
+import { db, COLLECTIONS } from "@/lib/firebase"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -16,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Loader2, Calendar, GitCompare, Eye, ChevronLeft, ChevronRight } from "lucide-react"
+import { Calendar, GitCompare, Eye, ChevronLeft, ChevronRight } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 import { ScheduleGrid } from "@/components/schedule-grid"
@@ -26,13 +24,10 @@ import { HistorialItem, Horario } from "@/lib/types"
 const ITEMS_PER_PAGE = 20
 
 export default function HistorialPage() {
-  const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
   const [historial, setHistorial] = useState<HistorialItem[]>([])
   const [schedules, setSchedules] = useState<Horario[]>([])
   const [currentPage, setCurrentPage] = useState(1)
-  const { employees, shifts } = useData()
+  const { employees, shifts, user } = useData()
   const [selectedVersion, setSelectedVersion] = useState<any>(null)
   const [compareVersions, setCompareVersions] = useState<{ v1: any | null; v2: any | null }>({
     v1: null,
@@ -42,58 +37,29 @@ export default function HistorialPage() {
   const [compareDialogOpen, setCompareDialogOpen] = useState(false)
 
   useEffect(() => {
-    if (!isFirebaseConfigured()) {
-      router.push("/")
-      return
-    }
+    if (!user) return
 
-    let unsubscribeHistorial: (() => void) | null = null
-    let unsubscribeSchedules: (() => void) | null = null
-    let unsubscribeEmployees: (() => void) | null = null
-    let unsubscribeShifts: (() => void) | null = null
+    // Obtener historial ordenado por fecha descendente
+    const historialQuery = query(collection(db, COLLECTIONS.HISTORIAL), orderBy("createdAt", "desc"), limit(50))
+    const unsubscribeHistorial = onSnapshot(historialQuery, (snapshot) => {
+      setHistorial(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
+    }, (error) => {
+      console.error("Error en listener de historial:", error)
+    })
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-      if (!currentUser) {
-        router.push("/")
-        // Limpiar listeners si el usuario se desautentica
-        if (unsubscribeHistorial) unsubscribeHistorial()
-        if (unsubscribeSchedules) unsubscribeSchedules()
-        if (unsubscribeEmployees) unsubscribeEmployees()
-        if (unsubscribeShifts) unsubscribeShifts()
-        unsubscribeHistorial = null
-        unsubscribeSchedules = null
-        unsubscribeEmployees = null
-        unsubscribeShifts = null
-      } else {
-        setUser(currentUser)
-        setLoading(false)
-        
-        // Solo crear los listeners cuando el usuario esté autenticado
-        // Obtener historial ordenado por fecha descendente
-        const historialQuery = query(collection(db, COLLECTIONS.HISTORIAL), orderBy("createdAt", "desc"), limit(50))
-        unsubscribeHistorial = onSnapshot(historialQuery, (snapshot) => {
-          setHistorial(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
-        }, (error) => {
-          console.error("Error en listener de historial:", error)
-        })
-
-        // Obtener horarios actuales
-        const schedulesQuery = query(collection(db, COLLECTIONS.SCHEDULES), orderBy("weekStart", "desc"))
-        unsubscribeSchedules = onSnapshot(schedulesQuery, (snapshot) => {
-          setSchedules(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
-        }, (error) => {
-          console.error("Error en listener de horarios:", error)
-        })
-
-      }
+    // Obtener horarios actuales
+    const schedulesQuery = query(collection(db, COLLECTIONS.SCHEDULES), orderBy("weekStart", "desc"))
+    const unsubscribeSchedules = onSnapshot(schedulesQuery, (snapshot) => {
+      setSchedules(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
+    }, (error) => {
+      console.error("Error en listener de horarios:", error)
     })
 
     return () => {
-      unsubscribeAuth()
-      if (unsubscribeHistorial) unsubscribeHistorial()
-      if (unsubscribeSchedules) unsubscribeSchedules()
+      unsubscribeHistorial()
+      unsubscribeSchedules()
     }
-  }, [router])
+  }, [user])
 
   const getAssignmentsCount = (item: any) => {
     if (!item.assignments) return 0
@@ -132,14 +98,6 @@ export default function HistorialPage() {
   const resetCompare = () => {
     setCompareVersions({ v1: null, v2: null })
     setCompareDialogOpen(false)
-  }
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
   }
 
   // Agrupar historial por horarioId

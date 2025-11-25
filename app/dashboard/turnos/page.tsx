@@ -2,21 +2,16 @@
 
 import type React from "react"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { onAuthStateChanged } from "firebase/auth"
+import { useState } from "react"
 import {
   collection,
-  query,
-  orderBy,
-  onSnapshot,
   addDoc,
   updateDoc,
   deleteDoc,
   doc,
   serverTimestamp,
 } from "firebase/firestore"
-import { auth, db, isFirebaseConfigured, COLLECTIONS } from "@/lib/firebase"
+import { db, COLLECTIONS } from "@/lib/firebase"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -31,7 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Pencil, Trash2, Loader2 } from "lucide-react"
+import { Plus, Pencil, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -49,10 +44,7 @@ const PRESET_COLORS = [
 ]
 
 export default function TurnosPage() {
-  const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
-  const { shifts, loading: dataLoading, refreshShifts } = useData()
+  const { shifts, loading: dataLoading, refreshShifts, user } = useData()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingShift, setEditingShift] = useState<Turno | null>(null)
   const [formData, setFormData] = useState({
@@ -62,26 +54,6 @@ export default function TurnosPage() {
     color: PRESET_COLORS[0],
   })
   const { toast } = useToast()
-
-  useEffect(() => {
-    if (!isFirebaseConfigured()) {
-      router.push("/")
-      return
-    }
-
-    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-      if (!currentUser) {
-        router.push("/")
-      } else {
-        setUser(currentUser)
-        setLoading(false)
-      }
-    })
-
-    return () => {
-      unsubscribeAuth()
-    }
-  }, [router])
 
   const handleOpenDialog = (shift?: any) => {
     if (shift) {
@@ -106,6 +78,15 @@ export default function TurnosPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!db) {
+      toast({
+        title: "Error",
+        description: "Firebase no está configurado",
+        variant: "destructive",
+      })
+      return
+    }
 
     try {
       if (editingShift) {
@@ -143,6 +124,15 @@ export default function TurnosPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("¿Estás seguro de que quieres eliminar este turno?")) return
 
+    if (!db) {
+      toast({
+        title: "Error",
+        description: "Firebase no está configurado",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       await deleteDoc(doc(db, COLLECTIONS.SHIFTS, id))
       // Refrescar datos del contexto
@@ -158,14 +148,6 @@ export default function TurnosPage() {
         variant: "destructive",
       })
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
   }
 
   return (
