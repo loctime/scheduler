@@ -25,12 +25,13 @@ export function LoginForm() {
       const userDoc = await getDoc(userRef)
 
       if (!userDoc.exists()) {
-        // Si el usuario no existe en nuestra colección, crear el documento
+        // Si el usuario no existe en nuestra colección, crear el documento con role 'user' por defecto
         await setDoc(userRef, {
           uid: user.uid,
           email: user.email,
           displayName: user.displayName,
           photoURL: user.photoURL,
+          role: 'user', // Role por defecto para nuevos usuarios
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         })

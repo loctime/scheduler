@@ -106,46 +106,79 @@ service cloud.firestore {
     function isHorariosAdmin()  { return horariosUserRole() == 'admin' || horariosUserRole() == 'maxdev'; }
     function isHorariosUser()   { return horariosUserRole() == 'user' || isHorariosAdmin(); }
     
-    // Colección: employees
-    match /employees/{empleadoId} {
+    // Colección: apps/horarios/users
+    match /apps/horarios/users/{userId} {
+      allow read: if isAuth() && (uid() == userId || isHorariosUser());
+      allow create: if isAuth() && uid() == userId
+        && nonEmptyString('uid')
+        && request.resource.data.uid == uid()
+        && isStringOrNull('email')
+        && isStringOrNull('displayName')
+        && isStringOrNull('photoURL')
+        && isStringOrNull('role')
+        && isTs('createdAt')
+        && isTs('updatedAt');
+      // Usuario puede actualizar sus propios datos (pero no su role)
+      allow update: if isAuth() && uid() == userId
+        && unchanged('uid')
+        && unchanged('role')
+        && isStringOrNull('email')
+        && isStringOrNull('displayName')
+        && isStringOrNull('photoURL')
+        && unchanged('createdAt')
+        && isTs('updatedAt');
+      // Admin puede actualizar cualquier usuario (incluyendo roles)
+      allow update: if isAuth() && isHorariosAdmin()
+        && unchanged('uid')
+        && isStringOrNull('email')
+        && isStringOrNull('displayName')
+        && isStringOrNull('photoURL')
+        && (isStringOrNull('role') || request.resource.data.role == 'user' || request.resource.data.role == 'admin' || request.resource.data.role == 'maxdev')
+        && unchanged('createdAt')
+        && isTs('updatedAt');
+      allow delete: if isAuth() && isHorariosAdmin();
+    }
+    
+    // Colección: apps/horarios/employees
+    match /apps/horarios/employees/{empleadoId} {
       allow read: if isAuth() && isHorariosUser();
       allow create: if isAuth() && isHorariosUser()
         && nonEmptyString('name')
         && isStringOrNull('email')
         && isStringOrNull('phone')
-        && (isCreate() || isTs('createdAt'))
-        && (isCreate() || isTs('updatedAt'));
+        && isTs('createdAt')
+        && isTs('updatedAt');
       allow update: if isAuth() && isHorariosUser()
         && nonEmptyString('name')
         && isStringOrNull('email')
         && isStringOrNull('phone')
         && unchanged('createdAt')
-        && (isUpdate() || isTs('updatedAt'));
+        && isTs('updatedAt');
       allow delete: if isAuth() && isHorariosAdmin();
     }
     
-    // Colección: shifts
-    match /shifts/{turnoId} {
+    // Colección: apps/horarios/shifts
+    match /apps/horarios/shifts/{turnoId} {
       allow read: if isAuth() && isHorariosUser();
       allow create: if isAuth() && isHorariosUser()
         && nonEmptyString('name')
         && isStringOrNull('startTime')
         && isStringOrNull('endTime')
         && nonEmptyString('color')
-        && (isCreate() || isTs('createdAt'))
-        && (isCreate() || isTs('updatedAt'));
+        && isTs('createdAt')
+        && isTs('updatedAt');
       allow update: if isAuth() && isHorariosUser()
         && nonEmptyString('name')
         && isStringOrNull('startTime')
         && isStringOrNull('endTime')
         && nonEmptyString('color')
         && unchanged('createdAt')
-        && (isUpdate() || isTs('updatedAt'));
+        && isTs('updatedAt');
       allow delete: if isAuth() && isHorariosAdmin();
     }
     
-    // Colección: schedules
-    match /schedules/{horarioId} {
+    // Colección: apps/horarios/schedules
+    match /apps/horarios/schedules/{horarioId} {
       allow read: if isAuth() && isHorariosUser();
       allow create: if isAuth() && isHorariosUser()
         && nonEmptyString('nombre')
@@ -153,8 +186,8 @@ service cloud.firestore {
         && nonEmptyString('semanaInicio')
         && nonEmptyString('semanaFin')
         && request.resource.data.assignments is map
-        && (isCreate() || isTs('createdAt'))
-        && (isCreate() || isTs('updatedAt'))
+        && isTs('createdAt')
+        && isTs('updatedAt')
         && (isStringOrNull('createdBy') || request.resource.data.createdBy == uid())
         && isStringOrNull('createdByName')
         && isStringOrNull('modifiedBy')
@@ -168,14 +201,14 @@ service cloud.firestore {
         && unchanged('createdAt')
         && unchanged('createdBy')
         && unchanged('createdByName')
-        && (isUpdate() || isTs('updatedAt'))
+        && isTs('updatedAt')
         && (isStringOrNull('modifiedBy') || request.resource.data.modifiedBy == uid())
         && isStringOrNull('modifiedByName');
       allow delete: if isAuth() && isHorariosAdmin();
     }
     
-    // Colección: historial
-    match /historial/{historialId} {
+    // Colección: apps/horarios/historial
+    match /apps/horarios/historial/{historialId} {
       allow read: if isAuth() && isHorariosUser();
       allow create: if isAuth() && isHorariosUser()
         && nonEmptyString('horarioId')
@@ -184,7 +217,7 @@ service cloud.firestore {
         && nonEmptyString('semanaFin')
         && request.resource.data.assignments is map
         && (request.resource.data.accion == 'creado' || request.resource.data.accion == 'modificado')
-        && (isCreate() || isTs('createdAt'))
+        && isTs('createdAt')
         && (isStringOrNull('createdBy') || request.resource.data.createdBy == uid())
         && isStringOrNull('createdByName')
         && (isBool('versionAnterior') || !('versionAnterior' in request.resource.data));
