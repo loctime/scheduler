@@ -474,25 +474,25 @@ export function ShiftSelectorPopover({
           </div>
           
           {/* Lista de turnos (solo mostrar si es turno normal, no para franco ni medio_franco) */}
-          {specialType === "shift" || specialType === null ? (
+          {(specialType === "shift" || specialType === null) && (
             <div className="space-y-3">
               <Label className="text-sm font-medium">Turnos disponibles:</Label>
               <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-              {shifts.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No hay turnos disponibles</p>
-              ) : (
-                shifts.map((shift) => {
-                  const isSelected = tempSelected.includes(shift.id)
-                  const isEditing = editingShiftId === shift.id
-                  const hasAdj = hasAdjustments(shift.id)
+                {shifts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay turnos disponibles</p>
+                ) : (
+                  shifts.map((shift) => {
+                    const isSelected = tempSelected.includes(shift.id)
+                    const isEditing = editingShiftId === shift.id
+                    const hasAdj = hasAdjustments(shift.id)
 
-                  return (
-                    <div
-                      key={shift.id}
-                      className={`border rounded-lg p-4 space-y-3 transition-colors ${
-                        isSelected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
-                      }`}
-                      onClick={(e) => {
+                    return (
+                      <div
+                        key={shift.id}
+                        className={`border rounded-lg p-4 space-y-3 transition-colors ${
+                          isSelected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
+                        }`}
+                        onClick={(e) => {
                         // Solo hacer toggle si el click NO fue en un elemento interactivo
                         const target = e.target as HTMLElement
                         const isInteractive = 
@@ -905,12 +905,13 @@ export function ShiftSelectorPopover({
                         </div>
                       )}
                     </div>
-                  )
-                })
-              )}
+                    )
+                  })
+                )}
+              </div>
             </div>
-          </div>
-        ) : null}
+          )}
+        </div>
         
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel}>
