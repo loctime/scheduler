@@ -72,69 +72,83 @@ export function ShiftSelectorPopover({
     open,
   })
 
-  const handleSave = () => {
+  const buildAssignmentFromShift = (shiftId: string): ShiftAssignment => {
+    const shift = shifts.find((s) => s.id === shiftId)
+    const adjusted = adjustedTimes[shiftId] || {}
+    const result: ShiftAssignment = { shiftId, type: "shift" }
+
+    if (!shift) {
+      return { ...result, ...adjusted }
+    }
+
+    if (adjusted.startTime !== undefined && adjusted.startTime !== shift.startTime) {
+      result.startTime = adjusted.startTime
+    }
+
+    if (adjusted.endTime !== undefined && adjusted.endTime !== shift.endTime) {
+      result.endTime = adjusted.endTime
+    }
+
+    if (adjusted.startTime2 !== undefined && adjusted.startTime2 !== shift.startTime2) {
+      result.startTime2 = adjusted.startTime2
+    }
+
+    if (adjusted.endTime2 !== undefined && adjusted.endTime2 !== shift.endTime2) {
+      result.endTime2 = adjusted.endTime2
+    }
+
+    return result
+  }
+
+  const finalizeAssignments = (assignments: ShiftAssignment[], shiftIdsOverride?: string[]) => {
     if (onAssignmentsChange) {
-      // Si es franco, retornar array con un solo elemento tipo franco
-      if (specialType === "franco") {
-        onAssignmentsChange([{ type: "franco" }])
-        onOpenChange(false)
+      onAssignmentsChange(assignments)
+    } else if (onShiftChange) {
+      const shiftIds =
+        shiftIdsOverride ??
+        assignments
+          .map((assignment) => assignment.shiftId)
+          .filter((id): id is string => Boolean(id))
+      onShiftChange(shiftIds)
+    }
+    onOpenChange(false)
+  }
+
+  const handleQuickShiftSelect = (shiftId: string) => {
+    const assignment = buildAssignmentFromShift(shiftId)
+    finalizeAssignments([assignment], [shiftId])
+  }
+
+  const handleSave = () => {
+    // Si es franco, retornar array con un solo elemento tipo franco
+    if (specialType === "franco") {
+      finalizeAssignments([{ type: "franco" }])
+      return
+    }
+
+    // Si es medio franco, validar que tenga horario
+    if (specialType === "medio_franco") {
+      if (!medioFrancoTime.startTime || !medioFrancoTime.endTime) {
+        toast({
+          title: "Error",
+          description: "Debes especificar un horario para el medio franco",
+          variant: "destructive",
+        })
         return
       }
-      
-      // Si es medio franco, validar que tenga horario
-      if (specialType === "medio_franco") {
-        if (!medioFrancoTime.startTime || !medioFrancoTime.endTime) {
-          toast({
-            title: "Error",
-            description: "Debes especificar un horario para el medio franco",
-            variant: "destructive",
-          })
-          return
-        }
-        onAssignmentsChange([{
+      finalizeAssignments([
+        {
           type: "medio_franco",
           startTime: medioFrancoTime.startTime,
           endTime: medioFrancoTime.endTime,
-        }])
-        onOpenChange(false)
-        return
-      }
-      
-      // Comportamiento normal para turnos
-      const assignments: ShiftAssignment[] = tempSelected.map((shiftId) => {
-        const shift = shifts.find((s) => s.id === shiftId)
-        if (!shift) {
-          return { shiftId, type: "shift" }
-        }
-        
-        const adjusted = adjustedTimes[shiftId] || {}
-        const result: ShiftAssignment = { shiftId, type: "shift" }
-        
-        // Solo incluir campos si fueron ajustados y son diferentes del turno base
-        if (adjusted.startTime !== undefined && adjusted.startTime !== shift.startTime) {
-          result.startTime = adjusted.startTime
-        }
-        
-        if (adjusted.endTime !== undefined && adjusted.endTime !== shift.endTime) {
-          result.endTime = adjusted.endTime
-        }
-        
-        if (adjusted.startTime2 !== undefined && adjusted.startTime2 !== shift.startTime2) {
-          result.startTime2 = adjusted.startTime2
-        }
-        
-        if (adjusted.endTime2 !== undefined && adjusted.endTime2 !== shift.endTime2) {
-          result.endTime2 = adjusted.endTime2
-        }
-        
-        return result
-      })
-      onAssignmentsChange(assignments)
-    } else if (onShiftChange) {
-      // Modo compatible: solo pasar IDs (no soporta francos)
-      onShiftChange(tempSelected)
+        },
+      ])
+      return
     }
-    onOpenChange(false)
+
+    // Comportamiento normal para turnos
+    const assignments: ShiftAssignment[] = tempSelected.map(buildAssignmentFromShift)
+    finalizeAssignments(assignments, tempSelected)
   }
 
   const handleCancel = () => {
@@ -155,6 +169,9 @@ export function ShiftSelectorPopover({
     if (type === "shift") {
       setMedioFrancoTime({ startTime: "", endTime: "" })
       setSelectedMedioTurnoId(null)
+    }
+    if (type === "franco") {
+      finalizeAssignments([{ type: "franco" }])
     }
   }
 
@@ -179,7 +196,7 @@ export function ShiftSelectorPopover({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Asignar Turnos</DialogTitle>
           <DialogDescription>
@@ -203,35 +220,38 @@ export function ShiftSelectorPopover({
           {(specialType === "shift" || specialType === null) && (
             <div className="space-y-3">
               <Label className="text-sm font-medium">Turnos disponibles:</Label>
-              <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+              <div className="max-h-[60vh] overflow-y-auto pr-1">
                 {shifts.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No hay turnos disponibles</p>
                 ) : (
-                  shifts.map((shift) => {
-                    const isSelected = tempSelected.includes(shift.id)
-                    const isEditing = editingShiftId === shift.id
-                    const hasAdj = hasAdjustments(shift.id)
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {shifts.map((shift) => {
+                      const isSelected = tempSelected.includes(shift.id)
+                      const isEditing = editingShiftId === shift.id
+                      const hasAdj = hasAdjustments(shift.id)
 
-                    return (
-                      <ShiftItem
-                        key={shift.id}
-                        shift={shift}
-                        isSelected={isSelected}
-                        isEditing={isEditing}
-                        hasAdjustments={hasAdj}
-                        adjustedTimes={adjustedTimes}
-                        extensions={extensions}
-                        onToggle={toggleShift}
-                        onEdit={(shiftId) => setEditingShiftId(editingShiftId === shiftId ? null : shiftId)}
-                        getDisplayTime={getDisplayTime}
-                        onUpdateTime={updateAdjustedTime}
-                        onAdjustTime={adjustTimeField}
-                        onResetTime={resetAdjustedTime}
-                        onResetAll={resetAllAdjustedTimes}
-                        onToggleExtension={handleToggleExtension}
-                      />
-                    )
-                  })
+                      return (
+                        <ShiftItem
+                          key={shift.id}
+                          shift={shift}
+                          isSelected={isSelected}
+                          isEditing={isEditing}
+                          hasAdjustments={hasAdj}
+                          adjustedTimes={adjustedTimes}
+                          extensions={extensions}
+                          onToggle={toggleShift}
+                          onEdit={(shiftId) => setEditingShiftId(editingShiftId === shiftId ? null : shiftId)}
+                          getDisplayTime={getDisplayTime}
+                          onUpdateTime={updateAdjustedTime}
+                          onAdjustTime={adjustTimeField}
+                          onResetTime={resetAdjustedTime}
+                          onResetAll={resetAllAdjustedTimes}
+                          onToggleExtension={handleToggleExtension}
+                          onQuickAssign={handleQuickShiftSelect}
+                        />
+                      )
+                    })}
+                  </div>
                 )}
               </div>
             </div>

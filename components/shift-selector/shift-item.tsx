@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Pencil } from "lucide-react"
 import { Turno, ShiftAssignment } from "@/lib/types"
 import { TimeAdjustmentForm } from "./time-adjustment-form"
-import { adjustTime } from "@/lib/utils"
+import { adjustTime, cn } from "@/lib/utils"
 
 interface ShiftItemProps {
   shift: Turno
@@ -24,6 +24,8 @@ interface ShiftItemProps {
   onResetTime: (shiftId: string, field: "startTime" | "endTime" | "startTime2" | "endTime2") => void
   onResetAll: (shiftId: string) => void
   onToggleExtension: (shiftId: string, type: "before" | "after") => void
+  onQuickAssign?: (shiftId: string) => void
+  className?: string
 }
 
 export function ShiftItem({
@@ -41,6 +43,8 @@ export function ShiftItem({
   onResetTime,
   onResetAll,
   onToggleExtension,
+  onQuickAssign,
+  className,
 }: ShiftItemProps) {
   const handleRowClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement
@@ -54,13 +58,21 @@ export function ShiftItem({
       target.tagName === 'LABEL'
     
     if (!isInteractive) {
-      onToggle(shift.id)
+      if (onQuickAssign) {
+        onQuickAssign(shift.id)
+      } else {
+        onToggle(shift.id)
+      }
     }
   }
 
   const handleCheckboxChange = (checked: boolean) => {
     // El checkbox maneja su propio estado
     if (checked && !isSelected) {
+      if (onQuickAssign) {
+        onQuickAssign(shift.id)
+        return
+      }
       onToggle(shift.id)
     } else if (!checked && isSelected) {
       onToggle(shift.id)
@@ -102,9 +114,11 @@ export function ShiftItem({
 
   return (
     <div
-      className={`border rounded-lg p-4 space-y-3 transition-colors ${
-        isSelected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
-      }`}
+      className={cn(
+        "border rounded-lg p-3 space-y-3 transition-colors h-full",
+        isSelected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50",
+        className,
+      )}
       onClick={handleRowClick}
     >
       {/* Checkbox y nombre del turno */}
