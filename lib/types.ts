@@ -82,6 +82,7 @@ export interface MedioTurno {
   startTime: string // formato "HH:mm"
   endTime: string // formato "HH:mm"
   nombre?: string // Nombre opcional para identificar el medio turno (ej: "Mañana", "Tarde")
+  color?: string // código hex para el color del medio franco (por defecto verde)
 }
 
 export interface Configuracion {

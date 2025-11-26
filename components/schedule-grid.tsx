@@ -1,10 +1,11 @@
 "use client"
 
 import { memo, useMemo, useCallback, useState } from "react"
+import type { CSSProperties } from "react"
 import { Card } from "@/components/ui/card"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import { Empleado, Turno, Horario, HistorialItem, ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
+import { Empleado, Turno, Horario, HistorialItem, ShiftAssignment, ShiftAssignmentValue, MedioTurno } from "@/lib/types"
 import { ShiftSelectorPopover } from "./shift-selector-popover"
 
 interface ScheduleGridProps {
@@ -16,6 +17,7 @@ interface ScheduleGridProps {
   onAssignmentUpdate?: (date: string, employeeId: string, assignments: ShiftAssignment[]) => void // nuevo formato
   readonly?: boolean
   monthRange?: { startDate: Date; endDate: Date } // Rango del mes para deshabilitar días fuera del rango
+  mediosTurnos?: MedioTurno[] // Medios turnos configurados
 }
 
 export const ScheduleGrid = memo(function ScheduleGrid({
@@ -27,6 +29,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   onAssignmentUpdate,
   readonly = false,
   monthRange,
+  mediosTurnos = [],
 }: ScheduleGridProps) {
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
 
@@ -157,6 +160,163 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     )
   }, [])
 
+  // Helper: convertir color hex a rgba
+  const hexToRgba = useCallback((hex: string, opacity: number = 0.15): string => {
+    const cleanHex = hex.replace('#', '')
+    const r = parseInt(cleanHex.substring(0, 2), 16)
+    const g = parseInt(cleanHex.substring(2, 4), 16)
+    const b = parseInt(cleanHex.substring(4, 6), 16)
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`
+  }, [])
+
+  // Helper: convertir hora "HH:mm" a minutos desde medianoche
+  const timeToMinutes = useCallback((time: string): number => {
+    const [hours, minutes] = time.split(':').map(Number)
+    return hours * 60 + minutes
+  }, [])
+
+  // Helper: obtener color del medio turno configurado
+  const getMedioTurnoColor = useCallback((startTime: string, endTime: string): string => {
+    // Buscar el medio turno configurado que coincida con el horario
+    const medioTurno = mediosTurnos.find(
+      mt => mt.startTime === startTime && mt.endTime === endTime
+    )
+    
+    // Si se encuentra y tiene color configurado, usarlo; sino usar verde por defecto
+    const colorHex = medioTurno?.color || "#22c55e"
+    return hexToRgba(colorHex, 0.15)
+  }, [mediosTurnos, hexToRgba])
+
+  // Obtener el color de fondo para una celda basado en las asignaciones
+  const getCellBackgroundStyle = useCallback(
+    (employeeId: string, date: string): CSSProperties | undefined => {
+      const assignments = getEmployeeAssignments(employeeId, date)
+      
+      // Si no hay asignaciones, no aplicar color
+      if (assignments.length === 0) return undefined
+      
+      // Color verde para franco (opacidad 0.15) - por defecto
+      const defaultGreenColor = 'rgba(34, 197, 94, 0.15)' // green-500 con opacidad
+      
+      // Si es franco, aplicar verde
+      if (assignments.some(a => a.type === "franco")) {
+        return { backgroundColor: defaultGreenColor }
+      }
+      
+      // Buscar medio franco
+      const medioFranco = assignments.find(a => a.type === "medio_franco")
+      
+      // Buscar turnos normales
+      const shiftAssignments = assignments.filter(
+        a => a.type === "shift" && a.shiftId
+      )
+      
+      // Si solo hay medio franco (sin turnos), usar color configurado o verde por defecto
+      if (medioFranco && shiftAssignments.length === 0) {
+        if (medioFranco.startTime && medioFranco.endTime) {
+          const medioColor = getMedioTurnoColor(medioFranco.startTime, medioFranco.endTime)
+          return { backgroundColor: medioColor }
+        }
+        return { backgroundColor: defaultGreenColor }
+      }
+      
+      // Si hay medio franco + turno(s), crear gradiente
+      if (medioFranco && shiftAssignments.length > 0) {
+        // Obtener el color del primer turno
+        const firstShift = getShiftInfo(shiftAssignments[0].shiftId || "")
+        if (!firstShift || !firstShift.color) {
+          const medioColor = medioFranco.startTime && medioFranco.endTime
+            ? getMedioTurnoColor(medioFranco.startTime, medioFranco.endTime)
+            : defaultGreenColor
+          return { backgroundColor: medioColor }
+        }
+        
+        const shiftColor = hexToRgba(firstShift.color, 0.15)
+        
+        // Obtener color del medio franco (configurado o por defecto)
+        const medioColor = medioFranco.startTime && medioFranco.endTime
+          ? getMedioTurnoColor(medioFranco.startTime, medioFranco.endTime)
+          : defaultGreenColor
+        
+        // Determinar la posición del medio franco basándose en su horario
+        let isMedioFrancoEarly = true // Por defecto, asumir que es temprano
+        
+        if (medioFranco.startTime && medioFranco.endTime) {
+          const medioStart = timeToMinutes(medioFranco.startTime)
+          const medioEnd = timeToMinutes(medioFranco.endTime)
+          
+          // Comparar con los turnos para determinar si el medio franco es temprano o tarde
+          let earliestShiftStart = Infinity
+          let latestShiftEnd = -Infinity
+          
+          shiftAssignments.forEach(assignment => {
+            const shift = getShiftInfo(assignment.shiftId || "")
+            if (shift) {
+              // Usar horarios ajustados si existen, sino los del turno base
+              const startTime = assignment.startTime || shift.startTime || ""
+              const endTime = assignment.endTime || shift.endTime || ""
+              const startTime2 = assignment.startTime2 || shift.startTime2 || ""
+              const endTime2 = assignment.endTime2 || shift.endTime2 || ""
+              
+              if (startTime) {
+                const start = timeToMinutes(startTime)
+                earliestShiftStart = Math.min(earliestShiftStart, start)
+              }
+              if (endTime) {
+                const end = timeToMinutes(endTime)
+                latestShiftEnd = Math.max(latestShiftEnd, end)
+              }
+              if (startTime2) {
+                const start2 = timeToMinutes(startTime2)
+                earliestShiftStart = Math.min(earliestShiftStart, start2)
+              }
+              if (endTime2) {
+                const end2 = timeToMinutes(endTime2)
+                latestShiftEnd = Math.max(latestShiftEnd, end2)
+              }
+            }
+          })
+          
+          // Si el medio franco termina antes de que empiece el turno, es temprano
+          // Si el medio franco empieza después de que termine el turno, es tarde
+          if (earliestShiftStart !== Infinity && medioEnd < earliestShiftStart) {
+            isMedioFrancoEarly = true
+          } else if (latestShiftEnd !== -Infinity && medioStart > latestShiftEnd) {
+            isMedioFrancoEarly = false
+          } else {
+            // Si hay solapamiento o no podemos determinar, usar la hora del día
+            // Si el medio franco empieza antes de las 12:00, es temprano
+            isMedioFrancoEarly = medioStart < 12 * 60
+          }
+        }
+        
+        // Crear gradiente: color del medio franco en una mitad, color del turno en la otra
+        if (isMedioFrancoEarly) {
+          // Medio franco temprano: color del medio franco a la izquierda, color del turno a la derecha
+          return {
+            background: `linear-gradient(to right, ${medioColor} 50%, ${shiftColor} 50%)`
+          }
+        } else {
+          // Medio franco tarde: color del turno a la izquierda, color del medio franco a la derecha
+          return {
+            background: `linear-gradient(to right, ${shiftColor} 50%, ${medioColor} 50%)`
+          }
+        }
+      }
+      
+      // Si solo hay turnos normales, aplicar color del primer turno
+      if (shiftAssignments.length > 0) {
+        const firstShift = getShiftInfo(shiftAssignments[0].shiftId || "")
+        if (firstShift && firstShift.color) {
+          return { backgroundColor: hexToRgba(firstShift.color, 0.15) }
+        }
+      }
+      
+      return undefined
+    },
+    [getEmployeeAssignments, getShiftInfo, hexToRgba, timeToMinutes, getMedioTurnoColor],
+  )
+
   const handleCellClick = useCallback(
     (date: string, employeeId: string) => {
       if (!readonly && (onShiftUpdate || onAssignmentUpdate)) {
@@ -244,24 +404,63 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                     ? (day < monthRange.startDate || day > monthRange.endDate)
                     : false
                   
+                  // Obtener estilo de fondo del turno (puede incluir gradientes)
+                  const backgroundStyle = !isOutOfRange 
+                    ? getCellBackgroundStyle(employee.id, dateStr)
+                    : undefined
+                  
+                  // Determinar clases para hover y selected cuando hay color de fondo
+                  const hasBackgroundStyle = !!backgroundStyle
+                  const hoverClass = hasBackgroundStyle
+                    ? "hover:brightness-95"
+                    : !readonly && (onShiftUpdate || onAssignmentUpdate)
+                    ? "hover:bg-muted/50"
+                    : ""
+                  const selectedClass = hasBackgroundStyle
+                    ? "ring-2 ring-primary/30"
+                    : isSelected
+                    ? "bg-primary/10"
+                    : ""
+                  
                   return (
                     <td
                       key={day.toISOString()}
-                      className={`border-r border-border px-4 py-4 last:border-r-0 ${
+                      className={`border-r border-border px-4 py-4 last:border-r-0 relative ${
                         isOutOfRange 
                           ? "bg-muted/20 opacity-50"
                           : !readonly && (onShiftUpdate || onAssignmentUpdate)
-                          ? "cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted"
+                          ? `cursor-pointer transition-all ${hoverClass} active:brightness-90`
                           : ""
-                      } ${isSelected ? "bg-primary/10" : ""}`}
+                      } ${selectedClass}`}
+                      style={backgroundStyle}
                       onClick={() => !isOutOfRange && handleCellClick(dateStr, employee.id)}
                     >
                       <div className="flex flex-col gap-2">
                         {(() => {
-                          const assignments = getEmployeeAssignments(employee.id, dateStr)
+                          let assignments = getEmployeeAssignments(employee.id, dateStr)
                           if (assignments.length === 0) {
                             return <span className="text-center text-lg text-muted-foreground">-</span>
                           }
+                          
+                          // Ordenar asignaciones: medio franco temprano arriba, medio franco tarde abajo
+                          const hasMedioFranco = assignments.some(a => a.type === "medio_franco")
+                          const hasShifts = assignments.some(a => a.type === "shift" && a.shiftId)
+                          
+                          if (hasMedioFranco && hasShifts) {
+                            assignments = [...assignments].sort((a, b) => {
+                              // Si uno es medio franco y el otro no, ordenar según la hora
+                              if (a.type === "medio_franco" && b.type !== "medio_franco") {
+                                const isEarly = a.startTime ? timeToMinutes(a.startTime) < 15 * 60 : true
+                                return isEarly ? -1 : 1 // Temprano va primero, tarde va último
+                              }
+                              if (b.type === "medio_franco" && a.type !== "medio_franco") {
+                                const isEarly = b.startTime ? timeToMinutes(b.startTime) < 15 * 60 : true
+                                return isEarly ? 1 : -1 // Temprano va primero, tarde va último
+                              }
+                              return 0 // Mantener orden original para otros casos
+                            })
+                          }
+                          
                           return assignments.map((assignment, idx) => {
                             // Manejar franco
                             if (assignment.type === "franco") {

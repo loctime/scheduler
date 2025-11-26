@@ -166,6 +166,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
                 onExportPDF={handleExportWeekPDF}
                 onExportExcel={() => handleExportWeekExcel(weekStartDate, weekDays, weekSchedule)}
                 exporting={exporting}
+                mediosTurnos={config?.mediosTurnos}
               />
             )
           })}

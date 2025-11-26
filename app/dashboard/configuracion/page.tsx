@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { Configuracion } from "@/lib/types"
@@ -18,7 +18,7 @@ import { Separator } from "@/components/ui/separator"
 import { MedioTurno } from "@/lib/types"
 
 export default function ConfiguracionPage() {
-  const { user } = useData()
+  const { user, shifts } = useData()
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -32,6 +32,27 @@ export default function ConfiguracionPage() {
     horasMinimasParaDescanso: 6,
     mediosTurnos: [],
   })
+
+  const shiftColorOptions = useMemo(() => {
+    if (!shifts || shifts.length === 0) return []
+    const colorMap = new Map<string, { color: string; name: string }>()
+
+    shifts.forEach((shift) => {
+      const color = shift.color?.trim()
+      if (!color) return
+      const key = color.toLowerCase()
+      if (!colorMap.has(key)) {
+        colorMap.set(key, { color, name: shift.name })
+      } else {
+        const existing = colorMap.get(key)
+        if (existing && existing.name.length < 40 && shift.name && !existing.name.includes(shift.name)) {
+          existing.name = `${existing.name}, ${shift.name}`
+        }
+      }
+    })
+
+    return Array.from(colorMap.values())
+  }, [shifts])
 
   useEffect(() => {
     if (!user) return
@@ -322,7 +343,7 @@ export default function ConfiguracionPage() {
             <div className="space-y-3">
               {(config.mediosTurnos || []).map((medioTurno, index) => (
                 <div key={medioTurno.id} className="flex items-center gap-3 p-3 border rounded-lg">
-                  <div className="flex-1 grid grid-cols-3 gap-3">
+                  <div className="flex-1 grid grid-cols-4 gap-3">
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Nombre (opcional)</Label>
                       <Input
@@ -362,6 +383,71 @@ export default function ConfiguracionPage() {
                         className="text-sm"
                       />
                     </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Color</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="color"
+                          value={medioTurno.color || "#22c55e"}
+                          onChange={(e) => {
+                            const nuevosMediosTurnos = [...(config.mediosTurnos || [])]
+                            nuevosMediosTurnos[index] = { ...medioTurno, color: e.target.value }
+                            setConfig({ ...config, mediosTurnos: nuevosMediosTurnos })
+                          }}
+                          className="h-9 w-16 p-1 cursor-pointer"
+                        />
+                        <Input
+                          type="text"
+                          placeholder="#22c55e"
+                          value={medioTurno.color || ""}
+                          onChange={(e) => {
+                            const nuevosMediosTurnos = [...(config.mediosTurnos || [])]
+                            nuevosMediosTurnos[index] = { ...medioTurno, color: e.target.value }
+                            setConfig({ ...config, mediosTurnos: nuevosMediosTurnos })
+                          }}
+                          className="text-sm flex-1"
+                        />
+                      </div>
+                      {shiftColorOptions.length > 0 && (
+                        <Select
+                          value={
+                            shiftColorOptions.find(
+                              (option) =>
+                                option.color.toLowerCase() === (medioTurno.color || "").toLowerCase(),
+                            )?.color || "custom"
+                          }
+                          onValueChange={(value) => {
+                            if (value === "custom") return
+                            const nuevosMediosTurnos = [...(config.mediosTurnos || [])]
+                            nuevosMediosTurnos[index] = { ...medioTurno, color: value }
+                            setConfig({ ...config, mediosTurnos: nuevosMediosTurnos })
+                          }}
+                        >
+                          <SelectTrigger className="text-sm">
+                            <SelectValue placeholder="Colores de turnos" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="custom">
+                              <span className="text-muted-foreground">Personalizado</span>
+                            </SelectItem>
+                            {shiftColorOptions.map((option) => (
+                              <SelectItem key={option.color} value={option.color}>
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className="h-3 w-3 rounded-full border border-border"
+                                    style={{ backgroundColor: option.color }}
+                                  />
+                                  <span className="text-sm">{option.name}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {option.color.toUpperCase()}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
                   </div>
                   <Button
                     variant="ghost"
@@ -392,6 +478,7 @@ export default function ConfiguracionPage() {
                   startTime: "11:00",
                   endTime: "15:00",
                   nombre: "",
+                  color: "#22c55e", // Verde por defecto
                 }
                 setConfig({
                   ...config,

@@ -5,7 +5,7 @@ import { Download, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { ScheduleGrid } from "@/components/schedule-grid"
-import { Empleado, Turno, Horario } from "@/lib/types"
+import { Empleado, Turno, Horario, MedioTurno } from "@/lib/types"
 
 interface WeekScheduleProps {
   weekDays: Date[]
@@ -19,6 +19,7 @@ interface WeekScheduleProps {
   onExportPDF: (weekStartDate: Date, weekEndDate: Date) => void
   onExportExcel?: () => void
   exporting: boolean
+  mediosTurnos?: MedioTurno[]
 }
 
 export function WeekSchedule({
@@ -33,6 +34,7 @@ export function WeekSchedule({
   onExportPDF,
   onExportExcel,
   exporting,
+  mediosTurnos,
 }: WeekScheduleProps) {
   const weekStartDate = weekDays[0]
   const weekEndDate = weekDays[weekDays.length - 1]
@@ -114,6 +116,7 @@ export function WeekSchedule({
         schedule={weekSchedule}
         onAssignmentUpdate={onAssignmentUpdate}
         monthRange={monthRange}
+        mediosTurnos={mediosTurnos}
       />
     </div>
   )
