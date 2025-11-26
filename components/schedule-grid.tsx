@@ -23,7 +23,12 @@ interface ScheduleGridProps {
   shifts: Turno[]
   schedule: Horario | HistorialItem | null
   onShiftUpdate?: (date: string, employeeId: string, shiftIds: string[]) => void // formato antiguo (compatibilidad)
-  onAssignmentUpdate?: (date: string, employeeId: string, assignments: ShiftAssignment[]) => void // nuevo formato
+  onAssignmentUpdate?: (
+    date: string,
+    employeeId: string,
+    assignments: ShiftAssignment[],
+    options?: { scheduleId?: string },
+  ) => void // nuevo formato
   readonly?: boolean
   monthRange?: { startDate: Date; endDate: Date } // Rango del mes para deshabilitar días fuera del rango
   mediosTurnos?: MedioTurno[] // Medios turnos configurados
@@ -351,11 +356,13 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   const handleAssignmentUpdate = useCallback(
     (assignments: ShiftAssignment[]) => {
       if (selectedCell && onAssignmentUpdate) {
-        onAssignmentUpdate(selectedCell.date, selectedCell.employeeId, assignments)
+        onAssignmentUpdate(selectedCell.date, selectedCell.employeeId, assignments, {
+          scheduleId: schedule?.id,
+        })
       }
       setSelectedCell(null)
     },
-    [selectedCell, onAssignmentUpdate],
+    [selectedCell, onAssignmentUpdate, schedule?.id],
   )
 
   const handleToggleExtra = useCallback(
@@ -393,9 +400,9 @@ export const ScheduleGrid = memo(function ScheduleGrid({
         }
       }
 
-      onAssignmentUpdate(date, employeeId, updatedAssignments)
+      onAssignmentUpdate(date, employeeId, updatedAssignments, { scheduleId: schedule?.id })
     },
-    [getEmployeeAssignments, getShiftInfo, onAssignmentUpdate],
+    [getEmployeeAssignments, getShiftInfo, onAssignmentUpdate, schedule?.id],
   )
 
   const selectedEmployee = selectedCell
@@ -482,7 +489,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                   
                   // Determinar clases para hover y selected cuando hay color de fondo
                   const hasBackgroundStyle = !!backgroundStyle
-                  const isClickable = !readonly && (onShiftUpdate || onAssignmentUpdate) && !isOutOfRange
+                  const isClickable = !readonly && (onShiftUpdate || onAssignmentUpdate)
                   const hoverClass = hasBackgroundStyle
                     ? isClickable ? "hover:brightness-95" : ""
                     : isClickable
@@ -524,7 +531,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                           : ""
                       } ${selectedClass}`}
                       style={backgroundStyle}
-                      onClick={() => !isOutOfRange && handleCellClick(dateStr, employee.id)}
+                      onClick={() => handleCellClick(dateStr, employee.id)}
                     >
                       {showExtraActions && (
                         <div className="absolute -top-1 right-1" onClick={(event) => event.stopPropagation()}>

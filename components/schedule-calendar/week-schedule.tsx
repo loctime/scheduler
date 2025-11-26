@@ -14,13 +14,14 @@ interface WeekScheduleProps {
   employees: Empleado[]
   shifts: Turno[]
   monthRange: { startDate: Date; endDate: Date }
-  onAssignmentUpdate: (date: string, employeeId: string, assignments: any[]) => void
+  onAssignmentUpdate?: (date: string, employeeId: string, assignments: any[]) => void
   onExportImage: (weekStartDate: Date, weekEndDate: Date) => void
   onExportPDF: (weekStartDate: Date, weekEndDate: Date) => void
   onExportExcel?: () => void
   exporting: boolean
   mediosTurnos?: MedioTurno[]
   employeeStats?: Record<string, EmployeeMonthlyStats>
+  readonly?: boolean
 }
 
 export function WeekSchedule({
@@ -37,6 +38,7 @@ export function WeekSchedule({
   exporting,
   mediosTurnos,
   employeeStats,
+  readonly = false,
 }: WeekScheduleProps) {
   const weekStartDate = weekDays[0]
   const weekEndDate = weekDays[weekDays.length - 1]
@@ -120,6 +122,7 @@ export function WeekSchedule({
         monthRange={monthRange}
         mediosTurnos={mediosTurnos}
         employeeStats={employeeStats}
+        readonly={readonly}
       />
     </div>
   )

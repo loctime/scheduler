@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Calendar, Users, Clock, History, LogOut, Settings } from "lucide-react"
+import { Calendar, Users, Clock, History, LogOut, Settings, CalendarDays } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -25,6 +25,7 @@ interface DashboardLayoutProps {
 
 const navItems = [
   { href: "/dashboard", label: "Horarios", icon: Calendar },
+  { href: "/dashboard/horarios-mensuales", label: "Vista Mensual", icon: CalendarDays },
   { href: "/dashboard/empleados", label: "Empleados", icon: Users },
   { href: "/dashboard/turnos", label: "Turnos", icon: Clock },
   { href: "/dashboard/historial", label: "Historial", icon: History },

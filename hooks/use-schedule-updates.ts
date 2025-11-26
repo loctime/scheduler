@@ -28,7 +28,12 @@ export function useScheduleUpdates({
   const { config } = useConfig()
 
   const handleAssignmentUpdate = useCallback(
-    async (date: string, employeeId: string, assignments: ShiftAssignment[]) => {
+    async (
+      date: string,
+      employeeId: string,
+      assignments: ShiftAssignment[],
+      options?: { scheduleId?: string },
+    ) => {
       try {
         // Validaciones básicas
         if (employees.length === 0) {
@@ -71,7 +76,13 @@ export function useScheduleUpdates({
         let scheduleNombre = `Semana del ${weekStartStr}`
 
         // Obtener el horario de esa semana específica
-        const weekSchedule = getWeekSchedule(weekStartDate)
+        let weekSchedule: Horario | null = null
+        if (options?.scheduleId) {
+          weekSchedule = schedules.find((s) => s.id === options.scheduleId) || null
+        }
+        if (!weekSchedule) {
+          weekSchedule = getWeekSchedule(weekStartDate)
+        }
 
         // Si no existe horario, crearlo. Si existe, actualizarlo
         if (!weekSchedule) {
@@ -264,7 +275,7 @@ export function useScheduleUpdates({
         })
       }
     },
-    [user, employees, shifts, config, toast, getWeekSchedule, weekStartsOn],
+    [user, employees, shifts, config, toast, getWeekSchedule, weekStartsOn, schedules],
   )
 
   return {
