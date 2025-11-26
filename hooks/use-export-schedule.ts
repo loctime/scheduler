@@ -67,24 +67,53 @@ export function useExportSchedule() {
         
         // Convertir badges a texto simple para la exportación
         const badges = element.querySelectorAll("[data-slot='badge']")
-        const originalContent: Array<{ el: HTMLElement; originalHTML: string; originalStyle: string }> = []
+        const originalContent: Array<{ el: HTMLElement; originalHTML: string; originalClassName: string; originalStyle: string }> = []
         badges.forEach((badge) => {
           const htmlBadge = badge as HTMLElement
+          // Obtener todo el texto del badge, incluyendo texto de elementos hijos
+          const textContent = htmlBadge.textContent || htmlBadge.innerText || ""
+          
           originalContent.push({
             el: htmlBadge,
             originalHTML: htmlBadge.innerHTML,
+            originalClassName: htmlBadge.className,
             originalStyle: htmlBadge.getAttribute("style") || "",
           })
-          // Obtener solo el texto del badge
-          const textContent = htmlBadge.textContent || htmlBadge.innerText || ""
+          
+          // Reemplazar completamente el contenido con solo texto
           htmlBadge.innerHTML = textContent
-          htmlBadge.style.backgroundColor = "transparent"
-          htmlBadge.style.border = "none"
-          htmlBadge.style.borderRadius = "0"
-          htmlBadge.style.padding = "0"
-          htmlBadge.style.color = "inherit"
-          htmlBadge.style.fontSize = "inherit"
-          htmlBadge.style.fontWeight = "inherit"
+          htmlBadge.className = "" // Quitar todas las clases
+          // Aplicar estilos inline para sobrescribir todo
+          htmlBadge.setAttribute("style", `
+            background-color: transparent !important;
+            border: none !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            color: inherit !important;
+            font-size: inherit !important;
+            font-weight: inherit !important;
+            display: block !important;
+          `)
+        })
+        
+        // También aplanar los divs contenedores que tienen gap
+        const containerDivs = element.querySelectorAll("td > div.flex.flex-col")
+        const originalDivs: Array<{ el: HTMLElement; originalClassName: string; originalStyle: string }> = []
+        containerDivs.forEach((div) => {
+          const htmlDiv = div as HTMLElement
+          originalDivs.push({
+            el: htmlDiv,
+            originalClassName: htmlDiv.className,
+            originalStyle: htmlDiv.getAttribute("style") || "",
+          })
+          htmlDiv.className = ""
+          htmlDiv.setAttribute("style", `
+            display: block !important;
+            gap: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          `)
         })
         
         try {
@@ -115,8 +144,19 @@ export function useExportSchedule() {
           })
         } finally {
           // Restaurar contenido original de los badges
-          originalContent.forEach(({ el, originalHTML, originalStyle }) => {
+          originalContent.forEach(({ el, originalHTML, originalClassName, originalStyle }) => {
             el.innerHTML = originalHTML
+            el.className = originalClassName
+            if (originalStyle) {
+              el.setAttribute("style", originalStyle)
+            } else {
+              el.removeAttribute("style")
+            }
+          })
+          
+          // Restaurar divs contenedores
+          originalDivs.forEach(({ el, originalClassName, originalStyle }) => {
+            el.className = originalClassName
             if (originalStyle) {
               el.setAttribute("style", originalStyle)
             } else {
@@ -214,24 +254,53 @@ export function useExportSchedule() {
 
         // Convertir badges a texto simple para la exportación
         const badges = element.querySelectorAll("[data-slot='badge']")
-        const originalContent: Array<{ el: HTMLElement; originalHTML: string; originalStyle: string }> = []
+        const originalContent: Array<{ el: HTMLElement; originalHTML: string; originalClassName: string; originalStyle: string }> = []
         badges.forEach((badge) => {
           const htmlBadge = badge as HTMLElement
+          // Obtener todo el texto del badge, incluyendo texto de elementos hijos
+          const textContent = htmlBadge.textContent || htmlBadge.innerText || ""
+          
           originalContent.push({
             el: htmlBadge,
             originalHTML: htmlBadge.innerHTML,
+            originalClassName: htmlBadge.className,
             originalStyle: htmlBadge.getAttribute("style") || "",
           })
-          // Obtener solo el texto del badge
-          const textContent = htmlBadge.textContent || htmlBadge.innerText || ""
+          
+          // Reemplazar completamente el contenido con solo texto
           htmlBadge.innerHTML = textContent
-          htmlBadge.style.backgroundColor = "transparent"
-          htmlBadge.style.border = "none"
-          htmlBadge.style.borderRadius = "0"
-          htmlBadge.style.padding = "0"
-          htmlBadge.style.color = "inherit"
-          htmlBadge.style.fontSize = "inherit"
-          htmlBadge.style.fontWeight = "inherit"
+          htmlBadge.className = "" // Quitar todas las clases
+          // Aplicar estilos inline para sobrescribir todo
+          htmlBadge.setAttribute("style", `
+            background-color: transparent !important;
+            border: none !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            color: inherit !important;
+            font-size: inherit !important;
+            font-weight: inherit !important;
+            display: block !important;
+          `)
+        })
+        
+        // También aplanar los divs contenedores que tienen gap
+        const containerDivs = element.querySelectorAll("td > div.flex.flex-col")
+        const originalDivs: Array<{ el: HTMLElement; originalClassName: string; originalStyle: string }> = []
+        containerDivs.forEach((div) => {
+          const htmlDiv = div as HTMLElement
+          originalDivs.push({
+            el: htmlDiv,
+            originalClassName: htmlDiv.className,
+            originalStyle: htmlDiv.getAttribute("style") || "",
+          })
+          htmlDiv.className = ""
+          htmlDiv.setAttribute("style", `
+            display: block !important;
+            gap: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          `)
         })
         
         try {
@@ -267,8 +336,19 @@ export function useExportSchedule() {
           })
         } finally {
           // Restaurar contenido original de los badges
-          originalContent.forEach(({ el, originalHTML, originalStyle }) => {
+          originalContent.forEach(({ el, originalHTML, originalClassName, originalStyle }) => {
             el.innerHTML = originalHTML
+            el.className = originalClassName
+            if (originalStyle) {
+              el.setAttribute("style", originalStyle)
+            } else {
+              el.removeAttribute("style")
+            }
+          })
+          
+          // Restaurar divs contenedores
+          originalDivs.forEach(({ el, originalClassName, originalStyle }) => {
+            el.className = originalClassName
             if (originalStyle) {
               el.setAttribute("style", originalStyle)
             } else {
