@@ -35,6 +35,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
   const pathname = usePathname()
 
   const handleSignOut = async () => {
+    if (!auth) return
     await signOut(auth)
   }
 

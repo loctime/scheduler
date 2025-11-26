@@ -13,7 +13,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!isFirebaseConfigured()) {
+    if (!isFirebaseConfigured() || !auth) {
       return
     }
 

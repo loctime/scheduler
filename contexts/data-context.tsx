@@ -54,7 +54,7 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
   }
 
   const refreshEmployees = useCallback(async () => {
-    if (!user) return
+    if (!user || !db) return
 
     try {
       // Intentar cargar desde cache primero
@@ -86,7 +86,7 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
   }, [user, toast])
 
   const refreshShifts = useCallback(async () => {
-    if (!user) return
+    if (!user || !db) return
 
     try {
       // Intentar cargar desde cache primero
@@ -118,7 +118,7 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
   }, [user, toast])
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !db) {
       setEmployees([])
       setShifts([])
       setLoading(false)

@@ -8,7 +8,6 @@ const nextConfig = {
   },
   // Optimizaciones para producción
   reactStrictMode: true,
-  swcMinify: true,
 }
 
 export default nextConfig

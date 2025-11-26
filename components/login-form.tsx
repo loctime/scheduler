@@ -14,6 +14,15 @@ export function LoginForm() {
   const { toast } = useToast()
 
   const handleGoogleSignIn = async () => {
+    if (!auth || !db) {
+      toast({
+        title: "Error de configuración",
+        description: "Firebase no está configurado correctamente",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       setLoading(true)
       const provider = new GoogleAuthProvider()

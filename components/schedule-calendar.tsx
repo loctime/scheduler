@@ -55,7 +55,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
   useEffect(() => {
     // Solo crear listeners si el usuario está autenticado
-    if (!user) {
+    if (!user || !db) {
       return
     }
 
