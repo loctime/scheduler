@@ -2,7 +2,6 @@
 
 import { memo, useMemo, useCallback, useState } from "react"
 import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { Empleado, Turno, Horario, HistorialItem, ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
@@ -267,12 +266,9 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                             // Manejar franco
                             if (assignment.type === "franco") {
                               return (
-                                <Badge
-                                  key={`franco-${idx}`}
-                                  className="justify-center text-base py-2 px-3 bg-gray-500 text-white"
-                                >
+                                <span key={`franco-${idx}`} className="text-center text-base block">
                                   FRANCO
-                                </Badge>
+                                </span>
                               )
                             }
                             
@@ -281,21 +277,16 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                               const displayTimeLines = getShiftDisplayTime("", assignment)
                               const hasTime = assignment.startTime && assignment.endTime
                               return (
-                                <Badge
-                                  key={`medio-franco-${idx}`}
-                                  className="justify-center text-base py-2 px-3 bg-orange-500 text-white leading-tight"
-                                >
-                                  <div className="flex flex-col gap-0.5">
-                                    {hasTime ? (
-                                      <>
-                                        <span className="block">{displayTimeLines[0]}</span>
-                                        <span className="block text-xs">(1/2 Franco)</span>
-                                      </>
-                                    ) : (
-                                      <span className="block">1/2 Franco</span>
-                                    )}
-                                  </div>
-                                </Badge>
+                                <div key={`medio-franco-${idx}`} className="text-center text-base">
+                                  {hasTime ? (
+                                    <>
+                                      <span className="block">{displayTimeLines[0]}</span>
+                                      <span className="block text-xs">(1/2 Franco)</span>
+                                    </>
+                                  ) : (
+                                    <span className="block">1/2 Franco</span>
+                                  )}
+                                </div>
                               )
                             }
                             
@@ -307,38 +298,21 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                             // Si no hay horario para mostrar, mostrar el nombre del turno como fallback
                             if (!displayTimeLines || displayTimeLines.length === 0 || (displayTimeLines.length === 1 && !displayTimeLines[0])) {
                               return (
-                                <Badge
-                                  key={assignment.shiftId}
-                                  className="justify-center text-base py-2 px-3"
-                                  style={{
-                                    backgroundColor: shift.color,
-                                    color: "#ffffff",
-                                  }}
-                                >
+                                <span key={assignment.shiftId} className="text-center text-base block">
                                   {shift.name}
-                                </Badge>
+                                </span>
                               )
                             }
 
                             // Si hay múltiples líneas o una línea larga, mostrar en formato multilínea
                             return (
-                              <Badge
-                                key={assignment.shiftId}
-                                className="justify-center text-base py-2 px-3 leading-tight"
-                                style={{
-                                  backgroundColor: shift.color,
-                                  color: "#ffffff",
-                                }}
-                                title={shift.name}
-                              >
-                                <div className="flex flex-col gap-0.5">
-                                  {displayTimeLines.map((line, lineIdx) => (
-                                    <span key={lineIdx} className="block">
-                                      {line}
-                                    </span>
-                                  ))}
-                                </div>
-                              </Badge>
+                              <div key={assignment.shiftId} className="text-center text-base">
+                                {displayTimeLines.map((line, lineIdx) => (
+                                  <span key={lineIdx} className="block">
+                                    {line}
+                                  </span>
+                                ))}
+                              </div>
                             )
                           })
                         })()}

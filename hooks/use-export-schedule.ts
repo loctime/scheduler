@@ -1,27 +1,123 @@
 import { useCallback, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
+import type { Empleado, Turno, Horario, ShiftAssignment } from "@/lib/types"
 
 export function useExportSchedule() {
   const [exporting, setExporting] = useState(false)
   const { toast } = useToast()
+
+  // Desactiva todos los pseudo-elementos que generan los "cuadritos"
+  const disablePseudoElements = () => {
+    document.body.classList.add("exporting-image")
+  }
+
+  const enablePseudoElements = () => {
+    document.body.classList.remove("exporting-image")
+  }
+
+  const cleanFlexDivs = (element: HTMLElement) => {
+    const cleaned: Array<{
+      el: HTMLElement
+      background: string
+      border: string
+      boxShadow: string
+      display: string
+      padding: string
+    }> = []
+
+    // Limpiar divs en las celdas (td)
+    const cells = element.querySelectorAll("td")
+    cells.forEach((td) => {
+      const innerDivs = td.querySelectorAll("div.flex.flex-col, div.text-center")
+      innerDivs.forEach((div) => {
+        const el = div as HTMLElement
+        cleaned.push({
+          el,
+          background: el.style.background || "",
+          border: el.style.border || "",
+          boxShadow: el.style.boxShadow || "",
+          display: el.style.display || "",
+          padding: el.style.padding || "",
+        })
+
+        el.style.background = "white"
+        el.style.border = "none"
+        el.style.boxShadow = "none"
+        el.style.display = "block"
+      })
+    })
+
+    // Limpiar divs en el header (th) - los que tienen "Lunes", "24 nov", etc.
+    const headers = element.querySelectorAll("th")
+    headers.forEach((th) => {
+      const innerDivs = th.querySelectorAll("div.flex.flex-col, div.text-center")
+      innerDivs.forEach((div) => {
+        const el = div as HTMLElement
+        cleaned.push({
+          el,
+          background: el.style.background || "",
+          border: el.style.border || "",
+          boxShadow: el.style.boxShadow || "",
+          display: el.style.display || "",
+          padding: el.style.padding || "",
+        })
+
+        el.style.background = "transparent"
+        el.style.border = "none"
+        el.style.boxShadow = "none"
+        el.style.display = "block"
+        el.style.padding = "12px 16px"  // Agregar más padding para dar más espacio a los textos
+      })
+      
+      // También agregar padding a los spans dentro del header
+      const spans = th.querySelectorAll("span")
+      spans.forEach((span) => {
+        const spanEl = span as HTMLElement
+        if (spanEl.style) {
+          cleaned.push({
+            el: spanEl,
+            background: spanEl.style.background || "",
+            border: spanEl.style.border || "",
+            boxShadow: spanEl.style.boxShadow || "",
+            display: spanEl.style.display || "",
+            padding: spanEl.style.padding || "",
+          })
+          spanEl.style.padding = "6px 10px"  // Padding adicional en los spans para más espacio
+        }
+      })
+    })
+
+    return cleaned
+  }
+
+  const restoreFlexDivs = (cleaned: any[]) => {
+    cleaned.forEach(({ el, background, border, boxShadow, display, padding }) => {
+      el.style.background = background
+      el.style.border = border
+      el.style.boxShadow = boxShadow
+      el.style.display = display
+      el.style.padding = padding || ""
+    })
+  }
 
   const exportImage = useCallback(async (elementId: string, filename: string) => {
     const element = document.getElementById(elementId)
     if (!element) {
       toast({
         title: "Error",
-        description: "No se encontró el elemento a exportar. Por favor, recarga la página.",
+        description: "No se encontró el elemento a exportar.",
         variant: "destructive",
       })
       return
     }
 
-    // Verificar que el elemento sea visible
     const rect = element.getBoundingClientRect()
     if (rect.width === 0 || rect.height === 0) {
       toast({
         title: "Error",
-        description: "El elemento no es visible. Por favor, asegúrate de que el horario esté cargado.",
+        description: "El elemento no es visible.",
         variant: "destructive",
       })
       return
@@ -29,350 +125,244 @@ export function useExportSchedule() {
 
     setExporting(true)
     const htmlElement = element as HTMLElement
+
+    // Guardar overflow original
+    const originalOverflow = {
+      overflow: htmlElement.style.overflow,
+      overflowX: htmlElement.style.overflowX,
+      overflowY: htmlElement.style.overflowY,
+    }
+
     try {
-      // Guardar estilos originales para restaurarlos después
-      const originalOverflow = htmlElement.style.overflow
-      const originalOverflowX = htmlElement.style.overflowX
-      const originalOverflowY = htmlElement.style.overflowY
-      
-      // Remover overflow temporalmente para capturar todo el contenido
+      disablePseudoElements()
+
+      // mostrar todo el contenido
       htmlElement.style.overflow = "visible"
       htmlElement.style.overflowX = "visible"
       htmlElement.style.overflowY = "visible"
-      
-      // También remover overflow de elementos hijos con scroll
-      const scrollableChildren: Array<{ el: HTMLElement; overflow: string; overflowX: string; overflowY: string }> = []
-      const allChildren = element.querySelectorAll("*")
-      allChildren.forEach((child) => {
-        const htmlChild = child as HTMLElement
-        if (htmlChild && htmlChild.style) {
-          const computedStyle = window.getComputedStyle(htmlChild)
-          if (computedStyle.overflow !== "visible" || computedStyle.overflowX !== "visible" || computedStyle.overflowY !== "visible") {
-            scrollableChildren.push({
-              el: htmlChild,
-              overflow: htmlChild.style.overflow || "",
-              overflowX: htmlChild.style.overflowX || "",
-              overflowY: htmlChild.style.overflowY || "",
-            })
-            htmlChild.style.overflow = "visible"
-            htmlChild.style.overflowX = "visible"
-            htmlChild.style.overflowY = "visible"
-          }
-        }
-      })
-      
-      try {
-        // Usar dom-to-image-more que maneja mejor los colores modernos
-        const domtoimage = await import("dom-to-image-more")
-        
-        // Convertir badges a texto simple para la exportación
-        const badges = element.querySelectorAll("[data-slot='badge']")
-        const originalContent: Array<{ el: HTMLElement; originalHTML: string; originalClassName: string; originalStyle: string }> = []
-        badges.forEach((badge) => {
-          const htmlBadge = badge as HTMLElement
-          // Obtener todo el texto del badge, incluyendo texto de elementos hijos
-          const textContent = htmlBadge.textContent || htmlBadge.innerText || ""
-          
-          originalContent.push({
-            el: htmlBadge,
-            originalHTML: htmlBadge.innerHTML,
-            originalClassName: htmlBadge.className,
-            originalStyle: htmlBadge.getAttribute("style") || "",
-          })
-          
-          // Reemplazar completamente el contenido con solo texto
-          htmlBadge.innerHTML = textContent
-          htmlBadge.className = "" // Quitar todas las clases
-          // Aplicar estilos inline para sobrescribir todo
-          htmlBadge.setAttribute("style", `
-            background-color: transparent !important;
-            border: none !important;
-            border-radius: 0 !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            color: inherit !important;
-            font-size: inherit !important;
-            font-weight: inherit !important;
-            display: block !important;
-          `)
-        })
-        
-        // También aplanar los divs contenedores que tienen gap
-        const containerDivs = element.querySelectorAll("td > div.flex.flex-col")
-        const originalDivs: Array<{ el: HTMLElement; originalClassName: string; originalStyle: string }> = []
-        containerDivs.forEach((div) => {
-          const htmlDiv = div as HTMLElement
-          originalDivs.push({
-            el: htmlDiv,
-            originalClassName: htmlDiv.className,
-            originalStyle: htmlDiv.getAttribute("style") || "",
-          })
-          htmlDiv.className = ""
-          htmlDiv.setAttribute("style", `
-            display: block !important;
-            gap: 0 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          `)
-        })
-        
-        try {
-          // Usar scrollWidth y scrollHeight para capturar todo el contenido
-          const width = element.scrollWidth || rect.width
-          const height = element.scrollHeight || rect.height
-          
-          const dataUrl = await domtoimage.toPng(element, {
-            quality: 1.0,
-            bgcolor: "#ffffff",
-            width: width,
-            height: height,
-          })
-          
-          const link = document.createElement("a")
-          link.download = filename
-          link.href = dataUrl
-          link.style.display = "none"
-          document.body.appendChild(link)
-          link.click()
-          setTimeout(() => {
-            document.body.removeChild(link)
-          }, 100)
-          
-          toast({
-            title: "Imagen exportada",
-            description: "El horario se ha exportado como imagen",
-          })
-        } finally {
-          // Restaurar contenido original de los badges
-          originalContent.forEach(({ el, originalHTML, originalClassName, originalStyle }) => {
-            el.innerHTML = originalHTML
-            el.className = originalClassName
-            if (originalStyle) {
-              el.setAttribute("style", originalStyle)
-            } else {
-              el.removeAttribute("style")
-            }
-          })
-          
-          // Restaurar divs contenedores
-          originalDivs.forEach(({ el, originalClassName, originalStyle }) => {
-            el.className = originalClassName
-            if (originalStyle) {
-              el.setAttribute("style", originalStyle)
-            } else {
-              el.removeAttribute("style")
-            }
-          })
-        }
-        
-      } finally {
-        // Restaurar estilos originales
-        htmlElement.style.overflow = originalOverflow
-        htmlElement.style.overflowX = originalOverflowX
-        htmlElement.style.overflowY = originalOverflowY
-        
-        scrollableChildren.forEach(({ el, overflow, overflowX, overflowY }) => {
-          el.style.overflow = overflow
-          el.style.overflowX = overflowX
-          el.style.overflowY = overflowY
-        })
-      }
 
-    } catch (error: any) {
-      console.error("Error al exportar imagen:", error)
+      // limpiar celdas
+      const cleanedFlex = cleanFlexDivs(htmlElement)
+
+      const domtoimage = await import("dom-to-image-more")
+
+      const dataUrl = await domtoimage.toPng(htmlElement, {
+        quality: 1.0,
+        bgcolor: "#ffffff",
+        width: element.scrollWidth,
+        height: element.scrollHeight,
+      })
+
+      const link = document.createElement("a")
+      link.download = filename
+      link.href = dataUrl
+      link.click()
+
+      restoreFlexDivs(cleanedFlex)
+
+      toast({
+        title: "OK",
+        description: "Imagen exportada correctamente.",
+      })
+    } catch (e) {
+      console.error(e)
       toast({
         title: "Error",
-        description: error?.message || "Ocurrió un error al exportar la imagen. Verifica la consola para más detalles.",
+        description: "No se pudo exportar.",
         variant: "destructive",
       })
     } finally {
+      enablePseudoElements()
+      htmlElement.style.overflow = originalOverflow.overflow
+      htmlElement.style.overflowX = originalOverflow.overflowX
+      htmlElement.style.overflowY = originalOverflow.overflowY
       setExporting(false)
     }
-  }, [toast])
+  }, [])
+
 
   const exportPDF = useCallback(async (elementId: string, filename: string) => {
     const element = document.getElementById(elementId)
-    if (!element) {
-      toast({
-        title: "Error",
-        description: "No se encontró el elemento a exportar. Por favor, recarga la página.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    // Verificar que el elemento sea visible
-    const rect = element.getBoundingClientRect()
-    if (rect.width === 0 || rect.height === 0) {
-      toast({
-        title: "Error",
-        description: "El elemento no es visible. Por favor, asegúrate de que el horario esté cargado.",
-        variant: "destructive",
-      })
-      return
-    }
+    if (!element) return
 
     setExporting(true)
+
     const htmlElement = element as HTMLElement
+    const originalOverflow = {
+      overflow: htmlElement.style.overflow,
+      overflowX: htmlElement.style.overflowX,
+      overflowY: htmlElement.style.overflowY,
+    }
+
     try {
-      // Guardar estilos originales para restaurarlos después
-      const originalOverflow = htmlElement.style.overflow
-      const originalOverflowX = htmlElement.style.overflowX
-      const originalOverflowY = htmlElement.style.overflowY
-      
-      // Remover overflow temporalmente para capturar todo el contenido
+      disablePseudoElements()
+
       htmlElement.style.overflow = "visible"
       htmlElement.style.overflowX = "visible"
       htmlElement.style.overflowY = "visible"
-      
-      // También remover overflow de elementos hijos con scroll
-      const scrollableChildren: Array<{ el: HTMLElement; overflow: string; overflowX: string; overflowY: string }> = []
-      const allChildren = element.querySelectorAll("*")
-      allChildren.forEach((child) => {
-        const htmlChild = child as HTMLElement
-        if (htmlChild && htmlChild.style) {
-          const computedStyle = window.getComputedStyle(htmlChild)
-          if (computedStyle.overflow !== "visible" || computedStyle.overflowX !== "visible" || computedStyle.overflowY !== "visible") {
-            scrollableChildren.push({
-              el: htmlChild,
-              overflow: htmlChild.style.overflow || "",
-              overflowX: htmlChild.style.overflowX || "",
-              overflowY: htmlChild.style.overflowY || "",
-            })
-            htmlChild.style.overflow = "visible"
-            htmlChild.style.overflowX = "visible"
-            htmlChild.style.overflowY = "visible"
-          }
-        }
+
+      const cleanedFlex = cleanFlexDivs(htmlElement)
+
+      const [domtoimage, jsPDF] = await Promise.all([
+        import("dom-to-image-more"),
+        import("jspdf").then(m => m.default),
+      ])
+
+      const dataUrl = await domtoimage.toPng(htmlElement, {
+        quality: 1.0,
+        bgcolor: "#ffffff",
+        width: element.scrollWidth,
+        height: element.scrollHeight,
       })
-      
-      try {
-        const [domtoimage, jsPDF] = await Promise.all([
-          import("dom-to-image-more"),
-          import("jspdf").then((m) => m.default),
-        ])
 
-        // Convertir badges a texto simple para la exportación
-        const badges = element.querySelectorAll("[data-slot='badge']")
-        const originalContent: Array<{ el: HTMLElement; originalHTML: string; originalClassName: string; originalStyle: string }> = []
-        badges.forEach((badge) => {
-          const htmlBadge = badge as HTMLElement
-          // Obtener todo el texto del badge, incluyendo texto de elementos hijos
-          const textContent = htmlBadge.textContent || htmlBadge.innerText || ""
-          
-          originalContent.push({
-            el: htmlBadge,
-            originalHTML: htmlBadge.innerHTML,
-            originalClassName: htmlBadge.className,
-            originalStyle: htmlBadge.getAttribute("style") || "",
-          })
-          
-          // Reemplazar completamente el contenido con solo texto
-          htmlBadge.innerHTML = textContent
-          htmlBadge.className = "" // Quitar todas las clases
-          // Aplicar estilos inline para sobrescribir todo
-          htmlBadge.setAttribute("style", `
-            background-color: transparent !important;
-            border: none !important;
-            border-radius: 0 !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            color: inherit !important;
-            font-size: inherit !important;
-            font-weight: inherit !important;
-            display: block !important;
-          `)
-        })
-        
-        // También aplanar los divs contenedores que tienen gap
-        const containerDivs = element.querySelectorAll("td > div.flex.flex-col")
-        const originalDivs: Array<{ el: HTMLElement; originalClassName: string; originalStyle: string }> = []
-        containerDivs.forEach((div) => {
-          const htmlDiv = div as HTMLElement
-          originalDivs.push({
-            el: htmlDiv,
-            originalClassName: htmlDiv.className,
-            originalStyle: htmlDiv.getAttribute("style") || "",
-          })
-          htmlDiv.className = ""
-          htmlDiv.setAttribute("style", `
-            display: block !important;
-            gap: 0 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          `)
-        })
-        
-        try {
-          // Usar scrollWidth y scrollHeight para capturar todo el contenido
-          const width = element.scrollWidth || rect.width
-          const height = element.scrollHeight || rect.height
+      const pdf = new jsPDF("l", "mm", "a4")
+      const pdfWidth = pdf.internal.pageSize.getWidth()
 
-          // Usar dom-to-image-more para generar la imagen
-          const dataUrl = await domtoimage.toPng(element, {
-            quality: 1.0,
-            bgcolor: "#ffffff",
-            width: width,
-            height: height,
-          })
+      const img = new Image()
+      img.src = dataUrl
+      await new Promise(res => (img.onload = res))
 
-          const pdf = new jsPDF("l", "mm", "a4")
-          const pdfWidth = pdf.internal.pageSize.getWidth()
-          
-          // Crear una imagen para obtener las dimensiones
-          const img = new Image()
-          img.src = dataUrl
-          await new Promise((resolve) => {
-            img.onload = resolve
-          })
-          
-          const pdfHeight = (img.height * pdfWidth) / img.width
-          pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight)
-          pdf.save(filename)
-          
-          toast({
-            title: "PDF exportado",
-            description: "El horario se ha exportado como PDF",
-          })
-        } finally {
-          // Restaurar contenido original de los badges
-          originalContent.forEach(({ el, originalHTML, originalClassName, originalStyle }) => {
-            el.innerHTML = originalHTML
-            el.className = originalClassName
-            if (originalStyle) {
-              el.setAttribute("style", originalStyle)
-            } else {
-              el.removeAttribute("style")
-            }
-          })
-          
-          // Restaurar divs contenedores
-          originalDivs.forEach(({ el, originalClassName, originalStyle }) => {
-            el.className = originalClassName
-            if (originalStyle) {
-              el.setAttribute("style", originalStyle)
-            } else {
-              el.removeAttribute("style")
-            }
-          })
+      const pdfHeight = (img.height * pdfWidth) / img.width
+      pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight)
+      pdf.save(filename)
+
+      restoreFlexDivs(cleanedFlex)
+
+      toast({
+        title: "PDF exportado",
+        description: "Se generó correctamente.",
+      })
+    } finally {
+      enablePseudoElements()
+      htmlElement.style.overflow = originalOverflow.overflow
+      htmlElement.style.overflowX = originalOverflow.overflowX
+      htmlElement.style.overflowY = originalOverflow.overflowY
+      setExporting(false)
+    }
+  }, [])
+
+  // Función para exportar a Excel
+  const exportExcel = useCallback(async (
+    weekDays: Date[],
+    employees: Empleado[],
+    shifts: Turno[],
+    schedule: Horario | null,
+    filename: string
+  ) => {
+    setExporting(true)
+    try {
+      const XLSX = await import("xlsx")
+
+      // Crear matriz de datos
+      const data: any[][] = []
+
+      // Fila de encabezados: Empleado + días de la semana
+      const headerRow = ["Empleado"]
+      weekDays.forEach((day) => {
+        headerRow.push(format(day, "EEE d MMM", { locale: es }))
+      })
+      data.push(headerRow)
+
+      // Función helper para obtener el texto del turno
+      const getShiftText = (assignment: ShiftAssignment | string, shiftMap: Map<string, Turno>): string => {
+        if (typeof assignment === "string") {
+          const shift = shiftMap.get(assignment)
+          return shift?.name || ""
         }
-      } finally {
-        // Restaurar estilos originales
-        htmlElement.style.overflow = originalOverflow
-        htmlElement.style.overflowX = originalOverflowX
-        htmlElement.style.overflowY = originalOverflowY
         
-        scrollableChildren.forEach(({ el, overflow, overflowX, overflowY }) => {
-          el.style.overflow = overflow
-          el.style.overflowX = overflowX
-          el.style.overflowY = overflowY
-        })
+        if (assignment.type === "franco") {
+          return "FRANCO"
+        }
+        
+        if (assignment.type === "medio_franco") {
+          if (assignment.startTime && assignment.endTime) {
+            return `${assignment.startTime} - ${assignment.endTime} (1/2 Franco)`
+          }
+          return "1/2 Franco"
+        }
+        
+        if (assignment.shiftId) {
+          const shift = shiftMap.get(assignment.shiftId)
+          if (!shift) return ""
+          
+          const start = assignment.startTime || shift.startTime
+          const end = assignment.endTime || shift.endTime
+          const start2 = assignment.startTime2 || shift.startTime2
+          const end2 = assignment.endTime2 || shift.endTime2
+          
+          if (start && end) {
+            if (start2 && end2) {
+              return `${start} - ${end}\n${start2} - ${end2}`
+            }
+            return `${start} - ${end}`
+          }
+          return shift.name
+        }
+        
+        return ""
       }
-    } catch (error: any) {
-      console.error("Error al exportar PDF:", error)
+
+      // Crear mapa de turnos para búsqueda rápida
+      const shiftMap = new Map(shifts.map((s) => [s.id, s]))
+
+      // Filas de datos: una por empleado
+      employees.forEach((employee) => {
+        const row = [employee.name]
+        
+        weekDays.forEach((day) => {
+          const dateStr = format(day, "yyyy-MM-dd")
+          const assignments = schedule?.assignments[dateStr]?.[employee.id]
+          
+          if (!assignments || (Array.isArray(assignments) && assignments.length === 0)) {
+            row.push("-")
+          } else {
+            // Convertir a array de ShiftAssignment
+            let assignmentArray: ShiftAssignment[] = []
+            if (Array.isArray(assignments)) {
+              if (assignments.length > 0 && typeof assignments[0] === "string") {
+                // Formato antiguo: string[]
+                assignmentArray = (assignments as string[]).map((shiftId) => ({
+                  shiftId,
+                  type: "shift" as const,
+                }))
+              } else {
+                // Formato nuevo: ShiftAssignment[]
+                assignmentArray = assignments as ShiftAssignment[]
+              }
+            }
+            
+            // Convertir asignaciones a texto
+            const texts = assignmentArray.map((a) => getShiftText(a, shiftMap)).filter(Boolean)
+            row.push(texts.join("\n") || "-")
+          }
+        })
+        
+        data.push(row)
+      })
+
+      // Crear workbook y worksheet
+      const ws = XLSX.utils.aoa_to_sheet(data)
+      
+      // Ajustar ancho de columnas
+      const colWidths = [{ wch: 20 }] // Columna de empleado
+      weekDays.forEach(() => colWidths.push({ wch: 15 }))
+      ws["!cols"] = colWidths
+
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, "Horario")
+
+      // Descargar archivo
+      XLSX.writeFile(wb, filename)
+
+      toast({
+        title: "Excel exportado",
+        description: "El archivo se descargó correctamente.",
+      })
+    } catch (error) {
+      console.error("Error al exportar a Excel:", error)
       toast({
         title: "Error",
-        description: error?.message || "Ocurrió un error al exportar el PDF. Verifica la consola para más detalles.",
+        description: "No se pudo exportar a Excel.",
         variant: "destructive",
       })
     } finally {
@@ -380,10 +370,5 @@ export function useExportSchedule() {
     }
   }, [toast])
 
-  return {
-    exporting,
-    exportImage,
-    exportPDF,
-  }
+  return { exporting, exportImage, exportPDF, exportExcel }
 }
-

@@ -27,7 +27,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   const { employees, shifts, loading: dataLoading } = useData()
   const { config } = useConfig()
   const { toast } = useToast()
-  const { exporting, exportImage, exportPDF } = useExportSchedule()
+  const { exporting, exportImage, exportPDF, exportExcel } = useExportSchedule()
 
   // Calcular rango del mes basado en mesInicioDia
   const monthStartDay = config?.mesInicioDia || 1
@@ -105,6 +105,16 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     await exportImage(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.png`)
   }, [exportImage])
 
+  const handleExportWeekExcel = useCallback(async (weekStartDate: Date, weekDays: Date[], weekSchedule: Horario | null) => {
+    await exportExcel(
+      weekDays,
+      employees,
+      shifts,
+      weekSchedule,
+      `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.xlsx`
+    )
+  }, [exportExcel, employees, shifts])
+
   const handleExportWeekPDF = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
     const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
     await exportPDF(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.pdf`)
@@ -154,6 +164,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
                 onAssignmentUpdate={handleAssignmentUpdate}
                 onExportImage={handleExportWeekImage}
                 onExportPDF={handleExportWeekPDF}
+                onExportExcel={() => handleExportWeekExcel(weekStartDate, weekDays, weekSchedule)}
                 exporting={exporting}
               />
             )

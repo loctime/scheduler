@@ -17,6 +17,7 @@ interface WeekScheduleProps {
   onAssignmentUpdate: (date: string, employeeId: string, assignments: any[]) => void
   onExportImage: (weekStartDate: Date, weekEndDate: Date) => void
   onExportPDF: (weekStartDate: Date, weekEndDate: Date) => void
+  onExportExcel?: () => void
   exporting: boolean
 }
 
@@ -30,6 +31,7 @@ export function WeekSchedule({
   onAssignmentUpdate,
   onExportImage,
   onExportPDF,
+  onExportExcel,
   exporting,
 }: WeekScheduleProps) {
   const weekStartDate = weekDays[0]
@@ -63,6 +65,27 @@ export function WeekSchedule({
               </>
             )}
           </Button>
+          {onExportExcel && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={onExportExcel} 
+              disabled={exporting}
+              aria-label="Exportar semana como Excel"
+            >
+              {exporting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Exportando...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Excel
+                </>
+              )}
+            </Button>
+          )}
           <Button 
             variant="outline" 
             size="sm"

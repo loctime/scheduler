@@ -123,3 +123,22 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* MODO EXPORTACIÓN: pseudo-elementos rellenan la celda */
+.exporting-image * {
+  position: relative !important;
+}
+
+.exporting-image *::before,
+.exporting-image *::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
