@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, getDoc } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -353,13 +353,34 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
         // Actualizar o crear en Firestore
         if (weekSchedule) {
-          // Actualizar existente
-          await updateDoc(doc(db, COLLECTIONS.SCHEDULES, scheduleId), {
+          // Actualizar existente - incluir todos los campos requeridos por las reglas de Firestore
+          // Asegurar que todos los campos tengan valores válidos (no vacíos)
+          // Incluir campos inmutables para que las reglas puedan verificar unchanged()
+          // Preservar valores originales exactos (null si es null, no incluir si es undefined)
+          const updateData: any = {
+            nombre: (weekSchedule.nombre?.trim() && weekSchedule.nombre.trim()) || scheduleNombre,
+            weekStart: (weekSchedule.weekStart?.trim() && weekSchedule.weekStart.trim()) || weekStartStr,
+            semanaInicio: (weekSchedule.semanaInicio?.trim() && weekSchedule.semanaInicio.trim()) || weekStartStr,
+            semanaFin: (weekSchedule.semanaFin?.trim() && weekSchedule.semanaFin.trim()) || weekEndStr,
             assignments: currentAssignments,
             updatedAt: serverTimestamp(),
-            modifiedBy: userId,
-            modifiedByName: userName,
-          })
+            modifiedBy: userId || null,
+            modifiedByName: userName || null,
+          }
+          
+          // Incluir campos inmutables solo si existen en el documento original
+          // Esto asegura que unchanged() funcione correctamente
+          if (weekSchedule.createdAt !== undefined) {
+            updateData.createdAt = weekSchedule.createdAt
+          }
+          if (weekSchedule.createdBy !== undefined) {
+            updateData.createdBy = weekSchedule.createdBy
+          }
+          if (weekSchedule.createdByName !== undefined) {
+            updateData.createdByName = weekSchedule.createdByName
+          }
+          
+          await updateDoc(doc(db, COLLECTIONS.SCHEDULES, scheduleId), updateData)
 
           toast({
             title: "Turnos actualizados",
@@ -548,13 +569,75 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
         // Actualizar o crear en Firestore
         if (weekSchedule) {
-          // Actualizar existente
-          await updateDoc(doc(db, COLLECTIONS.SCHEDULES, scheduleId), {
+          // Verificar que el usuario tenga el rol correcto
+          if (!userId) {
+            throw new Error("Usuario no autenticado")
+          }
+          
+          // Verificar rol del usuario (para diagnóstico)
+          try {
+            const userDocRef = doc(db, COLLECTIONS.USERS, userId)
+            const userDoc = await getDoc(userDocRef)
+            if (!userDoc.exists()) {
+              throw new Error(`El usuario ${userId} no tiene un documento en ${COLLECTIONS.USERS}. Por favor, cierra sesión y vuelve a iniciar sesión.`)
+            }
+            const userData = userDoc.data()
+            const userRole = userData?.role
+            console.log('[ScheduleCalendar] Verificación de usuario:', {
+              userId,
+              userRole,
+              hasRole: !!userRole,
+              userData: { ...userData, createdAt: userData?.createdAt ? 'timestamp' : undefined, updatedAt: userData?.updatedAt ? 'timestamp' : undefined },
+            })
+            
+            if (!userRole || (userRole !== 'user' && userRole !== 'admin' && userRole !== 'maxdev')) {
+              throw new Error(`El usuario no tiene un rol válido. Rol actual: ${userRole || 'ninguno'}. Se requiere: 'user', 'admin' o 'maxdev'`)
+            }
+          } catch (roleError: any) {
+            console.error('[ScheduleCalendar] Error verificando rol:', roleError)
+            if (roleError.message.includes('no tiene un documento')) {
+              throw roleError
+            }
+            // Continuar de todas formas, pero registrar el error
+          }
+          
+          // Actualizar existente - incluir todos los campos requeridos por las reglas de Firestore
+          // Asegurar que todos los campos tengan valores válidos (no vacíos)
+          // Incluir campos inmutables para que las reglas puedan verificar unchanged()
+          // Preservar valores originales exactos (null si es null, no incluir si es undefined)
+          const updateData: any = {
+            nombre: (weekSchedule.nombre?.trim() && weekSchedule.nombre.trim()) || scheduleNombre,
+            weekStart: (weekSchedule.weekStart?.trim() && weekSchedule.weekStart.trim()) || weekStartStr,
+            semanaInicio: (weekSchedule.semanaInicio?.trim() && weekSchedule.semanaInicio.trim()) || weekStartStr,
+            semanaFin: (weekSchedule.semanaFin?.trim() && weekSchedule.semanaFin.trim()) || weekEndStr,
             assignments: currentAssignments,
             updatedAt: serverTimestamp(),
-            modifiedBy: userId,
-            modifiedByName: userName,
+            modifiedBy: userId || null,
+            modifiedByName: userName || null,
+          }
+          
+          // Incluir campos inmutables - createdAt siempre debe estar presente
+          // createdBy y createdByName solo si existen en el documento original
+          if (weekSchedule.createdAt !== undefined && weekSchedule.createdAt !== null) {
+            updateData.createdAt = weekSchedule.createdAt
+          }
+          if (weekSchedule.createdBy !== undefined) {
+            updateData.createdBy = weekSchedule.createdBy
+          }
+          if (weekSchedule.createdByName !== undefined) {
+            updateData.createdByName = weekSchedule.createdByName
+          }
+          
+          console.log('[ScheduleCalendar] Actualizando asignaciones:', {
+            scheduleId,
+            hasCreatedAt: weekSchedule.createdAt !== undefined,
+            hasCreatedBy: weekSchedule.createdBy !== undefined,
+            hasCreatedByName: weekSchedule.createdByName !== undefined,
+            updateDataKeys: Object.keys(updateData),
+            userId,
           })
+          
+          await updateDoc(doc(db, COLLECTIONS.SCHEDULES, scheduleId), updateData)
 
           toast({
             title: "Turnos actualizados",
@@ -564,6 +647,11 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         // Si no existe, ya se creó arriba
       } catch (error: any) {
         console.error("Error al actualizar asignaciones:", error)
+        console.error("Error details:", {
+          code: error.code,
+          message: error.message,
+          stack: error.stack,
+        })
         toast({
           title: "Error",
           description: error.message || "Ocurrió un error al actualizar los turnos",

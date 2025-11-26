@@ -56,6 +56,24 @@ function unchanged(field) {
   return isUpdate() ? request.resource.data[field] == resource.data[field] : true;
 }
 
+// Inmutabilidad flexible - permite null/undefined
+function unchangedOrNull(field) {
+  return isUpdate() 
+    ? (
+        // Si el campo existe en ambos, deben ser iguales
+        (field in resource.data && field in request.resource.data && request.resource.data[field] == resource.data[field])
+        // O si no existe en ninguno
+        || (!(field in resource.data) && !(field in request.resource.data))
+        // O si ambos son null
+        || (resource.data[field] == null && request.resource.data[field] == null)
+        // O si no existe en el original y es null en la actualización
+        || (!(field in resource.data) && request.resource.data[field] == null)
+        // O si es null en el original y no existe en la actualización
+        || (resource.data[field] == null && !(field in request.resource.data))
+      )
+    : true;
+}
+
 // Tipos y validadores comunes
 function strBetween(field, min, max) {
   return request.resource.data[field] is string
