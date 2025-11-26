@@ -30,8 +30,9 @@ export function useExportSchedule() {
     setExporting(true)
     try {
       const html2canvas = (await import("html2canvas")).default
+      // Usar backgroundColor: null para evitar el parseo de colores modernos
       const canvas = await html2canvas(element, {
-        backgroundColor: "#ffffff",
+        backgroundColor: null,
         scale: 2,
         useCORS: true,
         allowTaint: false,
@@ -44,16 +45,40 @@ export function useExportSchedule() {
         throw new Error("No se pudo generar el canvas")
       }
 
-      const link = document.createElement("a")
-      link.download = filename
-      link.href = canvas.toDataURL("image/png", 1.0)
-      link.style.display = "none"
-      document.body.appendChild(link)
-      link.click()
-      // Esperar un poco antes de remover el link para asegurar que la descarga se inicie
-      setTimeout(() => {
-        document.body.removeChild(link)
-      }, 100)
+      // Agregar fondo blanco al canvas
+      const ctx = canvas.getContext("2d")
+      if (ctx) {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+        const data = imageData.data
+        
+        // Crear un nuevo canvas con fondo blanco
+        const newCanvas = document.createElement("canvas")
+        newCanvas.width = canvas.width
+        newCanvas.height = canvas.height
+        const newCtx = newCanvas.getContext("2d")
+        
+        if (newCtx) {
+          // Rellenar con fondo blanco
+          newCtx.fillStyle = "#ffffff"
+          newCtx.fillRect(0, 0, newCanvas.width, newCanvas.height)
+          // Dibujar el contenido original encima
+          newCtx.drawImage(canvas, 0, 0)
+          
+          const link = document.createElement("a")
+          link.download = filename
+          link.href = newCanvas.toDataURL("image/png", 1.0)
+          link.style.display = "none"
+          document.body.appendChild(link)
+          link.click()
+          setTimeout(() => {
+            document.body.removeChild(link)
+          }, 100)
+        } else {
+          throw new Error("No se pudo crear el contexto del canvas")
+        }
+      } else {
+        throw new Error("No se pudo obtener el contexto del canvas")
+      }
       
       toast({
         title: "Imagen exportada",
@@ -100,8 +125,9 @@ export function useExportSchedule() {
         import("jspdf").then((m) => m.default),
       ])
 
+      // Usar backgroundColor: null para evitar el parseo de colores modernos
       const canvas = await html2canvas(element, {
-        backgroundColor: "#ffffff",
+        backgroundColor: null,
         scale: 2,
         useCORS: true,
         allowTaint: false,
@@ -114,16 +140,38 @@ export function useExportSchedule() {
         throw new Error("No se pudo generar el canvas")
       }
 
-      const imgData = canvas.toDataURL("image/png", 1.0)
-      const pdf = new jsPDF("l", "mm", "a4")
-      const pdfWidth = pdf.internal.pageSize.getWidth()
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight)
-      pdf.save(filename)
-      toast({
-        title: "PDF exportado",
-        description: "El horario se ha exportado como PDF",
-      })
+      // Agregar fondo blanco al canvas
+      const ctx = canvas.getContext("2d")
+      if (ctx) {
+        // Crear un nuevo canvas con fondo blanco
+        const newCanvas = document.createElement("canvas")
+        newCanvas.width = canvas.width
+        newCanvas.height = canvas.height
+        const newCtx = newCanvas.getContext("2d")
+        
+        if (newCtx) {
+          // Rellenar con fondo blanco
+          newCtx.fillStyle = "#ffffff"
+          newCtx.fillRect(0, 0, newCanvas.width, newCanvas.height)
+          // Dibujar el contenido original encima
+          newCtx.drawImage(canvas, 0, 0)
+          
+          const imgData = newCanvas.toDataURL("image/png", 1.0)
+          const pdf = new jsPDF("l", "mm", "a4")
+          const pdfWidth = pdf.internal.pageSize.getWidth()
+          const pdfHeight = (newCanvas.height * pdfWidth) / newCanvas.width
+          pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight)
+          pdf.save(filename)
+          toast({
+            title: "PDF exportado",
+            description: "El horario se ha exportado como PDF",
+          })
+        } else {
+          throw new Error("No se pudo crear el contexto del canvas")
+        }
+      } else {
+        throw new Error("No se pudo obtener el contexto del canvas")
+      }
     } catch (error: any) {
       console.error("Error al exportar PDF:", error)
       toast({

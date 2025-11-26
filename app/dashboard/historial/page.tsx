@@ -42,7 +42,7 @@ export default function HistorialPage() {
     // Obtener historial ordenado por fecha descendente
     const historialQuery = query(collection(db, COLLECTIONS.HISTORIAL), orderBy("createdAt", "desc"), limit(50))
     const unsubscribeHistorial = onSnapshot(historialQuery, (snapshot) => {
-      setHistorial(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
+      setHistorial(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as HistorialItem)))
     }, (error) => {
       console.error("Error en listener de historial:", error)
     })
