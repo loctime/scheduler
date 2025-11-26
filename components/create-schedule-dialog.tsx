@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import { Empleado, Turno, Horario } from "@/lib/types"
+import { Empleado, Turno, Horario, ShiftAssignmentValue, ShiftAssignment } from "@/lib/types"
 
 interface CreateScheduleDialogProps {
   open: boolean
@@ -39,9 +39,34 @@ export function CreateScheduleDialog({
   const [assignments, setAssignments] = useState<Record<string, Record<string, string[]>>>({})
   const [nombre, setNombre] = useState("")
 
+  // Función para convertir ShiftAssignmentValue a string[]
+  const convertToStringArray = (value: ShiftAssignmentValue): string[] => {
+    if (Array.isArray(value) && value.length > 0) {
+      // Si el primer elemento es string, es string[]
+      if (typeof value[0] === "string") {
+        return value as string[]
+      }
+      // Si es ShiftAssignment[], extraer shiftId
+      return (value as ShiftAssignment[])
+        .map((assignment) => assignment.shiftId)
+        .filter((id): id is string => id !== undefined)
+    }
+    return []
+  }
+
   useEffect(() => {
     if (existingSchedule?.assignments) {
-      setAssignments(existingSchedule.assignments)
+      // Convertir ShiftAssignmentValue a string[] para cada asignación
+      const convertedAssignments: Record<string, Record<string, string[]>> = {}
+      Object.keys(existingSchedule.assignments).forEach((date) => {
+        convertedAssignments[date] = {}
+        Object.keys(existingSchedule.assignments[date]).forEach((employeeId) => {
+          convertedAssignments[date][employeeId] = convertToStringArray(
+            existingSchedule.assignments[date][employeeId]
+          )
+        })
+      })
+      setAssignments(convertedAssignments)
     } else {
       setAssignments({})
     }
