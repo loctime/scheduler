@@ -478,15 +478,14 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                     : false
                   
                   // Obtener estilo de fondo del turno (puede incluir gradientes)
-                  const backgroundStyle = !isOutOfRange 
-                    ? getCellBackgroundStyle(employee.id, dateStr)
-                    : undefined
+                  const backgroundStyle = getCellBackgroundStyle(employee.id, dateStr)
                   
                   // Determinar clases para hover y selected cuando hay color de fondo
                   const hasBackgroundStyle = !!backgroundStyle
+                  const isClickable = !readonly && (onShiftUpdate || onAssignmentUpdate) && !isOutOfRange
                   const hoverClass = hasBackgroundStyle
-                    ? "hover:brightness-95"
-                    : !readonly && (onShiftUpdate || onAssignmentUpdate)
+                    ? isClickable ? "hover:brightness-95" : ""
+                    : isClickable
                     ? "hover:bg-muted/50"
                     : ""
                   const selectedClass = hasBackgroundStyle
@@ -509,9 +508,8 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                     !!extendedStart && primaryShiftAssignment?.startTime === extendedStart
                   const hasExtraAfter = !!extendedEnd && primaryShiftAssignment?.endTime === extendedEnd
                   const showExtraActions =
-                    !readonly &&
+                    isClickable &&
                     !!onAssignmentUpdate &&
-                    !isOutOfRange &&
                     !!primaryShiftAssignment &&
                     !!primaryShift?.startTime &&
                     !!primaryShift?.endTime
@@ -521,9 +519,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                     <td
                       key={day.toISOString()}
                       className={`border-r border-border px-4 py-4 last:border-r-0 relative ${
-                        isOutOfRange 
-                          ? "bg-muted/20 opacity-50"
-                          : !readonly && (onShiftUpdate || onAssignmentUpdate)
+                        isClickable
                           ? `cursor-pointer transition-all ${hoverClass} active:brightness-90`
                           : ""
                       } ${selectedClass}`}
