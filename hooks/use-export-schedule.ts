@@ -28,62 +28,81 @@ export function useExportSchedule() {
     }
 
     setExporting(true)
+    const htmlElement = element as HTMLElement
     try {
-      const html2canvas = (await import("html2canvas")).default
-      // Usar backgroundColor: null para evitar el parseo de colores modernos
-      const canvas = await html2canvas(element, {
-        backgroundColor: null,
-        scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        logging: false,
-        width: rect.width,
-        height: rect.height,
+      // Guardar estilos originales para restaurarlos después
+      const originalOverflow = htmlElement.style.overflow
+      const originalOverflowX = htmlElement.style.overflowX
+      const originalOverflowY = htmlElement.style.overflowY
+      
+      // Remover overflow temporalmente para capturar todo el contenido
+      htmlElement.style.overflow = "visible"
+      htmlElement.style.overflowX = "visible"
+      htmlElement.style.overflowY = "visible"
+      
+      // También remover overflow de elementos hijos con scroll
+      const scrollableChildren: Array<{ el: HTMLElement; overflow: string; overflowX: string; overflowY: string }> = []
+      const allChildren = element.querySelectorAll("*")
+      allChildren.forEach((child) => {
+        const htmlChild = child as HTMLElement
+        if (htmlChild && htmlChild.style) {
+          const computedStyle = window.getComputedStyle(htmlChild)
+          if (computedStyle.overflow !== "visible" || computedStyle.overflowX !== "visible" || computedStyle.overflowY !== "visible") {
+            scrollableChildren.push({
+              el: htmlChild,
+              overflow: htmlChild.style.overflow || "",
+              overflowX: htmlChild.style.overflowX || "",
+              overflowY: htmlChild.style.overflowY || "",
+            })
+            htmlChild.style.overflow = "visible"
+            htmlChild.style.overflowX = "visible"
+            htmlChild.style.overflowY = "visible"
+          }
+        }
       })
       
-      if (!canvas) {
-        throw new Error("No se pudo generar el canvas")
+      try {
+        // Usar dom-to-image-more que maneja mejor los colores modernos
+        const domtoimage = await import("dom-to-image-more")
+        
+        // Usar scrollWidth y scrollHeight para capturar todo el contenido
+        const width = element.scrollWidth || rect.width
+        const height = element.scrollHeight || rect.height
+        
+        const dataUrl = await domtoimage.toPng(element, {
+          quality: 1.0,
+          bgcolor: "#ffffff",
+          width: width,
+          height: height,
+        })
+        
+        const link = document.createElement("a")
+        link.download = filename
+        link.href = dataUrl
+        link.style.display = "none"
+        document.body.appendChild(link)
+        link.click()
+        setTimeout(() => {
+          document.body.removeChild(link)
+        }, 100)
+        
+        toast({
+          title: "Imagen exportada",
+          description: "El horario se ha exportado como imagen",
+        })
+      } finally {
+        // Restaurar estilos originales
+        htmlElement.style.overflow = originalOverflow
+        htmlElement.style.overflowX = originalOverflowX
+        htmlElement.style.overflowY = originalOverflowY
+        
+        scrollableChildren.forEach(({ el, overflow, overflowX, overflowY }) => {
+          el.style.overflow = overflow
+          el.style.overflowX = overflowX
+          el.style.overflowY = overflowY
+        })
       }
 
-      // Agregar fondo blanco al canvas
-      const ctx = canvas.getContext("2d")
-      if (ctx) {
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-        const data = imageData.data
-        
-        // Crear un nuevo canvas con fondo blanco
-        const newCanvas = document.createElement("canvas")
-        newCanvas.width = canvas.width
-        newCanvas.height = canvas.height
-        const newCtx = newCanvas.getContext("2d")
-        
-        if (newCtx) {
-          // Rellenar con fondo blanco
-          newCtx.fillStyle = "#ffffff"
-          newCtx.fillRect(0, 0, newCanvas.width, newCanvas.height)
-          // Dibujar el contenido original encima
-          newCtx.drawImage(canvas, 0, 0)
-          
-          const link = document.createElement("a")
-          link.download = filename
-          link.href = newCanvas.toDataURL("image/png", 1.0)
-          link.style.display = "none"
-          document.body.appendChild(link)
-          link.click()
-          setTimeout(() => {
-            document.body.removeChild(link)
-          }, 100)
-        } else {
-          throw new Error("No se pudo crear el contexto del canvas")
-        }
-      } else {
-        throw new Error("No se pudo obtener el contexto del canvas")
-      }
-      
-      toast({
-        title: "Imagen exportada",
-        description: "El horario se ha exportado como imagen",
-      })
     } catch (error: any) {
       console.error("Error al exportar imagen:", error)
       toast({
@@ -119,58 +138,86 @@ export function useExportSchedule() {
     }
 
     setExporting(true)
+    const htmlElement = element as HTMLElement
     try {
-      const [html2canvas, jsPDF] = await Promise.all([
-        import("html2canvas").then((m) => m.default),
-        import("jspdf").then((m) => m.default),
-      ])
-
-      // Usar backgroundColor: null para evitar el parseo de colores modernos
-      const canvas = await html2canvas(element, {
-        backgroundColor: null,
-        scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        logging: false,
-        width: rect.width,
-        height: rect.height,
+      // Guardar estilos originales para restaurarlos después
+      const originalOverflow = htmlElement.style.overflow
+      const originalOverflowX = htmlElement.style.overflowX
+      const originalOverflowY = htmlElement.style.overflowY
+      
+      // Remover overflow temporalmente para capturar todo el contenido
+      htmlElement.style.overflow = "visible"
+      htmlElement.style.overflowX = "visible"
+      htmlElement.style.overflowY = "visible"
+      
+      // También remover overflow de elementos hijos con scroll
+      const scrollableChildren: Array<{ el: HTMLElement; overflow: string; overflowX: string; overflowY: string }> = []
+      const allChildren = element.querySelectorAll("*")
+      allChildren.forEach((child) => {
+        const htmlChild = child as HTMLElement
+        if (htmlChild && htmlChild.style) {
+          const computedStyle = window.getComputedStyle(htmlChild)
+          if (computedStyle.overflow !== "visible" || computedStyle.overflowX !== "visible" || computedStyle.overflowY !== "visible") {
+            scrollableChildren.push({
+              el: htmlChild,
+              overflow: htmlChild.style.overflow || "",
+              overflowX: htmlChild.style.overflowX || "",
+              overflowY: htmlChild.style.overflowY || "",
+            })
+            htmlChild.style.overflow = "visible"
+            htmlChild.style.overflowX = "visible"
+            htmlChild.style.overflowY = "visible"
+          }
+        }
       })
       
-      if (!canvas) {
-        throw new Error("No se pudo generar el canvas")
-      }
+      try {
+        const [domtoimage, jsPDF] = await Promise.all([
+          import("dom-to-image-more"),
+          import("jspdf").then((m) => m.default),
+        ])
 
-      // Agregar fondo blanco al canvas
-      const ctx = canvas.getContext("2d")
-      if (ctx) {
-        // Crear un nuevo canvas con fondo blanco
-        const newCanvas = document.createElement("canvas")
-        newCanvas.width = canvas.width
-        newCanvas.height = canvas.height
-        const newCtx = newCanvas.getContext("2d")
+        // Usar scrollWidth y scrollHeight para capturar todo el contenido
+        const width = element.scrollWidth || rect.width
+        const height = element.scrollHeight || rect.height
+
+        // Usar dom-to-image-more para generar la imagen
+        const dataUrl = await domtoimage.toPng(element, {
+          quality: 1.0,
+          bgcolor: "#ffffff",
+          width: width,
+          height: height,
+        })
+
+        const pdf = new jsPDF("l", "mm", "a4")
+        const pdfWidth = pdf.internal.pageSize.getWidth()
         
-        if (newCtx) {
-          // Rellenar con fondo blanco
-          newCtx.fillStyle = "#ffffff"
-          newCtx.fillRect(0, 0, newCanvas.width, newCanvas.height)
-          // Dibujar el contenido original encima
-          newCtx.drawImage(canvas, 0, 0)
-          
-          const imgData = newCanvas.toDataURL("image/png", 1.0)
-          const pdf = new jsPDF("l", "mm", "a4")
-          const pdfWidth = pdf.internal.pageSize.getWidth()
-          const pdfHeight = (newCanvas.height * pdfWidth) / newCanvas.width
-          pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight)
-          pdf.save(filename)
-          toast({
-            title: "PDF exportado",
-            description: "El horario se ha exportado como PDF",
-          })
-        } else {
-          throw new Error("No se pudo crear el contexto del canvas")
-        }
-      } else {
-        throw new Error("No se pudo obtener el contexto del canvas")
+        // Crear una imagen para obtener las dimensiones
+        const img = new Image()
+        img.src = dataUrl
+        await new Promise((resolve) => {
+          img.onload = resolve
+        })
+        
+        const pdfHeight = (img.height * pdfWidth) / img.width
+        pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight)
+        pdf.save(filename)
+        
+        toast({
+          title: "PDF exportado",
+          description: "El horario se ha exportado como PDF",
+        })
+      } finally {
+        // Restaurar estilos originales
+        htmlElement.style.overflow = originalOverflow
+        htmlElement.style.overflowX = originalOverflowX
+        htmlElement.style.overflowY = originalOverflowY
+        
+        scrollableChildren.forEach(({ el, overflow, overflowX, overflowY }) => {
+          el.style.overflow = overflow
+          el.style.overflowX = overflowX
+          el.style.overflowY = overflowY
+        })
       }
     } catch (error: any) {
       console.error("Error al exportar PDF:", error)
