@@ -35,6 +35,11 @@ export default function ConfiguracionPage() {
     if (!user) return
 
     const loadConfig = async () => {
+      if (!db) {
+        setLoading(false)
+        return
+      }
+
       try {
         setLoading(true)
         const configRef = doc(db, COLLECTIONS.CONFIG, "general")
@@ -78,21 +83,49 @@ export default function ConfiguracionPage() {
   }, [user, toast])
 
   const handleSave = async () => {
-    if (!user) return
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "No estás autenticado",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!db) {
+      toast({
+        title: "Error",
+        description: "Firebase no está configurado",
+        variant: "destructive",
+      })
+      return
+    }
 
     try {
       setSaving(true)
       const configRef = doc(db, COLLECTIONS.CONFIG, "general")
-      await setDoc(
-        configRef,
-        {
-          ...config,
-          updatedAt: serverTimestamp(),
-          updatedBy: user.uid,
-          updatedByName: user.displayName || user.email,
-        },
-        { merge: true }
-      )
+      
+      // Preparar datos asegurándonos de que todos los campos estén presentes
+      const dataToSave: any = {
+        mesInicioDia: config.mesInicioDia,
+        horasMaximasPorDia: config.horasMaximasPorDia,
+        semanaInicioDia: config.semanaInicioDia,
+        mostrarFinesDeSemana: config.mostrarFinesDeSemana,
+        formatoHora24: config.formatoHora24,
+        minutosDescanso: config.minutosDescanso,
+        horasMinimasParaDescanso: config.horasMinimasParaDescanso,
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid,
+        updatedByName: user.displayName || user.email || "",
+      }
+
+      // Si el documento no existe, agregar createdAt
+      const configSnap = await getDoc(configRef)
+      if (!configSnap.exists()) {
+        dataToSave.createdAt = serverTimestamp()
+      }
+
+      await setDoc(configRef, dataToSave, { merge: true })
 
       toast({
         title: "Configuración guardada",
@@ -100,9 +133,15 @@ export default function ConfiguracionPage() {
       })
     } catch (error: any) {
       console.error("Error saving config:", error)
+      console.error("Error details:", {
+        code: error.code,
+        message: error.message,
+        user: user?.uid,
+        config: config,
+      })
       toast({
         title: "Error",
-        description: "No se pudo guardar la configuración",
+        description: error.message || "No se pudo guardar la configuración",
         variant: "destructive",
       })
     } finally {

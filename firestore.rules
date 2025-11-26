@@ -227,31 +227,11 @@ service cloud.firestore {
     
     // Colección: apps/horarios/config
     match /apps/horarios/config/{configId} {
-      allow read: if isAuth() && isHorariosUser();
-      allow create: if isAuth() && isHorariosUser()
-        && isInt('mesInicioDia')
-        && isInt('horasMaximasPorDia')
-        && isInt('semanaInicioDia')
-        && isBool('mostrarFinesDeSemana')
-        && isBool('formatoHora24')
-        && isInt('minutosDescanso')
-        && (isInt('horasMinimasParaDescanso') || request.resource.data.horasMinimasParaDescanso is number)
-        && isTs('createdAt')
-        && isTs('updatedAt')
-        && (isStringOrNull('updatedBy') || request.resource.data.updatedBy == uid())
-        && isStringOrNull('updatedByName');
-      allow update: if isAuth() && isHorariosUser()
-        && isInt('mesInicioDia')
-        && isInt('horasMaximasPorDia')
-        && isInt('semanaInicioDia')
-        && isBool('mostrarFinesDeSemana')
-        && isBool('formatoHora24')
-        && isInt('minutosDescanso')
-        && (isInt('horasMinimasParaDescanso') || request.resource.data.horasMinimasParaDescanso is number)
-        && unchanged('createdAt')
-        && isTs('updatedAt')
-        && (isStringOrNull('updatedBy') || request.resource.data.updatedBy == uid())
-        && isStringOrNull('updatedByName');
+      // Permitir lectura a cualquier usuario autenticado
+      allow read: if isAuth();
+      // Permitir crear/actualizar a cualquier usuario autenticado
+      // Reglas completamente permisivas
+      allow create, update: if isAuth();
       allow delete: if isAuth() && isHorariosAdmin();
     }
     

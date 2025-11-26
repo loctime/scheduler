@@ -16,6 +16,7 @@ interface ScheduleGridProps {
   onShiftUpdate?: (date: string, employeeId: string, shiftIds: string[]) => void // formato antiguo (compatibilidad)
   onAssignmentUpdate?: (date: string, employeeId: string, assignments: ShiftAssignment[]) => void // nuevo formato
   readonly?: boolean
+  monthRange?: { startDate: Date; endDate: Date } // Rango del mes para deshabilitar días fuera del rango
 }
 
 export const ScheduleGrid = memo(function ScheduleGrid({
@@ -26,6 +27,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   onShiftUpdate,
   onAssignmentUpdate,
   readonly = false,
+  monthRange,
 }: ScheduleGridProps) {
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
 
@@ -184,7 +186,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
 
   return (
     <>
-      <Card id="schedule-grid" className="overflow-hidden border border-border bg-card">
+      <Card className="overflow-hidden border border-border bg-card">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
           <thead>
@@ -217,15 +219,22 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                   const dateStr = format(day, "yyyy-MM-dd")
                   const employeeShifts = getEmployeeShifts(employee.id, dateStr)
                   const isSelected = selectedCell?.date === dateStr && selectedCell?.employeeId === employee.id
+                  // Verificar si el día está fuera del rango del mes
+                  const isOutOfRange = monthRange 
+                    ? (day < monthRange.startDate || day > monthRange.endDate)
+                    : false
+                  
                   return (
                     <td
                       key={day.toISOString()}
                       className={`border-r border-border px-2 py-3 last:border-r-0 ${
-                        !readonly && (onShiftUpdate || onAssignmentUpdate)
+                        isOutOfRange 
+                          ? "bg-muted/20 opacity-50"
+                          : !readonly && (onShiftUpdate || onAssignmentUpdate)
                           ? "cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted"
                           : ""
                       } ${isSelected ? "bg-primary/10" : ""}`}
-                      onClick={() => handleCellClick(dateStr, employee.id)}
+                      onClick={() => !isOutOfRange && handleCellClick(dateStr, employee.id)}
                     >
                       <div className="flex flex-col gap-1">
                         {(() => {

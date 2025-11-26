@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card"
 import { Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { ScheduleGrid } from "@/components/schedule-grid"
 import { useToast } from "@/hooks/use-toast"
-import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns"
+import { format, startOfWeek, addDays, addWeeks, subWeeks, subMonths, addMonths, startOfMonth, endOfMonth, setDate } from "date-fns"
 import { es } from "date-fns/locale"
 import { useData } from "@/contexts/data-context"
 import { Horario, ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
@@ -21,15 +21,72 @@ interface ScheduleCalendarProps {
 
 export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   const [schedules, setSchedules] = useState<Horario[]>([])
-  const [currentWeek, setCurrentWeek] = useState(new Date())
+  const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedSchedule, setSelectedSchedule] = useState<Horario | null>(null)
   const [exporting, setExporting] = useState(false)
   const { toast } = useToast()
   const { employees, shifts, loading: dataLoading } = useData()
   const { config } = useConfig()
 
-  const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 })
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+  // Calcular rango del mes basado en mesInicioDia
+  const monthStartDay = config?.mesInicioDia || 1
+  const weekStartsOn = (config?.semanaInicioDia || 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
+
+  // Calcular inicio y fin del mes personalizado
+  const getCustomMonthRange = useCallback((date: Date) => {
+    const year = date.getFullYear()
+    const month = date.getMonth()
+    
+    // Fecha de inicio: mesInicioDia del mes actual
+    const startDate = setDate(new Date(year, month, 1), monthStartDay)
+    
+    // Fecha de fin: día anterior al mesInicioDia del mes siguiente
+    const nextMonth = addMonths(new Date(year, month, 1), 1)
+    const endDate = addDays(setDate(nextMonth, monthStartDay), -1)
+    
+    return { startDate, endDate }
+  }, [monthStartDay])
+
+  // Generar todas las semanas del mes
+  const getMonthWeeks = useCallback((date: Date): Date[][] => {
+    const { startDate, endDate } = getCustomMonthRange(date)
+    const weeks: Date[][] = []
+    
+    // Encontrar el inicio de la semana que contiene el startDate
+    // La semana debe comenzar en el día configurado (semanaInicioDia)
+    let weekStart = startOfWeek(startDate, { weekStartsOn })
+    
+    // Generar semanas hasta cubrir todo el rango
+    while (weekStart <= endDate) {
+      const week: Date[] = []
+      
+      // Generar 7 días completos de la semana
+      for (let i = 0; i < 7; i++) {
+        const day = addDays(weekStart, i)
+        week.push(new Date(day))
+      }
+      
+      // Verificar si la semana tiene al menos un día dentro del rango del mes
+      const hasDaysInRange = week.some((day) => day >= startDate && day <= endDate)
+      
+      if (hasDaysInRange) {
+        weeks.push(week)
+      }
+      
+      // Mover a la siguiente semana
+      weekStart = addWeeks(weekStart, 1)
+      
+      // Si el inicio de la siguiente semana ya pasó el endDate, terminar
+      if (weekStart > endDate && week[week.length - 1] > endDate) {
+        break
+      }
+    }
+    
+    return weeks
+  }, [getCustomMonthRange, weekStartsOn])
+
+  const monthRange = getCustomMonthRange(currentMonth)
+  const monthWeeks = getMonthWeeks(currentMonth)
 
   useEffect(() => {
     // Solo crear listeners si el usuario está autenticado
@@ -49,9 +106,8 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         })) as Horario[]
         setSchedules(schedulesData)
 
-        // Load current week schedule
-        const currentWeekSchedule = schedulesData.find((s) => s.weekStart === format(weekStart, "yyyy-MM-dd"))
-        setSelectedSchedule(currentWeekSchedule || null)
+        // Los horarios se cargan por semana individual, no necesitamos buscar uno específico aquí
+        // setSelectedSchedule se manejará por semana individual
       },
       (error) => {
         console.error("Error en listener de horarios:", error)
@@ -66,10 +122,10 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     return () => {
       if (unsubscribeSchedules) unsubscribeSchedules()
     }
-  }, [weekStart, user, toast])
+  }, [user, toast])
 
   const handleExportImage = useCallback(async () => {
-    const element = document.getElementById("schedule-grid")
+    const element = document.getElementById("schedule-month-container")
     if (!element) return
 
     setExporting(true)
@@ -81,7 +137,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         scale: 2,
       })
       const link = document.createElement("a")
-      link.download = `horario-${format(weekStart, "yyyy-MM-dd")}.png`
+      link.download = `horario-${format(monthRange.startDate, "yyyy-MM-dd")}.png`
       link.href = canvas.toDataURL()
       link.click()
       toast({
@@ -97,10 +153,10 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     } finally {
       setExporting(false)
     }
-  }, [weekStart, toast])
+  }, [monthRange.startDate, toast])
 
   const handleExportPDF = useCallback(async () => {
-    const element = document.getElementById("schedule-grid")
+    const element = document.getElementById("schedule-month-container")
     if (!element) return
 
     setExporting(true)
@@ -120,7 +176,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
       const pdfWidth = pdf.internal.pageSize.getWidth()
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width
       pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight)
-      pdf.save(`horario-${format(weekStart, "yyyy-MM-dd")}.pdf`)
+      pdf.save(`horario-${format(monthRange.startDate, "yyyy-MM-dd")}.pdf`)
       toast({
         title: "PDF exportado",
         description: "El horario se ha exportado como PDF",
@@ -134,10 +190,16 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     } finally {
       setExporting(false)
     }
-  }, [weekStart, toast])
+  }, [monthRange.startDate, toast])
+
+  // Función helper para obtener el horario de una semana específica
+  const getWeekSchedule = useCallback((weekStartDate: Date) => {
+    const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+    return schedules.find((s) => s.weekStart === weekStartStr) || null
+  }, [schedules])
 
   const handleShiftUpdate = useCallback(
-    async (date: string, employeeId: string, shiftIds: string[]) => {
+    async (date: string, employeeId: string, shiftIds: string[], weekStartDate?: Date) => {
       try {
         // Validaciones básicas
         if (employees.length === 0) {
@@ -158,8 +220,13 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
           return
         }
 
-        const weekStartStr = format(weekStart, "yyyy-MM-dd")
-        const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd")
+        // Determinar la semana basada en la fecha o la fecha proporcionada
+        const dateObj = weekStartDate ? weekStartDate : startOfWeek(new Date(date), { weekStartsOn })
+        const weekStartStr = format(dateObj, "yyyy-MM-dd")
+        const weekEndStr = format(addDays(dateObj, 6), "yyyy-MM-dd")
+        
+        // Obtener el horario de esa semana específica
+        const weekSchedule = getWeekSchedule(dateObj)
         const userName = user?.displayName || user?.email || "Usuario desconocido"
         const userId = user?.uid || ""
 
@@ -211,19 +278,19 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
           })
         } else {
           // Actualizar horario existente
-          scheduleId = selectedSchedule.id
-          scheduleNombre = selectedSchedule.nombre || scheduleNombre
+          scheduleId = weekSchedule.id
+          scheduleNombre = weekSchedule.nombre || scheduleNombre
 
           // Guardar versión anterior en historial antes de actualizar
           const historyData = {
-            horarioId: selectedSchedule.id,
+            horarioId: weekSchedule.id,
             nombre: scheduleNombre,
-            semanaInicio: selectedSchedule.semanaInicio || weekStartStr,
-            semanaFin: selectedSchedule.semanaFin || weekEndStr,
-            assignments: { ...selectedSchedule.assignments },
-            createdAt: selectedSchedule.updatedAt || selectedSchedule.createdAt || serverTimestamp(),
-            createdBy: selectedSchedule.createdBy || selectedSchedule.modifiedBy || userId,
-            createdByName: selectedSchedule.createdByName || selectedSchedule.modifiedByName || userName,
+            semanaInicio: weekSchedule.semanaInicio || weekStartStr,
+            semanaFin: weekSchedule.semanaFin || weekEndStr,
+            assignments: { ...weekSchedule.assignments },
+            createdAt: weekSchedule.updatedAt || weekSchedule.createdAt || serverTimestamp(),
+            createdBy: weekSchedule.createdBy || weekSchedule.modifiedBy || userId,
+            createdByName: weekSchedule.createdByName || weekSchedule.modifiedByName || userName,
             accion: "modificado" as const,
             versionAnterior: true,
           }
@@ -232,7 +299,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
           // Actualizar assignments
           currentAssignments = {
-            ...selectedSchedule.assignments,
+            ...weekSchedule.assignments,
           }
           if (!currentAssignments[date]) {
             currentAssignments[date] = {}
@@ -285,7 +352,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         }
 
         // Actualizar o crear en Firestore
-        if (selectedSchedule) {
+        if (weekSchedule) {
           // Actualizar existente
           await updateDoc(doc(db, COLLECTIONS.SCHEDULES, scheduleId), {
             assignments: currentAssignments,
@@ -309,7 +376,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         })
       }
     },
-    [selectedSchedule, weekStart, user, employees, shifts, config, toast],
+    [user, employees, shifts, config, toast, getWeekSchedule],
   )
 
   // Nueva función para manejar asignaciones con horarios ajustados
@@ -344,8 +411,11 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
           return
         }
 
-        const weekStartStr = format(weekStart, "yyyy-MM-dd")
-        const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd")
+        // Determinar la semana basada en la fecha
+        const dateObj = new Date(date)
+        const weekStartDate = startOfWeek(dateObj, { weekStartsOn })
+        const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+        const weekEndStr = format(addDays(weekStartDate, 6), "yyyy-MM-dd")
         const userName = user?.displayName || user?.email || "Usuario desconocido"
         const userId = user?.uid || ""
 
@@ -353,8 +423,11 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         let currentAssignments: Record<string, Record<string, ShiftAssignmentValue>> = {}
         let scheduleNombre = `Semana del ${weekStartStr}`
 
+        // Obtener el horario de esa semana específica
+        const weekSchedule = getWeekSchedule(weekStartDate)
+
         // Si no existe horario, crearlo. Si existe, actualizarlo
-        if (!selectedSchedule) {
+        if (!weekSchedule) {
           // Crear nuevo horario con formato nuevo
           currentAssignments = {
             [date]: {
@@ -397,19 +470,19 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
           })
         } else {
           // Actualizar horario existente
-          scheduleId = selectedSchedule.id
-          scheduleNombre = selectedSchedule.nombre || scheduleNombre
+          scheduleId = weekSchedule.id
+          scheduleNombre = weekSchedule.nombre || scheduleNombre
 
           // Guardar versión anterior en historial antes de actualizar
           const historyData = {
-            horarioId: selectedSchedule.id,
+            horarioId: weekSchedule.id,
             nombre: scheduleNombre,
-            semanaInicio: selectedSchedule.semanaInicio || weekStartStr,
-            semanaFin: selectedSchedule.semanaFin || weekEndStr,
-            assignments: { ...selectedSchedule.assignments },
-            createdAt: selectedSchedule.updatedAt || selectedSchedule.createdAt || serverTimestamp(),
-            createdBy: selectedSchedule.createdBy || selectedSchedule.modifiedBy || userId,
-            createdByName: selectedSchedule.createdByName || selectedSchedule.modifiedByName || userName,
+            semanaInicio: weekSchedule.semanaInicio || weekStartStr,
+            semanaFin: weekSchedule.semanaFin || weekEndStr,
+            assignments: { ...weekSchedule.assignments },
+            createdAt: weekSchedule.updatedAt || weekSchedule.createdAt || serverTimestamp(),
+            createdBy: weekSchedule.createdBy || weekSchedule.modifiedBy || userId,
+            createdByName: weekSchedule.createdByName || weekSchedule.modifiedByName || userName,
             accion: "modificado" as const,
             versionAnterior: true,
           }
@@ -418,7 +491,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
           // Actualizar assignments (convertir asignaciones antiguas al nuevo formato si es necesario)
           currentAssignments = {
-            ...selectedSchedule.assignments,
+            ...weekSchedule.assignments,
           }
           if (!currentAssignments[date]) {
             currentAssignments[date] = {}
@@ -474,7 +547,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         }
 
         // Actualizar o crear en Firestore
-        if (selectedSchedule) {
+        if (weekSchedule) {
           // Actualizar existente
           await updateDoc(doc(db, COLLECTIONS.SCHEDULES, scheduleId), {
             assignments: currentAssignments,
@@ -498,7 +571,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         })
       }
     },
-    [selectedSchedule, weekStart, user, employees, shifts, config, toast],
+    [user, employees, shifts, config, toast, getWeekSchedule],
   )
 
   return (
@@ -506,20 +579,20 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))} aria-label="Semana anterior">
+          <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} aria-label="Mes anterior">
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <h2 className="text-2xl font-bold text-foreground">
-            Semana del {format(weekStart, "d", { locale: es })} -{" "}
-            {format(addDays(weekStart, 6), "d 'de' MMMM, yyyy", { locale: es })}
+            {format(monthRange.startDate, "d 'de' MMMM", { locale: es })} -{" "}
+            {format(monthRange.endDate, "d 'de' MMMM, yyyy", { locale: es })}
           </h2>
-          <Button variant="outline" size="icon" onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))} aria-label="Semana siguiente">
+          <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} aria-label="Mes siguiente">
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
 
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExportImage} disabled={exporting || !selectedSchedule} aria-label="Exportar como imagen">
+          <Button variant="outline" onClick={handleExportImage} disabled={exporting} aria-label="Exportar como imagen">
             {exporting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -563,13 +636,29 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
           <p className="text-muted-foreground">No hay turnos configurados. Agrega turnos para crear horarios.</p>
         </Card>
       ) : (
-        <ScheduleGrid
-          weekDays={weekDays}
-          employees={employees}
-          shifts={shifts}
-          schedule={selectedSchedule}
-          onAssignmentUpdate={handleAssignmentUpdate}
-        />
+        <div id="schedule-month-container" className="space-y-6">
+          {monthWeeks.map((weekDays, weekIndex) => {
+            const weekStartDate = weekDays[0]
+            const weekSchedule = getWeekSchedule(weekStartDate)
+            
+            return (
+              <div key={weekIndex} className="space-y-2">
+                <h3 className="text-lg font-semibold text-foreground">
+                  Semana del {format(weekDays[0], "d", { locale: es })} -{" "}
+                  {format(weekDays[weekDays.length - 1], "d 'de' MMMM", { locale: es })}
+                </h3>
+                <ScheduleGrid
+                  weekDays={weekDays}
+                  employees={employees}
+                  shifts={shifts}
+                  schedule={weekSchedule}
+                  onAssignmentUpdate={handleAssignmentUpdate}
+                  monthRange={monthRange}
+                />
+              </div>
+            )
+          })}
+        </div>
       )}
     </div>
   )
