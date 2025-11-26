@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Turno, ShiftAssignment } from "@/lib/types"
 import { Pencil, ChevronDown, ChevronUp, RotateCcw } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface ShiftSelectorPopoverProps {
   open: boolean
@@ -55,11 +56,15 @@ export function ShiftSelectorPopover({
   employeeName,
   date,
 }: ShiftSelectorPopoverProps) {
+  const { toast } = useToast()
   const [tempSelected, setTempSelected] = useState<string[]>(selectedShiftIds)
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null)
   const [adjustedTimes, setAdjustedTimes] = useState<Record<string, Partial<ShiftAssignment>>>({})
   // Estado para rastrear extensiones de +30 min
   const [extensions, setExtensions] = useState<Record<string, { before: boolean; after: boolean }>>({})
+  // Estado para manejar francos
+  const [specialType, setSpecialType] = useState<"shift" | "franco" | "medio_franco" | null>(null)
+  const [medioFrancoTime, setMedioFrancoTime] = useState({ startTime: "", endTime: "" })
 
   // Rastrear el estado anterior de 'open'
   const prevOpenRef = useRef(false)
@@ -71,17 +76,39 @@ export function ShiftSelectorPopover({
     if (justOpened) {
       console.log('[ShiftSelector] Dialog just opened, initializing with selectedShiftIds:', selectedShiftIds)
       
-      // Inicializar el estado solo cuando se abre por primera vez
-      setTempSelected(selectedShiftIds)
+      // Verificar si hay asignaciones especiales (franco o medio_franco)
+      const hasFranco = selectedAssignments.some(a => a.type === "franco")
+      const hasMedioFranco = selectedAssignments.some(a => a.type === "medio_franco")
       
-      // Cargar horarios ajustados si existen
+      if (hasFranco) {
+        setSpecialType("franco")
+        setTempSelected([])
+        setMedioFrancoTime({ startTime: "", endTime: "" })
+      } else if (hasMedioFranco) {
+        const medioFranco = selectedAssignments.find(a => a.type === "medio_franco")
+        setSpecialType("medio_franco")
+        setTempSelected([])
+        setMedioFrancoTime({
+          startTime: medioFranco?.startTime || "",
+          endTime: medioFranco?.endTime || "",
+        })
+      } else {
+        setSpecialType("shift")
+        // Inicializar el estado solo cuando se abre por primera vez
+        setTempSelected(selectedShiftIds)
+        setMedioFrancoTime({ startTime: "", endTime: "" })
+      }
+      
+      // Cargar horarios ajustados si existen (solo para turnos normales)
       const adjusted: Record<string, Partial<ShiftAssignment>> = {}
       selectedAssignments.forEach((assignment) => {
-        adjusted[assignment.shiftId] = {
-          startTime: assignment.startTime,
-          endTime: assignment.endTime,
-          startTime2: assignment.startTime2,
-          endTime2: assignment.endTime2,
+        if (assignment.shiftId && assignment.type !== "franco" && assignment.type !== "medio_franco") {
+          adjusted[assignment.shiftId] = {
+            startTime: assignment.startTime,
+            endTime: assignment.endTime,
+            startTime2: assignment.startTime2,
+            endTime2: assignment.endTime2,
+          }
         }
       })
       setAdjustedTimes(adjusted)
@@ -90,20 +117,22 @@ export function ShiftSelectorPopover({
       // Cargar estado de extensiones basado en horarios ajustados
       const loadedExtensions: Record<string, { before: boolean; after: boolean }> = {}
       selectedAssignments.forEach((assignment) => {
-        const shift = shifts.find((s) => s.id === assignment.shiftId)
-        if (shift && assignment.startTime && assignment.endTime) {
-          // Verificar si hay extensión de 30 min antes (startTime es 30 min antes del base)
-          const baseStart30MinBefore = adjustTime(shift.startTime || "", -30)
-          const hasBefore = assignment.startTime === baseStart30MinBefore
-          
-          // Verificar si hay extensión de 30 min después (endTime es 30 min después del base)
-          const baseEnd30MinAfter = adjustTime(shift.endTime || "", 30)
-          const hasAfter = assignment.endTime === baseEnd30MinAfter
-          
-          if (hasBefore || hasAfter) {
-            loadedExtensions[assignment.shiftId] = {
-              before: hasBefore,
-              after: hasAfter,
+        if (assignment.shiftId) {
+          const shift = shifts.find((s) => s.id === assignment.shiftId)
+          if (shift && assignment.startTime && assignment.endTime) {
+            // Verificar si hay extensión de 30 min antes (startTime es 30 min antes del base)
+            const baseStart30MinBefore = adjustTime(shift.startTime || "", -30)
+            const hasBefore = assignment.startTime === baseStart30MinBefore
+            
+            // Verificar si hay extensión de 30 min después (endTime es 30 min después del base)
+            const baseEnd30MinAfter = adjustTime(shift.endTime || "", 30)
+            const hasAfter = assignment.endTime === baseEnd30MinAfter
+            
+            if (hasBefore || hasAfter) {
+              loadedExtensions[assignment.shiftId] = {
+                before: hasBefore,
+                after: hasAfter,
+              }
             }
           }
         }
@@ -174,15 +203,41 @@ export function ShiftSelectorPopover({
 
   const handleSave = () => {
     if (onAssignmentsChange) {
-      // Convertir a formato ShiftAssignment[]
+      // Si es franco, retornar array con un solo elemento tipo franco
+      if (specialType === "franco") {
+        onAssignmentsChange([{ type: "franco" }])
+        onOpenChange(false)
+        return
+      }
+      
+      // Si es medio franco, validar que tenga horario
+      if (specialType === "medio_franco") {
+        if (!medioFrancoTime.startTime || !medioFrancoTime.endTime) {
+          toast({
+            title: "Error",
+            description: "Debes especificar un horario para el medio franco",
+            variant: "destructive",
+          })
+          return
+        }
+        onAssignmentsChange([{
+          type: "medio_franco",
+          startTime: medioFrancoTime.startTime,
+          endTime: medioFrancoTime.endTime,
+        }])
+        onOpenChange(false)
+        return
+      }
+      
+      // Comportamiento normal para turnos
       const assignments: ShiftAssignment[] = tempSelected.map((shiftId) => {
         const shift = shifts.find((s) => s.id === shiftId)
         if (!shift) {
-          return { shiftId }
+          return { shiftId, type: "shift" }
         }
         
         const adjusted = adjustedTimes[shiftId] || {}
-        const result: ShiftAssignment = { shiftId }
+        const result: ShiftAssignment = { shiftId, type: "shift" }
         
         // Solo incluir campos si fueron ajustados y son diferentes del turno base
         if (adjusted.startTime !== undefined && adjusted.startTime !== shift.startTime) {
@@ -211,21 +266,44 @@ export function ShiftSelectorPopover({
       console.log('[ShiftSelector] Guardando asignaciones:', assignments)
       onAssignmentsChange(assignments)
     } else if (onShiftChange) {
-      // Modo compatible: solo pasar IDs
+      // Modo compatible: solo pasar IDs (no soporta francos)
       onShiftChange(tempSelected)
     }
     onOpenChange(false)
   }
 
   const handleCancel = () => {
-    setTempSelected(selectedShiftIds)
+    // Restaurar estado inicial
+    const hasFranco = selectedAssignments.some(a => a.type === "franco")
+    const hasMedioFranco = selectedAssignments.some(a => a.type === "medio_franco")
+    
+    if (hasFranco) {
+      setSpecialType("franco")
+      setTempSelected([])
+      setMedioFrancoTime({ startTime: "", endTime: "" })
+    } else if (hasMedioFranco) {
+      const medioFranco = selectedAssignments.find(a => a.type === "medio_franco")
+      setSpecialType("medio_franco")
+      setTempSelected([])
+      setMedioFrancoTime({
+        startTime: medioFranco?.startTime || "",
+        endTime: medioFranco?.endTime || "",
+      })
+    } else {
+      setSpecialType("shift")
+      setTempSelected(selectedShiftIds)
+      setMedioFrancoTime({ startTime: "", endTime: "" })
+    }
+    
     const adjusted: Record<string, Partial<ShiftAssignment>> = {}
     selectedAssignments.forEach((assignment) => {
-      adjusted[assignment.shiftId] = {
-        startTime: assignment.startTime,
-        endTime: assignment.endTime,
-        startTime2: assignment.startTime2,
-        endTime2: assignment.endTime2,
+      if (assignment.shiftId && assignment.type !== "franco" && assignment.type !== "medio_franco") {
+        adjusted[assignment.shiftId] = {
+          startTime: assignment.startTime,
+          endTime: assignment.endTime,
+          startTime2: assignment.startTime2,
+          endTime2: assignment.endTime2,
+        }
       }
     })
     setAdjustedTimes(adjusted)
@@ -266,9 +344,79 @@ export function ShiftSelectorPopover({
         </DialogHeader>
         
         <div className="flex-1 overflow-y-auto space-y-4 py-4">
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Turnos disponibles:</Label>
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+          {/* Opciones de franco */}
+          <div className="space-y-3 border-b pb-4">
+            <Label className="text-sm font-medium">Estado del día:</Label>
+            <div className="grid grid-cols-3 gap-2">
+              <Button
+                type="button"
+                variant={specialType === "franco" ? "default" : "outline"}
+                onClick={() => {
+                  setSpecialType("franco")
+                  setTempSelected([]) // Limpiar turnos seleccionados
+                  setMedioFrancoTime({ startTime: "", endTime: "" })
+                }}
+                className="w-full"
+              >
+                Franco
+              </Button>
+              <Button
+                type="button"
+                variant={specialType === "medio_franco" ? "default" : "outline"}
+                onClick={() => {
+                  setSpecialType("medio_franco")
+                  setTempSelected([]) // Limpiar turnos seleccionados
+                }}
+                className="w-full"
+              >
+                1/2 Franco
+              </Button>
+              <Button
+                type="button"
+                variant={specialType === "shift" || specialType === null ? "default" : "outline"}
+                onClick={() => {
+                  setSpecialType("shift")
+                  setMedioFrancoTime({ startTime: "", endTime: "" })
+                }}
+                className="w-full"
+              >
+                Turno Normal
+              </Button>
+            </div>
+            
+            {/* Si es medio franco, mostrar inputs de horario */}
+            {specialType === "medio_franco" && (
+              <div className="space-y-2 pt-2">
+                <Label className="text-xs font-medium">Horario del medio franco (normalmente 4 horas):</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Hora Inicio</Label>
+                    <Input
+                      type="time"
+                      value={medioFrancoTime.startTime}
+                      onChange={(e) => setMedioFrancoTime({ ...medioFrancoTime, startTime: e.target.value })}
+                      className="text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Hora Fin</Label>
+                    <Input
+                      type="time"
+                      value={medioFrancoTime.endTime}
+                      onChange={(e) => setMedioFrancoTime({ ...medioFrancoTime, endTime: e.target.value })}
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Lista de turnos (solo mostrar si es turno normal) */}
+          {specialType !== "franco" && (
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Turnos disponibles:</Label>
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto">
               {shifts.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No hay turnos disponibles</p>
               ) : (
@@ -701,6 +849,7 @@ export function ShiftSelectorPopover({
               )}
             </div>
           </div>
+          )}
         </div>
         
         <DialogFooter>

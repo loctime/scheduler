@@ -105,13 +105,6 @@ match /apps/horarios/schedules/{horarioId} {
     && nonEmptyString('semanaInicio')
     && nonEmptyString('semanaFin')
     && request.resource.data.assignments is map
-    && (
-      unchanged('createdAt') || 
-      !('createdAt' in resource.data) ||
-      (resource.data.createdAt == null && request.resource.data.createdAt == null)
-    )
-    && unchangedOrNull('createdBy')
-    && unchangedOrNull('createdByName')
     && isTs('updatedAt')
     && (isStringOrNull('modifiedBy') || request.resource.data.modifiedBy == uid())
     && isStringOrNull('modifiedByName');

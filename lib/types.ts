@@ -21,7 +21,8 @@ export interface Turno {
 
 // Asignación de turno con horarios ajustados opcionales
 export interface ShiftAssignment {
-  shiftId: string
+  shiftId?: string // Opcional para franco/medio_franco
+  type?: "shift" | "franco" | "medio_franco" // Tipo de asignación (por defecto "shift")
   startTime?: string // horario ajustado (opcional, si no existe usa el del turno base)
   endTime?: string // horario ajustado (opcional)
   startTime2?: string // segunda franja ajustada (opcional)

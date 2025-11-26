@@ -192,6 +192,76 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     }
   }, [monthRange.startDate, toast])
 
+  const handleExportWeekImage = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
+    const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
+    const element = document.getElementById(weekId)
+    if (!element) return
+
+    setExporting(true)
+    try {
+      // Lazy load html2canvas
+      const html2canvas = (await import("html2canvas")).default
+      const canvas = await html2canvas(element, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+      })
+      const link = document.createElement("a")
+      link.download = `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.png`
+      link.href = canvas.toDataURL()
+      link.click()
+      toast({
+        title: "Imagen exportada",
+        description: "La semana se ha exportado como imagen",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Ocurrió un error al exportar la imagen",
+        variant: "destructive",
+      })
+    } finally {
+      setExporting(false)
+    }
+  }, [toast])
+
+  const handleExportWeekPDF = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
+    const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
+    const element = document.getElementById(weekId)
+    if (!element) return
+
+    setExporting(true)
+    try {
+      // Lazy load ambas librerías
+      const [html2canvas, jsPDF] = await Promise.all([
+        import("html2canvas").then((m) => m.default),
+        import("jspdf").then((m) => m.default),
+      ])
+
+      const canvas = await html2canvas(element, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+      })
+      const imgData = canvas.toDataURL("image/png")
+      const pdf = new jsPDF("l", "mm", "a4")
+      const pdfWidth = pdf.internal.pageSize.getWidth()
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight)
+      pdf.save(`horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.pdf`)
+      toast({
+        title: "PDF exportado",
+        description: "La semana se ha exportado como PDF",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Ocurrió un error al exportar el PDF",
+        variant: "destructive",
+      })
+    } finally {
+      setExporting(false)
+    }
+  }, [toast])
+
   // Función helper para obtener el horario de una semana específica
   const getWeekSchedule = useCallback((weekStartDate: Date) => {
     const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
@@ -523,35 +593,38 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
           }
         }
 
-        // Validar solapamientos (necesita convertir a formato compatible)
-        // Por ahora mantenemos la validación básica
-        const shiftIds = assignments.map((a) => a.shiftId)
-        const overlaps = validateScheduleAssignments(
-          { [date]: { [employeeId]: shiftIds } },
-          employees,
-          shifts
-        )
-        const relevantOverlaps = overlaps.filter(
-          (o) => o.employeeId === employeeId && o.date === date,
-        )
-        if (relevantOverlaps.length > 0) {
-          const overlapMessages = relevantOverlaps.map((o) => o.message).join("\n")
-          toast({
-            title: "Advertencia: Solapamientos detectados",
-            description: overlapMessages,
-            variant: "destructive",
-          })
+        // Validar solapamientos (filtrar francos y medio francos)
+        const shiftIds = assignments
+          .filter((a) => a.type !== "franco" && a.type !== "medio_franco" && a.shiftId)
+          .map((a) => a.shiftId!)
+        if (shiftIds.length > 0) {
+          const overlaps = validateScheduleAssignments(
+            { [date]: { [employeeId]: shiftIds } },
+            employees,
+            shifts
+          )
+          const relevantOverlaps = overlaps.filter(
+            (o) => o.employeeId === employeeId && o.date === date,
+          )
+          if (relevantOverlaps.length > 0) {
+            const overlapMessages = relevantOverlaps.map((o) => o.message).join("\n")
+            toast({
+              title: "Advertencia: Solapamientos detectados",
+              description: overlapMessages,
+              variant: "destructive",
+            })
+          }
         }
 
-        // Validar horas máximas por día (necesita adaptar para horarios ajustados)
+        // Validar horas máximas por día (soporta francos y medio francos)
         if (config) {
           const minutosDescanso = config.minutosDescanso || 30
           const horasMinimasParaDescanso = config.horasMinimasParaDescanso || 6
           const horasMaximasPorDia = config.horasMaximasPorDia || 8
 
-          // Por ahora validamos con los IDs de turnos (las validaciones necesitarán actualizarse)
+          // Pasar las asignaciones completas para que calculateDailyHours maneje francos
           const dailyValidation = validateDailyHours(
-            shiftIds,
+            assignments,
             shifts,
             horasMaximasPorDia,
             minutosDescanso,
@@ -670,7 +743,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
           <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} aria-label="Mes anterior">
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <h2 className="text-2xl font-bold text-foreground">
+          <h2 className="text-3xl font-bold text-foreground">
             {format(monthRange.startDate, "d 'de' MMMM", { locale: es })} -{" "}
             {format(monthRange.endDate, "d 'de' MMMM, yyyy", { locale: es })}
           </h2>
@@ -680,7 +753,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         </div>
 
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExportImage} disabled={exporting} aria-label="Exportar como imagen">
+          <Button variant="outline" onClick={handleExportImage} disabled={exporting} aria-label="Exportar mes completo como imagen">
             {exporting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -689,11 +762,11 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
             ) : (
               <>
                 <Download className="mr-2 h-4 w-4" />
-                Imagen
+                Imagen (Mes completo)
               </>
             )}
           </Button>
-          <Button variant="outline" onClick={handleExportPDF} disabled={exporting || !selectedSchedule} aria-label="Exportar como PDF">
+          <Button variant="outline" onClick={handleExportPDF} disabled={exporting} aria-label="Exportar mes completo como PDF">
             {exporting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -702,7 +775,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
             ) : (
               <>
                 <Download className="mr-2 h-4 w-4" />
-                PDF
+                PDF (Mes completo)
               </>
             )}
           </Button>
@@ -727,14 +800,58 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         <div id="schedule-month-container" className="space-y-6">
           {monthWeeks.map((weekDays, weekIndex) => {
             const weekStartDate = weekDays[0]
+            const weekEndDate = weekDays[weekDays.length - 1]
             const weekSchedule = getWeekSchedule(weekStartDate)
+            const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
             
             return (
-              <div key={weekIndex} className="space-y-2">
-                <h3 className="text-lg font-semibold text-foreground">
-                  Semana del {format(weekDays[0], "d", { locale: es })} -{" "}
-                  {format(weekDays[weekDays.length - 1], "d 'de' MMMM", { locale: es })}
-                </h3>
+              <div key={weekIndex} id={weekId} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-2xl font-semibold text-foreground">
+                    Semana del {format(weekDays[0], "d", { locale: es })} -{" "}
+                    {format(weekDays[weekDays.length - 1], "d 'de' MMMM", { locale: es })}
+                  </h3>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleExportWeekImage(weekStartDate, weekEndDate)} 
+                      disabled={exporting}
+                      aria-label="Exportar semana como imagen"
+                    >
+                      {exporting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Exportando...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="mr-2 h-4 w-4" />
+                          Imagen
+                        </>
+                      )}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleExportWeekPDF(weekStartDate, weekEndDate)} 
+                      disabled={exporting}
+                      aria-label="Exportar semana como PDF"
+                    >
+                      {exporting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Exportando...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="mr-2 h-4 w-4" />
+                          PDF
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
                 <ScheduleGrid
                   weekDays={weekDays}
                   employees={employees}

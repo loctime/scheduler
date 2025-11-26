@@ -120,9 +120,10 @@ export function calculateShiftHours(
 /**
  * Calcula las horas trabajadas totales de un empleado en un día
  * Considera todos los turnos asignados y aplica descanso cuando corresponde
+ * Soporta ShiftAssignment[] para manejar francos y medio francos
  */
 export function calculateDailyHours(
-  shiftIds: string[],
+  shiftIds: string[] | any[], // Puede ser string[] o ShiftAssignment[]
   shifts: Turno[],
   minutosDescanso: number = 30,
   horasMinimasParaDescanso: number = 6
@@ -130,6 +131,47 @@ export function calculateDailyHours(
   const shiftMap = new Map(shifts.map((s) => [s.id, s]))
   let totalHours = 0
 
+  // Si es array de ShiftAssignment
+  if (shiftIds.length > 0 && typeof shiftIds[0] === "object" && "type" in shiftIds[0]) {
+    const assignments = shiftIds as any[]
+    assignments.forEach((assignment) => {
+      // Ignorar francos
+      if (assignment.type === "franco") {
+        return
+      }
+      
+      // Calcular horas de medio franco
+      if (assignment.type === "medio_franco") {
+        if (assignment.startTime && assignment.endTime) {
+          const [hStart, mStart] = assignment.startTime.split(":").map(Number)
+          const [hEnd, mEnd] = assignment.endTime.split(":").map(Number)
+          const start = hStart * 60 + mStart
+          const end = hEnd * 60 + mEnd
+          const totalMinutes = end - start
+          totalHours += totalMinutes / 60
+        }
+        return
+      }
+      
+      // Turno normal
+      if (assignment.shiftId) {
+        const shift = shiftMap.get(assignment.shiftId)
+        if (shift) {
+          // Usar horarios ajustados si existen, sino usar los del turno base
+          const tempShift: any = { ...shift }
+          if (assignment.startTime) tempShift.startTime = assignment.startTime
+          if (assignment.endTime) tempShift.endTime = assignment.endTime
+          if (assignment.startTime2) tempShift.startTime2 = assignment.startTime2
+          if (assignment.endTime2) tempShift.endTime2 = assignment.endTime2
+          
+          totalHours += calculateShiftHours(tempShift, minutosDescanso, horasMinimasParaDescanso)
+        }
+      }
+    })
+    return totalHours
+  }
+
+  // Comportamiento original para string[]
   shiftIds.forEach((shiftId) => {
     const shift = shiftMap.get(shiftId)
     if (shift) {
@@ -176,9 +218,10 @@ export function validateWeeklyHours(
 
 /**
  * Valida horas máximas por día considerando descansos
+ * Soporta string[] o ShiftAssignment[] para manejar francos y medio francos
  */
 export function validateDailyHours(
-  shiftIds: string[],
+  shiftIds: string[] | any[],
   shifts: Turno[],
   maxHours: number,
   minutosDescanso: number = 30,

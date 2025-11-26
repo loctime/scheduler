@@ -54,10 +54,13 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     if (value.length === 0) return []
     // Si es string[] (formato antiguo), convertir
     if (typeof value[0] === "string") {
-      return (value as string[]).map((shiftId) => ({ shiftId }))
+      return (value as string[]).map((shiftId) => ({ shiftId, type: "shift" as const }))
     }
     // Si es ShiftAssignment[] (formato nuevo)
-    return value as ShiftAssignment[]
+    return (value as ShiftAssignment[]).map((a) => ({
+      ...a,
+      type: a.type || "shift" as const,
+    }))
   }, [])
 
   // Memoizar función de obtener turnos de empleado (IDs)
@@ -93,6 +96,20 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   // Obtener horario para mostrar (ajustado o base)
   const getShiftDisplayTime = useCallback(
     (shiftId: string, assignment?: ShiftAssignment): string => {
+      // Si es medio franco, usar sus horarios directamente
+      if (assignment?.type === "medio_franco") {
+        if (assignment.startTime && assignment.endTime) {
+          return `${assignment.startTime} - ${assignment.endTime}`
+        }
+        return "1/2 Franco"
+      }
+      
+      // Si es franco, no debería llegar aquí, pero por seguridad:
+      if (assignment?.type === "franco") {
+        return "FRANCO"
+      }
+      
+      // Comportamiento normal para turnos
       const shift = getShiftInfo(shiftId)
       if (!shift) return ""
 
@@ -191,17 +208,17 @@ export const ScheduleGrid = memo(function ScheduleGrid({
           <table className="w-full border-collapse">
           <thead>
             <tr className="border-b border-border bg-muted/50">
-              <th className="min-w-[180px] border-r border-border px-4 py-3 text-left text-sm font-semibold text-foreground">
+              <th className="min-w-[220px] border-r border-border px-6 py-4 text-left text-xl font-semibold text-foreground">
                 Empleado
               </th>
               {weekDays.map((day) => (
                 <th
                   key={day.toISOString()}
-                  className="min-w-[140px] border-r border-border px-4 py-3 text-center text-sm font-semibold text-foreground last:border-r-0"
+                  className="min-w-[180px] border-r border-border px-6 py-4 text-center text-xl font-semibold text-foreground last:border-r-0"
                 >
                   <div className="flex flex-col">
                     <span className="capitalize">{format(day, "EEEE", { locale: es })}</span>
-                    <span className="text-xs font-normal text-muted-foreground">
+                    <span className="text-base font-normal text-muted-foreground">
                       {format(day, "d MMM", { locale: es })}
                     </span>
                   </div>
@@ -212,7 +229,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
           <tbody>
             {employees.map((employee) => (
               <tr key={employee.id} className="border-b border-border last:border-b-0">
-                <td className="border-r border-border bg-muted/30 px-4 py-3 font-medium text-foreground">
+                <td className="border-r border-border bg-muted/30 px-6 py-4 text-lg font-medium text-foreground">
                   {employee.name}
                 </td>
                 {weekDays.map((day) => {
@@ -227,7 +244,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                   return (
                     <td
                       key={day.toISOString()}
-                      className={`border-r border-border px-2 py-3 last:border-r-0 ${
+                      className={`border-r border-border px-4 py-4 last:border-r-0 ${
                         isOutOfRange 
                           ? "bg-muted/20 opacity-50"
                           : !readonly && (onShiftUpdate || onAssignmentUpdate)
@@ -236,23 +253,51 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                       } ${isSelected ? "bg-primary/10" : ""}`}
                       onClick={() => !isOutOfRange && handleCellClick(dateStr, employee.id)}
                     >
-                      <div className="flex flex-col gap-1">
+                      <div className="flex flex-col gap-2">
                         {(() => {
                           const assignments = getEmployeeAssignments(employee.id, dateStr)
                           if (assignments.length === 0) {
-                            return <span className="text-center text-xs text-muted-foreground">-</span>
+                            return <span className="text-center text-lg text-muted-foreground">-</span>
                           }
-                          return assignments.map((assignment) => {
-                            const shift = getShiftInfo(assignment.shiftId)
+                          return assignments.map((assignment, idx) => {
+                            // Manejar franco
+                            if (assignment.type === "franco") {
+                              return (
+                                <Badge
+                                  key={`franco-${idx}`}
+                                  className="justify-center text-base py-2 px-3 bg-gray-500 text-white"
+                                >
+                                  FRANCO
+                                </Badge>
+                              )
+                            }
+                            
+                            // Manejar medio franco
+                            if (assignment.type === "medio_franco") {
+                              const displayTime = assignment.startTime && assignment.endTime
+                                ? `${assignment.startTime} - ${assignment.endTime}`
+                                : "1/2 Franco"
+                              return (
+                                <Badge
+                                  key={`medio-franco-${idx}`}
+                                  className="justify-center text-base py-2 px-3 bg-orange-500 text-white"
+                                >
+                                  {displayTime} (1/2 Franco)
+                                </Badge>
+                              )
+                            }
+                            
+                            // Comportamiento normal para turnos
+                            const shift = getShiftInfo(assignment.shiftId || "")
                             if (!shift) return null
-                            const displayTime = getShiftDisplayTime(assignment.shiftId, assignment)
+                            const displayTime = getShiftDisplayTime(assignment.shiftId || "", assignment)
 
                             // Si no hay horario para mostrar, mostrar el nombre del turno como fallback
                             if (!displayTime) {
                               return (
                                 <Badge
                                   key={assignment.shiftId}
-                                  className="justify-center text-xs"
+                                  className="justify-center text-base py-2 px-3"
                                   style={{
                                     backgroundColor: shift.color,
                                     color: "#ffffff",
@@ -266,7 +311,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                             return (
                               <Badge
                                 key={assignment.shiftId}
-                                className="justify-center text-xs"
+                                className="justify-center text-base py-2 px-3"
                                 style={{
                                   backgroundColor: shift.color,
                                   color: "#ffffff",
