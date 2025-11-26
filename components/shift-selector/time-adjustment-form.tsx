@@ -4,14 +4,14 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { ChevronDown, ChevronUp, RotateCcw } from "lucide-react"
-import { Turno } from "@/lib/types"
+import { Turno, ShiftAssignment } from "@/lib/types"
 
 interface TimeAdjustmentFormProps {
   shift: Turno
   isEditing: boolean
-  adjustedTimes: Record<string, Partial<any>>
+  adjustedTimes: Record<string, Partial<ShiftAssignment>>
   getDisplayTime: (shiftId: string, field: "startTime" | "endTime" | "startTime2" | "endTime2") => string
-  onUpdateTime: (shiftId: string, field: keyof any, value: string) => void
+  onUpdateTime: (shiftId: string, field: keyof ShiftAssignment, value: string) => void
   onAdjustTime: (shiftId: string, field: "startTime" | "endTime" | "startTime2" | "endTime2", minutes: number) => void
   onResetTime: (shiftId: string, field: "startTime" | "endTime" | "startTime2" | "endTime2") => void
   onResetAll: (shiftId: string) => void

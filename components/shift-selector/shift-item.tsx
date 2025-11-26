@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Pencil } from "lucide-react"
-import { Turno } from "@/lib/types"
+import { Turno, ShiftAssignment } from "@/lib/types"
 import { TimeAdjustmentForm } from "./time-adjustment-form"
 import { adjustTime } from "@/lib/utils"
 
@@ -14,12 +14,12 @@ interface ShiftItemProps {
   isSelected: boolean
   isEditing: boolean
   hasAdjustments: boolean
-  adjustedTimes: Record<string, Partial<any>>
+  adjustedTimes: Record<string, Partial<ShiftAssignment>>
   extensions: Record<string, { before: boolean; after: boolean }>
   onToggle: (shiftId: string) => void
   onEdit: (shiftId: string) => void
   getDisplayTime: (shiftId: string, field: "startTime" | "endTime" | "startTime2" | "endTime2") => string
-  onUpdateTime: (shiftId: string, field: keyof any, value: string) => void
+  onUpdateTime: (shiftId: string, field: keyof ShiftAssignment, value: string) => void
   onAdjustTime: (shiftId: string, field: "startTime" | "endTime" | "startTime2" | "endTime2", minutes: number) => void
   onResetTime: (shiftId: string, field: "startTime" | "endTime" | "startTime2" | "endTime2") => void
   onResetAll: (shiftId: string) => void
@@ -210,7 +210,7 @@ export function ShiftItem({
           onAdjustTime={onAdjustTime}
           onResetTime={onResetTime}
           onResetAll={onResetAll}
-          hasAdjustments={hasAdjustments}
+          hasAdjustments={(shiftId: string) => hasAdjustments}
         />
       )}
     </div>

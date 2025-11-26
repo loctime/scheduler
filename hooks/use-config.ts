@@ -11,6 +11,11 @@ export function useConfig() {
 
   useEffect(() => {
     const loadConfig = async () => {
+      if (!db) {
+        setLoading(false)
+        return
+      }
+      
       try {
         const configRef = doc(db, COLLECTIONS.CONFIG, "general")
         const configSnap = await getDoc(configRef)
@@ -48,11 +53,7 @@ export function useConfig() {
       }
     }
 
-    if (db) {
-      loadConfig()
-    } else {
-      setLoading(false)
-    }
+    loadConfig()
   }, [])
 
   return { config, loading }
