@@ -44,8 +44,10 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     if (typeof value[0] === "string") {
       return value as string[]
     }
-    // Si es ShiftAssignment[] (formato nuevo)
-    return (value as ShiftAssignment[]).map((a) => a.shiftId)
+    // Si es ShiftAssignment[] (formato nuevo), extraer shiftId y filtrar undefined
+    return (value as ShiftAssignment[])
+      .map((a) => a.shiftId)
+      .filter((id): id is string => id !== undefined)
   }, [])
 
   // Helper: convertir ShiftAssignmentValue a ShiftAssignment[]
