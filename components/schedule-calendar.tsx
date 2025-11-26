@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { collection, query, orderBy, onSnapshot } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
@@ -9,16 +9,29 @@ import { Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { format, subMonths, addMonths } from "date-fns"
 import { useData } from "@/contexts/data-context"
-import { Horario } from "@/lib/types"
+import { Horario, ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
 import { useConfig } from "@/hooks/use-config"
 import { getCustomMonthRange, getMonthWeeks } from "@/lib/utils"
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { useScheduleUpdates } from "@/hooks/use-schedule-updates"
 import { MonthHeader } from "@/components/schedule-calendar/month-header"
 import { WeekSchedule } from "@/components/schedule-calendar/week-schedule"
+import { calculateDailyHours } from "@/lib/validations"
+import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 
 interface ScheduleCalendarProps {
   user: any
+}
+
+const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAssignment[] => {
+  if (!value || !Array.isArray(value) || value.length === 0) return []
+  if (typeof value[0] === "string") {
+    return (value as string[]).map((shiftId) => ({ shiftId, type: "shift" as const }))
+  }
+  return (value as ShiftAssignment[]).map((assignment) => ({
+    ...assignment,
+    type: assignment.type || "shift",
+  }))
 }
 
 export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
@@ -120,6 +133,78 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     await exportPDF(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.pdf`)
   }, [exportPDF])
 
+  const employeeMonthlyStats = useMemo<Record<string, EmployeeMonthlyStats>>(() => {
+    const stats: Record<string, EmployeeMonthlyStats> = {}
+    employees.forEach((employee) => {
+      stats[employee.id] = { francos: 0, horasExtras: 0 }
+    })
+
+    if (employees.length === 0 || shifts.length === 0) {
+      return stats
+    }
+
+    const minutosDescanso = config?.minutosDescanso ?? 30
+    const horasMinimasParaDescanso = config?.horasMinimasParaDescanso ?? 6
+
+    monthWeeks.forEach((weekDays) => {
+      const weekSchedule = getWeekSchedule(weekDays[0])
+      if (!weekSchedule?.assignments) return
+
+      weekDays.forEach((day) => {
+        if (day < monthRange.startDate || day > monthRange.endDate) return
+
+        const dateStr = format(day, "yyyy-MM-dd")
+        const dateAssignments = weekSchedule.assignments[dateStr]
+        if (!dateAssignments) return
+
+        Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
+          if (!stats[employeeId]) {
+            stats[employeeId] = { francos: 0, horasExtras: 0 }
+          }
+
+          const normalizedAssignments = normalizeAssignments(assignmentValue)
+          if (normalizedAssignments.length === 0) {
+            return
+          }
+
+          let francosCount = 0
+          normalizedAssignments.forEach((assignment) => {
+            if (assignment.type === "franco") {
+              francosCount += 1
+            } else if (assignment.type === "medio_franco") {
+              francosCount += 0.5
+            }
+          })
+
+          if (francosCount > 0) {
+            stats[employeeId].francos += francosCount
+          }
+
+          const dailyHours = calculateDailyHours(
+            normalizedAssignments,
+            shifts,
+            minutosDescanso,
+            horasMinimasParaDescanso,
+          )
+          if (dailyHours > 8) {
+            stats[employeeId].horasExtras += dailyHours - 8
+          }
+        })
+      })
+    })
+
+    return stats
+  }, [
+    employees,
+    shifts,
+    monthWeeks,
+    monthRange.startDate,
+    monthRange.endDate,
+    getWeekSchedule,
+    config?.minutosDescanso,
+    config?.horasMinimasParaDescanso,
+  ])
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -167,6 +252,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
                 onExportExcel={() => handleExportWeekExcel(weekStartDate, weekDays, weekSchedule)}
                 exporting={exporting}
                 mediosTurnos={config?.mediosTurnos}
+                employeeStats={employeeMonthlyStats}
               />
             )
           })}

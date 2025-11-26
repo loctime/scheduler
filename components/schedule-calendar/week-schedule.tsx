@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Download, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import { ScheduleGrid } from "@/components/schedule-grid"
+import { ScheduleGrid, type EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { Empleado, Turno, Horario, MedioTurno } from "@/lib/types"
 
 interface WeekScheduleProps {
@@ -20,6 +20,7 @@ interface WeekScheduleProps {
   onExportExcel?: () => void
   exporting: boolean
   mediosTurnos?: MedioTurno[]
+  employeeStats?: Record<string, EmployeeMonthlyStats>
 }
 
 export function WeekSchedule({
@@ -35,6 +36,7 @@ export function WeekSchedule({
   onExportExcel,
   exporting,
   mediosTurnos,
+  employeeStats,
 }: WeekScheduleProps) {
   const weekStartDate = weekDays[0]
   const weekEndDate = weekDays[weekDays.length - 1]
@@ -117,6 +119,7 @@ export function WeekSchedule({
         onAssignmentUpdate={onAssignmentUpdate}
         monthRange={monthRange}
         mediosTurnos={mediosTurnos}
+        employeeStats={employeeStats}
       />
     </div>
   )

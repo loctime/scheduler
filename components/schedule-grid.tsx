@@ -3,10 +3,19 @@
 import { memo, useMemo, useCallback, useState } from "react"
 import type { CSSProperties } from "react"
 import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { Empleado, Turno, Horario, HistorialItem, ShiftAssignment, ShiftAssignmentValue, MedioTurno } from "@/lib/types"
 import { ShiftSelectorPopover } from "./shift-selector-popover"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Check } from "lucide-react"
+import { adjustTime } from "@/lib/utils"
+
+export interface EmployeeMonthlyStats {
+  francos: number
+  horasExtras: number
+}
 
 interface ScheduleGridProps {
   weekDays: Date[]
@@ -18,6 +27,7 @@ interface ScheduleGridProps {
   readonly?: boolean
   monthRange?: { startDate: Date; endDate: Date } // Rango del mes para deshabilitar días fuera del rango
   mediosTurnos?: MedioTurno[] // Medios turnos configurados
+  employeeStats?: Record<string, EmployeeMonthlyStats>
 }
 
 export const ScheduleGrid = memo(function ScheduleGrid({
@@ -30,8 +40,10 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   readonly = false,
   monthRange,
   mediosTurnos = [],
+  employeeStats,
 }: ScheduleGridProps) {
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
+  const [extraMenuOpenKey, setExtraMenuOpenKey] = useState<string | null>(null)
 
   // Memoizar mapa de turnos para búsqueda O(1)
   const shiftMap = useMemo(() => {
@@ -346,6 +358,46 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     [selectedCell, onAssignmentUpdate],
   )
 
+  const handleToggleExtra = useCallback(
+    (employeeId: string, date: string, type: "before" | "after") => {
+      if (!onAssignmentUpdate) return
+      const assignments = getEmployeeAssignments(employeeId, date)
+      if (assignments.length === 0) return
+
+      const targetIndex = assignments.findIndex(
+        (assignment) => assignment.type !== "franco" && assignment.type !== "medio_franco" && assignment.shiftId,
+      )
+      if (targetIndex === -1) return
+
+      const assignment = { ...assignments[targetIndex] }
+      const shift = assignment.shiftId ? getShiftInfo(assignment.shiftId) : undefined
+      if (!shift || !shift.startTime || !shift.endTime) return
+
+      const updatedAssignments = assignments.map((item, idx) => (idx === targetIndex ? assignment : item))
+
+      if (type === "before") {
+        const extendedStart = adjustTime(shift.startTime, -30)
+        if (!extendedStart) return
+        if (assignment.startTime === extendedStart) {
+          delete assignment.startTime
+        } else {
+          assignment.startTime = extendedStart
+        }
+      } else {
+        const extendedEnd = adjustTime(shift.endTime, 30)
+        if (!extendedEnd) return
+        if (assignment.endTime === extendedEnd) {
+          delete assignment.endTime
+        } else {
+          assignment.endTime = extendedEnd
+        }
+      }
+
+      onAssignmentUpdate(date, employeeId, updatedAssignments)
+    },
+    [getEmployeeAssignments, getShiftInfo, onAssignmentUpdate],
+  )
+
   const selectedEmployee = selectedCell
     ? employees.find((e) => e.id === selectedCell.employeeId)
     : null
@@ -363,6 +415,13 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     if (!selectedCell || !onAssignmentUpdate) return undefined
     return getEmployeeAssignments(selectedCell.employeeId, selectedCell.date)
   }, [selectedCell?.employeeId, selectedCell?.date, schedule?.assignments, onAssignmentUpdate, getEmployeeAssignments])
+
+  const formatStatValue = useCallback((value: number) => {
+    if (!Number.isFinite(value) || value === 0) {
+      return "0"
+    }
+    return Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1)
+  }, [])
 
   return (
     <>
@@ -392,8 +451,22 @@ export const ScheduleGrid = memo(function ScheduleGrid({
           <tbody>
             {employees.map((employee) => (
               <tr key={employee.id} className="border-b border-border last:border-b-0">
-                <td className="border-r border-border bg-muted/30 px-6 py-4 text-lg font-medium text-foreground">
-                  {employee.name}
+                <td className="border-r border-border bg-muted/30 px-6 py-4 text-lg font-medium text-foreground align-top">
+                  <div className="space-y-1">
+                    <p>{employee.name}</p>
+                    {employeeStats && employeeStats[employee.id] && (
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium text-foreground">Francos:</span>
+                          <span>{formatStatValue(employeeStats[employee.id].francos)}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium text-foreground">Horas extra:</span>
+                          <span>{formatStatValue(employeeStats[employee.id].horasExtras)}h</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </td>
                 {weekDays.map((day) => {
                   const dateStr = format(day, "yyyy-MM-dd")
@@ -421,7 +494,29 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                     : isSelected
                     ? "bg-primary/10"
                     : ""
-                  
+                  const assignments = getEmployeeAssignments(employee.id, dateStr)
+                  const primaryShiftAssignment = assignments.find(
+                    (assignment) => assignment.type !== "franco" && assignment.type !== "medio_franco" && assignment.shiftId,
+                  )
+                  const primaryShift =
+                    primaryShiftAssignment && primaryShiftAssignment.shiftId
+                      ? getShiftInfo(primaryShiftAssignment.shiftId)
+                      : undefined
+                  const extendedStart =
+                    primaryShift?.startTime ? adjustTime(primaryShift.startTime, -30) : undefined
+                  const extendedEnd = primaryShift?.endTime ? adjustTime(primaryShift.endTime, 30) : undefined
+                  const hasExtraBefore =
+                    !!extendedStart && primaryShiftAssignment?.startTime === extendedStart
+                  const hasExtraAfter = !!extendedEnd && primaryShiftAssignment?.endTime === extendedEnd
+                  const showExtraActions =
+                    !readonly &&
+                    !!onAssignmentUpdate &&
+                    !isOutOfRange &&
+                    !!primaryShiftAssignment &&
+                    !!primaryShift?.startTime &&
+                    !!primaryShift?.endTime
+                  const cellKey = `${employee.id}-${dateStr}`
+
                   return (
                     <td
                       key={day.toISOString()}
@@ -435,34 +530,71 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                       style={backgroundStyle}
                       onClick={() => !isOutOfRange && handleCellClick(dateStr, employee.id)}
                     >
+                      {showExtraActions && (
+                        <div className="absolute top-2 right-2" onClick={(event) => event.stopPropagation()}>
+                          <DropdownMenu
+                            open={extraMenuOpenKey === cellKey}
+                            onOpenChange={(open) => setExtraMenuOpenKey(open ? cellKey : null)}
+                          >
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="secondary" size="sm" className="h-7 px-2 text-xs">
+                                +Extra
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-44 text-xs">
+                              <DropdownMenuItem
+                                onSelect={(event) => {
+                                  event.preventDefault()
+                                  handleToggleExtra(employee.id, dateStr, "before")
+                                  setExtraMenuOpenKey(null)
+                                }}
+                                className="flex items-center gap-2 text-xs"
+                              >
+                                <span className="flex-1">+30 min antes</span>
+                                {hasExtraBefore && <Check className="h-4 w-4 text-primary" />}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={(event) => {
+                                  event.preventDefault()
+                                  handleToggleExtra(employee.id, dateStr, "after")
+                                  setExtraMenuOpenKey(null)
+                                }}
+                                className="flex items-center gap-2 text-xs"
+                              >
+                                <span className="flex-1">+30 min después</span>
+                                {hasExtraAfter && <Check className="h-4 w-4 text-primary" />}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      )}
                       <div className="flex flex-col gap-2">
                         {(() => {
-                          let assignments = getEmployeeAssignments(employee.id, dateStr)
                           if (assignments.length === 0) {
                             return <span className="text-center text-lg text-muted-foreground">-</span>
                           }
-                          
+
+                          let orderedAssignments = assignments
+
                           // Ordenar asignaciones: medio franco temprano arriba, medio franco tarde abajo
-                          const hasMedioFranco = assignments.some(a => a.type === "medio_franco")
-                          const hasShifts = assignments.some(a => a.type === "shift" && a.shiftId)
-                          
+                          const hasMedioFranco = assignments.some((a) => a.type === "medio_franco")
+                          const hasShifts = assignments.some((a) => a.type === "shift" && a.shiftId)
+
                           if (hasMedioFranco && hasShifts) {
-                            assignments = [...assignments].sort((a, b) => {
-                              // Si uno es medio franco y el otro no, ordenar según la hora
+                            orderedAssignments = [...assignments].sort((a, b) => {
                               if (a.type === "medio_franco" && b.type !== "medio_franco") {
                                 const isEarly = a.startTime ? timeToMinutes(a.startTime) < 15 * 60 : true
-                                return isEarly ? -1 : 1 // Temprano va primero, tarde va último
+                                return isEarly ? -1 : 1
                               }
                               if (b.type === "medio_franco" && a.type !== "medio_franco") {
                                 const isEarly = b.startTime ? timeToMinutes(b.startTime) < 15 * 60 : true
-                                return isEarly ? 1 : -1 // Temprano va primero, tarde va último
+                                return isEarly ? 1 : -1
                               }
-                              return 0 // Mantener orden original para otros casos
+                              return 0
                             })
                           }
-                          
-                          return assignments.map((assignment, idx) => {
-                            // Manejar franco
+
+                          return orderedAssignments.map((assignment, idx) => {
                             if (assignment.type === "franco") {
                               return (
                                 <span key={`franco-${idx}`} className="text-center text-base block">
@@ -470,8 +602,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                                 </span>
                               )
                             }
-                            
-                            // Manejar medio franco
+
                             if (assignment.type === "medio_franco") {
                               const displayTimeLines = getShiftDisplayTime("", assignment)
                               const hasTime = assignment.startTime && assignment.endTime
@@ -488,14 +619,16 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                                 </div>
                               )
                             }
-                            
-                            // Comportamiento normal para turnos
+
                             const shift = getShiftInfo(assignment.shiftId || "")
                             if (!shift) return null
                             const displayTimeLines = getShiftDisplayTime(assignment.shiftId || "", assignment)
 
-                            // Si no hay horario para mostrar, mostrar el nombre del turno como fallback
-                            if (!displayTimeLines || displayTimeLines.length === 0 || (displayTimeLines.length === 1 && !displayTimeLines[0])) {
+                            if (
+                              !displayTimeLines ||
+                              displayTimeLines.length === 0 ||
+                              (displayTimeLines.length === 1 && !displayTimeLines[0])
+                            ) {
                               return (
                                 <span key={assignment.shiftId} className="text-center text-base block">
                                   {shift.name}
@@ -503,7 +636,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                               )
                             }
 
-                            // Si hay múltiples líneas o una línea larga, mostrar en formato multilínea
                             return (
                               <div key={assignment.shiftId} className="text-center text-base">
                                 {displayTimeLines.map((line, lineIdx) => (

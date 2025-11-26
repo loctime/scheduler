@@ -186,13 +186,15 @@ export function useScheduleUpdates({
             minutosDescanso,
             horasMinimasParaDescanso
           )
+
+          // Ya no mostramos toast cuando se exceden las horas máximas diarias, ya que ahora los
+          // usuarios pueden extender turnos manualmente y esperan ese comportamiento.
           if (!dailyValidation.valid) {
-            const employee = employees.find((e) => e.id === employeeId)
-            toast({
-              title: "Advertencia: Horas máximas por día excedidas",
-              description: `${employee?.name || "Empleado"} - ${dailyValidation.message}`,
-              variant: "destructive",
-            })
+            console.debug(
+              "[useScheduleUpdates] Horas máximas por día excedidas:",
+              employees.find((e) => e.id === employeeId)?.name || employeeId,
+              dailyValidation.message
+            )
           }
         }
 
