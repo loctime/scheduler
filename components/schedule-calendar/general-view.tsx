@@ -1,0 +1,107 @@
+"use client"
+
+import { MonthHeader } from "@/components/schedule-calendar/month-header"
+import { WeekSchedule } from "@/components/schedule-calendar/week-schedule"
+import { EmptyStateCard, LoadingStateCard } from "@/components/schedule-calendar/state-card"
+import type { Horario, Empleado, Turno, MedioTurno, ShiftAssignment } from "@/lib/types"
+import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
+
+type AssignmentUpdateHandler = (
+  date: string,
+  employeeId: string,
+  assignments: ShiftAssignment[],
+  options?: { scheduleId?: string },
+) => Promise<void>
+
+interface GeneralViewProps {
+  dataLoading: boolean
+  employees: Empleado[]
+  shifts: Turno[]
+  monthRange: { startDate: Date; endDate: Date }
+  monthWeeks: Date[][]
+  exporting: boolean
+  mediosTurnos?: MedioTurno[]
+  employeeMonthlyStats: Record<string, EmployeeMonthlyStats>
+  getWeekSchedule: (weekStartDate: Date) => Horario | null
+  onAssignmentUpdate?: AssignmentUpdateHandler
+  onExportMonthImage: () => Promise<void>
+  onExportMonthPDF: () => Promise<void>
+  onExportWeekImage: (weekStartDate: Date, weekEndDate: Date) => Promise<void>
+  onExportWeekPDF: (weekStartDate: Date, weekEndDate: Date) => Promise<void>
+  onExportWeekExcel: (weekStartDate: Date, weekDays: Date[], weekSchedule: Horario | null) => Promise<void>
+  onPreviousMonth: () => void
+  onNextMonth: () => void
+}
+
+export function GeneralView({
+  dataLoading,
+  employees,
+  shifts,
+  monthRange,
+  monthWeeks,
+  exporting,
+  mediosTurnos,
+  employeeMonthlyStats,
+  getWeekSchedule,
+  onAssignmentUpdate,
+  onExportMonthImage,
+  onExportMonthPDF,
+  onExportWeekImage,
+  onExportWeekPDF,
+  onExportWeekExcel,
+  onPreviousMonth,
+  onNextMonth,
+}: GeneralViewProps) {
+  if (dataLoading) {
+    return <LoadingStateCard />
+  }
+
+  if (employees.length === 0) {
+    return <EmptyStateCard message="No hay empleados registrados. Agrega empleados para crear horarios." />
+  }
+
+  if (shifts.length === 0) {
+    return <EmptyStateCard message="No hay turnos configurados. Agrega turnos para crear horarios." />
+  }
+
+  return (
+    <div className="space-y-6">
+      <MonthHeader
+        monthRange={monthRange}
+        onPreviousMonth={onPreviousMonth}
+        onNextMonth={onNextMonth}
+        onExportImage={onExportMonthImage}
+        onExportPDF={onExportMonthPDF}
+        exporting={exporting}
+      />
+
+      <div id="schedule-month-container" className="space-y-6">
+        {monthWeeks.map((weekDays, weekIndex) => {
+          const weekStartDate = weekDays[0]
+          const weekSchedule = getWeekSchedule(weekStartDate)
+
+          return (
+            <WeekSchedule
+              key={weekIndex}
+              weekDays={weekDays}
+              weekIndex={weekIndex}
+              weekSchedule={weekSchedule}
+              employees={employees}
+              shifts={shifts}
+              monthRange={monthRange}
+              onAssignmentUpdate={onAssignmentUpdate}
+              onExportImage={onExportWeekImage}
+              onExportPDF={onExportWeekPDF}
+              onExportExcel={() => onExportWeekExcel(weekStartDate, weekDays, weekSchedule)}
+              exporting={exporting}
+              mediosTurnos={mediosTurnos}
+              employeeStats={employeeMonthlyStats}
+            />
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+
