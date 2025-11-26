@@ -531,13 +531,13 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                       onClick={() => !isOutOfRange && handleCellClick(dateStr, employee.id)}
                     >
                       {showExtraActions && (
-                        <div className="absolute top-2 right-2" onClick={(event) => event.stopPropagation()}>
+                        <div className="absolute -top-1 right-1" onClick={(event) => event.stopPropagation()}>
                           <DropdownMenu
                             open={extraMenuOpenKey === cellKey}
                             onOpenChange={(open) => setExtraMenuOpenKey(open ? cellKey : null)}
                           >
                             <DropdownMenuTrigger asChild>
-                              <Button variant="secondary" size="sm" className="h-7 px-2 text-xs">
+                              <Button variant="secondary" size="sm" className="h-6 px-2 text-xs">
                                 +Extra
                               </Button>
                             </DropdownMenuTrigger>

@@ -16,6 +16,7 @@ import { useConfig } from "@/hooks/use-config"
 import { useShiftSelector } from "@/hooks/use-shift-selector"
 import { SpecialTypeSelector } from "@/components/shift-selector/special-type-selector"
 import { ShiftItem } from "@/components/shift-selector/shift-item"
+import { cn } from "@/lib/utils"
 
 interface ShiftSelectorPopoverProps {
   open: boolean
@@ -224,8 +225,22 @@ export function ShiftSelectorPopover({
                 {shifts.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No hay turnos disponibles</p>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {shifts.map((shift) => {
+                  <div
+                    className={cn(
+                      "grid grid-cols-1 gap-3",
+                      !editingShiftId && "sm:grid-cols-2 lg:grid-cols-3",
+                    )}
+                  >
+                    {editingShiftId && (
+                      <div className="bg-secondary/60 border border-secondary rounded-md px-3 py-2 text-xs text-secondary-foreground shadow-sm">
+                        <p className="font-semibold">Edición puntual</p>
+                        <p>
+                          Los cambios solo afectan a <span className="font-medium">{employeeName}</span> el{" "}
+                          <span className="font-medium">{date}</span>.
+                        </p>
+                      </div>
+                    )}
+                    {(editingShiftId ? shifts.filter((shift) => shift.id === editingShiftId) : shifts).map((shift) => {
                       const isSelected = tempSelected.includes(shift.id)
                       const isEditing = editingShiftId === shift.id
                       const hasAdj = hasAdjustments(shift.id)
@@ -248,6 +263,7 @@ export function ShiftSelectorPopover({
                           onResetAll={resetAllAdjustedTimes}
                           onToggleExtension={handleToggleExtension}
                           onQuickAssign={handleQuickShiftSelect}
+                        className={isEditing ? "p-5 sm:p-6 border-2" : undefined}
                         />
                       )
                     })}
