@@ -93,25 +93,25 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     [shiftMap],
   )
 
-  // Obtener horario para mostrar (ajustado o base)
+  // Obtener horario para mostrar (ajustado o base) - retorna array de líneas
   const getShiftDisplayTime = useCallback(
-    (shiftId: string, assignment?: ShiftAssignment): string => {
+    (shiftId: string, assignment?: ShiftAssignment): string[] => {
       // Si es medio franco, usar sus horarios directamente
       if (assignment?.type === "medio_franco") {
         if (assignment.startTime && assignment.endTime) {
-          return `${assignment.startTime} - ${assignment.endTime}`
+          return [`${assignment.startTime} - ${assignment.endTime}`]
         }
-        return "1/2 Franco"
+        return ["1/2 Franco"]
       }
       
       // Si es franco, no debería llegar aquí, pero por seguridad:
       if (assignment?.type === "franco") {
-        return "FRANCO"
+        return ["FRANCO"]
       }
       
       // Comportamiento normal para turnos
       const shift = getShiftInfo(shiftId)
-      if (!shift) return ""
+      if (!shift) return [""]
 
       // Si hay asignación con horarios ajustados, usar esos
       if (assignment) {
@@ -123,9 +123,10 @@ export const ScheduleGrid = memo(function ScheduleGrid({
         if (start && end) {
           const first = `${start} - ${end}`
           if (start2 && end2) {
-            return `${first} / ${start2} - ${end2}`
+            // Retornar en dos líneas separadas
+            return [first, `${start2} - ${end2}`]
           }
-          return first
+          return [first]
         }
       }
 
@@ -133,12 +134,13 @@ export const ScheduleGrid = memo(function ScheduleGrid({
       if (shift.startTime && shift.endTime) {
         const first = `${shift.startTime} - ${shift.endTime}`
         if (shift.startTime2 && shift.endTime2) {
-          return `${first} / ${shift.startTime2} - ${shift.endTime2}`
+          // Retornar en dos líneas separadas
+          return [first, `${shift.startTime2} - ${shift.endTime2}`]
         }
-        return first
+        return [first]
       }
 
-      return ""
+      return [""]
     },
     [getShiftInfo],
   )
@@ -274,15 +276,23 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                             
                             // Manejar medio franco
                             if (assignment.type === "medio_franco") {
-                              const displayTime = assignment.startTime && assignment.endTime
-                                ? `${assignment.startTime} - ${assignment.endTime}`
-                                : "1/2 Franco"
+                              const displayTimeLines = getShiftDisplayTime("", assignment)
+                              const hasTime = assignment.startTime && assignment.endTime
                               return (
                                 <Badge
                                   key={`medio-franco-${idx}`}
-                                  className="justify-center text-base py-2 px-3 bg-orange-500 text-white"
+                                  className="justify-center text-base py-2 px-3 bg-orange-500 text-white leading-tight"
                                 >
-                                  {displayTime} (1/2 Franco)
+                                  <div className="flex flex-col gap-0.5">
+                                    {hasTime ? (
+                                      <>
+                                        <span className="block">{displayTimeLines[0]}</span>
+                                        <span className="block text-xs">(1/2 Franco)</span>
+                                      </>
+                                    ) : (
+                                      <span className="block">1/2 Franco</span>
+                                    )}
+                                  </div>
                                 </Badge>
                               )
                             }
@@ -290,10 +300,10 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                             // Comportamiento normal para turnos
                             const shift = getShiftInfo(assignment.shiftId || "")
                             if (!shift) return null
-                            const displayTime = getShiftDisplayTime(assignment.shiftId || "", assignment)
+                            const displayTimeLines = getShiftDisplayTime(assignment.shiftId || "", assignment)
 
                             // Si no hay horario para mostrar, mostrar el nombre del turno como fallback
-                            if (!displayTime) {
+                            if (!displayTimeLines || displayTimeLines.length === 0 || (displayTimeLines.length === 1 && !displayTimeLines[0])) {
                               return (
                                 <Badge
                                   key={assignment.shiftId}
@@ -308,17 +318,24 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                               )
                             }
 
+                            // Si hay múltiples líneas o una línea larga, mostrar en formato multilínea
                             return (
                               <Badge
                                 key={assignment.shiftId}
-                                className="justify-center text-base py-2 px-3"
+                                className="justify-center text-base py-2 px-3 leading-tight"
                                 style={{
                                   backgroundColor: shift.color,
                                   color: "#ffffff",
                                 }}
                                 title={shift.name}
                               >
-                                {displayTime}
+                                <div className="flex flex-col gap-0.5">
+                                  {displayTimeLines.map((line, lineIdx) => (
+                                    <span key={lineIdx} className="block">
+                                      {line}
+                                    </span>
+                                  ))}
+                                </div>
                               </Badge>
                             )
                           })

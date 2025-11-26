@@ -61,7 +61,7 @@ match /apps/horarios/employees/{empleadoId} {
     && isStringOrNull('phone')
     && unchanged('createdAt')
     && isTs('updatedAt');
-  allow delete: if isAuth() && isHorariosAdmin();
+  allow delete: if isAuth() && isHorariosUser();
 }
 
 // Colección: apps/horarios/shifts
@@ -81,7 +81,7 @@ match /apps/horarios/shifts/{turnoId} {
     && nonEmptyString('color')
     && unchanged('createdAt')
     && isTs('updatedAt');
-  allow delete: if isAuth() && isHorariosAdmin();
+  allow delete: if isAuth() && isHorariosUser();
 }
 
 // Colección: apps/horarios/schedules

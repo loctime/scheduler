@@ -13,8 +13,9 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2, Save } from "lucide-react"
+import { Loader2, Save, Plus, Trash2 } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
+import { MedioTurno } from "@/lib/types"
 
 export default function ConfiguracionPage() {
   const { user } = useData()
@@ -29,6 +30,7 @@ export default function ConfiguracionPage() {
     formatoHora24: true,
     minutosDescanso: 30,
     horasMinimasParaDescanso: 6,
+    mediosTurnos: [],
   })
 
   useEffect(() => {
@@ -57,6 +59,7 @@ export default function ConfiguracionPage() {
             formatoHora24: true,
             minutosDescanso: 30,
             horasMinimasParaDescanso: 6,
+            mediosTurnos: [],
           }
           await setDoc(configRef, {
             ...defaultConfig,
@@ -114,6 +117,7 @@ export default function ConfiguracionPage() {
         formatoHora24: config.formatoHora24,
         minutosDescanso: config.minutosDescanso,
         horasMinimasParaDescanso: config.horasMinimasParaDescanso,
+        mediosTurnos: config.mediosTurnos || [],
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
         updatedByName: user.displayName || user.email || "",
@@ -306,6 +310,102 @@ export default function ConfiguracionPage() {
                 Un turno continuo debe tener al menos esta cantidad de horas para aplicar el descanso. Los turnos cortados (con segunda franja horaria) no aplican descanso, independientemente de su duración.
               </p>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Medios Turnos (1/2 Franco)</CardTitle>
+            <CardDescription>Define horarios predefinidos para los medios francos</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              {(config.mediosTurnos || []).map((medioTurno, index) => (
+                <div key={medioTurno.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                  <div className="flex-1 grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Nombre (opcional)</Label>
+                      <Input
+                        placeholder="Ej: Mañana"
+                        value={medioTurno.nombre || ""}
+                        onChange={(e) => {
+                          const nuevosMediosTurnos = [...(config.mediosTurnos || [])]
+                          nuevosMediosTurnos[index] = { ...medioTurno, nombre: e.target.value }
+                          setConfig({ ...config, mediosTurnos: nuevosMediosTurnos })
+                        }}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Hora Inicio</Label>
+                      <Input
+                        type="time"
+                        value={medioTurno.startTime}
+                        onChange={(e) => {
+                          const nuevosMediosTurnos = [...(config.mediosTurnos || [])]
+                          nuevosMediosTurnos[index] = { ...medioTurno, startTime: e.target.value }
+                          setConfig({ ...config, mediosTurnos: nuevosMediosTurnos })
+                        }}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Hora Fin</Label>
+                      <Input
+                        type="time"
+                        value={medioTurno.endTime}
+                        onChange={(e) => {
+                          const nuevosMediosTurnos = [...(config.mediosTurnos || [])]
+                          nuevosMediosTurnos[index] = { ...medioTurno, endTime: e.target.value }
+                          setConfig({ ...config, mediosTurnos: nuevosMediosTurnos })
+                        }}
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      const nuevosMediosTurnos = (config.mediosTurnos || []).filter((_, i) => i !== index)
+                      setConfig({ ...config, mediosTurnos: nuevosMediosTurnos })
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              ))}
+              
+              {(!config.mediosTurnos || config.mediosTurnos.length === 0) && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No hay medios turnos configurados. Agrega uno para empezar.
+                </p>
+              )}
+            </div>
+            
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const nuevoMedioTurno: MedioTurno = {
+                  id: `medio-turno-${Date.now()}`,
+                  startTime: "11:00",
+                  endTime: "15:00",
+                  nombre: "",
+                }
+                setConfig({
+                  ...config,
+                  mediosTurnos: [...(config.mediosTurnos || []), nuevoMedioTurno],
+                })
+              }}
+              className="w-full"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Agregar Medio Turno
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              Estos horarios aparecerán como opciones cuando se seleccione "1/2 Franco" al asignar turnos.
+            </p>
           </CardContent>
         </Card>
 

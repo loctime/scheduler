@@ -27,6 +27,7 @@ export function useConfig() {
             formatoHora24: true,
             minutosDescanso: 30,
             horasMinimasParaDescanso: 6,
+            mediosTurnos: [],
           })
         }
       } catch (error) {
@@ -40,6 +41,7 @@ export function useConfig() {
           formatoHora24: true,
           minutosDescanso: 30,
           horasMinimasParaDescanso: 6,
+          mediosTurnos: [],
         })
       } finally {
         setLoading(false)

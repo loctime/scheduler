@@ -172,7 +172,7 @@ service cloud.firestore {
         && isStringOrNull('phone')
         && unchanged('createdAt')
         && isTs('updatedAt');
-      allow delete: if isAuth() && isHorariosAdmin();
+      allow delete: if isAuth() && isHorariosUser();
     }
     
     // Colección: apps/horarios/shifts
@@ -192,7 +192,7 @@ service cloud.firestore {
         && nonEmptyString('color')
         && unchanged('createdAt')
         && isTs('updatedAt');
-      allow delete: if isAuth() && isHorariosAdmin();
+      allow delete: if isAuth() && isHorariosUser();
     }
     
     // Colección: apps/horarios/schedules

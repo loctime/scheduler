@@ -77,6 +77,13 @@ export interface ShiftOverlap {
   message: string
 }
 
+export interface MedioTurno {
+  id: string // ID único para identificar el medio turno
+  startTime: string // formato "HH:mm"
+  endTime: string // formato "HH:mm"
+  nombre?: string // Nombre opcional para identificar el medio turno (ej: "Mañana", "Tarde")
+}
+
 export interface Configuracion {
   id?: string
   mesInicioDia: number // Día del mes en que empieza (1-28)
@@ -86,6 +93,7 @@ export interface Configuracion {
   formatoHora24: boolean
   minutosDescanso: number // Minutos de descanso que se restan (por defecto 30)
   horasMinimasParaDescanso: number // Horas mínimas para aplicar descanso (por defecto 6)
+  mediosTurnos?: MedioTurno[] // Medios turnos predefinidos para 1/2 franco
   createdAt?: any
   updatedAt?: any
   updatedBy?: string

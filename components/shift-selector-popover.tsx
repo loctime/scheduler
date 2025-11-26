@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge"
 import { Turno, ShiftAssignment } from "@/lib/types"
 import { Pencil, ChevronDown, ChevronUp, RotateCcw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useConfig } from "@/hooks/use-config"
 
 interface ShiftSelectorPopoverProps {
   open: boolean
@@ -57,6 +58,7 @@ export function ShiftSelectorPopover({
   date,
 }: ShiftSelectorPopoverProps) {
   const { toast } = useToast()
+  const { config } = useConfig()
   const [tempSelected, setTempSelected] = useState<string[]>(selectedShiftIds)
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null)
   const [adjustedTimes, setAdjustedTimes] = useState<Record<string, Partial<ShiftAssignment>>>({})
@@ -65,6 +67,7 @@ export function ShiftSelectorPopover({
   // Estado para manejar francos
   const [specialType, setSpecialType] = useState<"shift" | "franco" | "medio_franco" | null>(null)
   const [medioFrancoTime, setMedioFrancoTime] = useState({ startTime: "", endTime: "" })
+  const [selectedMedioTurnoId, setSelectedMedioTurnoId] = useState<string | null>(null)
 
   // Rastrear el estado anterior de 'open'
   const prevOpenRef = useRef(false)
@@ -88,10 +91,15 @@ export function ShiftSelectorPopover({
         const medioFranco = selectedAssignments.find(a => a.type === "medio_franco")
         setSpecialType("medio_franco")
         setTempSelected([])
-        setMedioFrancoTime({
-          startTime: medioFranco?.startTime || "",
-          endTime: medioFranco?.endTime || "",
-        })
+        const startTime = medioFranco?.startTime || ""
+        const endTime = medioFranco?.endTime || ""
+        setMedioFrancoTime({ startTime, endTime })
+        
+        // Verificar si coincide con algún medio turno predefinido
+        const matchingMedioTurno = config?.mediosTurnos?.find(
+          mt => mt.startTime === startTime && mt.endTime === endTime
+        )
+        setSelectedMedioTurnoId(matchingMedioTurno?.id || null)
       } else {
         setSpecialType("shift")
         // Inicializar el estado solo cuando se abre por primera vez
@@ -285,10 +293,15 @@ export function ShiftSelectorPopover({
       const medioFranco = selectedAssignments.find(a => a.type === "medio_franco")
       setSpecialType("medio_franco")
       setTempSelected([])
-      setMedioFrancoTime({
-        startTime: medioFranco?.startTime || "",
-        endTime: medioFranco?.endTime || "",
-      })
+      const startTime = medioFranco?.startTime || ""
+      const endTime = medioFranco?.endTime || ""
+      setMedioFrancoTime({ startTime, endTime })
+      
+      // Verificar si coincide con algún medio turno predefinido
+      const matchingMedioTurno = config?.mediosTurnos?.find(
+        mt => mt.startTime === startTime && mt.endTime === endTime
+      )
+      setSelectedMedioTurnoId(matchingMedioTurno?.id || null)
     } else {
       setSpecialType("shift")
       setTempSelected(selectedShiftIds)
@@ -366,6 +379,8 @@ export function ShiftSelectorPopover({
                 onClick={() => {
                   setSpecialType("medio_franco")
                   setTempSelected([]) // Limpiar turnos seleccionados
+                  setSelectedMedioTurnoId(null)
+                  setMedioFrancoTime({ startTime: "", endTime: "" })
                 }}
                 className="w-full"
               >
@@ -377,6 +392,7 @@ export function ShiftSelectorPopover({
                 onClick={() => {
                   setSpecialType("shift")
                   setMedioFrancoTime({ startTime: "", endTime: "" })
+                  setSelectedMedioTurnoId(null)
                 }}
                 className="w-full"
               >
@@ -384,36 +400,81 @@ export function ShiftSelectorPopover({
               </Button>
             </div>
             
-            {/* Si es medio franco, mostrar inputs de horario */}
+            {/* Si es medio franco, mostrar opciones de medios turnos predefinidos */}
             {specialType === "medio_franco" && (
-              <div className="space-y-2 pt-2">
-                <Label className="text-xs font-medium">Horario del medio franco (normalmente 4 horas):</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Hora Inicio</Label>
-                    <Input
-                      type="time"
-                      value={medioFrancoTime.startTime}
-                      onChange={(e) => setMedioFrancoTime({ ...medioFrancoTime, startTime: e.target.value })}
-                      className="text-sm"
-                    />
+              <div className="space-y-3 pt-2">
+                <Label className="text-xs font-medium">Selecciona un horario predefinido o ingresa uno personalizado:</Label>
+                
+                {/* Medios turnos predefinidos */}
+                {config?.mediosTurnos && config.mediosTurnos.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Horarios predefinidos:</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {config.mediosTurnos.map((medioTurno) => {
+                        const isSelected = selectedMedioTurnoId === medioTurno.id
+                        const displayName = medioTurno.nombre || `${medioTurno.startTime} - ${medioTurno.endTime}`
+                        return (
+                          <Button
+                            key={medioTurno.id}
+                            type="button"
+                            variant={isSelected ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => {
+                              setSelectedMedioTurnoId(medioTurno.id)
+                              setMedioFrancoTime({
+                                startTime: medioTurno.startTime,
+                                endTime: medioTurno.endTime,
+                              })
+                            }}
+                            className="text-xs justify-start"
+                          >
+                            <span className="font-medium">{displayName}</span>
+                            <span className="ml-2 text-muted-foreground">
+                              ({medioTurno.startTime} - {medioTurno.endTime})
+                            </span>
+                          </Button>
+                        )
+                      })}
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Hora Fin</Label>
-                    <Input
-                      type="time"
-                      value={medioFrancoTime.endTime}
-                      onChange={(e) => setMedioFrancoTime({ ...medioFrancoTime, endTime: e.target.value })}
-                      className="text-sm"
-                    />
+                )}
+                
+                {/* Inputs manuales */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">O ingresa un horario personalizado:</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Hora Inicio</Label>
+                      <Input
+                        type="time"
+                        value={medioFrancoTime.startTime}
+                        onChange={(e) => {
+                          setMedioFrancoTime({ ...medioFrancoTime, startTime: e.target.value })
+                          setSelectedMedioTurnoId(null) // Deseleccionar si se edita manualmente
+                        }}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Hora Fin</Label>
+                      <Input
+                        type="time"
+                        value={medioFrancoTime.endTime}
+                        onChange={(e) => {
+                          setMedioFrancoTime({ ...medioFrancoTime, endTime: e.target.value })
+                          setSelectedMedioTurnoId(null) // Deseleccionar si se edita manualmente
+                        }}
+                        className="text-sm"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
             )}
           </div>
           
-          {/* Lista de turnos (solo mostrar si es turno normal) */}
-          {specialType !== "franco" && (
+          {/* Lista de turnos (solo mostrar si es turno normal, no para franco ni medio_franco) */}
+          {specialType === "shift" || specialType === null ? (
             <div className="space-y-3">
               <Label className="text-sm font-medium">Turnos disponibles:</Label>
               <div className="space-y-3 max-h-[60vh] overflow-y-auto">
@@ -849,8 +910,7 @@ export function ShiftSelectorPopover({
               )}
             </div>
           </div>
-          )}
-        </div>
+        ) : null}
         
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel}>
