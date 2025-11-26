@@ -65,31 +65,66 @@ export function useExportSchedule() {
         // Usar dom-to-image-more que maneja mejor los colores modernos
         const domtoimage = await import("dom-to-image-more")
         
-        // Usar scrollWidth y scrollHeight para capturar todo el contenido
-        const width = element.scrollWidth || rect.width
-        const height = element.scrollHeight || rect.height
-        
-        const dataUrl = await domtoimage.toPng(element, {
-          quality: 1.0,
-          bgcolor: "#ffffff",
-          width: width,
-          height: height,
+        // Convertir badges a texto simple para la exportación
+        const badges = element.querySelectorAll("[data-slot='badge']")
+        const originalContent: Array<{ el: HTMLElement; originalHTML: string; originalStyle: string }> = []
+        badges.forEach((badge) => {
+          const htmlBadge = badge as HTMLElement
+          originalContent.push({
+            el: htmlBadge,
+            originalHTML: htmlBadge.innerHTML,
+            originalStyle: htmlBadge.getAttribute("style") || "",
+          })
+          // Obtener solo el texto del badge
+          const textContent = htmlBadge.textContent || htmlBadge.innerText || ""
+          htmlBadge.innerHTML = textContent
+          htmlBadge.style.backgroundColor = "transparent"
+          htmlBadge.style.border = "none"
+          htmlBadge.style.borderRadius = "0"
+          htmlBadge.style.padding = "0"
+          htmlBadge.style.color = "inherit"
+          htmlBadge.style.fontSize = "inherit"
+          htmlBadge.style.fontWeight = "inherit"
         })
         
-        const link = document.createElement("a")
-        link.download = filename
-        link.href = dataUrl
-        link.style.display = "none"
-        document.body.appendChild(link)
-        link.click()
-        setTimeout(() => {
-          document.body.removeChild(link)
-        }, 100)
+        try {
+          // Usar scrollWidth y scrollHeight para capturar todo el contenido
+          const width = element.scrollWidth || rect.width
+          const height = element.scrollHeight || rect.height
+          
+          const dataUrl = await domtoimage.toPng(element, {
+            quality: 1.0,
+            bgcolor: "#ffffff",
+            width: width,
+            height: height,
+          })
+          
+          const link = document.createElement("a")
+          link.download = filename
+          link.href = dataUrl
+          link.style.display = "none"
+          document.body.appendChild(link)
+          link.click()
+          setTimeout(() => {
+            document.body.removeChild(link)
+          }, 100)
+          
+          toast({
+            title: "Imagen exportada",
+            description: "El horario se ha exportado como imagen",
+          })
+        } finally {
+          // Restaurar contenido original de los badges
+          originalContent.forEach(({ el, originalHTML, originalStyle }) => {
+            el.innerHTML = originalHTML
+            if (originalStyle) {
+              el.setAttribute("style", originalStyle)
+            } else {
+              el.removeAttribute("style")
+            }
+          })
+        }
         
-        toast({
-          title: "Imagen exportada",
-          description: "El horario se ha exportado como imagen",
-        })
       } finally {
         // Restaurar estilos originales
         htmlElement.style.overflow = originalOverflow
@@ -177,36 +212,70 @@ export function useExportSchedule() {
           import("jspdf").then((m) => m.default),
         ])
 
-        // Usar scrollWidth y scrollHeight para capturar todo el contenido
-        const width = element.scrollWidth || rect.width
-        const height = element.scrollHeight || rect.height
+        // Convertir badges a texto simple para la exportación
+        const badges = element.querySelectorAll("[data-slot='badge']")
+        const originalContent: Array<{ el: HTMLElement; originalHTML: string; originalStyle: string }> = []
+        badges.forEach((badge) => {
+          const htmlBadge = badge as HTMLElement
+          originalContent.push({
+            el: htmlBadge,
+            originalHTML: htmlBadge.innerHTML,
+            originalStyle: htmlBadge.getAttribute("style") || "",
+          })
+          // Obtener solo el texto del badge
+          const textContent = htmlBadge.textContent || htmlBadge.innerText || ""
+          htmlBadge.innerHTML = textContent
+          htmlBadge.style.backgroundColor = "transparent"
+          htmlBadge.style.border = "none"
+          htmlBadge.style.borderRadius = "0"
+          htmlBadge.style.padding = "0"
+          htmlBadge.style.color = "inherit"
+          htmlBadge.style.fontSize = "inherit"
+          htmlBadge.style.fontWeight = "inherit"
+        })
+        
+        try {
+          // Usar scrollWidth y scrollHeight para capturar todo el contenido
+          const width = element.scrollWidth || rect.width
+          const height = element.scrollHeight || rect.height
 
-        // Usar dom-to-image-more para generar la imagen
-        const dataUrl = await domtoimage.toPng(element, {
-          quality: 1.0,
-          bgcolor: "#ffffff",
-          width: width,
-          height: height,
-        })
+          // Usar dom-to-image-more para generar la imagen
+          const dataUrl = await domtoimage.toPng(element, {
+            quality: 1.0,
+            bgcolor: "#ffffff",
+            width: width,
+            height: height,
+          })
 
-        const pdf = new jsPDF("l", "mm", "a4")
-        const pdfWidth = pdf.internal.pageSize.getWidth()
-        
-        // Crear una imagen para obtener las dimensiones
-        const img = new Image()
-        img.src = dataUrl
-        await new Promise((resolve) => {
-          img.onload = resolve
-        })
-        
-        const pdfHeight = (img.height * pdfWidth) / img.width
-        pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight)
-        pdf.save(filename)
-        
-        toast({
-          title: "PDF exportado",
-          description: "El horario se ha exportado como PDF",
-        })
+          const pdf = new jsPDF("l", "mm", "a4")
+          const pdfWidth = pdf.internal.pageSize.getWidth()
+          
+          // Crear una imagen para obtener las dimensiones
+          const img = new Image()
+          img.src = dataUrl
+          await new Promise((resolve) => {
+            img.onload = resolve
+          })
+          
+          const pdfHeight = (img.height * pdfWidth) / img.width
+          pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight)
+          pdf.save(filename)
+          
+          toast({
+            title: "PDF exportado",
+            description: "El horario se ha exportado como PDF",
+          })
+        } finally {
+          // Restaurar contenido original de los badges
+          originalContent.forEach(({ el, originalHTML, originalStyle }) => {
+            el.innerHTML = originalHTML
+            if (originalStyle) {
+              el.setAttribute("style", originalStyle)
+            } else {
+              el.removeAttribute("style")
+            }
+          })
+        }
       } finally {
         // Restaurar estilos originales
         htmlElement.style.overflow = originalOverflow

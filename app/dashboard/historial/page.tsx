@@ -50,7 +50,7 @@ export default function HistorialPage() {
     // Obtener horarios actuales
     const schedulesQuery = query(collection(db, COLLECTIONS.SCHEDULES), orderBy("weekStart", "desc"))
     const unsubscribeSchedules = onSnapshot(schedulesQuery, (snapshot) => {
-      setSchedules(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
+      setSchedules(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Horario)))
     }, (error) => {
       console.error("Error en listener de horarios:", error)
     })
