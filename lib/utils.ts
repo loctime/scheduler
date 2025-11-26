@@ -4,3 +4,85 @@ import { twMerge } from 'tailwind-merge'
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
+
+import { startOfWeek, addDays, addWeeks, setDate, addMonths } from "date-fns"
+
+/**
+ * Ajusta una hora en formato HH:mm sumando o restando minutos
+ * @param timeStr Hora en formato "HH:mm"
+ * @param minutes Minutos a sumar (positivo) o restar (negativo)
+ * @returns Nueva hora en formato "HH:mm"
+ */
+export function adjustTime(timeStr: string | undefined, minutes: number): string {
+  if (!timeStr) return ""
+  
+  const [hours, mins] = timeStr.split(":").map(Number)
+  const totalMinutes = hours * 60 + mins + minutes
+  
+  // Normalizar a 24 horas
+  const normalizedMinutes = ((totalMinutes % 1440) + 1440) % 1440
+  const newHours = Math.floor(normalizedMinutes / 60)
+  const newMins = normalizedMinutes % 60
+  
+  return `${String(newHours).padStart(2, "0")}:${String(newMins).padStart(2, "0")}`
+}
+
+/**
+ * Calcula el rango del mes personalizado basado en mesInicioDia
+ */
+export function getCustomMonthRange(date: Date, monthStartDay: number) {
+  const year = date.getFullYear()
+  const month = date.getMonth()
+  
+  // Fecha de inicio: mesInicioDia del mes actual
+  const startDate = setDate(new Date(year, month, 1), monthStartDay)
+  
+  // Fecha de fin: día anterior al mesInicioDia del mes siguiente
+  const nextMonth = addMonths(new Date(year, month, 1), 1)
+  const endDate = addDays(setDate(nextMonth, monthStartDay), -1)
+  
+  return { startDate, endDate }
+}
+
+/**
+ * Genera todas las semanas del mes basado en el rango personalizado
+ */
+export function getMonthWeeks(
+  date: Date,
+  monthStartDay: number,
+  weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6
+): Date[][] {
+  const { startDate, endDate } = getCustomMonthRange(date, monthStartDay)
+  const weeks: Date[][] = []
+  
+  // Encontrar el inicio de la semana que contiene el startDate
+  let weekStart = startOfWeek(startDate, { weekStartsOn })
+  
+  // Generar semanas hasta cubrir todo el rango
+  while (weekStart <= endDate) {
+    const week: Date[] = []
+    
+    // Generar 7 días completos de la semana
+    for (let i = 0; i < 7; i++) {
+      const day = addDays(weekStart, i)
+      week.push(new Date(day))
+    }
+    
+    // Verificar si la semana tiene al menos un día dentro del rango del mes
+    const hasDaysInRange = week.some((day) => day >= startDate && day <= endDate)
+    
+    if (hasDaysInRange) {
+      weeks.push(week)
+    }
+    
+    // Mover a la siguiente semana
+    weekStart = addWeeks(weekStart, 1)
+    
+    // Si el inicio de la siguiente semana ya pasó el endDate, terminar
+    if (weekStart > endDate && week[week.length - 1] > endDate) {
+      break
+    }
+  }
+  
+  return weeks
+}

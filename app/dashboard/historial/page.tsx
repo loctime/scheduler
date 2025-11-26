@@ -37,7 +37,7 @@ export default function HistorialPage() {
   const [compareDialogOpen, setCompareDialogOpen] = useState(false)
 
   useEffect(() => {
-    if (!user) return
+    if (!user || !db) return
 
     // Obtener historial ordenado por fecha descendente
     const historialQuery = query(collection(db, COLLECTIONS.HISTORIAL), orderBy("createdAt", "desc"), limit(50))
