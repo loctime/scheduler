@@ -97,6 +97,7 @@ export interface Configuracion {
   minutosDescanso: number // Minutos de descanso que se restan (por defecto 30)
   horasMinimasParaDescanso: number // Horas mínimas para aplicar descanso (por defecto 6)
   mediosTurnos?: MedioTurno[] // Medios turnos predefinidos para 1/2 franco
+  ordenEmpleados?: string[] // Orden personalizado de IDs de empleados
   createdAt?: any
   updatedAt?: any
   updatedBy?: string

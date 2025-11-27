@@ -9,8 +9,10 @@ import { es } from "date-fns/locale"
 import { Empleado, Turno, Horario, HistorialItem, ShiftAssignment, ShiftAssignmentValue, MedioTurno } from "@/lib/types"
 import { ShiftSelectorPopover } from "./shift-selector-popover"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Check } from "lucide-react"
+import { Check, GripVertical } from "lucide-react"
 import { adjustTime } from "@/lib/utils"
+import { useConfig } from "@/hooks/use-config"
+import { useEmployeeOrder } from "@/hooks/use-employee-order"
 
 export interface EmployeeMonthlyStats {
   francos: number
@@ -49,11 +51,42 @@ export const ScheduleGrid = memo(function ScheduleGrid({
 }: ScheduleGridProps) {
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
   const [extraMenuOpenKey, setExtraMenuOpenKey] = useState<string | null>(null)
+  const [draggedEmployeeId, setDraggedEmployeeId] = useState<string | null>(null)
+  const [dragOverEmployeeId, setDragOverEmployeeId] = useState<string | null>(null)
+  
+  const { config } = useConfig()
+  const { updateEmployeeOrder } = useEmployeeOrder()
 
   // Memoizar mapa de turnos para búsqueda O(1)
   const shiftMap = useMemo(() => {
     return new Map(shifts.map((s) => [s.id, s]))
   }, [shifts])
+
+  // Obtener orden de empleados desde configuración o usar orden por defecto
+  const orderedEmployeeIds = useMemo(() => {
+    if (config?.ordenEmpleados && config.ordenEmpleados.length > 0) {
+      // Validar que todos los IDs del orden existan en los empleados actuales
+      const employeeIds = new Set(employees.map(emp => emp.id))
+      const validOrder = config.ordenEmpleados.filter(id => employeeIds.has(id))
+      
+      // Agregar empleados nuevos que no estén en el orden
+      const newEmployees = employees
+        .filter(emp => !validOrder.includes(emp.id))
+        .map(emp => emp.id)
+      
+      return [...validOrder, ...newEmployees]
+    }
+    // Si no hay orden guardado, usar el orden por defecto (por nombre)
+    return employees.map(emp => emp.id)
+  }, [config?.ordenEmpleados, employees])
+
+  // Obtener empleados ordenados según el orden guardado
+  const orderedEmployees = useMemo(() => {
+    const employeeMap = new Map(employees.map(emp => [emp.id, emp]))
+    return orderedEmployeeIds
+      .map(id => employeeMap.get(id))
+      .filter((emp): emp is Empleado => emp !== undefined)
+  }, [orderedEmployeeIds, employees])
 
   // Helper: convertir ShiftAssignmentValue a string[] (IDs)
   const toShiftIds = useCallback((value: ShiftAssignmentValue | undefined): string[] => {
@@ -178,7 +211,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   }, [])
 
   // Helper: convertir color hex a rgba
-  const hexToRgba = useCallback((hex: string, opacity: number = 0.15): string => {
+  const hexToRgba = useCallback((hex: string, opacity: number = 0.35): string => {
     const cleanHex = hex.replace('#', '')
     const r = parseInt(cleanHex.substring(0, 2), 16)
     const g = parseInt(cleanHex.substring(2, 4), 16)
@@ -201,8 +234,56 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     
     // Si se encuentra y tiene color configurado, usarlo; sino usar verde por defecto
     const colorHex = medioTurno?.color || "#22c55e"
-    return hexToRgba(colorHex, 0.15)
+    return hexToRgba(colorHex, 0.35)
   }, [mediosTurnos, hexToRgba])
+
+  // Helper: buscar un turno que coincida con un horario dado (para obtener su color)
+  const findMatchingShift = useCallback(
+    (startTime: string, endTime: string, excludeShiftId?: string): Turno | undefined => {
+      if (!startTime || !endTime) return undefined
+      
+      const startMinutes = timeToMinutes(startTime)
+      const endMinutes = timeToMinutes(endTime)
+      
+      // Primero intentar buscar por nombre (palabras clave)
+      const nameLowerStart = startMinutes < 14 * 60 ? ["mañana", "morning", "matutino"] : 
+                            startMinutes >= 18 * 60 ? ["noche", "night", "nocturno"] : []
+      
+      const nameMatch = shifts.find((shift) => {
+        if (shift.id === excludeShiftId || shift.startTime2 || shift.endTime2) return false
+        const nameLower = shift.name.toLowerCase()
+        return nameLowerStart.some(keyword => nameLower.includes(keyword))
+      })
+      
+      if (nameMatch) return nameMatch
+      
+      // Si no se encuentra por nombre, buscar por horarios similares
+      // Priorizar turnos simples (sin segunda franja) que tengan horarios similares
+      const matchingShift = shifts.find((shift) => {
+        if (shift.id === excludeShiftId || shift.startTime2 || shift.endTime2) return false
+        
+        // Solo considerar turnos simples (sin segunda franja)
+        if (shift.startTime && shift.endTime) {
+          const shiftStart = timeToMinutes(shift.startTime)
+          const shiftEnd = timeToMinutes(shift.endTime)
+          
+          // Verificar si el rango de horarios se solapa o es muy similar
+          // Coincidencia si la diferencia en inicio y fin es menor a 60 minutos
+          const startDiff = Math.abs(shiftStart - startMinutes)
+          const endDiff = Math.abs(shiftEnd - endMinutes)
+          
+          if (startDiff <= 60 && endDiff <= 60) {
+            return true
+          }
+        }
+        
+        return false
+      })
+      
+      return matchingShift
+    },
+    [shifts, timeToMinutes],
+  )
 
   // Obtener el color de fondo para una celda basado en las asignaciones
   const getCellBackgroundStyle = useCallback(
@@ -212,8 +293,8 @@ export const ScheduleGrid = memo(function ScheduleGrid({
       // Si no hay asignaciones, no aplicar color
       if (assignments.length === 0) return undefined
       
-      // Color verde para franco (opacidad 0.15) - por defecto
-      const defaultGreenColor = 'rgba(34, 197, 94, 0.15)' // green-500 con opacidad
+      // Color verde para franco (opacidad 0.35) - por defecto
+      const defaultGreenColor = 'rgba(34, 197, 94, 0.35)' // green-500 con opacidad
       
       // Si es franco, aplicar verde
       if (assignments.some(a => a.type === "franco")) {
@@ -248,7 +329,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
           return { backgroundColor: medioColor }
         }
         
-        const shiftColor = hexToRgba(firstShift.color, 0.15)
+        const shiftColor = hexToRgba(firstShift.color, 0.35)
         
         // Obtener color del medio franco (configurado o por defecto)
         const medioColor = medioFranco.startTime && medioFranco.endTime
@@ -321,17 +402,64 @@ export const ScheduleGrid = memo(function ScheduleGrid({
         }
       }
       
-      // Si solo hay turnos normales, aplicar color del primer turno
+      // Si solo hay turnos normales, verificar si es un turno cortado
       if (shiftAssignments.length > 0) {
-        const firstShift = getShiftInfo(shiftAssignments[0].shiftId || "")
+        const firstAssignment = shiftAssignments[0]
+        const firstShift = getShiftInfo(firstAssignment.shiftId || "")
+        if (!firstShift) return undefined
+        
+        // Obtener horarios (ajustados o base)
+        const startTime = firstAssignment.startTime || firstShift.startTime || ""
+        const endTime = firstAssignment.endTime || firstShift.endTime || ""
+        const startTime2 = firstAssignment.startTime2 || firstShift.startTime2 || ""
+        const endTime2 = firstAssignment.endTime2 || firstShift.endTime2 || ""
+        
+        // Si es un turno cortado (tiene segunda franja), aplicar gradiente vertical
+        if (startTime && endTime && startTime2 && endTime2) {
+          // Opacidad más alta para turnos cortados (mejor contraste)
+          const cutShiftOpacity = 0.35
+          
+          // Buscar turnos que coincidan con cada franja para obtener sus colores
+          const morningShift = findMatchingShift(startTime, endTime, firstShift.id)
+          const nightShift = findMatchingShift(startTime2, endTime2, firstShift.id)
+          
+          // Si encontramos ambos turnos, usar sus colores
+          if (morningShift && nightShift) {
+            const morningColor = hexToRgba(morningShift.color, cutShiftOpacity)
+            const nightColor = hexToRgba(nightShift.color, cutShiftOpacity)
+            return {
+              background: `linear-gradient(to bottom, ${morningColor} 50%, ${nightColor} 50%)`
+            }
+          }
+          // Si solo encontramos uno, usar ese color y el del turno actual
+          if (morningShift) {
+            const morningColor = hexToRgba(morningShift.color, cutShiftOpacity)
+            const nightColor = hexToRgba(firstShift.color, cutShiftOpacity)
+            return {
+              background: `linear-gradient(to bottom, ${morningColor} 50%, ${nightColor} 50%)`
+            }
+          }
+          if (nightShift) {
+            const morningColor = hexToRgba(firstShift.color, cutShiftOpacity)
+            const nightColor = hexToRgba(nightShift.color, cutShiftOpacity)
+            return {
+              background: `linear-gradient(to bottom, ${morningColor} 50%, ${nightColor} 50%)`
+            }
+          }
+          // Si no encontramos ninguno, usar el color del turno para ambas partes
+          const shiftColor = hexToRgba(firstShift.color, cutShiftOpacity)
+          return { backgroundColor: shiftColor }
+        }
+        
+        // Si no es turno cortado, aplicar color del turno normalmente
         if (firstShift && firstShift.color) {
-          return { backgroundColor: hexToRgba(firstShift.color, 0.15) }
+          return { backgroundColor: hexToRgba(firstShift.color, 0.35) }
         }
       }
       
       return undefined
     },
-    [getEmployeeAssignments, getShiftInfo, hexToRgba, timeToMinutes, getMedioTurnoColor],
+    [getEmployeeAssignments, getShiftInfo, hexToRgba, timeToMinutes, getMedioTurnoColor, findMatchingShift],
   )
 
   const handleCellClick = useCallback(
@@ -430,6 +558,60 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     return Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1)
   }, [])
 
+  // Handlers para drag and drop
+  const handleDragStart = useCallback((e: React.DragEvent, employeeId: string) => {
+    if (readonly) return
+    setDraggedEmployeeId(employeeId)
+    e.dataTransfer.effectAllowed = "move"
+    e.dataTransfer.setData("text/plain", employeeId)
+    // Hacer el elemento semi-transparente mientras se arrastra
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = "0.5"
+    }
+  }, [readonly])
+
+  const handleDragEnd = useCallback((e: React.DragEvent) => {
+    if (readonly) return
+    setDraggedEmployeeId(null)
+    setDragOverEmployeeId(null)
+    // Restaurar opacidad
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = "1"
+    }
+  }, [readonly])
+
+  const handleDragOver = useCallback((e: React.DragEvent, employeeId: string) => {
+    if (readonly || !draggedEmployeeId || draggedEmployeeId === employeeId) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = "move"
+    setDragOverEmployeeId(employeeId)
+  }, [readonly, draggedEmployeeId])
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverEmployeeId(null)
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent, targetEmployeeId: string) => {
+    if (readonly || !draggedEmployeeId || draggedEmployeeId === targetEmployeeId) return
+    e.preventDefault()
+    
+    const draggedIndex = orderedEmployeeIds.indexOf(draggedEmployeeId)
+    const targetIndex = orderedEmployeeIds.indexOf(targetEmployeeId)
+    
+    if (draggedIndex === -1 || targetIndex === -1) return
+
+    // Reordenar el array
+    const newOrder = [...orderedEmployeeIds]
+    const [removed] = newOrder.splice(draggedIndex, 1)
+    newOrder.splice(targetIndex, 0, removed)
+    
+    setDraggedEmployeeId(null)
+    setDragOverEmployeeId(null)
+    
+    // Guardar el nuevo orden en Firebase
+    updateEmployeeOrder(newOrder)
+  }, [readonly, draggedEmployeeId, orderedEmployeeIds, updateEmployeeOrder])
+
   return (
     <>
       <Card className="overflow-hidden border border-border bg-card">
@@ -456,11 +638,33 @@ export const ScheduleGrid = memo(function ScheduleGrid({
             </tr>
           </thead>
           <tbody>
-            {employees.map((employee) => (
-              <tr key={employee.id} className="border-b border-border last:border-b-0">
+            {orderedEmployees.map((employee) => (
+              <tr 
+                key={employee.id} 
+                className={`border-b border-border last:border-b-0 ${
+                  dragOverEmployeeId === employee.id ? "bg-primary/5" : ""
+                } ${draggedEmployeeId === employee.id ? "opacity-50" : ""}`}
+                draggable={!readonly}
+                onDragStart={(e) => handleDragStart(e, employee.id)}
+                onDragEnd={handleDragEnd}
+                onDragOver={(e) => handleDragOver(e, employee.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, employee.id)}
+              >
                 <td className="border-r border-border bg-muted/30 px-6 py-4 text-lg font-medium text-foreground align-top">
-                  <div className="space-y-1">
-                    <p>{employee.name}</p>
+                  <div className="flex items-start gap-2">
+                    {!readonly && (
+                      <button
+                        type="button"
+                        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors touch-none"
+                        draggable={false}
+                        aria-label="Arrastrar para reordenar"
+                      >
+                        <GripVertical className="h-5 w-5" />
+                      </button>
+                    )}
+                    <div className="space-y-1 flex-1">
+                      <p>{employee.name}</p>
                     {employeeStats && employeeStats[employee.id] && (
                       <div className="text-xs text-muted-foreground space-y-0.5">
                         <div className="flex items-center gap-1">
@@ -473,6 +677,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                         </div>
                       </div>
                     )}
+                    </div>
                   </div>
                 </td>
                 {weekDays.map((day) => {

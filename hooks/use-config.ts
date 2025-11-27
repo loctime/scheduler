@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { doc, getDoc } from "firebase/firestore"
+import { doc, onSnapshot } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { Configuracion } from "@/lib/types"
 
@@ -10,50 +10,47 @@ export function useConfig() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const loadConfig = async () => {
-      if (!db) {
-        setLoading(false)
-        return
-      }
-      
-      try {
-        const configRef = doc(db, COLLECTIONS.CONFIG, "general")
-        const configSnap = await getDoc(configRef)
-
-        if (configSnap.exists()) {
-          setConfig(configSnap.data() as Configuracion)
-        } else {
-          // Configuración por defecto
-          setConfig({
-            mesInicioDia: 1,
-            horasMaximasPorDia: 8,
-            semanaInicioDia: 1,
-            mostrarFinesDeSemana: true,
-            formatoHora24: true,
-            minutosDescanso: 30,
-            horasMinimasParaDescanso: 6,
-            mediosTurnos: [],
-          })
-        }
-      } catch (error) {
-        console.error("Error loading config:", error)
-        // Usar valores por defecto en caso de error
-        setConfig({
-          mesInicioDia: 1,
-          horasMaximasPorDia: 8,
-          semanaInicioDia: 1,
-          mostrarFinesDeSemana: true,
-          formatoHora24: true,
-          minutosDescanso: 30,
-          horasMinimasParaDescanso: 6,
-          mediosTurnos: [],
-        })
-      } finally {
-        setLoading(false)
-      }
+    if (!db) {
+      setLoading(false)
+      return
     }
 
-    loadConfig()
+    const configRef = doc(db, COLLECTIONS.CONFIG, "general")
+    
+    // Configuración por defecto
+    const defaultConfig: Configuracion = {
+      mesInicioDia: 1,
+      horasMaximasPorDia: 8,
+      semanaInicioDia: 1,
+      mostrarFinesDeSemana: true,
+      formatoHora24: true,
+      minutosDescanso: 30,
+      horasMinimasParaDescanso: 6,
+      mediosTurnos: [],
+    }
+
+    // Escuchar cambios en tiempo real
+    const unsubscribe = onSnapshot(
+      configRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          setConfig(snapshot.data() as Configuracion)
+        } else {
+          setConfig(defaultConfig)
+        }
+        setLoading(false)
+      },
+      (error) => {
+        console.error("Error loading config:", error)
+        // Usar valores por defecto en caso de error
+        setConfig(defaultConfig)
+        setLoading(false)
+      }
+    )
+
+    return () => {
+      unsubscribe()
+    }
   }, [])
 
   return { config, loading }
