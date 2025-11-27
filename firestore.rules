@@ -159,40 +159,52 @@ service cloud.firestore {
     
     // Colección: apps/horarios/employees
     match /apps/horarios/employees/{empleadoId} {
-      allow read: if isAuth() && isHorariosUser();
+      allow read: if isAuth() && isHorariosUser() && resource.data.userId == uid();
       allow create: if isAuth() && isHorariosUser()
         && nonEmptyString('name')
+        && nonEmptyString('userId')
+        && request.resource.data.userId == uid()
         && isStringOrNull('email')
         && isStringOrNull('phone')
         && isTs('createdAt')
         && isTs('updatedAt');
       allow update: if isAuth() && isHorariosUser()
+        && resource.data.userId == uid()
+        && request.resource.data.userId == uid()
         && nonEmptyString('name')
         && isStringOrNull('email')
         && isStringOrNull('phone')
         && unchanged('createdAt')
         && isTs('updatedAt');
-      allow delete: if isAuth() && isHorariosUser();
+      allow delete: if isAuth() && isHorariosUser() && resource.data.userId == uid();
     }
     
     // Colección: apps/horarios/shifts
     match /apps/horarios/shifts/{turnoId} {
-      allow read: if isAuth() && isHorariosUser();
+      allow read: if isAuth() && isHorariosUser() && resource.data.userId == uid();
       allow create: if isAuth() && isHorariosUser()
         && nonEmptyString('name')
+        && nonEmptyString('userId')
+        && request.resource.data.userId == uid()
         && isStringOrNull('startTime')
         && isStringOrNull('endTime')
+        && isStringOrNull('startTime2')
+        && isStringOrNull('endTime2')
         && nonEmptyString('color')
         && isTs('createdAt')
         && isTs('updatedAt');
       allow update: if isAuth() && isHorariosUser()
+        && resource.data.userId == uid()
+        && request.resource.data.userId == uid()
         && nonEmptyString('name')
         && isStringOrNull('startTime')
         && isStringOrNull('endTime')
+        && isStringOrNull('startTime2')
+        && isStringOrNull('endTime2')
         && nonEmptyString('color')
         && unchanged('createdAt')
         && isTs('updatedAt');
-      allow delete: if isAuth() && isHorariosUser();
+      allow delete: if isAuth() && isHorariosUser() && resource.data.userId == uid();
     }
     
     // Colección: apps/horarios/schedules

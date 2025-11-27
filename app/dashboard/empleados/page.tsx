@@ -115,6 +115,7 @@ export default function EmpleadosPage() {
         const promises = namesToAdd.map((name: string) =>
           addDoc(collection(db!, COLLECTIONS.EMPLOYEES), {
             name,
+            userId: user.uid,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           })

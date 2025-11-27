@@ -3,6 +3,7 @@ export interface Empleado {
   name: string
   email?: string
   phone?: string
+  userId: string
   createdAt?: any
   updatedAt?: any
 }
@@ -15,6 +16,7 @@ export interface Turno {
   startTime2?: string // formato "HH:mm" - Segunda franja horaria (turno cortado)
   endTime2?: string // formato "HH:mm" - Segunda franja horaria (turno cortado)
   color: string // código hex
+  userId: string
   createdAt?: any
   updatedAt?: any
 }

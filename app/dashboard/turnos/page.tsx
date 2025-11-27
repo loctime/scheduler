@@ -131,6 +131,7 @@ export default function TurnosPage() {
         const newShiftData: any = {
           name: formData.name,
           color: formData.color,
+          userId: user.uid,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         }

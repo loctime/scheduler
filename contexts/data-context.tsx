@@ -1,7 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react"
-import { collection, query, orderBy, onSnapshot, getDocs } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, getDocs, where } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { Empleado, Turno } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
@@ -64,7 +64,11 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
       }
 
       // Cargar desde Firestore
-      const employeesQuery = query(collection(db, COLLECTIONS.EMPLOYEES), orderBy("name"))
+      const employeesQuery = query(
+        collection(db, COLLECTIONS.EMPLOYEES),
+        where("userId", "==", user.uid),
+        orderBy("name")
+      )
       const snapshot = await getDocs(employeesQuery)
       const employeesData = snapshot.docs.map((doc) => ({
         id: doc.id,
@@ -96,7 +100,11 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
       }
 
       // Cargar desde Firestore
-      const shiftsQuery = query(collection(db, COLLECTIONS.SHIFTS), orderBy("name"))
+      const shiftsQuery = query(
+        collection(db, COLLECTIONS.SHIFTS),
+        where("userId", "==", user.uid),
+        orderBy("name")
+      )
       const snapshot = await getDocs(shiftsQuery)
       const shiftsData = snapshot.docs.map((doc) => ({
         id: doc.id,
@@ -134,8 +142,16 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
 
     // Configurar listeners en tiempo real (pero con menos frecuencia)
     // Solo para cambios críticos, no para cada actualización
-    const employeesQuery = query(collection(db, COLLECTIONS.EMPLOYEES), orderBy("name"))
-    const shiftsQuery = query(collection(db, COLLECTIONS.SHIFTS), orderBy("name"))
+    const employeesQuery = query(
+      collection(db, COLLECTIONS.EMPLOYEES),
+      where("userId", "==", user.uid),
+      orderBy("name")
+    )
+    const shiftsQuery = query(
+      collection(db, COLLECTIONS.SHIFTS),
+      where("userId", "==", user.uid),
+      orderBy("name")
+    )
 
     const unsubscribeEmployees = onSnapshot(
       employeesQuery,
