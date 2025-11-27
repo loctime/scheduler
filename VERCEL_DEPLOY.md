@@ -84,3 +84,4 @@ vercel logs
 - 🔄 Cada push a `main` hace deploy automático
 - 📝 Los Pull Requests generan previews automáticos
 
+
