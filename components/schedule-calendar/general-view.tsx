@@ -1,10 +1,12 @@
 "use client"
 
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { MonthHeader } from "@/components/schedule-calendar/month-header"
 import { WeekSchedule } from "@/components/schedule-calendar/week-schedule"
 import { EmptyStateCard, LoadingStateCard } from "@/components/schedule-calendar/state-card"
 import type { Horario, Empleado, Turno, MedioTurno, ShiftAssignment } from "@/lib/types"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
+import { format } from "date-fns"
 
 type AssignmentUpdateHandler = (
   date: string,
@@ -52,6 +54,49 @@ export function GeneralView({
   onPreviousMonth,
   onNextMonth,
 }: GeneralViewProps) {
+  // Crear un mapa de semanas expandidas usando la fecha de inicio de semana como clave
+  const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(() => {
+    // Por defecto, todas las semanas están expandidas
+    const defaultExpanded = new Set<string>()
+    monthWeeks.forEach((weekDays) => {
+      const weekKey = format(weekDays[0], "yyyy-MM-dd")
+      defaultExpanded.add(weekKey)
+    })
+    return defaultExpanded
+  })
+
+  // Sincronizar el estado cuando cambian las semanas del mes
+  const weekKeys = useMemo(
+    () => monthWeeks.map((weekDays) => format(weekDays[0], "yyyy-MM-dd")),
+    [monthWeeks],
+  )
+
+  // Asegurar que todas las semanas nuevas estén expandidas por defecto
+  useEffect(() => {
+    setExpandedWeeks((prev) => {
+      const updated = new Set(prev)
+      weekKeys.forEach((key) => {
+        if (!updated.has(key)) {
+          updated.add(key)
+        }
+      })
+      return updated
+    })
+  }, [weekKeys])
+
+  const handleWeekToggle = useCallback((weekStartDate: Date, isOpen: boolean) => {
+    const weekKey = format(weekStartDate, "yyyy-MM-dd")
+    setExpandedWeeks((prev) => {
+      const updated = new Set(prev)
+      if (isOpen) {
+        updated.add(weekKey)
+      } else {
+        updated.delete(weekKey)
+      }
+      return updated
+    })
+  }, [])
+
   if (dataLoading) {
     return <LoadingStateCard />
   }
@@ -79,6 +124,8 @@ export function GeneralView({
         {monthWeeks.map((weekDays, weekIndex) => {
           const weekStartDate = weekDays[0]
           const weekSchedule = getWeekSchedule(weekStartDate)
+          const weekKey = format(weekStartDate, "yyyy-MM-dd")
+          const isExpanded = expandedWeeks.has(weekKey)
 
           return (
             <WeekSchedule
@@ -96,6 +143,8 @@ export function GeneralView({
               exporting={exporting}
               mediosTurnos={mediosTurnos}
               employeeStats={employeeMonthlyStats}
+              open={isExpanded}
+              onOpenChange={(open) => handleWeekToggle(weekStartDate, open)}
             />
           )
         })}

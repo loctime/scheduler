@@ -309,11 +309,43 @@ export const ScheduleGrid = memo(function ScheduleGrid({
         a => a.type === "shift" && a.shiftId
       )
       
-      // Si solo hay medio franco (sin turnos), usar color configurado o verde por defecto
+      // Si solo hay medio franco (sin turnos), crear gradiente vertical como turno cortado
       if (medioFranco && shiftAssignments.length === 0) {
         if (medioFranco.startTime && medioFranco.endTime) {
-          const medioColor = getMedioTurnoColor(medioFranco.startTime, medioFranco.endTime)
-          return { backgroundColor: medioColor }
+          // Buscar un turno que coincida con el horario del medio franco para obtener su color
+          const matchingShift = findMatchingShift(medioFranco.startTime, medioFranco.endTime)
+          
+          // Determinar si el medio franco es temprano (mañana) o tarde (noche)
+          const medioStart = timeToMinutes(medioFranco.startTime)
+          const isEarly = medioStart < 14 * 60 // Antes de las 14:00
+          
+          if (matchingShift) {
+            // Si encontramos un turno que coincide, usar gradiente con su color
+            const shiftColor = hexToRgba(matchingShift.color, 0.35)
+            if (isEarly) {
+              // Medio franco temprano (mañana): arriba color del turno, abajo verde
+              return {
+                background: `linear-gradient(to bottom, ${shiftColor} 50%, ${defaultGreenColor} 50%)`
+              }
+            } else {
+              // Medio franco tarde (noche): arriba verde, abajo color del turno
+              return {
+                background: `linear-gradient(to bottom, ${defaultGreenColor} 50%, ${shiftColor} 50%)`
+              }
+            }
+          } else {
+            // Si no encontramos turno, usar color configurado del medio turno o verde
+            const medioColor = getMedioTurnoColor(medioFranco.startTime, medioFranco.endTime)
+            if (isEarly) {
+              return {
+                background: `linear-gradient(to bottom, ${medioColor} 50%, ${defaultGreenColor} 50%)`
+              }
+            } else {
+              return {
+                background: `linear-gradient(to bottom, ${defaultGreenColor} 50%, ${medioColor} 50%)`
+              }
+            }
+          }
         }
         return { backgroundColor: defaultGreenColor }
       }
@@ -331,73 +363,25 @@ export const ScheduleGrid = memo(function ScheduleGrid({
         
         const shiftColor = hexToRgba(firstShift.color, 0.35)
         
-        // Obtener color del medio franco (configurado o por defecto)
-        const medioColor = medioFranco.startTime && medioFranco.endTime
-          ? getMedioTurnoColor(medioFranco.startTime, medioFranco.endTime)
-          : defaultGreenColor
-        
-        // Determinar la posición del medio franco basándose en su horario
+        // Determinar si el medio franco es temprano (mañana) o tarde (noche)
         let isMedioFrancoEarly = true // Por defecto, asumir que es temprano
         
         if (medioFranco.startTime && medioFranco.endTime) {
           const medioStart = timeToMinutes(medioFranco.startTime)
-          const medioEnd = timeToMinutes(medioFranco.endTime)
-          
-          // Comparar con los turnos para determinar si el medio franco es temprano o tarde
-          let earliestShiftStart = Infinity
-          let latestShiftEnd = -Infinity
-          
-          shiftAssignments.forEach(assignment => {
-            const shift = getShiftInfo(assignment.shiftId || "")
-            if (shift) {
-              // Usar horarios ajustados si existen, sino los del turno base
-              const startTime = assignment.startTime || shift.startTime || ""
-              const endTime = assignment.endTime || shift.endTime || ""
-              const startTime2 = assignment.startTime2 || shift.startTime2 || ""
-              const endTime2 = assignment.endTime2 || shift.endTime2 || ""
-              
-              if (startTime) {
-                const start = timeToMinutes(startTime)
-                earliestShiftStart = Math.min(earliestShiftStart, start)
-              }
-              if (endTime) {
-                const end = timeToMinutes(endTime)
-                latestShiftEnd = Math.max(latestShiftEnd, end)
-              }
-              if (startTime2) {
-                const start2 = timeToMinutes(startTime2)
-                earliestShiftStart = Math.min(earliestShiftStart, start2)
-              }
-              if (endTime2) {
-                const end2 = timeToMinutes(endTime2)
-                latestShiftEnd = Math.max(latestShiftEnd, end2)
-              }
-            }
-          })
-          
-          // Si el medio franco termina antes de que empiece el turno, es temprano
-          // Si el medio franco empieza después de que termine el turno, es tarde
-          if (earliestShiftStart !== Infinity && medioEnd < earliestShiftStart) {
-            isMedioFrancoEarly = true
-          } else if (latestShiftEnd !== -Infinity && medioStart > latestShiftEnd) {
-            isMedioFrancoEarly = false
-          } else {
-            // Si hay solapamiento o no podemos determinar, usar la hora del día
-            // Si el medio franco empieza antes de las 12:00, es temprano
-            isMedioFrancoEarly = medioStart < 12 * 60
-          }
+          // Si el medio franco empieza antes de las 14:00, es temprano (mañana)
+          isMedioFrancoEarly = medioStart < 14 * 60
         }
         
-        // Crear gradiente: color del medio franco en una mitad, color del turno en la otra
+        // Crear gradiente vertical: verde para medio franco, color del turno para el turno
         if (isMedioFrancoEarly) {
-          // Medio franco temprano: color del medio franco a la izquierda, color del turno a la derecha
+          // Medio franco temprano (mañana): arriba turno, abajo medio franco (verde)
           return {
-            background: `linear-gradient(to right, ${medioColor} 50%, ${shiftColor} 50%)`
+            background: `linear-gradient(to bottom, ${shiftColor} 50%, ${defaultGreenColor} 50%)`
           }
         } else {
-          // Medio franco tarde: color del turno a la izquierda, color del medio franco a la derecha
+          // Medio franco tarde (noche): arriba medio franco (verde), abajo turno
           return {
-            background: `linear-gradient(to right, ${shiftColor} 50%, ${medioColor} 50%)`
+            background: `linear-gradient(to bottom, ${defaultGreenColor} 50%, ${shiftColor} 50%)`
           }
         }
       }
@@ -784,19 +768,25 @@ export const ScheduleGrid = memo(function ScheduleGrid({
 
                           let orderedAssignments = assignments
 
-                          // Ordenar asignaciones: medio franco temprano arriba, medio franco tarde abajo
+                          // Ordenar asignaciones: 
+                          // - Medio franco temprano (mañana): turno arriba, medio franco abajo
+                          // - Medio franco tarde (noche): medio franco arriba, turno abajo
                           const hasMedioFranco = assignments.some((a) => a.type === "medio_franco")
                           const hasShifts = assignments.some((a) => a.type === "shift" && a.shiftId)
 
                           if (hasMedioFranco && hasShifts) {
                             orderedAssignments = [...assignments].sort((a, b) => {
                               if (a.type === "medio_franco" && b.type !== "medio_franco") {
-                                const isEarly = a.startTime ? timeToMinutes(a.startTime) < 15 * 60 : true
-                                return isEarly ? -1 : 1
+                                const isEarly = a.startTime ? timeToMinutes(a.startTime) < 14 * 60 : true
+                                // Si es temprano, el turno va arriba (medio franco abajo)
+                                // Si es tarde, el medio franco va arriba
+                                return isEarly ? 1 : -1
                               }
                               if (b.type === "medio_franco" && a.type !== "medio_franco") {
-                                const isEarly = b.startTime ? timeToMinutes(b.startTime) < 15 * 60 : true
-                                return isEarly ? 1 : -1
+                                const isEarly = b.startTime ? timeToMinutes(b.startTime) < 14 * 60 : true
+                                // Si es temprano, el turno va arriba (medio franco abajo)
+                                // Si es tarde, el medio franco va arriba
+                                return isEarly ? -1 : 1
                               }
                               return 0
                             })
@@ -814,18 +804,44 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                             if (assignment.type === "medio_franco") {
                               const displayTimeLines = getShiftDisplayTime("", assignment)
                               const hasTime = assignment.startTime && assignment.endTime
-                              return (
-                                <div key={`medio-franco-${idx}`} className="text-center text-base">
-                                  {hasTime ? (
-                                    <>
-                                      <span className="block">{displayTimeLines[0]}</span>
-                                      <span className="block text-xs">(1/2 Franco)</span>
-                                    </>
-                                  ) : (
-                                    <span className="block">1/2 Franco</span>
-                                  )}
-                                </div>
-                              )
+                              
+                              // Determinar si el medio franco es temprano o tarde
+                              const medioStart = assignment.startTime ? timeToMinutes(assignment.startTime) : null
+                              const isEarly = medioStart !== null && medioStart < 14 * 60
+                              
+                              if (hasTime) {
+                                if (hasShifts) {
+                                  // Cuando hay turno, solo mostrar "(1/2 Franco)" sin horario
+                                  return (
+                                    <span key={`medio-franco-${idx}`} className="block text-center text-base font-semibold text-[#22c55e]">
+                                      (1/2 Franco)
+                                    </span>
+                                  )
+                                } else {
+                                  // Cuando es solo medio franco, mostrar como turno cortado
+                                  // Si es temprano: arriba el horario, abajo "(1/2 Franco)"
+                                  // Si es tarde: arriba "(1/2 Franco)", abajo el horario
+                                  if (isEarly) {
+                                    return (
+                                      <div key={`medio-franco-${idx}`} className="text-center text-base">
+                                        <span className="block">{displayTimeLines[0]}</span>
+                                        <span className="block text-xs font-semibold text-[#22c55e]">(1/2 Franco)</span>
+                                      </div>
+                                    )
+                                  } else {
+                                    return (
+                                      <div key={`medio-franco-${idx}`} className="text-center text-base">
+                                        <span className="block text-xs font-semibold text-[#22c55e]">(1/2 Franco)</span>
+                                        <span className="block">{displayTimeLines[0]}</span>
+                                      </div>
+                                    )
+                                  }
+                                }
+                              } else {
+                                return (
+                                  <span key={`medio-franco-${idx}`} className="block text-center text-base">1/2 Franco</span>
+                                )
+                              }
                             }
 
                             const shift = getShiftInfo(assignment.shiftId || "")
