@@ -197,6 +197,21 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     [getEmployeeAssignments, getShiftInfo, onAssignmentUpdate, schedule?.id]
   )
 
+  const handleQuickAssignments = useCallback(
+    (date: string, employeeId: string, assignments: ShiftAssignment[]) => {
+      if (onAssignmentUpdate) {
+        onAssignmentUpdate(date, employeeId, assignments, { scheduleId: schedule?.id })
+      } else if (onShiftUpdate) {
+        const shiftIds = assignments
+          .map((a) => a.shiftId)
+          .filter((id): id is string => Boolean(id))
+        onShiftUpdate(date, employeeId, shiftIds)
+      }
+      setSelectedCell(null)
+    },
+    [onAssignmentUpdate, onShiftUpdate, schedule?.id]
+  )
+
   // Obtener empleado y fecha seleccionados
   const selectedEmployee = selectedCell ? employees.find((e) => e.id === selectedCell.employeeId) : null
   const selectedDate = selectedCell
@@ -293,6 +308,9 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                         adjustTime={adjustTime}
                         onAssignmentUpdate={onAssignmentUpdate}
                         scheduleId={schedule?.id}
+                        shifts={shifts}
+                        mediosTurnos={mediosTurnos}
+                        onQuickAssignments={handleQuickAssignments}
                       />
                     )}
                   </React.Fragment>
@@ -302,19 +320,8 @@ export const ScheduleGrid = memo(function ScheduleGrid({
           </table>
         </div>
       </Card>
-      {selectedCell && selectedEmployee && selectedDate && (
-        <ShiftSelectorPopover
-          open={true}
-          onOpenChange={(open) => !open && setSelectedCell(null)}
-          shifts={shifts}
-          selectedShiftIds={selectedShiftIds}
-          selectedAssignments={selectedAssignments}
-          onShiftChange={onShiftUpdate ? handleShiftUpdate : undefined}
-          onAssignmentsChange={onAssignmentUpdate ? handleAssignmentUpdate : undefined}
-          employeeName={selectedEmployee.name}
-          date={format(selectedDate, "EEEE, d 'de' MMMM", { locale: es })}
-        />
-      )}
+      {/* El selector de turnos ahora se muestra inline en la celda seleccionada,
+          así que ya no usamos el modal ShiftSelectorPopover */}
     </>
   )
 })

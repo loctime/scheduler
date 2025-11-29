@@ -2,7 +2,8 @@
 
 import React from "react"
 import { format } from "date-fns"
-import { Empleado, ShiftAssignment, EmployeeMonthlyStats } from "@/lib/types"
+import { Empleado, ShiftAssignment, MedioTurno, Turno } from "@/lib/types"
+import type { EmployeeMonthlyStats } from "../index"
 import { Button } from "@/components/ui/button"
 import { GripVertical, Plus } from "lucide-react"
 import { hexToRgba, formatStatValue } from "../utils/schedule-grid-utils"
@@ -44,6 +45,9 @@ interface EmployeeRowProps {
     options?: { scheduleId?: string }
   ) => void
   scheduleId?: string
+  shifts: Turno[]
+  mediosTurnos?: MedioTurno[]
+  onQuickAssignments?: (date: string, employeeId: string, assignments: ShiftAssignment[]) => void
 }
 
 export function EmployeeRow({
@@ -75,6 +79,9 @@ export function EmployeeRow({
   adjustTime,
   onAssignmentUpdate,
   scheduleId,
+  shifts,
+  mediosTurnos,
+  onQuickAssignments,
 }: EmployeeRowProps) {
   return (
     <tr
@@ -191,6 +198,13 @@ export function EmployeeRow({
             hasExtraAfter={hasExtraAfter}
             onToggleExtra={(type) => handleToggleExtra(employee.id, dateStr, type)}
             onExtraMenuOpenChange={(open) => setExtraMenuOpenKey(open ? cellKey : null)}
+            quickShifts={shifts}
+            mediosTurnos={mediosTurnos}
+            onQuickAssignments={
+              onQuickAssignments
+                ? (assignments) => onQuickAssignments(dateStr, employee.id, assignments)
+                : undefined
+            }
           />
         )
       })}

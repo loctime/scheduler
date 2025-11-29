@@ -5,8 +5,9 @@ import type { CSSProperties } from "react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Check } from "lucide-react"
-import { ShiftAssignment, Turno } from "@/lib/types"
+import { ShiftAssignment, Turno, MedioTurno } from "@/lib/types"
 import { CellAssignments } from "./cell-assignments"
+import { InlineShiftSelector } from "./inline-shift-selector"
 
 interface ScheduleCellProps {
   date: string
@@ -24,6 +25,9 @@ interface ScheduleCellProps {
   hasExtraAfter: boolean
   onToggleExtra: (type: "before" | "after") => void
   onExtraMenuOpenChange: (open: boolean) => void
+  quickShifts: Turno[]
+  mediosTurnos?: MedioTurno[]
+  onQuickAssignments?: (assignments: ShiftAssignment[]) => void
 }
 
 export function ScheduleCell({
@@ -42,6 +46,9 @@ export function ScheduleCell({
   hasExtraAfter,
   onToggleExtra,
   onExtraMenuOpenChange,
+  quickShifts,
+  mediosTurnos,
+  onQuickAssignments,
 }: ScheduleCellProps) {
   const hasBackgroundStyle = !!backgroundStyle
   const hoverClass = hasBackgroundStyle
@@ -97,7 +104,15 @@ export function ScheduleCell({
         </div>
       )}
       <div className="flex flex-col gap-2">
-        <CellAssignments assignments={assignments} getShiftInfo={getShiftInfo} />
+        {isSelected && isClickable && onQuickAssignments ? (
+          <InlineShiftSelector
+            shifts={quickShifts}
+            mediosTurnos={mediosTurnos}
+            onSelectAssignments={onQuickAssignments}
+          />
+        ) : (
+          <CellAssignments assignments={assignments} getShiftInfo={getShiftInfo} />
+        )}
       </div>
     </td>
   )
