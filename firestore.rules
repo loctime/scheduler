@@ -111,78 +111,62 @@ service cloud.firestore {
     
     // ========= HORARIOS SCHEDULER =========
     
-    // Helpers específicos para HORARIOS
+    // Helper para verificar que el usuario tiene documento en apps/horarios/users
     function horariosUserDocExists() {
       return isAuth() && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()));
     }
-    function horariosUserRole() {
-      return isAuth() && horariosUserDocExists()
-        ? get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role
-        : null;
-    }
-    function isHorariosMaxDev() { return horariosUserRole() == 'maxdev'; }
-    function isHorariosAdmin()  { return horariosUserRole() == 'admin' || horariosUserRole() == 'maxdev'; }
-    function isHorariosUser()   { return horariosUserRole() == 'user' || isHorariosAdmin(); }
     
     // Colección: apps/horarios/users
     match /apps/horarios/users/{userId} {
-      allow read: if isAuth() && (uid() == userId || isHorariosUser());
+      allow read: if isAuth() && uid() == userId;
       allow create: if isAuth() && uid() == userId
         && nonEmptyString('uid')
         && request.resource.data.uid == uid()
         && isStringOrNull('email')
         && isStringOrNull('displayName')
         && isStringOrNull('photoURL')
-        && (isStringOrNull('role') || request.resource.data.role == 'user' || request.resource.data.role == 'admin' || request.resource.data.role == 'maxdev')
+        && isStringOrNull('role')
         && isTs('createdAt')
         && isTs('updatedAt');
-      // Usuario puede actualizar sus propios datos (pero no cambiar su role si ya existe)
       allow update: if isAuth() && uid() == userId
         && unchanged('uid')
-        && (unchanged('role') || (!('role' in resource.data) && request.resource.data.role == 'user'))
         && isStringOrNull('email')
         && isStringOrNull('displayName')
         && isStringOrNull('photoURL')
+        && isStringOrNull('role')
         && unchanged('createdAt')
         && isTs('updatedAt');
-      // Admin puede actualizar cualquier usuario (incluyendo roles)
-      allow update: if isAuth() && isHorariosAdmin()
-        && unchanged('uid')
-        && isStringOrNull('email')
-        && isStringOrNull('displayName')
-        && isStringOrNull('photoURL')
-        && (isStringOrNull('role') || request.resource.data.role == 'user' || request.resource.data.role == 'admin' || request.resource.data.role == 'maxdev')
-        && unchanged('createdAt')
-        && isTs('updatedAt');
-      allow delete: if isAuth() && isHorariosAdmin();
+      allow delete: if false; // No permitir eliminar usuarios
     }
     
     // Colección: apps/horarios/employees
     match /apps/horarios/employees/{empleadoId} {
-      allow read: if isAuth() && isHorariosUser() && resource.data.userId == uid();
-      allow create: if isAuth() && isHorariosUser()
+      allow read: if isAuth() && horariosUserDocExists() && resource.data.userId == uid();
+      allow create: if isAuth() && horariosUserDocExists()
         && nonEmptyString('name')
         && nonEmptyString('userId')
         && request.resource.data.userId == uid()
         && isStringOrNull('email')
         && isStringOrNull('phone')
+        && isStringOrNull('puestoId')
         && isTs('createdAt')
         && isTs('updatedAt');
-      allow update: if isAuth() && isHorariosUser()
+      allow update: if isAuth() && horariosUserDocExists()
         && resource.data.userId == uid()
-        && request.resource.data.userId == uid()
+        && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
         && nonEmptyString('name')
         && isStringOrNull('email')
         && isStringOrNull('phone')
+        && isStringOrNull('puestoId')
         && unchanged('createdAt')
         && isTs('updatedAt');
-      allow delete: if isAuth() && isHorariosUser() && resource.data.userId == uid();
+      allow delete: if isAuth() && horariosUserDocExists() && resource.data.userId == uid();
     }
     
     // Colección: apps/horarios/shifts
     match /apps/horarios/shifts/{turnoId} {
-      allow read: if isAuth() && isHorariosUser() && resource.data.userId == uid();
-      allow create: if isAuth() && isHorariosUser()
+      allow read: if isAuth() && horariosUserDocExists() && resource.data.userId == uid();
+      allow create: if isAuth() && horariosUserDocExists()
         && nonEmptyString('name')
         && nonEmptyString('userId')
         && request.resource.data.userId == uid()
@@ -193,9 +177,9 @@ service cloud.firestore {
         && nonEmptyString('color')
         && isTs('createdAt')
         && isTs('updatedAt');
-      allow update: if isAuth() && isHorariosUser()
+      allow update: if isAuth() && horariosUserDocExists()
         && resource.data.userId == uid()
-        && request.resource.data.userId == uid()
+        && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
         && nonEmptyString('name')
         && isStringOrNull('startTime')
         && isStringOrNull('endTime')
@@ -204,13 +188,13 @@ service cloud.firestore {
         && nonEmptyString('color')
         && unchanged('createdAt')
         && isTs('updatedAt');
-      allow delete: if isAuth() && isHorariosUser() && resource.data.userId == uid();
+      allow delete: if isAuth() && horariosUserDocExists() && resource.data.userId == uid();
     }
     
     // Colección: apps/horarios/schedules
     match /apps/horarios/schedules/{horarioId} {
-      allow read: if isAuth() && isHorariosUser();
-      allow create: if isAuth() && isHorariosUser()
+      allow read: if isAuth() && horariosUserDocExists();
+      allow create: if isAuth() && horariosUserDocExists()
         && nonEmptyString('nombre')
         && nonEmptyString('weekStart')
         && nonEmptyString('semanaInicio')
@@ -222,7 +206,7 @@ service cloud.firestore {
         && isStringOrNull('createdByName')
         && isStringOrNull('modifiedBy')
         && isStringOrNull('modifiedByName');
-      allow update: if isAuth() && isHorariosUser()
+      allow update: if isAuth() && horariosUserDocExists()
         && nonEmptyString('nombre')
         && nonEmptyString('weekStart')
         && nonEmptyString('semanaInicio')
@@ -231,13 +215,13 @@ service cloud.firestore {
         && isTs('updatedAt')
         && (isStringOrNull('modifiedBy') || request.resource.data.modifiedBy == uid())
         && isStringOrNull('modifiedByName');
-      allow delete: if isAuth() && isHorariosAdmin();
+      allow delete: if isAuth() && horariosUserDocExists();
     }
     
     // Colección: apps/horarios/historial
     match /apps/horarios/historial/{historialId} {
-      allow read: if isAuth() && isHorariosUser();
-      allow create: if isAuth() && isHorariosUser()
+      allow read: if isAuth() && horariosUserDocExists();
+      allow create: if isAuth() && horariosUserDocExists()
         && nonEmptyString('horarioId')
         && nonEmptyString('nombre')
         && nonEmptyString('semanaInicio')
@@ -249,17 +233,16 @@ service cloud.firestore {
         && isStringOrNull('createdByName')
         && (isBool('versionAnterior') || !('versionAnterior' in request.resource.data));
       allow update: if false; // Historial es inmutable
-      allow delete: if isAuth() && isHorariosAdmin();
+      allow delete: if isAuth() && horariosUserDocExists();
     }
     
     // Colección: apps/horarios/config
     match /apps/horarios/config/{configId} {
-      // Permitir lectura a cualquier usuario autenticado
-      allow read: if isAuth();
-      // Permitir crear/actualizar a cualquier usuario autenticado
-      // Reglas completamente permisivas
-      allow create, update: if isAuth();
-      allow delete: if isAuth() && isHorariosAdmin();
+      // Permitir lectura a cualquier usuario autenticado con documento de usuario
+      allow read: if isAuth() && horariosUserDocExists();
+      // Permitir crear/actualizar a cualquier usuario autenticado con documento de usuario
+      allow create, update: if isAuth() && horariosUserDocExists();
+      allow delete: if false; // No permitir eliminar configuración
     }
     
     

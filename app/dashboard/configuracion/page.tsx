@@ -15,7 +15,24 @@ import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2, Save, Plus, Trash2 } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
-import { MedioTurno } from "@/lib/types"
+import { MedioTurno, Puesto } from "@/lib/types"
+
+// Función helper para determinar el color de texto según el contraste
+const getContrastColor = (hexColor: string): string => {
+  // Remover el # si existe
+  const hex = hexColor.replace('#', '')
+  
+  // Convertir a RGB
+  const r = parseInt(hex.substring(0, 2), 16)
+  const g = parseInt(hex.substring(2, 4), 16)
+  const b = parseInt(hex.substring(4, 6), 16)
+  
+  // Calcular la luminosidad relativa
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  
+  // Si la luminosidad es mayor a 0.5, usar texto oscuro, sino texto claro
+  return luminance > 0.5 ? '#000000' : '#ffffff'
+}
 
 export default function ConfiguracionPage() {
   const { user, shifts } = useData()
@@ -31,6 +48,7 @@ export default function ConfiguracionPage() {
     minutosDescanso: 30,
     horasMinimasParaDescanso: 6,
     mediosTurnos: [],
+    puestos: [],
   })
 
   const shiftColorOptions = useMemo(() => {
@@ -81,6 +99,7 @@ export default function ConfiguracionPage() {
             minutosDescanso: 30,
             horasMinimasParaDescanso: 6,
             mediosTurnos: [],
+            puestos: [],
           }
           await setDoc(configRef, {
             ...defaultConfig,
@@ -139,6 +158,7 @@ export default function ConfiguracionPage() {
         minutosDescanso: config.minutosDescanso,
         horasMinimasParaDescanso: config.horasMinimasParaDescanso,
         mediosTurnos: config.mediosTurnos || [],
+        puestos: config.puestos || [],
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
         updatedByName: user.displayName || user.email || "",
@@ -492,6 +512,109 @@ export default function ConfiguracionPage() {
             </Button>
             <p className="text-sm text-muted-foreground">
               Estos horarios aparecerán como opciones cuando se seleccione "1/2 Franco" al asignar turnos.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Puestos de Trabajo</CardTitle>
+            <CardDescription>Define los puestos de trabajo y sus colores para diferenciar empleados</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              {(config.puestos || []).map((puesto, index) => (
+                <div key={puesto.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                  <div className="flex-1 grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Nombre del Puesto</Label>
+                      <Input
+                        placeholder="Ej: Salón, Cocina, Bacha"
+                        value={puesto.nombre}
+                        onChange={(e) => {
+                          const nuevosPuestos = [...(config.puestos || [])]
+                          nuevosPuestos[index] = { ...puesto, nombre: e.target.value }
+                          setConfig({ ...config, puestos: nuevosPuestos })
+                        }}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Color</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="color"
+                          value={puesto.color}
+                          onChange={(e) => {
+                            const nuevosPuestos = [...(config.puestos || [])]
+                            nuevosPuestos[index] = { ...puesto, color: e.target.value }
+                            setConfig({ ...config, puestos: nuevosPuestos })
+                          }}
+                          className="h-9 w-16 p-1 cursor-pointer"
+                        />
+                        <Input
+                          type="text"
+                          placeholder="#000000"
+                          value={puesto.color}
+                          onChange={(e) => {
+                            const nuevosPuestos = [...(config.puestos || [])]
+                            nuevosPuestos[index] = { ...puesto, color: e.target.value }
+                            setConfig({ ...config, puestos: nuevosPuestos })
+                          }}
+                          className="text-sm flex-1"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1 flex items-end">
+                      <div
+                        className="h-9 w-full rounded border border-border flex items-center justify-center text-xs font-medium"
+                        style={{ backgroundColor: puesto.color, color: getContrastColor(puesto.color) }}
+                      >
+                        Vista previa
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      const nuevosPuestos = (config.puestos || []).filter((_, i) => i !== index)
+                      setConfig({ ...config, puestos: nuevosPuestos })
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              ))}
+              
+              {(!config.puestos || config.puestos.length === 0) && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No hay puestos configurados. Agrega uno para empezar.
+                </p>
+              )}
+            </div>
+            
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const nuevoPuesto: Puesto = {
+                  id: `puesto-${Date.now()}`,
+                  nombre: "",
+                  color: "#3b82f6", // Azul por defecto
+                }
+                setConfig({
+                  ...config,
+                  puestos: [...(config.puestos || []), nuevoPuesto],
+                })
+              }}
+              className="w-full"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Agregar Puesto
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              Los puestos te permiten diferenciar visualmente a los empleados según su área de trabajo. Asigna un puesto a cada empleado desde la página de Empleados.
             </p>
           </CardContent>
         </Card>

@@ -10,6 +10,7 @@ import {
   deleteDoc,
   doc,
   serverTimestamp,
+  getDoc,
 } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { DashboardLayout } from "@/components/dashboard-layout"
@@ -30,17 +31,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
+import { useConfig } from "@/hooks/use-config"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Empleado } from "@/lib/types"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function EmpleadosPage() {
   const { employees, loading: dataLoading, refreshEmployees, user } = useData()
+  const { config } = useConfig()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<Empleado | null>(null)
-  const [formData, setFormData] = useState<{ name: string; email: string; phone: string }>({
+  const [formData, setFormData] = useState<{ name: string; email: string; phone: string; puestoId?: string }>({
     name: "",
     email: "",
     phone: "",
+    puestoId: "",
   })
   const [bulkNames, setBulkNames] = useState("")
   const { toast } = useToast()
@@ -48,11 +53,16 @@ export default function EmpleadosPage() {
   const handleOpenDialog = (employee?: any) => {
     if (employee) {
       setEditingEmployee(employee)
-      setFormData({ name: employee.name, email: employee.email || "", phone: employee.phone || "" })
+      setFormData({ 
+        name: employee.name, 
+        email: employee.email || "", 
+        phone: employee.phone || "",
+        puestoId: employee.puestoId || "",
+      })
       setBulkNames("")
     } else {
       setEditingEmployee(null)
-      setFormData({ name: "", email: "", phone: "" })
+      setFormData({ name: "", email: "", phone: "", puestoId: "" })
       setBulkNames("")
     }
     setDialogOpen(true)
@@ -81,16 +91,71 @@ export default function EmpleadosPage() {
           })
           return
         }
-        await updateDoc(doc(db, COLLECTIONS.EMPLOYEES, editingEmployee.id), {
+
+        // Logs de depuración
+        const updateData = {
           name: formData.name.trim(),
           email: formData.email.trim() || null,
           phone: formData.phone.trim() || null,
+          puestoId: formData.puestoId || null,
           updatedAt: serverTimestamp(),
-        })
-        toast({
-          title: "Empleado actualizado",
-          description: "Los datos del empleado se han actualizado correctamente",
-        })
+        }
+        
+        // Verificar el documento actual en Firestore
+        const empleadoDocRef = doc(db, COLLECTIONS.EMPLOYEES, editingEmployee.id)
+        const empleadoDocSnap = await getDoc(empleadoDocRef)
+        
+        const empleadoFirestoreData = empleadoDocSnap.exists() ? empleadoDocSnap.data() : null
+        
+        // Verificar si el usuario tiene documento en apps/horarios/users
+        const userDocRef = doc(db, COLLECTIONS.USERS, user?.uid || "")
+        const userDocSnap = await getDoc(userDocRef)
+        const userData = userDocSnap.exists() ? userDocSnap.data() : null
+        
+        console.log("[DEBUG] Intentando actualizar empleado:")
+        console.log("  - empleadoId:", editingEmployee.id)
+        console.log("  - empleadoEnEstado:", JSON.stringify(editingEmployee, null, 2))
+        console.log("  - empleadoEnFirestore:", empleadoFirestoreData ? JSON.stringify(empleadoFirestoreData, null, 2) : "NO EXISTE")
+        console.log("  - datosActualizacion:", JSON.stringify({ ...updateData, updatedAt: "[serverTimestamp]" }, null, 2))
+        console.log("  - userId del usuario actual:", user?.uid)
+        console.log("  - userId del empleado en Firestore:", empleadoFirestoreData?.userId)
+        console.log("  - ¿Coinciden los userIds?:", empleadoFirestoreData?.userId === user?.uid)
+        console.log("  - collectionPath:", COLLECTIONS.EMPLOYEES)
+        console.log("  - ruta completa:", `${COLLECTIONS.EMPLOYEES}/${editingEmployee.id}`)
+        console.log("  - Documento del usuario en apps/horarios/users:", userData ? JSON.stringify(userData, null, 2) : "NO EXISTE")
+        console.log("  - Rol del usuario:", userData?.role || "SIN ROL")
+        console.log("  - ¿Usuario tiene rol válido?:", userData?.role && ['user', 'admin', 'maxdev'].includes(userData.role))
+        
+        if (!empleadoDocSnap.exists()) {
+          throw new Error(`El empleado con ID ${editingEmployee.id} no existe en Firestore`)
+        }
+        
+        const empleadoFirestore = empleadoDocSnap.data()
+        if (empleadoFirestore.userId !== user?.uid) {
+          console.error("[DEBUG] ❌ El userId del empleado no coincide:", {
+            empleadoUserId: empleadoFirestore.userId,
+            usuarioActual: user?.uid,
+          })
+          throw new Error(`No tienes permisos para actualizar este empleado. El empleado pertenece a otro usuario.`)
+        }
+
+        try {
+          await updateDoc(doc(db, COLLECTIONS.EMPLOYEES, editingEmployee.id), updateData)
+          console.log("[DEBUG] ✅ Empleado actualizado exitosamente")
+          toast({
+            title: "Empleado actualizado",
+            description: "Los datos del empleado se han actualizado correctamente",
+          })
+        } catch (updateError: any) {
+          console.error("[DEBUG] ❌ Error al actualizar empleado:", {
+            code: updateError.code,
+            message: updateError.message,
+            empleadoId: editingEmployee.id,
+            datosEnviados: updateData,
+            empleadoOriginal: editingEmployee,
+          })
+          throw updateError // Re-lanzar para que se maneje en el catch general
+        }
       } else {
         // Modo creación: agregar uno o múltiples empleados
         const namesToAdd = bulkNames.trim()
@@ -131,13 +196,27 @@ export default function EmpleadosPage() {
       // Refrescar datos del contexto
       await refreshEmployees()
       setDialogOpen(false)
-      setFormData({ name: "", email: "", phone: "" })
+      setFormData({ name: "", email: "", phone: "", puestoId: "" })
       setBulkNames("")
       setEditingEmployee(null)
     } catch (error: any) {
+      console.error("[DEBUG] ❌ Error general al guardar empleado:", {
+        code: error.code,
+        message: error.message,
+        stack: error.stack,
+        error: error,
+      })
+      
+      let errorMessage = "Ocurrió un error al guardar el empleado"
+      if (error.code === "permission-denied") {
+        errorMessage = `Permisos insuficientes. Código: ${error.code}. Verifica que el empleado pertenezca a tu usuario (userId: ${user?.uid})`
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
       toast({
         title: "Error",
-        description: error.message || "Ocurrió un error al guardar el empleado",
+        description: errorMessage,
         variant: "destructive",
       })
     }
@@ -212,18 +291,36 @@ export default function EmpleadosPage() {
                 <TableHeader>
                   <TableRow className="border-border">
                     <TableHead className="text-foreground">Nombre</TableHead>
+                    <TableHead className="text-foreground">Puesto</TableHead>
                     <TableHead className="text-foreground">Email</TableHead>
                     <TableHead className="text-foreground">Teléfono</TableHead>
                     <TableHead className="text-right text-foreground">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {employees.map((employee) => (
-                    <TableRow key={employee.id} className="border-border">
-                      <TableCell className="font-medium text-foreground">{employee.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{employee.email || "-"}</TableCell>
-                      <TableCell className="text-muted-foreground">{employee.phone || "-"}</TableCell>
-                      <TableCell className="text-right">
+                  {employees.map((employee) => {
+                    const puesto = employee.puestoId
+                      ? (config?.puestos || []).find((p) => p.id === employee.puestoId)
+                      : null
+                    return (
+                      <TableRow key={employee.id} className="border-border">
+                        <TableCell className="font-medium text-foreground">{employee.name}</TableCell>
+                        <TableCell>
+                          {puesto ? (
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="h-3 w-3 rounded-full border border-border"
+                                style={{ backgroundColor: puesto.color }}
+                              />
+                              <span className="text-foreground">{puesto.nombre}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{employee.email || "-"}</TableCell>
+                        <TableCell className="text-muted-foreground">{employee.phone || "-"}</TableCell>
+                        <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(employee)}>
                             <Pencil className="h-4 w-4" />
@@ -234,7 +331,8 @@ export default function EmpleadosPage() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    )
+                  })}
                 </TableBody>
               </Table>
             )}
@@ -294,6 +392,36 @@ export default function EmpleadosPage() {
                         className="border-input bg-background text-foreground"
                         placeholder="+1234567890"
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="puesto" className="text-foreground">
+                        Puesto de Trabajo
+                      </Label>
+                      <Select
+                        value={formData.puestoId || "none"}
+                        onValueChange={(value) => setFormData({ ...formData, puestoId: value === "none" ? "" : value })}
+                      >
+                        <SelectTrigger className="border-input bg-background text-foreground">
+                          <SelectValue placeholder="Seleccionar puesto" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sin puesto</SelectItem>
+                          {(config?.puestos || []).map((puesto) => (
+                            <SelectItem key={puesto.id} value={puesto.id}>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="h-3 w-3 rounded-full border border-border"
+                                  style={{ backgroundColor: puesto.color }}
+                                />
+                                <span>{puesto.nombre}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground">
+                        El color del puesto se mostrará junto al nombre del empleado
+                      </p>
                     </div>
                   </div>
                 ) : (

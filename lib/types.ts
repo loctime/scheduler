@@ -3,6 +3,7 @@ export interface Empleado {
   name: string
   email?: string
   phone?: string
+  puestoId?: string // ID del puesto de trabajo asignado
   userId: string
   createdAt?: any
   updatedAt?: any
@@ -87,6 +88,12 @@ export interface MedioTurno {
   color?: string // código hex para el color del medio franco (por defecto verde)
 }
 
+export interface Puesto {
+  id: string // ID único para identificar el puesto
+  nombre: string // Nombre del puesto (ej: "Salón", "Cocina", "Bacha")
+  color: string // código hex para el color del puesto
+}
+
 export interface Configuracion {
   id?: string
   mesInicioDia: number // Día del mes en que empieza (1-28)
@@ -97,6 +104,7 @@ export interface Configuracion {
   minutosDescanso: number // Minutos de descanso que se restan (por defecto 30)
   horasMinimasParaDescanso: number // Horas mínimas para aplicar descanso (por defecto 6)
   mediosTurnos?: MedioTurno[] // Medios turnos predefinidos para 1/2 franco
+  puestos?: Puesto[] // Puestos de trabajo con sus colores
   ordenEmpleados?: string[] // Orden personalizado de IDs de empleados
   createdAt?: any
   updatedAt?: any

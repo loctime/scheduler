@@ -312,7 +312,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   const employeeMonthlyStats = useMemo<Record<string, EmployeeMonthlyStats>>(() => {
     const stats: Record<string, EmployeeMonthlyStats> = {}
     employees.forEach((employee) => {
-      stats[employee.id] = { francos: 0, horasExtras: 0 }
+      stats[employee.id] = { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0 }
     })
 
     if (employees.length === 0 || shifts.length === 0) {
@@ -322,9 +322,24 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     const minutosDescanso = config?.minutosDescanso ?? 30
     const horasMinimasParaDescanso = config?.horasMinimasParaDescanso ?? 6
 
+    // Mapa para rastrear horas extras por semana (para obtener la última semana)
+    const weeklyExtras: Record<string, Record<string, number>> = {}
+    let lastWeekStartStr: string | null = null
+
     monthWeeks.forEach((weekDays) => {
       const weekSchedule = getWeekSchedule(weekDays[0])
       if (!weekSchedule?.assignments) return
+
+      const weekStartStr = format(weekDays[0], "yyyy-MM-dd")
+      // Inicializar el registro de horas extras para esta semana
+      if (!weeklyExtras[weekStartStr]) {
+        weeklyExtras[weekStartStr] = {}
+        employees.forEach((employee) => {
+          weeklyExtras[weekStartStr][employee.id] = 0
+        })
+      }
+      // Actualizar la última semana procesada
+      lastWeekStartStr = weekStartStr
 
       weekDays.forEach((day) => {
         if (day < monthRange.startDate || day > monthRange.endDate) return
@@ -335,7 +350,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
         Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
           if (!stats[employeeId]) {
-            stats[employeeId] = { francos: 0, horasExtras: 0 }
+            stats[employeeId] = { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0 }
           }
 
           const normalizedAssignments = normalizeAssignments(assignmentValue)
@@ -363,11 +378,22 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
             horasMinimasParaDescanso,
           )
           if (dailyHours > 8) {
-            stats[employeeId].horasExtras += dailyHours - 8
+            const extraHours = dailyHours - 8
+            // Acumular en el total del mes
+            stats[employeeId].horasExtrasMes += extraHours
+            // Acumular en la semana actual
+            weeklyExtras[weekStartStr][employeeId] = (weeklyExtras[weekStartStr][employeeId] || 0) + extraHours
           }
         })
       })
     })
+
+    // Asignar las horas extras de la última semana como horasExtrasSemana
+    if (lastWeekStartStr && weeklyExtras[lastWeekStartStr]) {
+      Object.entries(weeklyExtras[lastWeekStartStr]).forEach(([employeeId, weekExtra]) => {
+        stats[employeeId].horasExtrasSemana = weekExtra
+      })
+    }
 
     return stats
   }, [

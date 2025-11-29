@@ -16,7 +16,8 @@ import { useEmployeeOrder } from "@/hooks/use-employee-order"
 
 export interface EmployeeMonthlyStats {
   francos: number
-  horasExtras: number
+  horasExtrasSemana: number
+  horasExtrasMes: number
 }
 
 interface ScheduleGridProps {
@@ -35,6 +36,7 @@ interface ScheduleGridProps {
   monthRange?: { startDate: Date; endDate: Date } // Rango del mes para deshabilitar días fuera del rango
   mediosTurnos?: MedioTurno[] // Medios turnos configurados
   employeeStats?: Record<string, EmployeeMonthlyStats>
+  isFirstWeek?: boolean // Indica si es la primera semana del mes
 }
 
 export const ScheduleGrid = memo(function ScheduleGrid({
@@ -48,6 +50,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   monthRange,
   mediosTurnos = [],
   employeeStats,
+  isFirstWeek = false,
 }: ScheduleGridProps) {
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
   const [extraMenuOpenKey, setExtraMenuOpenKey] = useState<string | null>(null)
@@ -61,6 +64,12 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   const shiftMap = useMemo(() => {
     return new Map(shifts.map((s) => [s.id, s]))
   }, [shifts])
+
+  // Memoizar mapa de puestos para búsqueda O(1)
+  const puestoMap = useMemo(() => {
+    if (!config?.puestos) return new Map()
+    return new Map(config.puestos.map((p) => [p.id, p]))
+  }, [config?.puestos])
 
   // Obtener orden de empleados desde configuración o usar orden por defecto
   const orderedEmployeeIds = useMemo(() => {
@@ -601,15 +610,15 @@ export const ScheduleGrid = memo(function ScheduleGrid({
       <Card className="overflow-hidden border border-border bg-card">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b border-border bg-muted/50">
-              <th className="min-w-[220px] border-r border-border px-6 py-4 text-left text-xl font-semibold text-foreground">
+          <thead className={`${isFirstWeek ? "sticky top-0" : ""} z-30`}>
+            <tr className="border-b border-border bg-muted/50 backdrop-blur-sm">
+              <th className="min-w-[220px] border-r border-border px-6 py-4 text-left text-xl font-semibold text-foreground bg-muted/50 backdrop-blur-sm">
                 Empleado
               </th>
               {weekDays.map((day) => (
                 <th
                   key={day.toISOString()}
-                  className="min-w-[180px] border-r border-border px-6 py-4 text-center text-xl font-semibold text-foreground last:border-r-0"
+                  className="min-w-[180px] border-r border-border px-6 py-4 text-center text-xl font-semibold text-foreground last:border-r-0 bg-muted/50 backdrop-blur-sm"
                 >
                   <div className="flex flex-col">
                     <span className="capitalize">{format(day, "EEEE", { locale: es })}</span>
@@ -648,7 +657,20 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                       </button>
                     )}
                     <div className="space-y-1 flex-1">
-                      <p>{employee.name}</p>
+                      <div className="flex items-center gap-2">
+                        {employee.puestoId && puestoMap.has(employee.puestoId) && (
+                          <span
+                            className="h-3 w-3 rounded-full border border-border flex-shrink-0"
+                            style={{ backgroundColor: puestoMap.get(employee.puestoId)?.color }}
+                            title={puestoMap.get(employee.puestoId)?.nombre}
+                          />
+                        )}
+                        <p style={
+                          employee.puestoId && puestoMap.has(employee.puestoId)
+                            ? { color: puestoMap.get(employee.puestoId)?.color }
+                            : undefined
+                        }>{employee.name}</p>
+                      </div>
                     {employeeStats && employeeStats[employee.id] && (
                       <div className="text-xs text-muted-foreground space-y-0.5">
                         <div className="flex items-center gap-1">
@@ -656,8 +678,12 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                           <span>{formatStatValue(employeeStats[employee.id].francos)}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <span className="font-medium text-foreground">Horas extra:</span>
-                          <span>{formatStatValue(employeeStats[employee.id].horasExtras)}h</span>
+                          <span className="font-medium text-foreground">Horas extra semana:</span>
+                          <span>{formatStatValue(employeeStats[employee.id].horasExtrasSemana)}h</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium text-foreground">Horas extra mes:</span>
+                          <span>{formatStatValue(employeeStats[employee.id].horasExtrasMes)}h</span>
                         </div>
                       </div>
                     )}
