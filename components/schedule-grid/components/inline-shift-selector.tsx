@@ -48,14 +48,15 @@ export function InlineShiftSelector({ shifts, mediosTurnos, onSelectAssignments 
   // Por ahora mostramos todos los turnos configurados como opciones rápidas
   // El usuario puede nombrarlos "Mañana", "Tarde", "Noche", etc.
   return (
-    <div className="space-y-3">
+    <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
       <div className="grid grid-cols-3 gap-1">
         <Button
           type="button"
           size="sm"
           variant={specialType === "franco" ? "default" : "outline"}
-          className="h-8 text-xs"
-          onClick={() => {
+          className="h-6 text-[11px] px-1.5"
+          onClick={(e) => {
+            e.stopPropagation()
             setSpecialType("franco")
             handleSelectFranco()
           }}
@@ -66,8 +67,11 @@ export function InlineShiftSelector({ shifts, mediosTurnos, onSelectAssignments 
           type="button"
           size="sm"
           variant={specialType === "medio_franco" ? "default" : "outline"}
-          className="h-8 text-xs"
-          onClick={() => setSpecialType("medio_franco")}
+          className="h-6 text-[11px] px-1.5"
+          onClick={(e) => {
+            e.stopPropagation()
+            setSpecialType("medio_franco")
+          }}
         >
           1/2 Franco
         </Button>
@@ -75,115 +79,118 @@ export function InlineShiftSelector({ shifts, mediosTurnos, onSelectAssignments 
           type="button"
           size="sm"
           variant={specialType === "shift" ? "default" : "outline"}
-          className="h-8 text-xs"
-          onClick={() => setSpecialType("shift")}
+          className="h-6 text-[11px] px-1.5"
+          onClick={(e) => {
+            e.stopPropagation()
+            setSpecialType("shift")
+          }}
         >
-          Turno normal
+          Turno
         </Button>
       </div>
 
       {specialType === "shift" && (
-        <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">Turnos disponibles</Label>
-          <div className="flex flex-col gap-1">
-            {shifts.length === 0 ? (
-              <span className="text-[11px] text-muted-foreground">No hay turnos configurados</span>
-            ) : (
-              shifts.map((shift) => (
-                <Button
-                  key={shift.id}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-auto py-2 px-2 justify-start text-left text-xs"
-                  onClick={() => handleSelectShift(shift)}
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="inline-block h-3 w-3 rounded-full"
-                      style={{ backgroundColor: shift.color }}
-                    />
-                    <div className="flex flex-col">
-                      <span className="font-medium">{shift.name}</span>
-                      {(shift.startTime || shift.endTime || shift.startTime2 || shift.endTime2) && (
-                        <span className="text-[11px] text-muted-foreground">
-                          {shift.startTime && shift.endTime ? `${shift.startTime} - ${shift.endTime}` : ""}
-                          {shift.startTime2 && shift.endTime2
-                            ? `${shift.startTime && shift.endTime ? " / " : ""}${shift.startTime2} - ${
-                                shift.endTime2
-                              }`
-                            : ""}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </Button>
-              ))
-            )}
-          </div>
+        <div className="flex flex-wrap gap-1">
+          {shifts.length === 0 ? (
+            <span className="text-[10px] text-muted-foreground">No hay turnos</span>
+          ) : (
+            shifts.map((shift) => (
+              <Button
+                key={shift.id}
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-6 px-1.5 text-[11px]"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleSelectShift(shift)
+                }}
+              >
+                <span
+                  className="inline-block h-2 w-2 rounded-full mr-1"
+                  style={{ backgroundColor: shift.color }}
+                />
+                {shift.name}
+              </Button>
+            ))
+          )}
         </div>
       )}
 
       {specialType === "medio_franco" && (
-        <div className="space-y-2">
+        <div className="space-y-1">
           {mediosTurnos && mediosTurnos.length > 0 && (
-            <div className="space-y-1">
-              <Label className="text-[11px] text-muted-foreground">Horarios 1/2 franco</Label>
-              <div className="grid grid-cols-2 gap-1">
-                {mediosTurnos.map((medio) => (
-                  <Button
-                    key={medio.id}
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-auto py-1 px-2 justify-start text-left text-[11px]"
-                    onClick={() =>
-                      handleSelectMedioFranco({
-                        startTime: medio.startTime,
-                        endTime: medio.endTime,
-                      })
-                    }
-                  >
-                    <span className="font-medium">{medio.nombre || "1/2 Franco"}</span>
-                    <span className="ml-1 text-[11px] text-muted-foreground">
-                      ({medio.startTime} - {medio.endTime})
-                    </span>
-                  </Button>
-                ))}
-              </div>
+            <div className="flex flex-wrap gap-1">
+              {mediosTurnos.map((medio) => (
+                <Button
+                  key={medio.id}
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-1.5 text-[11px]"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleSelectMedioFranco({
+                      startTime: medio.startTime,
+                      endTime: medio.endTime,
+                    })
+                  }}
+                >
+                  {medio.nombre || "1/2 Franco"}
+                </Button>
+              ))}
             </div>
           )}
 
-          <div className="space-y-1">
-            <Label className="text-[11px] text-muted-foreground">Horario personalizado</Label>
-            <div className="grid grid-cols-2 gap-1">
-              <div className="space-y-0.5">
-                <Label className="text-[10px] text-muted-foreground">Inicio</Label>
-                <Input
-                  type="time"
-                  className="h-7 px-2 text-[11px]"
-                  value={medioFrancoTime.startTime}
-                  onChange={(e) => {
-                    const next = { ...medioFrancoTime, startTime: e.target.value }
-                    setMedioFrancoTime(next)
-                    handleSelectMedioFranco(next)
-                  }}
-                />
-              </div>
-              <div className="space-y-0.5">
-                <Label className="text-[10px] text-muted-foreground">Fin</Label>
-                <Input
-                  type="time"
-                  className="h-7 px-2 text-[11px]"
-                  value={medioFrancoTime.endTime}
-                  onChange={(e) => {
-                    const next = { ...medioFrancoTime, endTime: e.target.value }
-                    setMedioFrancoTime(next)
-                    handleSelectMedioFranco(next)
-                  }}
-                />
-              </div>
-            </div>
+          <div className="grid grid-cols-2 gap-1">
+            <Input
+              type="time"
+              className="h-6 px-1.5 text-[11px]"
+              placeholder="Inicio"
+              value={medioFrancoTime.startTime}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                e.stopPropagation()
+                const next = { ...medioFrancoTime, startTime: e.target.value }
+                setMedioFrancoTime(next)
+                // Solo guardar y cerrar si ambos campos están completos
+                if (next.startTime && next.endTime) {
+                  handleSelectMedioFranco(next)
+                }
+              }}
+              onBlur={(e) => {
+                // Al perder el foco, si ambos campos están completos, guardar y cerrar
+                const currentValue = e.target.value
+                const next = { ...medioFrancoTime, startTime: currentValue }
+                if (next.startTime && next.endTime) {
+                  handleSelectMedioFranco(next)
+                }
+              }}
+            />
+            <Input
+              type="time"
+              className="h-6 px-1.5 text-[11px]"
+              placeholder="Fin"
+              value={medioFrancoTime.endTime}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                e.stopPropagation()
+                const next = { ...medioFrancoTime, endTime: e.target.value }
+                setMedioFrancoTime(next)
+                // Solo guardar y cerrar si ambos campos están completos
+                if (next.startTime && next.endTime) {
+                  handleSelectMedioFranco(next)
+                }
+              }}
+              onBlur={(e) => {
+                // Al perder el foco, si ambos campos están completos, guardar y cerrar
+                const currentValue = e.target.value
+                const next = { ...medioFrancoTime, endTime: currentValue }
+                if (next.startTime && next.endTime) {
+                  handleSelectMedioFranco(next)
+                }
+              }}
+            />
           </div>
         </div>
       )}

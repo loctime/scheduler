@@ -199,6 +199,10 @@ export const ScheduleGrid = memo(function ScheduleGrid({
 
   const handleQuickAssignments = useCallback(
     (date: string, employeeId: string, assignments: ShiftAssignment[]) => {
+      // Cerrar la celda inmediatamente antes de actualizar
+      setSelectedCell(null)
+      
+      // Actualizar los assignments después de cerrar
       if (onAssignmentUpdate) {
         onAssignmentUpdate(date, employeeId, assignments, { scheduleId: schedule?.id })
       } else if (onShiftUpdate) {
@@ -207,7 +211,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
           .filter((id): id is string => Boolean(id))
         onShiftUpdate(date, employeeId, shiftIds)
       }
-      setSelectedCell(null)
     },
     [onAssignmentUpdate, onShiftUpdate, schedule?.id]
   )

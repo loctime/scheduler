@@ -6,8 +6,8 @@ interface UseSeparatorsProps {
   orderedItemIds: string[]
   separadorMap: Map<string, Separador>
   addSeparator?: (nombre: string, tipo?: "puesto" | "personalizado", color?: string) => Promise<Separador | null>
-  updateSeparator?: (id: string, separator: Partial<Separador> & { nombre: string }) => Promise<void>
-  deleteSeparator?: (id: string) => Promise<void>
+  updateSeparator?: (separatorId: string, updatedSeparator: Separador) => Promise<boolean>
+  deleteSeparator?: (separatorId: string) => Promise<boolean>
   onOrderUpdate: (newOrder: string[]) => void
 }
 
@@ -66,11 +66,13 @@ export function useSeparators({
       return
     }
 
-    await updateSeparator(editingSeparatorId, {
+    const updatedSeparator: Separador = {
       ...separator,
       nombre: separatorEditName.trim(),
       color: separatorEditColor.trim() || undefined,
-    })
+    }
+
+    await updateSeparator(editingSeparatorId, updatedSeparator)
 
     setEditingSeparatorId(null)
     setSeparatorEditName("")
@@ -89,11 +91,13 @@ export function useSeparators({
     async (separatorId: string) => {
       if (readonly || !deleteSeparator) return
 
-      await deleteSeparator(separatorId)
-
-      // Remover del orden
-      const newOrder = orderedItemIds.filter((id) => id !== separatorId)
-      onOrderUpdate(newOrder)
+      const success = await deleteSeparator(separatorId)
+      
+      if (success) {
+        // Remover del orden
+        const newOrder = orderedItemIds.filter((id) => id !== separatorId)
+        onOrderUpdate(newOrder)
+      }
     },
     [readonly, deleteSeparator, orderedItemIds, onOrderUpdate]
   )
