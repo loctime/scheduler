@@ -27,7 +27,6 @@ export function useConfig() {
       minutosDescanso: 30,
       horasMinimasParaDescanso: 6,
       mediosTurnos: [],
-      puestos: [],
     }
 
     // Escuchar cambios en tiempo real

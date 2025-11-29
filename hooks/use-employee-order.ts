@@ -60,7 +60,7 @@ export function useEmployeeOrder() {
   )
 
   const addSeparator = useCallback(
-    async (nombre: string, puestoId?: string, color?: string): Promise<Separador | null> => {
+    async (nombre: string, _puestoId?: string, color?: string): Promise<Separador | null> => {
       if (!user || !db) {
         console.warn("No se puede agregar separador: usuario o Firebase no disponible")
         return null
@@ -76,14 +76,9 @@ export function useEmployeeOrder() {
         const newSeparator: Separador = {
           id: `separador-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           nombre: nombre.toUpperCase(),
-          tipo: puestoId ? "puesto" : "personalizado",
+          tipo: "personalizado",
           createdAt: now,
           updatedAt: now,
-        }
-        
-        // Solo agregar puestoId si existe (no undefined)
-        if (puestoId) {
-          newSeparator.puestoId = puestoId
         }
         
         // Solo agregar color si existe (no undefined)

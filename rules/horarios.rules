@@ -34,10 +34,9 @@ match /apps/horarios/employees/{empleadoId} {
     && nonEmptyString('name')
     && nonEmptyString('userId')
     && request.resource.data.userId == uid()
-    && isStringOrNull('email')
-    && isStringOrNull('phone')
-    && isStringOrNull('puestoId')
-    && isTs('createdAt')
+        && isStringOrNull('email')
+        && isStringOrNull('phone')
+        && isTs('createdAt')
     && isTs('updatedAt');
   allow update: if isAuth()
     && resource.data.userId == uid()
@@ -45,7 +44,6 @@ match /apps/horarios/employees/{empleadoId} {
     && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() >= 1))
     && (!('email' in request.resource.data) || request.resource.data.email is string || request.resource.data.email == null)
     && (!('phone' in request.resource.data) || request.resource.data.phone is string || request.resource.data.phone == null)
-    && (!('puestoId' in request.resource.data) || request.resource.data.puestoId is string || request.resource.data.puestoId == null)
     && unchanged('createdAt');
   allow delete: if isAuth() && resource.data.userId == uid();
 }

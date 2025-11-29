@@ -30,13 +30,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
-import { useConfig } from "@/hooks/use-config"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function EmpleadosPage() {
   const { employees, loading: dataLoading, refreshEmployees, user } = useData()
-  const { config } = useConfig()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [bulkNames, setBulkNames] = useState("")
   const { toast } = useToast()
@@ -83,8 +81,6 @@ export default function EmpleadosPage() {
         updateData.email = value?.trim() || null
       } else if (field === 'phone') {
         updateData.phone = value?.trim() || null
-      } else if (field === 'puestoId') {
-        updateData.puestoId = value || null
       }
 
       await updateDoc(doc(db, COLLECTIONS.EMPLOYEES, employeeId), updateData)
@@ -240,7 +236,6 @@ export default function EmpleadosPage() {
                 <TableHeader>
                   <TableRow className="border-border">
                     <TableHead className="text-foreground">Nombre</TableHead>
-                    <TableHead className="text-foreground">Puesto</TableHead>
                     <TableHead className="text-foreground">Email</TableHead>
                     <TableHead className="text-foreground">Teléfono</TableHead>
                     <TableHead className="text-right text-foreground">Acciones</TableHead>
@@ -248,10 +243,6 @@ export default function EmpleadosPage() {
                 </TableHeader>
                 <TableBody>
                   {employees.map((employee) => {
-                    const puesto = employee.puestoId
-                      ? (config?.puestos || []).find((p) => p.id === employee.puestoId)
-                      : null
-                    
                     const isEditing = editingField?.id === employee.id
                     const editingThisField = isEditing && editingField?.field
                     
@@ -283,66 +274,6 @@ export default function EmpleadosPage() {
                               className="cursor-pointer hover:bg-muted rounded px-2 py-1 -mx-2 transition-colors"
                             >
                               {employee.name}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {editingThisField === 'puestoId' ? (
-                            <Select
-                              value={inlineValue || "none"}
-                              onValueChange={async (value) => {
-                                const finalValue = value === "none" ? null : value
-                                await handleInlineSave(employee.id, 'puestoId', finalValue)
-                              }}
-                              onOpenChange={(open) => {
-                                if (!open && editingField?.id === employee.id) {
-                                  // Pequeño delay para permitir que se guarde primero
-                                  setTimeout(() => {
-                                    if (editingField?.id === employee.id) {
-                                      setEditingField(null)
-                                      setInlineValue("")
-                                    }
-                                  }, 100)
-                                }
-                              }}
-                            >
-                              <SelectTrigger className="h-8 w-full">
-                                <SelectValue placeholder="Seleccionar puesto" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">Sin puesto</SelectItem>
-                                {(config?.puestos || []).map((p) => (
-                                  <SelectItem key={p.id} value={p.id}>
-                                    <div className="flex items-center gap-2">
-                                      <span
-                                        className="h-3 w-3 rounded-full border border-border"
-                                        style={{ backgroundColor: p.color }}
-                                      />
-                                      <span>{p.nombre}</span>
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <div
-                              onClick={() => {
-                                setEditingField({ id: employee.id, field: 'puestoId' })
-                                setInlineValue(employee.puestoId || "")
-                              }}
-                              className="cursor-pointer hover:bg-muted rounded px-2 py-1 -mx-2 transition-colors"
-                            >
-                              {puesto ? (
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className="h-3 w-3 rounded-full border border-border"
-                                    style={{ backgroundColor: puesto.color }}
-                                  />
-                                  <span className="text-foreground">{puesto.nombre}</span>
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
                             </div>
                           )}
                         </TableCell>
@@ -452,7 +383,7 @@ export default function EmpleadosPage() {
                     rows={6}
                   />
                   <p className="text-sm text-muted-foreground">
-                    Escribe un nombre por línea para agregar múltiples empleados a la vez. Puedes editar los detalles (email, teléfono, puesto) después haciendo clic en cada campo.
+                    Escribe un nombre por línea para agregar múltiples empleados a la vez. Puedes editar los detalles (email, teléfono) después haciendo clic en cada campo.
                   </p>
                 </div>
               </div>

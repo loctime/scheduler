@@ -69,12 +69,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     return new Map(shifts.map((s) => [s.id, s]))
   }, [shifts])
 
-  // Memoizar mapa de puestos para búsqueda O(1)
-  const puestoMap = useMemo(() => {
-    if (!config?.puestos) return new Map()
-    return new Map(config.puestos.map((p) => [p.id, p]))
-  }, [config?.puestos])
-
   // Memoizar mapa de separadores para búsqueda O(1)
   const separadorMap = useMemo(() => {
     if (!config?.separadores) return new Map()
@@ -640,21 +634,11 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   }, [readonly, draggedEmployeeId, orderedItemIds, updateEmployeeOrder])
 
   // Handler para agregar separador en una posición específica
-  const handleAddSeparator = useCallback(async (position: number, suggestedPuestoId?: string) => {
+  const handleAddSeparator = useCallback(async (position: number) => {
     if (readonly || !addSeparator) return
     
-    let nombre = "SEPARADOR"
-    let puestoId = suggestedPuestoId
-    let color: string | undefined = undefined
-    
-    // Si hay un puesto sugerido, usar su nombre y color
-    if (suggestedPuestoId && puestoMap.has(suggestedPuestoId)) {
-      const puesto = puestoMap.get(suggestedPuestoId)
-      nombre = puesto?.nombre.toUpperCase() || "SEPARADOR"
-      color = puesto?.color
-    }
-    
-    const newSeparator = await addSeparator(nombre, puestoId, color)
+    const nombre = "SEPARADOR"
+    const newSeparator = await addSeparator(nombre, undefined, undefined)
     if (!newSeparator) return
     
     // Insertar el separador en la posición indicada
@@ -662,7 +646,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     newOrder.splice(position, 0, newSeparator.id)
     
     updateEmployeeOrder(newOrder)
-  }, [readonly, addSeparator, puestoMap, orderedItemIds, updateEmployeeOrder])
+  }, [readonly, addSeparator, orderedItemIds, updateEmployeeOrder])
 
   // Handler para editar separador
   const handleEditSeparator = useCallback((separator: Separador) => {
@@ -710,39 +694,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     updateEmployeeOrder(newOrder)
   }, [readonly, deleteSeparator, orderedItemIds, updateEmployeeOrder])
 
-  // Función para sugerir puesto basado en empleados adyacentes
-  const getSuggestedPuestoId = useCallback((position: number): string | undefined => {
-    // Buscar el puesto más común entre los empleados que seguirían después de esta posición
-    if (position >= orderedItems.length) return undefined
-    
-    const employeesAfter = orderedItems.slice(position).filter(
-      item => item.type === "employee"
-    ).slice(0, 3) as Array<{ type: "employee"; data: Empleado }>
-    
-    if (employeesAfter.length === 0) return undefined
-    
-    const puestoCounts = new Map<string, number>()
-    employeesAfter.forEach(({ data }) => {
-      if (data.puestoId) {
-        puestoCounts.set(data.puestoId, (puestoCounts.get(data.puestoId) || 0) + 1)
-      }
-    })
-    
-    if (puestoCounts.size === 0) return undefined
-    
-    // Retornar el puesto más común
-    let maxCount = 0
-    let mostCommonPuesto: string | undefined
-    puestoCounts.forEach((count, puestoId) => {
-      if (count > maxCount) {
-        maxCount = count
-        mostCommonPuesto = puestoId
-      }
-    })
-    
-    return mostCommonPuesto
-  }, [orderedItems, puestoMap])
-
   // Función para obtener el color del separador que aplica a un empleado
   // (el último separador antes de este empleado)
   const getSeparatorColorForEmployee = useCallback((employeeIndex: number): string | undefined => {
@@ -754,15 +705,11 @@ export const ScheduleGrid = memo(function ScheduleGrid({
         if (item.data.color) {
           return item.data.color
         }
-        // Si el separador tiene puestoId y ese puesto tiene color, usarlo
-        if (item.data.puestoId && puestoMap.has(item.data.puestoId)) {
-          return puestoMap.get(item.data.puestoId)?.color
-        }
         return undefined
       }
     }
     return undefined
-  }, [orderedItems, puestoMap])
+  }, [orderedItems])
 
   return (
     <>
@@ -794,7 +741,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
               // Mostrar botón para agregar separador solo en empleados
               const showAddButton = !readonly && item.type === "employee"
               const insertIndex = itemIndex
-              const suggestedPuestoId = showAddButton ? getSuggestedPuestoId(insertIndex) : undefined
 
               return (
                 <React.Fragment key={item.type === "employee" ? `emp-${item.data.id}` : `sep-${item.data.id}`}>
@@ -862,8 +808,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                                 style={
                                   item.data.color 
                                     ? { color: item.data.color }
-                                    : item.data.puestoId && puestoMap.has(item.data.puestoId)
-                                    ? { color: puestoMap.get(item.data.puestoId)?.color }
                                     : undefined
                                 }
                               >
@@ -930,7 +874,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                                 className="h-5 w-5 p-0 rounded-full opacity-30 hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary hover:bg-primary/10"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  handleAddSeparator(insertIndex, suggestedPuestoId)
+                                  handleAddSeparator(insertIndex)
                                 }}
                                 title="Agregar separador"
                               >
@@ -951,18 +895,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                             )}
                             <div className="space-y-1 flex-1">
                             <div className="flex items-center gap-2">
-                              {item.data.puestoId && puestoMap.has(item.data.puestoId) && (
-                                <span
-                                  className="h-3 w-3 rounded-full border border-border flex-shrink-0"
-                                  style={{ backgroundColor: puestoMap.get(item.data.puestoId)?.color }}
-                                  title={puestoMap.get(item.data.puestoId)?.nombre}
-                                />
-                              )}
-                              <p style={
-                                item.data.puestoId && puestoMap.has(item.data.puestoId)
-                                  ? { color: puestoMap.get(item.data.puestoId)?.color }
-                                  : undefined
-                              }>{item.data.name}</p>
+                              <p>{item.data.name}</p>
                             </div>
                           {employeeStats && employeeStats[item.data.id] && (
                             <div className="text-xs text-muted-foreground space-y-0.5">
