@@ -56,13 +56,8 @@ export function GeneralView({
 }: GeneralViewProps) {
   // Crear un mapa de semanas expandidas usando la fecha de inicio de semana como clave
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(() => {
-    // Por defecto, todas las semanas están expandidas
-    const defaultExpanded = new Set<string>()
-    monthWeeks.forEach((weekDays) => {
-      const weekKey = format(weekDays[0], "yyyy-MM-dd")
-      defaultExpanded.add(weekKey)
-    })
-    return defaultExpanded
+    // Por defecto, todas las semanas están cerradas
+    return new Set<string>()
   })
 
   // Sincronizar el estado cuando cambian las semanas del mes
@@ -71,12 +66,13 @@ export function GeneralView({
     [monthWeeks],
   )
 
-  // Asegurar que todas las semanas nuevas estén expandidas por defecto
+  // Limpiar semanas que ya no existen cuando cambian las semanas del mes
   useEffect(() => {
     setExpandedWeeks((prev) => {
-      const updated = new Set(prev)
-      weekKeys.forEach((key) => {
-        if (!updated.has(key)) {
+      const updated = new Set<string>()
+      // Mantener solo las semanas que aún existen
+      prev.forEach((key) => {
+        if (weekKeys.includes(key)) {
           updated.add(key)
         }
       })

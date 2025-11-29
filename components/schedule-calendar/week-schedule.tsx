@@ -64,7 +64,7 @@ export function WeekSchedule({
   const canShowActions = showActions && hasExportHandlers
 
   // Si no se proporciona open/onOpenChange, usar estado interno
-  const [internalOpen, setInternalOpen] = useState(true)
+  const [internalOpen, setInternalOpen] = useState(false)
   const isOpen = open !== undefined ? open : internalOpen
   const handleOpenChange = onOpenChange || setInternalOpen
 
@@ -74,11 +74,11 @@ export function WeekSchedule({
       onOpenChange={handleOpenChange}
       className="space-y-2"
     >
-      <div className="flex items-center justify-between rounded-lg border border-border bg-card p-4 shadow-sm hover:bg-accent/50 transition-colors">
+      <div className="flex items-center justify-between rounded-lg border border-border bg-card p-4 shadow-sm transition-colors">
         <CollapsibleTrigger asChild>
-          <Button
-            variant="ghost"
-            className="h-auto p-0 hover:bg-transparent flex-1 justify-start"
+          <button
+            type="button"
+            className="h-auto p-0 hover:bg-accent/50 flex-1 justify-start text-left bg-transparent border-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md"
             aria-label={isOpen ? "Contraer semana" : "Expandir semana"}
           >
             <div className="flex items-center gap-2">
@@ -89,7 +89,7 @@ export function WeekSchedule({
               )}
               <h3 className="text-2xl font-semibold text-foreground">{headerTitle}</h3>
             </div>
-          </Button>
+          </button>
         </CollapsibleTrigger>
         {canShowActions && (
           <div className="flex gap-2 ml-4" onClick={(e) => e.stopPropagation()}>
