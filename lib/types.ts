@@ -94,6 +94,15 @@ export interface Puesto {
   color: string // código hex para el color del puesto
 }
 
+export interface Separador {
+  id: string // ID único para identificar el separador
+  nombre: string // Nombre del separador (ej: "SALÓN", "COCINA", "BACHA")
+  puestoId?: string // ID del puesto asociado (opcional)
+  tipo: "puesto" | "personalizado" // Tipo de separador
+  createdAt?: any
+  updatedAt?: any
+}
+
 export interface Configuracion {
   id?: string
   mesInicioDia: number // Día del mes en que empieza (1-28)
@@ -105,7 +114,8 @@ export interface Configuracion {
   horasMinimasParaDescanso: number // Horas mínimas para aplicar descanso (por defecto 6)
   mediosTurnos?: MedioTurno[] // Medios turnos predefinidos para 1/2 franco
   puestos?: Puesto[] // Puestos de trabajo con sus colores
-  ordenEmpleados?: string[] // Orden personalizado de IDs de empleados
+  separadores?: Separador[] // Separadores para organizar empleados por puestos
+  ordenEmpleados?: string[] // Orden personalizado: puede incluir IDs de empleados o IDs de separadores
   createdAt?: any
   updatedAt?: any
   updatedBy?: string

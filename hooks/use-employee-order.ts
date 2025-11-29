@@ -5,13 +5,14 @@ import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
+import { Separador } from "@/lib/types"
 
 export function useEmployeeOrder() {
   const { user } = useData()
   const { toast } = useToast()
 
   const updateEmployeeOrder = useCallback(
-    async (orderedEmployeeIds: string[]) => {
+    async (orderedItemIds: string[]) => {
       if (!user || !db) {
         console.warn("No se puede actualizar el orden: usuario o Firebase no disponible")
         return
@@ -28,7 +29,7 @@ export function useEmployeeOrder() {
           configRef,
           {
             ...currentConfig,
-            ordenEmpleados: orderedEmployeeIds,
+            ordenEmpleados: orderedItemIds,
             updatedAt: serverTimestamp(),
             updatedBy: user.uid,
             updatedByName: user.displayName || user.email || "",
@@ -47,7 +48,152 @@ export function useEmployeeOrder() {
     [user, toast]
   )
 
-  return { updateEmployeeOrder }
+  const addSeparator = useCallback(
+    async (nombre: string, puestoId?: string): Promise<Separador | null> => {
+      if (!user || !db) {
+        console.warn("No se puede agregar separador: usuario o Firebase no disponible")
+        return null
+      }
+
+      try {
+        const configRef = doc(db, COLLECTIONS.CONFIG, "general")
+        const configSnap = await getDoc(configRef)
+        const currentConfig = configSnap.exists() ? configSnap.data() : {}
+        const currentSeparadores: Separador[] = currentConfig.separadores || []
+
+        const newSeparator: Separador = {
+          id: `separador-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          nombre: nombre.toUpperCase(),
+          tipo: puestoId ? "puesto" : "personalizado",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }
+        
+        // Solo agregar puestoId si existe (no undefined)
+        if (puestoId) {
+          newSeparator.puestoId = puestoId
+        }
+
+        const updatedSeparadores = [...currentSeparadores, newSeparator]
+
+        await setDoc(
+          configRef,
+          {
+            ...currentConfig,
+            separadores: updatedSeparadores,
+            updatedAt: serverTimestamp(),
+            updatedBy: user.uid,
+            updatedByName: user.displayName || user.email || "",
+          },
+          { merge: true }
+        )
+
+        return newSeparator
+      } catch (error) {
+        console.error("Error agregando separador:", error)
+        toast({
+          title: "Error",
+          description: "No se pudo agregar el separador",
+          variant: "destructive",
+        })
+        return null
+      }
+    },
+    [user, toast]
+  )
+
+  const updateSeparator = useCallback(
+    async (separatorId: string, updatedSeparator: Separador): Promise<boolean> => {
+      if (!user || !db) {
+        console.warn("No se puede actualizar separador: usuario o Firebase no disponible")
+        return false
+      }
+
+      try {
+        const configRef = doc(db, COLLECTIONS.CONFIG, "general")
+        const configSnap = await getDoc(configRef)
+        const currentConfig = configSnap.exists() ? configSnap.data() : {}
+        const currentSeparadores: Separador[] = currentConfig.separadores || []
+
+        const updatedSeparadores = currentSeparadores.map((s) =>
+          s.id === separatorId
+            ? { ...updatedSeparator, updatedAt: serverTimestamp() }
+            : s
+        )
+
+        await setDoc(
+          configRef,
+          {
+            ...currentConfig,
+            separadores: updatedSeparadores,
+            updatedAt: serverTimestamp(),
+            updatedBy: user.uid,
+            updatedByName: user.displayName || user.email || "",
+          },
+          { merge: true }
+        )
+
+        return true
+      } catch (error) {
+        console.error("Error actualizando separador:", error)
+        toast({
+          title: "Error",
+          description: "No se pudo actualizar el separador",
+          variant: "destructive",
+        })
+        return false
+      }
+    },
+    [user, toast]
+  )
+
+  const deleteSeparator = useCallback(
+    async (separatorId: string): Promise<boolean> => {
+      if (!user || !db) {
+        console.warn("No se puede eliminar separador: usuario o Firebase no disponible")
+        return false
+      }
+
+      try {
+        const configRef = doc(db, COLLECTIONS.CONFIG, "general")
+        const configSnap = await getDoc(configRef)
+        const currentConfig = configSnap.exists() ? configSnap.data() : {}
+        const currentSeparadores: Separador[] = currentConfig.separadores || []
+
+        const updatedSeparadores = currentSeparadores.filter((s) => s.id !== separatorId)
+
+        await setDoc(
+          configRef,
+          {
+            ...currentConfig,
+            separadores: updatedSeparadores,
+            updatedAt: serverTimestamp(),
+            updatedBy: user.uid,
+            updatedByName: user.displayName || user.email || "",
+          },
+          { merge: true }
+        )
+
+        return true
+      } catch (error) {
+        console.error("Error eliminando separador:", error)
+        toast({
+          title: "Error",
+          description: "No se pudo eliminar el separador",
+          variant: "destructive",
+        })
+        return false
+      }
+    },
+    [user, toast]
+  )
+
+  return { 
+    updateEmployeeOrder,
+    addSeparator,
+    updateSeparator,
+    deleteSeparator,
+  }
 }
 
 

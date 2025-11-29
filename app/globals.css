@@ -124,9 +124,23 @@
   }
 }
 
-/* MODO EXPORTACIÓN: pseudo-elementos rellenan la celda */
+/* MODO EXPORTACIÓN
+   - Quitamos bordes, outlines y sombras para evitar "marcos" alrededor de los textos
+   - Neutralizamos pseudo-elementos que puedan dibujar decoraciones extras
+*/
 .exporting-image * {
   position: relative !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Bordes solo en las celdas de tablas durante la exportación */
+.exporting-image table,
+.exporting-image th,
+.exporting-image td {
+  border: 1px solid #d4d4d8 !important; /* gris suave similar al borde de la app */
+  border-collapse: collapse !important;
 }
 
 .exporting-image *::before,

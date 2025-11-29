@@ -1,15 +1,16 @@
 "use client"
 
-import { memo, useMemo, useCallback, useState } from "react"
+import React, { memo, useMemo, useCallback, useState } from "react"
 import type { CSSProperties } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import { Empleado, Turno, Horario, HistorialItem, ShiftAssignment, ShiftAssignmentValue, MedioTurno } from "@/lib/types"
+import { Empleado, Turno, Horario, HistorialItem, ShiftAssignment, ShiftAssignmentValue, MedioTurno, Separador } from "@/lib/types"
 import { ShiftSelectorPopover } from "./shift-selector-popover"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Check, GripVertical } from "lucide-react"
+import { Check, GripVertical, Plus, Trash2, Edit2 } from "lucide-react"
+import { Input } from "@/components/ui/input"
 import { adjustTime } from "@/lib/utils"
 import { useConfig } from "@/hooks/use-config"
 import { useEmployeeOrder } from "@/hooks/use-employee-order"
@@ -56,9 +57,12 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   const [extraMenuOpenKey, setExtraMenuOpenKey] = useState<string | null>(null)
   const [draggedEmployeeId, setDraggedEmployeeId] = useState<string | null>(null)
   const [dragOverEmployeeId, setDragOverEmployeeId] = useState<string | null>(null)
+  const [editingSeparatorId, setEditingSeparatorId] = useState<string | null>(null)
+  const [separatorEditName, setSeparatorEditName] = useState("")
+  const [hoveredGapIndex, setHoveredGapIndex] = useState<number | null>(null)
   
   const { config } = useConfig()
-  const { updateEmployeeOrder } = useEmployeeOrder()
+  const { updateEmployeeOrder, addSeparator, updateSeparator, deleteSeparator } = useEmployeeOrder()
 
   // Memoizar mapa de turnos para búsqueda O(1)
   const shiftMap = useMemo(() => {
@@ -71,12 +75,22 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     return new Map(config.puestos.map((p) => [p.id, p]))
   }, [config?.puestos])
 
-  // Obtener orden de empleados desde configuración o usar orden por defecto
-  const orderedEmployeeIds = useMemo(() => {
+  // Memoizar mapa de separadores para búsqueda O(1)
+  const separadorMap = useMemo(() => {
+    if (!config?.separadores) return new Map()
+    return new Map(config.separadores.map((s) => [s.id, s]))
+  }, [config?.separadores])
+
+  // Obtener orden de elementos (empleados y separadores) desde configuración o usar orden por defecto
+  const orderedItemIds = useMemo(() => {
     if (config?.ordenEmpleados && config.ordenEmpleados.length > 0) {
-      // Validar que todos los IDs del orden existan en los empleados actuales
       const employeeIds = new Set(employees.map(emp => emp.id))
-      const validOrder = config.ordenEmpleados.filter(id => employeeIds.has(id))
+      const separatorIds = new Set(config.separadores?.map(s => s.id) || [])
+      
+      // Filtrar solo IDs válidos (empleados o separadores)
+      const validOrder = config.ordenEmpleados.filter(id => 
+        employeeIds.has(id) || separatorIds.has(id)
+      )
       
       // Agregar empleados nuevos que no estén en el orden
       const newEmployees = employees
@@ -87,15 +101,35 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     }
     // Si no hay orden guardado, usar el orden por defecto (por nombre)
     return employees.map(emp => emp.id)
-  }, [config?.ordenEmpleados, employees])
+  }, [config?.ordenEmpleados, config?.separadores, employees])
 
-  // Obtener empleados ordenados según el orden guardado
-  const orderedEmployees = useMemo(() => {
+  // Tipo para elementos del grid (empleado o separador)
+  type GridItem = { type: "employee"; data: Empleado } | { type: "separator"; data: Separador }
+
+  // Obtener elementos ordenados (empleados y separadores) según el orden guardado
+  const orderedItems = useMemo(() => {
     const employeeMap = new Map(employees.map(emp => [emp.id, emp]))
-    return orderedEmployeeIds
-      .map(id => employeeMap.get(id))
-      .filter((emp): emp is Empleado => emp !== undefined)
-  }, [orderedEmployeeIds, employees])
+    const items: GridItem[] = []
+    
+    orderedItemIds.forEach(id => {
+      // Verificar si es un separador
+      if (separadorMap.has(id)) {
+        const separator = separadorMap.get(id)
+        if (separator) {
+          items.push({ type: "separator", data: separator })
+        }
+      } 
+      // Verificar si es un empleado
+      else if (employeeMap.has(id)) {
+        const employee = employeeMap.get(id)
+        if (employee) {
+          items.push({ type: "employee", data: employee })
+        }
+      }
+    })
+    
+    return items
+  }, [orderedItemIds, employees, separadorMap])
 
   // Helper: convertir ShiftAssignmentValue a string[] (IDs)
   const toShiftIds = useCallback((value: ShiftAssignmentValue | undefined): string[] => {
@@ -584,17 +618,17 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     setDragOverEmployeeId(null)
   }, [])
 
-  const handleDrop = useCallback((e: React.DragEvent, targetEmployeeId: string) => {
-    if (readonly || !draggedEmployeeId || draggedEmployeeId === targetEmployeeId) return
+  const handleDrop = useCallback((e: React.DragEvent, targetId: string) => {
+    if (readonly || !draggedEmployeeId || draggedEmployeeId === targetId) return
     e.preventDefault()
     
-    const draggedIndex = orderedEmployeeIds.indexOf(draggedEmployeeId)
-    const targetIndex = orderedEmployeeIds.indexOf(targetEmployeeId)
+    const draggedIndex = orderedItemIds.indexOf(draggedEmployeeId)
+    const targetIndex = orderedItemIds.indexOf(targetId)
     
     if (draggedIndex === -1 || targetIndex === -1) return
 
     // Reordenar el array
-    const newOrder = [...orderedEmployeeIds]
+    const newOrder = [...orderedItemIds]
     const [removed] = newOrder.splice(draggedIndex, 1)
     newOrder.splice(targetIndex, 0, removed)
     
@@ -603,7 +637,104 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     
     // Guardar el nuevo orden en Firebase
     updateEmployeeOrder(newOrder)
-  }, [readonly, draggedEmployeeId, orderedEmployeeIds, updateEmployeeOrder])
+  }, [readonly, draggedEmployeeId, orderedItemIds, updateEmployeeOrder])
+
+  // Handler para agregar separador en una posición específica
+  const handleAddSeparator = useCallback(async (position: number, suggestedPuestoId?: string) => {
+    if (readonly || !addSeparator) return
+    
+    let nombre = "SEPARADOR"
+    let puestoId = suggestedPuestoId
+    
+    // Si hay un puesto sugerido, usar su nombre
+    if (suggestedPuestoId && puestoMap.has(suggestedPuestoId)) {
+      const puesto = puestoMap.get(suggestedPuestoId)
+      nombre = puesto?.nombre.toUpperCase() || "SEPARADOR"
+    }
+    
+    const newSeparator = await addSeparator(nombre, puestoId)
+    if (!newSeparator) return
+    
+    // Insertar el separador en la posición indicada
+    const newOrder = [...orderedItemIds]
+    newOrder.splice(position, 0, newSeparator.id)
+    
+    updateEmployeeOrder(newOrder)
+  }, [readonly, addSeparator, puestoMap, orderedItemIds, updateEmployeeOrder])
+
+  // Handler para editar separador
+  const handleEditSeparator = useCallback((separator: Separador) => {
+    setEditingSeparatorId(separator.id)
+    setSeparatorEditName(separator.nombre)
+  }, [])
+
+  // Handler para guardar edición de separador
+  const handleSaveSeparatorEdit = useCallback(async () => {
+    if (!editingSeparatorId || !updateSeparator || !separatorEditName.trim()) {
+      setEditingSeparatorId(null)
+      setSeparatorEditName("")
+      return
+    }
+    
+    const separator = separadorMap.get(editingSeparatorId)
+    if (!separator) {
+      setEditingSeparatorId(null)
+      setSeparatorEditName("")
+      return
+    }
+    
+    await updateSeparator(editingSeparatorId, {
+      ...separator,
+      nombre: separatorEditName.trim(),
+    })
+    
+    setEditingSeparatorId(null)
+    setSeparatorEditName("")
+  }, [editingSeparatorId, separatorEditName, updateSeparator, separadorMap])
+
+  // Handler para eliminar separador
+  const handleDeleteSeparator = useCallback(async (separatorId: string) => {
+    if (readonly || !deleteSeparator) return
+    
+    await deleteSeparator(separatorId)
+    
+    // Remover del orden
+    const newOrder = orderedItemIds.filter(id => id !== separatorId)
+    updateEmployeeOrder(newOrder)
+  }, [readonly, deleteSeparator, orderedItemIds, updateEmployeeOrder])
+
+  // Función para sugerir puesto basado en empleados adyacentes
+  const getSuggestedPuestoId = useCallback((position: number): string | undefined => {
+    // Buscar el puesto más común entre los empleados que seguirían después de esta posición
+    if (position >= orderedItems.length) return undefined
+    
+    const employeesAfter = orderedItems.slice(position).filter(
+      item => item.type === "employee"
+    ).slice(0, 3) as Array<{ type: "employee"; data: Empleado }>
+    
+    if (employeesAfter.length === 0) return undefined
+    
+    const puestoCounts = new Map<string, number>()
+    employeesAfter.forEach(({ data }) => {
+      if (data.puestoId) {
+        puestoCounts.set(data.puestoId, (puestoCounts.get(data.puestoId) || 0) + 1)
+      }
+    })
+    
+    if (puestoCounts.size === 0) return undefined
+    
+    // Retornar el puesto más común
+    let maxCount = 0
+    let mostCommonPuesto: string | undefined
+    puestoCounts.forEach((count, puestoId) => {
+      if (count > maxCount) {
+        maxCount = count
+        mostCommonPuesto = puestoId
+      }
+    })
+    
+    return mostCommonPuesto
+  }, [orderedItems, puestoMap])
 
   return (
     <>
@@ -631,76 +762,179 @@ export const ScheduleGrid = memo(function ScheduleGrid({
             </tr>
           </thead>
           <tbody>
-            {orderedEmployees.map((employee) => (
-              <tr 
-                key={employee.id} 
-                className={`border-b border-border last:border-b-0 ${
-                  dragOverEmployeeId === employee.id ? "bg-primary/5" : ""
-                } ${draggedEmployeeId === employee.id ? "opacity-50" : ""}`}
-                draggable={!readonly}
-                onDragStart={(e) => handleDragStart(e, employee.id)}
-                onDragEnd={handleDragEnd}
-                onDragOver={(e) => handleDragOver(e, employee.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, employee.id)}
-              >
-                <td className="border-r border-border bg-muted/30 px-6 py-4 text-lg font-medium text-foreground align-top">
-                  <div className="flex items-start gap-2">
-                    {!readonly && (
-                      <button
-                        type="button"
-                        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors touch-none"
-                        draggable={false}
-                        aria-label="Arrastrar para reordenar"
-                      >
-                        <GripVertical className="h-5 w-5" />
-                      </button>
-                    )}
-                    <div className="space-y-1 flex-1">
-                      <div className="flex items-center gap-2">
-                        {employee.puestoId && puestoMap.has(employee.puestoId) && (
-                          <span
-                            className="h-3 w-3 rounded-full border border-border flex-shrink-0"
-                            style={{ backgroundColor: puestoMap.get(employee.puestoId)?.color }}
-                            title={puestoMap.get(employee.puestoId)?.nombre}
-                          />
-                        )}
-                        <p style={
-                          employee.puestoId && puestoMap.has(employee.puestoId)
-                            ? { color: puestoMap.get(employee.puestoId)?.color }
-                            : undefined
-                        }>{employee.name}</p>
-                      </div>
-                    {employeeStats && employeeStats[employee.id] && (
-                      <div className="text-xs text-muted-foreground space-y-0.5">
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium text-foreground">Francos:</span>
-                          <span>{formatStatValue(employeeStats[employee.id].francos)}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium text-foreground">Horas extra semana:</span>
-                          <span>{formatStatValue(employeeStats[employee.id].horasExtrasSemana)}h</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium text-foreground">Horas extra mes:</span>
-                          <span>{formatStatValue(employeeStats[employee.id].horasExtrasMes)}h</span>
-                        </div>
-                      </div>
-                    )}
-                    </div>
+            {/* Botón para agregar separador al inicio de la primera columna */}
+            {!readonly && (
+              <tr className="border-b border-border">
+                <td className="border-r border-border bg-muted/30 px-6 py-2">
+                  <div className="flex items-center justify-start">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-3 text-xs rounded-full bg-background border border-border shadow-sm hover:bg-primary hover:text-primary-foreground"
+                      onClick={() => {
+                        const suggestedPuestoId = getSuggestedPuestoId(0)
+                        handleAddSeparator(0, suggestedPuestoId)
+                      }}
+                      title="Agregar separador"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Agregar separador
+                    </Button>
                   </div>
                 </td>
-                {weekDays.map((day) => {
-                  const dateStr = format(day, "yyyy-MM-dd")
-                  const employeeShifts = getEmployeeShifts(employee.id, dateStr)
-                  const isSelected = selectedCell?.date === dateStr && selectedCell?.employeeId === employee.id
+                {weekDays.map((day) => (
+                  <td key={day.toISOString()} className="border-r border-border last:border-r-0"></td>
+                ))}
+              </tr>
+            )}
+            {orderedItems.map((item, itemIndex) => {
+              return (
+                <React.Fragment key={item.type === "employee" ? `emp-${item.data.id}` : `sep-${item.data.id}`}>
+
+                  {/* Renderizar separador o empleado */}
+                  {item.type === "separator" ? (
+                    <tr key={item.data.id} className="border-b border-border bg-muted/30">
+                      <td colSpan={weekDays.length + 1} className="px-6 py-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3 flex-1">
+                            <div className="h-px bg-border flex-1"></div>
+                            {editingSeparatorId === item.data.id ? (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  value={separatorEditName}
+                                  onChange={(e) => setSeparatorEditName(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      handleSaveSeparatorEdit()
+                                    } else if (e.key === "Escape") {
+                                      setEditingSeparatorId(null)
+                                      setSeparatorEditName("")
+                                    }
+                                  }}
+                                  className="h-7 text-sm font-semibold text-center min-w-[120px]"
+                                  autoFocus
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0"
+                                  onClick={handleSaveSeparatorEdit}
+                                >
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <h3
+                                className="text-sm font-semibold text-foreground uppercase tracking-wide cursor-pointer hover:text-primary transition-colors"
+                                onClick={() => !readonly && handleEditSeparator(item.data)}
+                                style={
+                                  item.data.puestoId && puestoMap.has(item.data.puestoId)
+                                    ? { color: puestoMap.get(item.data.puestoId)?.color }
+                                    : undefined
+                                }
+                              >
+                                {item.data.nombre}
+                              </h3>
+                            )}
+                            <div className="h-px bg-border flex-1"></div>
+                          </div>
+                          {!readonly && editingSeparatorId !== item.data.id && (
+                            <div className="flex items-center gap-1 ml-4">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => handleEditSeparator(item.data)}
+                                title="Editar separador"
+                              >
+                                <Edit2 className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                                onClick={() => handleDeleteSeparator(item.data.id)}
+                                title="Eliminar separador"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    // Renderizar empleado (código existente)
+                    <tr 
+                      key={item.data.id} 
+                      className={`border-b border-border last:border-b-0 ${
+                        dragOverEmployeeId === item.data.id ? "bg-primary/5" : ""
+                      } ${draggedEmployeeId === item.data.id ? "opacity-50" : ""}`}
+                      draggable={!readonly}
+                      onDragStart={(e) => handleDragStart(e, item.data.id)}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={(e) => handleDragOver(e, item.data.id)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, item.data.id)}
+                    >
+                      <td className="border-r border-border bg-muted/30 px-6 py-4 text-lg font-medium text-foreground align-top">
+                        <div className="flex items-start gap-2">
+                          {!readonly && (
+                            <button
+                              type="button"
+                              className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors touch-none"
+                              draggable={false}
+                              aria-label="Arrastrar para reordenar"
+                            >
+                              <GripVertical className="h-5 w-5" />
+                            </button>
+                          )}
+                          <div className="space-y-1 flex-1">
+                            <div className="flex items-center gap-2">
+                              {item.data.puestoId && puestoMap.has(item.data.puestoId) && (
+                                <span
+                                  className="h-3 w-3 rounded-full border border-border flex-shrink-0"
+                                  style={{ backgroundColor: puestoMap.get(item.data.puestoId)?.color }}
+                                  title={puestoMap.get(item.data.puestoId)?.nombre}
+                                />
+                              )}
+                              <p style={
+                                item.data.puestoId && puestoMap.has(item.data.puestoId)
+                                  ? { color: puestoMap.get(item.data.puestoId)?.color }
+                                  : undefined
+                              }>{item.data.name}</p>
+                            </div>
+                          {employeeStats && employeeStats[item.data.id] && (
+                            <div className="text-xs text-muted-foreground space-y-0.5">
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium text-foreground">Francos:</span>
+                                <span>{formatStatValue(employeeStats[item.data.id].francos)}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium text-foreground">Horas extra semana:</span>
+                                <span>{formatStatValue(employeeStats[item.data.id].horasExtrasSemana)}h</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium text-foreground">Horas extra mes:</span>
+                                <span>{formatStatValue(employeeStats[item.data.id].horasExtrasMes)}h</span>
+                              </div>
+                            </div>
+                          )}
+                          </div>
+                        </div>
+                      </td>
+                      {weekDays.map((day) => {
+                        const dateStr = format(day, "yyyy-MM-dd")
+                        const employeeShifts = getEmployeeShifts(item.data.id, dateStr)
+                        const isSelected = selectedCell?.date === dateStr && selectedCell?.employeeId === item.data.id
                   // Verificar si el día está fuera del rango del mes
                   const isOutOfRange = monthRange 
                     ? (day < monthRange.startDate || day > monthRange.endDate)
                     : false
                   
-                  // Obtener estilo de fondo del turno (puede incluir gradientes)
-                  const backgroundStyle = getCellBackgroundStyle(employee.id, dateStr)
+                        // Obtener estilo de fondo del turno (puede incluir gradientes)
+                        const backgroundStyle = getCellBackgroundStyle(item.data.id, dateStr)
                   
                   // Determinar clases para hover y selected cuando hay color de fondo
                   const hasBackgroundStyle = !!backgroundStyle
@@ -715,7 +949,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                     : isSelected
                     ? "bg-primary/10"
                     : ""
-                  const assignments = getEmployeeAssignments(employee.id, dateStr)
+                        const assignments = getEmployeeAssignments(item.data.id, dateStr)
                   const primaryShiftAssignment = assignments.find(
                     (assignment) => assignment.type !== "franco" && assignment.type !== "medio_franco" && assignment.shiftId,
                   )
@@ -735,10 +969,10 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                     !!primaryShiftAssignment &&
                     !!primaryShift?.startTime &&
                     !!primaryShift?.endTime
-                  const cellKey = `${employee.id}-${dateStr}`
+                        const cellKey = `${item.data.id}-${dateStr}`
 
-                  return (
-                    <td
+                        return (
+                          <td
                       key={day.toISOString()}
                       className={`border-r border-border px-4 py-4 last:border-r-0 relative ${
                         isClickable
@@ -746,7 +980,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                           : ""
                       } ${selectedClass}`}
                       style={backgroundStyle}
-                      onClick={() => handleCellClick(dateStr, employee.id)}
+                            onClick={() => handleCellClick(dateStr, item.data.id)}
                     >
                       {showExtraActions && (
                         <div className="absolute -top-1 right-1" onClick={(event) => event.stopPropagation()}>
@@ -763,7 +997,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                               <DropdownMenuItem
                                 onSelect={(event) => {
                                   event.preventDefault()
-                                  handleToggleExtra(employee.id, dateStr, "before")
+                                  handleToggleExtra(item.data.id, dateStr, "before")
                                   setExtraMenuOpenKey(null)
                                 }}
                                 className="flex items-center gap-2 text-xs"
@@ -774,7 +1008,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                               <DropdownMenuItem
                                 onSelect={(event) => {
                                   event.preventDefault()
-                                  handleToggleExtra(employee.id, dateStr, "after")
+                                  handleToggleExtra(item.data.id, dateStr, "after")
                                   setExtraMenuOpenKey(null)
                                 }}
                                 className="flex items-center gap-2 text-xs"
@@ -899,10 +1133,13 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                         })()}
                       </div>
                     </td>
-                  )
-                })}
-              </tr>
-            ))}
+                      )
+                    })}
+                    </tr>
+                  )}
+                </React.Fragment>
+              )
+            })}
           </tbody>
         </table>
       </div>
