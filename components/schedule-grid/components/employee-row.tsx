@@ -48,6 +48,11 @@ interface EmployeeRowProps {
   shifts: Turno[]
   mediosTurnos?: MedioTurno[]
   onQuickAssignments?: (date: string, employeeId: string, assignments: ShiftAssignment[]) => void
+  // Undo props
+  cellUndoHistory: Map<string, ShiftAssignment[]>
+  handleCellUndo: (date: string, employeeId: string) => void
+  handleGlobalUndo: () => void
+  canUndo: boolean
 }
 
 export function EmployeeRow({
@@ -82,6 +87,10 @@ export function EmployeeRow({
   shifts,
   mediosTurnos,
   onQuickAssignments,
+  cellUndoHistory,
+  handleCellUndo,
+  handleGlobalUndo,
+  canUndo,
 }: EmployeeRowProps) {
   return (
     <tr
@@ -180,6 +189,9 @@ export function EmployeeRow({
           !!primaryShift?.endTime
         const cellKey = `${employee.id}-${dateStr}`
 
+        const undoCellKey = `${dateStr}-${employee.id}`
+        const hasCellHistory = cellUndoHistory.has(undoCellKey)
+
         return (
           <ScheduleCell
             key={day.toISOString()}
@@ -205,6 +217,11 @@ export function EmployeeRow({
                 ? (assignments) => onQuickAssignments(dateStr, employee.id, assignments)
                 : undefined
             }
+            readonly={readonly}
+            hasCellHistory={hasCellHistory}
+            onCellUndo={() => handleCellUndo(dateStr, employee.id)}
+            onGlobalUndo={handleGlobalUndo}
+            canUndo={canUndo}
           />
         )
       })}

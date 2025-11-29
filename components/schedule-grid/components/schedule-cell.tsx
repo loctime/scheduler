@@ -4,7 +4,14 @@ import React from "react"
 import type { CSSProperties } from "react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Check } from "lucide-react"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  ContextMenuSeparator,
+} from "@/components/ui/context-menu"
+import { Check, RotateCcw, Undo2 } from "lucide-react"
 import { ShiftAssignment, Turno, MedioTurno } from "@/lib/types"
 import { CellAssignments } from "./cell-assignments"
 import { InlineShiftSelector } from "./inline-shift-selector"
@@ -28,6 +35,11 @@ interface ScheduleCellProps {
   quickShifts: Turno[]
   mediosTurnos?: MedioTurno[]
   onQuickAssignments?: (assignments: ShiftAssignment[]) => void
+  readonly?: boolean
+  hasCellHistory?: boolean
+  onCellUndo?: () => void
+  onGlobalUndo?: () => void
+  canUndo?: boolean
 }
 
 export function ScheduleCell({
@@ -49,6 +61,11 @@ export function ScheduleCell({
   quickShifts,
   mediosTurnos,
   onQuickAssignments,
+  readonly = false,
+  hasCellHistory = false,
+  onCellUndo,
+  onGlobalUndo,
+  canUndo = false,
 }: ScheduleCellProps) {
   const hasBackgroundStyle = !!backgroundStyle
   const hoverClass = hasBackgroundStyle
@@ -61,13 +78,30 @@ export function ScheduleCell({
   const selectedClass = hasBackgroundStyle ? "ring-2 ring-primary/30" : isSelected ? "bg-primary/10" : ""
 
   return (
-    <td
-      className={`border-r border-border px-4 py-4 last:border-r-0 relative ${
-        isClickable ? `cursor-pointer transition-all ${hoverClass} active:brightness-90` : ""
-      } ${selectedClass}`}
-      style={backgroundStyle}
-      onClick={() => onCellClick(date, employeeId)}
-    >
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <td
+          className={`border-r border-border px-4 py-4 last:border-r-0 relative group ${
+            isClickable ? `cursor-pointer transition-all ${hoverClass} active:brightness-90` : ""
+          } ${selectedClass}`}
+          style={backgroundStyle}
+          onClick={() => onCellClick(date, employeeId)}
+        >
+          {/* Botón pequeño de deshacer en celda (arriba a la izquierda) */}
+          {!readonly && hasCellHistory && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onCellUndo?.()
+              }}
+              className="absolute top-1 left-1 z-10 flex h-5 w-5 items-center justify-center rounded bg-primary/90 text-primary-foreground opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-100 hover:bg-primary shadow-sm"
+              title="Deshacer cambio en esta celda"
+              aria-label="Deshacer cambio en esta celda"
+            >
+              <RotateCcw className="h-3 w-3" />
+            </button>
+          )}
       {showExtraActions && (
         <div className="absolute -top-1 right-1" onClick={(event) => event.stopPropagation()}>
           <DropdownMenu open={extraMenuOpenKey === cellKey} onOpenChange={onExtraMenuOpenChange}>
@@ -115,6 +149,32 @@ export function ScheduleCell({
         )}
       </div>
     </td>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        {!readonly && (
+          <>
+            <ContextMenuItem onClick={() => onCellClick(date, employeeId)}>
+              Editar turno
+            </ContextMenuItem>
+            {hasCellHistory && (
+              <>
+                <ContextMenuSeparator />
+                <ContextMenuItem onClick={() => onCellUndo?.()}>
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Deshacer cambio en esta celda
+                </ContextMenuItem>
+              </>
+            )}
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={() => onGlobalUndo?.()} disabled={!canUndo}>
+              <Undo2 className="mr-2 h-4 w-4" />
+              Deshacer último cambio
+              <span className="ml-auto text-xs text-muted-foreground">Ctrl+Z</span>
+            </ContextMenuItem>
+          </>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }
 
