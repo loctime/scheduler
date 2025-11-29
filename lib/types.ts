@@ -99,6 +99,7 @@ export interface Separador {
   nombre: string // Nombre del separador (ej: "SALÓN", "COCINA", "BACHA")
   puestoId?: string // ID del puesto asociado (opcional)
   tipo: "puesto" | "personalizado" // Tipo de separador
+  color?: string // código hex para el color del separador (opcional)
   createdAt?: any
   updatedAt?: any
 }

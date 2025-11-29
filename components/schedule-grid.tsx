@@ -59,6 +59,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   const [dragOverEmployeeId, setDragOverEmployeeId] = useState<string | null>(null)
   const [editingSeparatorId, setEditingSeparatorId] = useState<string | null>(null)
   const [separatorEditName, setSeparatorEditName] = useState("")
+  const [separatorEditColor, setSeparatorEditColor] = useState("")
   
   const { config } = useConfig()
   const { updateEmployeeOrder, addSeparator, updateSeparator, deleteSeparator } = useEmployeeOrder()
@@ -644,14 +645,16 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     
     let nombre = "SEPARADOR"
     let puestoId = suggestedPuestoId
+    let color: string | undefined = undefined
     
-    // Si hay un puesto sugerido, usar su nombre
+    // Si hay un puesto sugerido, usar su nombre y color
     if (suggestedPuestoId && puestoMap.has(suggestedPuestoId)) {
       const puesto = puestoMap.get(suggestedPuestoId)
       nombre = puesto?.nombre.toUpperCase() || "SEPARADOR"
+      color = puesto?.color
     }
     
-    const newSeparator = await addSeparator(nombre, puestoId)
+    const newSeparator = await addSeparator(nombre, puestoId, color)
     if (!newSeparator) return
     
     // Insertar el separador en la posición indicada
@@ -665,6 +668,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   const handleEditSeparator = useCallback((separator: Separador) => {
     setEditingSeparatorId(separator.id)
     setSeparatorEditName(separator.nombre)
+    setSeparatorEditColor(separator.color || "")
   }, [])
 
   // Handler para guardar edición de separador
@@ -672,6 +676,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     if (!editingSeparatorId || !updateSeparator || !separatorEditName.trim()) {
       setEditingSeparatorId(null)
       setSeparatorEditName("")
+      setSeparatorEditColor("")
       return
     }
     
@@ -679,17 +684,20 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     if (!separator) {
       setEditingSeparatorId(null)
       setSeparatorEditName("")
+      setSeparatorEditColor("")
       return
     }
     
     await updateSeparator(editingSeparatorId, {
       ...separator,
       nombre: separatorEditName.trim(),
+      color: separatorEditColor.trim() || undefined,
     })
     
     setEditingSeparatorId(null)
     setSeparatorEditName("")
-  }, [editingSeparatorId, separatorEditName, updateSeparator, separadorMap])
+    setSeparatorEditColor("")
+  }, [editingSeparatorId, separatorEditName, separatorEditColor, updateSeparator, separadorMap])
 
   // Handler para eliminar separador
   const handleDeleteSeparator = useCallback(async (separatorId: string) => {
@@ -733,6 +741,27 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     })
     
     return mostCommonPuesto
+  }, [orderedItems, puestoMap])
+
+  // Función para obtener el color del separador que aplica a un empleado
+  // (el último separador antes de este empleado)
+  const getSeparatorColorForEmployee = useCallback((employeeIndex: number): string | undefined => {
+    // Buscar el último separador antes de este índice
+    for (let i = employeeIndex - 1; i >= 0; i--) {
+      const item = orderedItems[i]
+      if (item.type === "separator") {
+        // Si el separador tiene color, usarlo
+        if (item.data.color) {
+          return item.data.color
+        }
+        // Si el separador tiene puestoId y ese puesto tiene color, usarlo
+        if (item.data.puestoId && puestoMap.has(item.data.puestoId)) {
+          return puestoMap.get(item.data.puestoId)?.color
+        }
+        return undefined
+      }
+    }
+    return undefined
   }, [orderedItems, puestoMap])
 
   return (
@@ -787,10 +816,18 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                                     } else if (e.key === "Escape") {
                                       setEditingSeparatorId(null)
                                       setSeparatorEditName("")
+                                      setSeparatorEditColor("")
                                     }
                                   }}
                                   className="h-7 text-sm font-semibold text-center min-w-[120px]"
                                   autoFocus
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <Input
+                                  type="color"
+                                  value={separatorEditColor || "#3b82f6"}
+                                  onChange={(e) => setSeparatorEditColor(e.target.value)}
+                                  className="h-7 w-12 p-1 cursor-pointer"
                                   onClick={(e) => e.stopPropagation()}
                                 />
                                 <Button
@@ -810,6 +847,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                                       handleDeleteSeparator(item.data.id)
                                       setEditingSeparatorId(null)
                                       setSeparatorEditName("")
+                                      setSeparatorEditColor("")
                                     }}
                                     title="Eliminar separador"
                                   >
@@ -822,7 +860,9 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                                 className="text-sm font-semibold text-foreground uppercase tracking-wide cursor-pointer hover:text-primary transition-colors"
                                 onClick={() => !readonly && handleEditSeparator(item.data)}
                                 style={
-                                  item.data.puestoId && puestoMap.has(item.data.puestoId)
+                                  item.data.color 
+                                    ? { color: item.data.color }
+                                    : item.data.puestoId && puestoMap.has(item.data.puestoId)
                                     ? { color: puestoMap.get(item.data.puestoId)?.color }
                                     : undefined
                                 }
@@ -871,7 +911,15 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                       onDragLeave={handleDragLeave}
                       onDrop={(e) => handleDrop(e, item.data.id)}
                     >
-                      <td className="border-r border-border bg-muted/30 px-6 py-4 text-lg font-medium text-foreground align-top">
+                      <td 
+                        className="border-r border-border px-6 py-4 text-lg font-medium text-foreground align-top"
+                        style={(() => {
+                          const separatorColor = getSeparatorColorForEmployee(itemIndex)
+                          return separatorColor 
+                            ? { backgroundColor: hexToRgba(separatorColor, 0.1) }
+                            : { backgroundColor: 'rgb(var(--muted) / 0.3)' }
+                        })()}
+                      >
                         <div className="flex flex-col gap-1">
                           {/* Botón sutil para agregar separador antes de este empleado */}
                           {showAddButton && (
