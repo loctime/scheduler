@@ -42,7 +42,7 @@ export function useExportSchedule() {
           padding: el.style.padding || "",
         })
 
-        el.style.background = "white"
+        el.style.background = "transparent"
         el.style.border = "none"
         el.style.boxShadow = "none"
         el.style.display = "block"

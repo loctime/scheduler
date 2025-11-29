@@ -140,21 +140,21 @@ export function EmployeeRow({
             )}
             <div className="space-y-1 flex-1">
               <div className="flex items-center gap-2">
-                <p>{employee.name}</p>
+                <p className="text-xl font-bold">{employee.name}</p>
               </div>
               {employeeStats && employeeStats[employee.id] && (
-                <div className="text-xs text-muted-foreground space-y-0.5">
+                <div className="text-sm text-muted-foreground space-y-0.5">
                   <div className="flex items-center gap-1">
-                    <span className="font-medium text-foreground">Francos:</span>
-                    <span>{formatStatValue(employeeStats[employee.id].francos)}</span>
+                    <span className="font-bold text-foreground">Francos:</span>
+                    <span className="font-semibold">{formatStatValue(employeeStats[employee.id].francos)}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <span className="font-medium text-foreground">Horas extra semana:</span>
-                    <span>{formatStatValue(employeeStats[employee.id].horasExtrasSemana)}h</span>
+                    <span className="font-bold text-foreground">Horas extra semana:</span>
+                    <span className="font-semibold">{formatStatValue(employeeStats[employee.id].horasExtrasSemana)}h</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <span className="font-medium text-foreground">Horas extra mes:</span>
-                    <span>{formatStatValue(employeeStats[employee.id].horasExtrasMes)}h</span>
+                    <span className="font-bold text-foreground">Horas extra mes:</span>
+                    <span className="font-semibold">{formatStatValue(employeeStats[employee.id].horasExtrasMes)}h</span>
                   </div>
                 </div>
               )}
