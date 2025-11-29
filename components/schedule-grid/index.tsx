@@ -251,7 +251,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     [orderedItems]
   )
 
-  const isClickable = !readonly && (onShiftUpdate || onAssignmentUpdate)
+  const isClickable = !readonly && !!(onShiftUpdate || onAssignmentUpdate)
 
   return (
     <>
