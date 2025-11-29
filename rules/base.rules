@@ -51,10 +51,12 @@ function ownerIs(field) {
   );
 }
 
-// Inmutabilidad
-function unchanged(field) {
-  return isUpdate() ? request.resource.data[field] == resource.data[field] : true;
-}
+    // Inmutabilidad
+    function unchanged(field) {
+      return isUpdate() 
+        ? (!(field in request.resource.data) || request.resource.data[field] == resource.data[field])
+        : true;
+    }
 
 // Inmutabilidad flexible - permite null/undefined
 function unchangedOrNull(field) {

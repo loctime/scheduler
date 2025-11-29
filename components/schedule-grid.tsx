@@ -610,15 +610,15 @@ export const ScheduleGrid = memo(function ScheduleGrid({
       <Card className="overflow-hidden border border-border bg-card">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
-          <thead className={`${isFirstWeek ? "sticky top-0" : ""} z-30`}>
-            <tr className="border-b border-border bg-muted/50 backdrop-blur-sm">
-              <th className="min-w-[220px] border-r border-border px-6 py-4 text-left text-xl font-semibold text-foreground bg-muted/50 backdrop-blur-sm">
+          <thead>
+            <tr className="border-b border-border bg-muted/50">
+              <th className="min-w-[220px] border-r border-border px-6 py-4 text-left text-xl font-semibold text-foreground">
                 Empleado
               </th>
               {weekDays.map((day) => (
                 <th
                   key={day.toISOString()}
-                  className="min-w-[180px] border-r border-border px-6 py-4 text-center text-xl font-semibold text-foreground last:border-r-0 bg-muted/50 backdrop-blur-sm"
+                  className="min-w-[180px] border-r border-border px-6 py-4 text-center text-xl font-semibold text-foreground last:border-r-0"
                 >
                   <div className="flex flex-col">
                     <span className="capitalize">{format(day, "EEEE", { locale: es })}</span>

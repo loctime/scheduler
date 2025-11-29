@@ -58,10 +58,12 @@ service cloud.firestore {
       );
     }
     
-    // Inmutabilidad
-    function unchanged(field) {
-      return isUpdate() ? request.resource.data[field] == resource.data[field] : true;
-    }
+        // Inmutabilidad
+        function unchanged(field) {
+          return isUpdate() 
+            ? (!(field in request.resource.data) || request.resource.data[field] == resource.data[field])
+            : true;
+        }
     
     // Inmutabilidad flexible - permite null/undefined
     function unchangedOrNull(field) {
@@ -134,15 +136,14 @@ service cloud.firestore {
         && isStringOrNull('displayName')
         && isStringOrNull('photoURL')
         && isStringOrNull('role')
-        && unchanged('createdAt')
-        && isTs('updatedAt');
+        && unchanged('createdAt');
       allow delete: if false; // No permitir eliminar usuarios
     }
     
     // Colección: apps/horarios/employees
     match /apps/horarios/employees/{empleadoId} {
-      allow read: if isAuth() && horariosUserDocExists() && resource.data.userId == uid();
-      allow create: if isAuth() && horariosUserDocExists()
+      allow read: if isAuth() && resource.data.userId == uid();
+      allow create: if isAuth()
         && nonEmptyString('name')
         && nonEmptyString('userId')
         && request.resource.data.userId == uid()
@@ -151,22 +152,21 @@ service cloud.firestore {
         && isStringOrNull('puestoId')
         && isTs('createdAt')
         && isTs('updatedAt');
-      allow update: if isAuth() && horariosUserDocExists()
+      allow update: if isAuth()
         && resource.data.userId == uid()
         && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
-        && nonEmptyString('name')
-        && isStringOrNull('email')
-        && isStringOrNull('phone')
-        && isStringOrNull('puestoId')
-        && unchanged('createdAt')
-        && isTs('updatedAt');
-      allow delete: if isAuth() && horariosUserDocExists() && resource.data.userId == uid();
+        && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() >= 1))
+        && (!('email' in request.resource.data) || request.resource.data.email is string || request.resource.data.email == null)
+        && (!('phone' in request.resource.data) || request.resource.data.phone is string || request.resource.data.phone == null)
+        && (!('puestoId' in request.resource.data) || request.resource.data.puestoId is string || request.resource.data.puestoId == null)
+        && unchanged('createdAt');
+      allow delete: if isAuth() && resource.data.userId == uid();
     }
     
     // Colección: apps/horarios/shifts
     match /apps/horarios/shifts/{turnoId} {
-      allow read: if isAuth() && horariosUserDocExists() && resource.data.userId == uid();
-      allow create: if isAuth() && horariosUserDocExists()
+      allow read: if isAuth() && resource.data.userId == uid();
+      allow create: if isAuth()
         && nonEmptyString('name')
         && nonEmptyString('userId')
         && request.resource.data.userId == uid()
@@ -177,7 +177,7 @@ service cloud.firestore {
         && nonEmptyString('color')
         && isTs('createdAt')
         && isTs('updatedAt');
-      allow update: if isAuth() && horariosUserDocExists()
+      allow update: if isAuth()
         && resource.data.userId == uid()
         && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
         && nonEmptyString('name')
@@ -186,15 +186,14 @@ service cloud.firestore {
         && isStringOrNull('startTime2')
         && isStringOrNull('endTime2')
         && nonEmptyString('color')
-        && unchanged('createdAt')
-        && isTs('updatedAt');
-      allow delete: if isAuth() && horariosUserDocExists() && resource.data.userId == uid();
+        && unchanged('createdAt');
+      allow delete: if isAuth() && resource.data.userId == uid();
     }
     
     // Colección: apps/horarios/schedules
     match /apps/horarios/schedules/{horarioId} {
-      allow read: if isAuth() && horariosUserDocExists();
-      allow create: if isAuth() && horariosUserDocExists()
+      allow read: if isAuth();
+      allow create: if isAuth()
         && nonEmptyString('nombre')
         && nonEmptyString('weekStart')
         && nonEmptyString('semanaInicio')
@@ -206,22 +205,21 @@ service cloud.firestore {
         && isStringOrNull('createdByName')
         && isStringOrNull('modifiedBy')
         && isStringOrNull('modifiedByName');
-      allow update: if isAuth() && horariosUserDocExists()
+      allow update: if isAuth()
         && nonEmptyString('nombre')
         && nonEmptyString('weekStart')
         && nonEmptyString('semanaInicio')
         && nonEmptyString('semanaFin')
         && request.resource.data.assignments is map
-        && isTs('updatedAt')
         && (isStringOrNull('modifiedBy') || request.resource.data.modifiedBy == uid())
         && isStringOrNull('modifiedByName');
-      allow delete: if isAuth() && horariosUserDocExists();
+      allow delete: if isAuth();
     }
     
     // Colección: apps/horarios/historial
     match /apps/horarios/historial/{historialId} {
-      allow read: if isAuth() && horariosUserDocExists();
-      allow create: if isAuth() && horariosUserDocExists()
+      allow read: if isAuth();
+      allow create: if isAuth()
         && nonEmptyString('horarioId')
         && nonEmptyString('nombre')
         && nonEmptyString('semanaInicio')
@@ -233,15 +231,15 @@ service cloud.firestore {
         && isStringOrNull('createdByName')
         && (isBool('versionAnterior') || !('versionAnterior' in request.resource.data));
       allow update: if false; // Historial es inmutable
-      allow delete: if isAuth() && horariosUserDocExists();
+      allow delete: if isAuth();
     }
     
     // Colección: apps/horarios/config
     match /apps/horarios/config/{configId} {
-      // Permitir lectura a cualquier usuario autenticado con documento de usuario
-      allow read: if isAuth() && horariosUserDocExists();
-      // Permitir crear/actualizar a cualquier usuario autenticado con documento de usuario
-      allow create, update: if isAuth() && horariosUserDocExists();
+      // Permitir lectura a cualquier usuario autenticado
+      allow read: if isAuth();
+      // Permitir crear/actualizar a cualquier usuario autenticado
+      allow create, update: if isAuth();
       allow delete: if false; // No permitir eliminar configuración
     }
     

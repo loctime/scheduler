@@ -10,7 +10,6 @@ import {
   deleteDoc,
   doc,
   serverTimestamp,
-  getDoc,
 } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { DashboardLayout } from "@/components/dashboard-layout"
@@ -28,44 +27,86 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { Plus, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
 import { useConfig } from "@/hooks/use-config"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Empleado } from "@/lib/types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function EmpleadosPage() {
   const { employees, loading: dataLoading, refreshEmployees, user } = useData()
   const { config } = useConfig()
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingEmployee, setEditingEmployee] = useState<Empleado | null>(null)
-  const [formData, setFormData] = useState<{ name: string; email: string; phone: string; puestoId?: string }>({
-    name: "",
-    email: "",
-    phone: "",
-    puestoId: "",
-  })
   const [bulkNames, setBulkNames] = useState("")
   const { toast } = useToast()
+  
+  // Estados para edición inline
+  const [editingField, setEditingField] = useState<{id: string, field: string} | null>(null)
+  const [inlineValue, setInlineValue] = useState("")
 
-  const handleOpenDialog = (employee?: any) => {
-    if (employee) {
-      setEditingEmployee(employee)
-      setFormData({ 
-        name: employee.name, 
-        email: employee.email || "", 
-        phone: employee.phone || "",
-        puestoId: employee.puestoId || "",
-      })
-      setBulkNames("")
-    } else {
-      setEditingEmployee(null)
-      setFormData({ name: "", email: "", phone: "", puestoId: "" })
-      setBulkNames("")
-    }
+  const handleOpenDialog = () => {
+    setBulkNames("")
     setDialogOpen(true)
+  }
+
+  // Función para guardar cambios inline
+  const handleInlineSave = async (employeeId: string, field: string, value: string | null) => {
+    if (!db) {
+      toast({
+        title: "Error",
+        description: "Firebase no está configurado",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const updateData: any = {
+        updatedAt: serverTimestamp(),
+      }
+
+      // Solo actualizar el campo que cambió
+      if (field === 'name') {
+        if (!value || !value.trim()) {
+          toast({
+            title: "Error",
+            description: "El nombre es requerido",
+            variant: "destructive",
+          })
+          setEditingField(null)
+          setInlineValue("")
+          return
+        }
+        updateData.name = value.trim()
+      } else if (field === 'email') {
+        updateData.email = value?.trim() || null
+      } else if (field === 'phone') {
+        updateData.phone = value?.trim() || null
+      } else if (field === 'puestoId') {
+        updateData.puestoId = value || null
+      }
+
+      await updateDoc(doc(db, COLLECTIONS.EMPLOYEES, employeeId), updateData)
+      
+      toast({
+        title: "Actualizado",
+        description: "Campo actualizado correctamente",
+      })
+      
+      await refreshEmployees()
+      setEditingField(null)
+      setInlineValue("")
+    } catch (error: any) {
+      console.error("[DEBUG] Error al actualizar campo:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Ocurrió un error al actualizar",
+        variant: "destructive",
+      })
+      setEditingField(null)
+      setInlineValue("")
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -81,142 +122,50 @@ export default function EmpleadosPage() {
     }
 
     try {
-      if (editingEmployee) {
-        // Modo edición: actualizar un solo empleado
-        if (!formData.name.trim()) {
-          toast({
-            title: "Error",
-            description: "El nombre es requerido",
-            variant: "destructive",
-          })
-          return
-        }
+      // Solo creación: agregar uno o múltiples empleados
+      const namesToAdd = bulkNames.trim()
+        ? bulkNames
+            .split("\n")
+            .map((name: string) => name.trim())
+            .filter((name: string) => name.length > 0)
+        : []
 
-        // Logs de depuración
-        const updateData = {
-          name: formData.name.trim(),
-          email: formData.email.trim() || null,
-          phone: formData.phone.trim() || null,
-          puestoId: formData.puestoId || null,
-          updatedAt: serverTimestamp(),
-        }
-        
-        // Verificar el documento actual en Firestore
-        const empleadoDocRef = doc(db, COLLECTIONS.EMPLOYEES, editingEmployee.id)
-        const empleadoDocSnap = await getDoc(empleadoDocRef)
-        
-        const empleadoFirestoreData = empleadoDocSnap.exists() ? empleadoDocSnap.data() : null
-        
-        // Verificar si el usuario tiene documento en apps/horarios/users
-        const userDocRef = doc(db, COLLECTIONS.USERS, user?.uid || "")
-        const userDocSnap = await getDoc(userDocRef)
-        const userData = userDocSnap.exists() ? userDocSnap.data() : null
-        
-        console.log("[DEBUG] Intentando actualizar empleado:")
-        console.log("  - empleadoId:", editingEmployee.id)
-        console.log("  - empleadoEnEstado:", JSON.stringify(editingEmployee, null, 2))
-        console.log("  - empleadoEnFirestore:", empleadoFirestoreData ? JSON.stringify(empleadoFirestoreData, null, 2) : "NO EXISTE")
-        console.log("  - datosActualizacion:", JSON.stringify({ ...updateData, updatedAt: "[serverTimestamp]" }, null, 2))
-        console.log("  - userId del usuario actual:", user?.uid)
-        console.log("  - userId del empleado en Firestore:", empleadoFirestoreData?.userId)
-        console.log("  - ¿Coinciden los userIds?:", empleadoFirestoreData?.userId === user?.uid)
-        console.log("  - collectionPath:", COLLECTIONS.EMPLOYEES)
-        console.log("  - ruta completa:", `${COLLECTIONS.EMPLOYEES}/${editingEmployee.id}`)
-        console.log("  - Documento del usuario en apps/horarios/users:", userData ? JSON.stringify(userData, null, 2) : "NO EXISTE")
-        console.log("  - Rol del usuario:", userData?.role || "SIN ROL")
-        console.log("  - ¿Usuario tiene rol válido?:", userData?.role && ['user', 'admin', 'maxdev'].includes(userData.role))
-        
-        if (!empleadoDocSnap.exists()) {
-          throw new Error(`El empleado con ID ${editingEmployee.id} no existe en Firestore`)
-        }
-        
-        const empleadoFirestore = empleadoDocSnap.data()
-        if (empleadoFirestore.userId !== user?.uid) {
-          console.error("[DEBUG] ❌ El userId del empleado no coincide:", {
-            empleadoUserId: empleadoFirestore.userId,
-            usuarioActual: user?.uid,
-          })
-          throw new Error(`No tienes permisos para actualizar este empleado. El empleado pertenece a otro usuario.`)
-        }
-
-        try {
-          await updateDoc(doc(db, COLLECTIONS.EMPLOYEES, editingEmployee.id), updateData)
-          console.log("[DEBUG] ✅ Empleado actualizado exitosamente")
-          toast({
-            title: "Empleado actualizado",
-            description: "Los datos del empleado se han actualizado correctamente",
-          })
-        } catch (updateError: any) {
-          console.error("[DEBUG] ❌ Error al actualizar empleado:", {
-            code: updateError.code,
-            message: updateError.message,
-            empleadoId: editingEmployee.id,
-            datosEnviados: updateData,
-            empleadoOriginal: editingEmployee,
-          })
-          throw updateError // Re-lanzar para que se maneje en el catch general
-        }
-      } else {
-        // Modo creación: agregar uno o múltiples empleados
-        const namesToAdd = bulkNames.trim()
-          ? bulkNames
-              .split("\n")
-              .map((name: string) => name.trim())
-              .filter((name: string) => name.length > 0)
-          : formData.name.trim()
-          ? [formData.name.trim()]
-          : []
-
-        if (namesToAdd.length === 0) {
-          toast({
-            title: "Error",
-            description: "Debes ingresar al menos un nombre",
-            variant: "destructive",
-          })
-          return
-        }
-
-        // Crear todos los empleados
-        const promises = namesToAdd.map((name: string) =>
-          addDoc(collection(db!, COLLECTIONS.EMPLOYEES), {
-            name,
-            userId: user.uid,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          })
-        )
-
-        await Promise.all(promises)
-
+      if (namesToAdd.length === 0) {
         toast({
-          title: "Empleados creados",
-          description: `Se ${namesToAdd.length === 1 ? "ha creado" : "han creado"} ${namesToAdd.length} empleado${namesToAdd.length === 1 ? "" : "s"} correctamente`,
+          title: "Error",
+          description: "Debes ingresar al menos un nombre",
+          variant: "destructive",
         })
+        return
       }
+
+      // Crear todos los empleados
+      const promises = namesToAdd.map((name: string) =>
+        addDoc(collection(db!, COLLECTIONS.EMPLOYEES), {
+          name,
+          userId: user!.uid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
+      )
+
+      await Promise.all(promises)
+
+      toast({
+        title: "Empleados creados",
+        description: `Se ${namesToAdd.length === 1 ? "ha creado" : "han creado"} ${namesToAdd.length} empleado${namesToAdd.length === 1 ? "" : "s"} correctamente`,
+      })
+      
       // Refrescar datos del contexto
       await refreshEmployees()
       setDialogOpen(false)
-      setFormData({ name: "", email: "", phone: "", puestoId: "" })
       setBulkNames("")
-      setEditingEmployee(null)
     } catch (error: any) {
-      console.error("[DEBUG] ❌ Error general al guardar empleado:", {
-        code: error.code,
-        message: error.message,
-        stack: error.stack,
-        error: error,
-      })
-      
-      let errorMessage = "Ocurrió un error al guardar el empleado"
-      if (error.code === "permission-denied") {
-        errorMessage = `Permisos insuficientes. Código: ${error.code}. Verifica que el empleado pertenezca a tu usuario (userId: ${user?.uid})`
-      } else if (error.message) {
-        errorMessage = error.message
-      }
+      console.error("[DEBUG] ❌ Error general al crear empleado:", error)
       
       toast({
         title: "Error",
-        description: errorMessage,
+        description: error.message || "Ocurrió un error al crear el empleado",
         variant: "destructive",
       })
     }
@@ -302,35 +251,174 @@ export default function EmpleadosPage() {
                     const puesto = employee.puestoId
                       ? (config?.puestos || []).find((p) => p.id === employee.puestoId)
                       : null
+                    
+                    const isEditing = editingField?.id === employee.id
+                    const editingThisField = isEditing && editingField?.field
+                    
                     return (
                       <TableRow key={employee.id} className="border-border">
-                        <TableCell className="font-medium text-foreground">{employee.name}</TableCell>
-                        <TableCell>
-                          {puesto ? (
-                            <div className="flex items-center gap-2">
-                              <span
-                                className="h-3 w-3 rounded-full border border-border"
-                                style={{ backgroundColor: puesto.color }}
-                              />
-                              <span className="text-foreground">{puesto.nombre}</span>
-                            </div>
+                        <TableCell className="font-medium text-foreground">
+                          {editingThisField === 'name' ? (
+                            <Input
+                              value={inlineValue}
+                              onChange={(e) => setInlineValue(e.target.value)}
+                              onBlur={() => handleInlineSave(employee.id, 'name', inlineValue)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleInlineSave(employee.id, 'name', inlineValue)
+                                } else if (e.key === 'Escape') {
+                                  setEditingField(null)
+                                  setInlineValue("")
+                                }
+                              }}
+                              autoFocus
+                              className="h-8"
+                            />
                           ) : (
-                            <span className="text-muted-foreground">-</span>
+                            <div
+                              onClick={() => {
+                                setEditingField({ id: employee.id, field: 'name' })
+                                setInlineValue(employee.name)
+                              }}
+                              className="cursor-pointer hover:bg-muted rounded px-2 py-1 -mx-2 transition-colors"
+                            >
+                              {employee.name}
+                            </div>
                           )}
                         </TableCell>
-                        <TableCell className="text-muted-foreground">{employee.email || "-"}</TableCell>
-                        <TableCell className="text-muted-foreground">{employee.phone || "-"}</TableCell>
+                        <TableCell>
+                          {editingThisField === 'puestoId' ? (
+                            <Select
+                              value={inlineValue || "none"}
+                              onValueChange={async (value) => {
+                                const finalValue = value === "none" ? null : value
+                                await handleInlineSave(employee.id, 'puestoId', finalValue)
+                              }}
+                              onOpenChange={(open) => {
+                                if (!open && editingField?.id === employee.id) {
+                                  // Pequeño delay para permitir que se guarde primero
+                                  setTimeout(() => {
+                                    if (editingField?.id === employee.id) {
+                                      setEditingField(null)
+                                      setInlineValue("")
+                                    }
+                                  }, 100)
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="h-8 w-full">
+                                <SelectValue placeholder="Seleccionar puesto" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Sin puesto</SelectItem>
+                                {(config?.puestos || []).map((p) => (
+                                  <SelectItem key={p.id} value={p.id}>
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className="h-3 w-3 rounded-full border border-border"
+                                        style={{ backgroundColor: p.color }}
+                                      />
+                                      <span>{p.nombre}</span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <div
+                              onClick={() => {
+                                setEditingField({ id: employee.id, field: 'puestoId' })
+                                setInlineValue(employee.puestoId || "")
+                              }}
+                              className="cursor-pointer hover:bg-muted rounded px-2 py-1 -mx-2 transition-colors"
+                            >
+                              {puesto ? (
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className="h-3 w-3 rounded-full border border-border"
+                                    style={{ backgroundColor: puesto.color }}
+                                  />
+                                  <span className="text-foreground">{puesto.nombre}</span>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {editingThisField === 'email' ? (
+                            <Input
+                              type="email"
+                              value={inlineValue}
+                              onChange={(e) => setInlineValue(e.target.value)}
+                              onBlur={() => handleInlineSave(employee.id, 'email', inlineValue)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleInlineSave(employee.id, 'email', inlineValue)
+                                } else if (e.key === 'Escape') {
+                                  setEditingField(null)
+                                  setInlineValue("")
+                                }
+                              }}
+                              autoFocus
+                              className="h-8"
+                              placeholder="email@ejemplo.com"
+                            />
+                          ) : (
+                            <div
+                              onClick={() => {
+                                setEditingField({ id: employee.id, field: 'email' })
+                                setInlineValue(employee.email || "")
+                              }}
+                              className="cursor-pointer hover:bg-muted rounded px-2 py-1 -mx-2 transition-colors"
+                            >
+                              {employee.email || "-"}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {editingThisField === 'phone' ? (
+                            <Input
+                              value={inlineValue}
+                              onChange={(e) => setInlineValue(e.target.value)}
+                              onBlur={() => handleInlineSave(employee.id, 'phone', inlineValue)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleInlineSave(employee.id, 'phone', inlineValue)
+                                } else if (e.key === 'Escape') {
+                                  setEditingField(null)
+                                  setInlineValue("")
+                                }
+                              }}
+                              autoFocus
+                              className="h-8"
+                              placeholder="+1234567890"
+                            />
+                          ) : (
+                            <div
+                              onClick={() => {
+                                setEditingField({ id: employee.id, field: 'phone' })
+                                setInlineValue(employee.phone || "")
+                              }}
+                              className="cursor-pointer hover:bg-muted rounded px-2 py-1 -mx-2 transition-colors"
+                            >
+                              {employee.phone || "-"}
+                            </div>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(employee)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(employee.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                          <div className="flex justify-end gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => handleDelete(employee.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     )
                   })}
                 </TableBody>
@@ -343,111 +431,36 @@ export default function EmpleadosPage() {
           <DialogContent className="bg-card">
             <DialogHeader>
               <DialogTitle className="text-card-foreground">
-                {editingEmployee ? "Editar Empleado" : "Agregar Empleados"}
+                Agregar Empleados
               </DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                {editingEmployee
-                  ? "Actualiza el nombre del empleado"
-                  : "Ingresa el nombre del empleado o múltiples nombres (uno por línea) para agregar varios a la vez"}
+                Ingresa el nombre del empleado o múltiples nombres (uno por línea) para agregar varios a la vez
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit}>
               <div className="space-y-4 py-4">
-                {editingEmployee ? (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name" className="text-foreground">
-                        Nombre *
-                      </Label>
-                      <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        required
-                        className="border-input bg-background text-foreground"
-                        placeholder="Nombre del empleado"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="text-foreground">
-                        Email
-                      </Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="border-input bg-background text-foreground"
-                        placeholder="email@ejemplo.com"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone" className="text-foreground">
-                        Teléfono
-                      </Label>
-                      <Input
-                        id="phone"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        className="border-input bg-background text-foreground"
-                        placeholder="+1234567890"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="puesto" className="text-foreground">
-                        Puesto de Trabajo
-                      </Label>
-                      <Select
-                        value={formData.puestoId || "none"}
-                        onValueChange={(value) => setFormData({ ...formData, puestoId: value === "none" ? "" : value })}
-                      >
-                        <SelectTrigger className="border-input bg-background text-foreground">
-                          <SelectValue placeholder="Seleccionar puesto" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Sin puesto</SelectItem>
-                          {(config?.puestos || []).map((puesto) => (
-                            <SelectItem key={puesto.id} value={puesto.id}>
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className="h-3 w-3 rounded-full border border-border"
-                                  style={{ backgroundColor: puesto.color }}
-                                />
-                                <span>{puesto.nombre}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-sm text-muted-foreground">
-                        El color del puesto se mostrará junto al nombre del empleado
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label htmlFor="bulkNames" className="text-foreground">
-                      Nombres de Empleados *
-                    </Label>
-                    <Textarea
-                      id="bulkNames"
-                      value={bulkNames}
-                      onChange={(e) => setBulkNames(e.target.value)}
-                      placeholder="Ingresa un nombre por línea. Ejemplo:&#10;Juan Pérez&#10;María García&#10;Carlos López"
-                      className="border-input bg-background text-foreground min-h-32"
-                      rows={6}
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Escribe un nombre por línea para agregar múltiples empleados a la vez
-                    </p>
-                  </div>
-                )}
+                <div className="space-y-2">
+                  <Label htmlFor="bulkNames" className="text-foreground">
+                    Nombres de Empleados *
+                  </Label>
+                  <Textarea
+                    id="bulkNames"
+                    value={bulkNames}
+                    onChange={(e) => setBulkNames(e.target.value)}
+                    placeholder="Ingresa un nombre por línea. Ejemplo:&#10;Juan Pérez&#10;María García&#10;Carlos López"
+                    className="border-input bg-background text-foreground min-h-32"
+                    rows={6}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Escribe un nombre por línea para agregar múltiples empleados a la vez. Puedes editar los detalles (email, teléfono, puesto) después haciendo clic en cada campo.
+                  </p>
+                </div>
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit">{editingEmployee ? "Actualizar" : "Agregar"}</Button>
+                <Button type="submit">Agregar</Button>
               </DialogFooter>
             </form>
           </DialogContent>
