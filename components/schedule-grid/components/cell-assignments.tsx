@@ -42,7 +42,7 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
   }, [assignments])
 
   if (assignments.length === 0) {
-    return <span className="text-center text-xl text-muted-foreground font-medium">-</span>
+    return <span className="text-center text-2xl text-muted-foreground font-medium">-</span>
   }
 
   const hasShifts = assignments.some((a) => a.type === "shift" && a.shiftId)
@@ -52,7 +52,7 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
       {orderedAssignments.map((assignment, idx) => {
         if (assignment.type === "franco") {
           return (
-            <span key={`franco-${idx}`} className="text-center text-lg font-bold block">
+            <span key={`franco-${idx}`} className="text-center text-xl font-bold block">
               FRANCO
             </span>
           )
@@ -71,7 +71,7 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
             if (hasShifts) {
               // Cuando hay turno, solo mostrar "(1/2 Franco)" sin horario
               return (
-                <span key={`medio-franco-${idx}`} className="block text-center text-lg font-bold text-[#22c55e]">
+                <span key={`medio-franco-${idx}`} className="block text-center text-xl font-bold text-[#22c55e]">
                   (1/2 Franco)
                 </span>
               )
@@ -81,15 +81,15 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
               // Si es tarde: arriba "(1/2 Franco)", abajo el horario
               if (isEarly) {
                 return (
-                  <div key={`medio-franco-${idx}`} className="text-center text-lg">
+                  <div key={`medio-franco-${idx}`} className="text-center text-xl">
                     <span className="block font-semibold">{displayTimeLines[0]}</span>
-                    <span className="block text-sm font-bold text-[#22c55e]">(1/2 Franco)</span>
+                    <span className="block text-base font-bold text-[#22c55e]">(1/2 Franco)</span>
                   </div>
                 )
               } else {
                 return (
-                  <div key={`medio-franco-${idx}`} className="text-center text-lg">
-                    <span className="block text-sm font-bold text-[#22c55e]">(1/2 Franco)</span>
+                  <div key={`medio-franco-${idx}`} className="text-center text-xl">
+                    <span className="block text-base font-bold text-[#22c55e]">(1/2 Franco)</span>
                     <span className="block font-semibold">{displayTimeLines[0]}</span>
                   </div>
                 )
@@ -97,7 +97,7 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
             }
           } else {
             return (
-              <span key={`medio-franco-${idx}`} className="block text-center text-lg font-semibold">
+              <span key={`medio-franco-${idx}`} className="block text-center text-xl font-semibold">
                 1/2 Franco
               </span>
             )
@@ -110,14 +110,14 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
 
         if (!displayTimeLines || displayTimeLines.length === 0 || (displayTimeLines.length === 1 && !displayTimeLines[0])) {
           return (
-            <span key={assignment.shiftId} className="text-center text-lg font-semibold block">
+            <span key={assignment.shiftId} className="text-center text-xl font-semibold block">
               {shift.name}
             </span>
           )
         }
 
         return (
-          <div key={assignment.shiftId} className="text-center text-lg">
+          <div key={assignment.shiftId} className="text-center text-xl">
             {displayTimeLines.map((line, lineIdx) => (
               <span key={lineIdx} className="block font-semibold">
                 {line}

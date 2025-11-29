@@ -140,10 +140,10 @@ export function EmployeeRow({
             )}
             <div className="space-y-1 flex-1">
               <div className="flex items-center gap-2">
-                <p className="text-xl font-bold">{employee.name}</p>
+                <p className="text-2xl font-bold">{employee.name}</p>
               </div>
               {employeeStats && employeeStats[employee.id] && (
-                <div className="text-sm text-muted-foreground space-y-0.5">
+                <div className="text-base text-muted-foreground space-y-0.5">
                   <div className="flex items-center gap-1">
                     <span className="font-bold text-foreground">Francos:</span>
                     <span className="font-semibold">{formatStatValue(employeeStats[employee.id].francos)}</span>
