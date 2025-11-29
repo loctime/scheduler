@@ -163,3 +163,8 @@
   box-shadow: none !important;
   outline: none !important;
 }
+
+/* Ocultar el botón "+Extra" durante la exportación */
+.exporting-image td > div.absolute {
+  display: none !important;
+}
