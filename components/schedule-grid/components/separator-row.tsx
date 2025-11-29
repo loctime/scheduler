@@ -51,7 +51,8 @@ export function SeparatorRow({
               backgroundColor: hexToRgba(separatorColor, 0.1),
             }
           : {
-              borderBottomColor: "rgb(var(--border))",
+              borderBottomColor: "#000000",
+              borderBottomWidth: "2px",
               backgroundColor: "rgb(var(--muted) / 0.3)",
             }
       })()}

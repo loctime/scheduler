@@ -1,17 +1,14 @@
 "use client"
 
-import React, { memo, useMemo, useCallback, useState, useEffect } from "react"
+import React, { memo, useMemo, useCallback, useState } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Undo2 } from "lucide-react"
 import { Empleado, Turno, Horario, HistorialItem, ShiftAssignment, MedioTurno } from "@/lib/types"
 import { ShiftSelectorPopover } from "../shift-selector-popover"
 import { adjustTime } from "@/lib/utils"
 import { useConfig } from "@/hooks/use-config"
 import { useEmployeeOrder } from "@/hooks/use-employee-order"
-import { useUndoRedo } from "@/hooks/use-undo-redo"
 import { useScheduleGridData } from "./hooks/use-schedule-grid-data"
 import { useCellBackgroundStyles } from "./hooks/use-cell-background-styles"
 import { useDragAndDrop } from "./hooks/use-drag-and-drop"
@@ -66,7 +63,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
 
   const { config } = useConfig()
   const { updateEmployeeOrder, addSeparator, updateSeparator, deleteSeparator } = useEmployeeOrder()
-  const { saveState, undo, canUndo, lastChangeDescription } = useUndoRedo()
 
   // Hook para datos del grid
   const {
@@ -148,45 +144,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     [schedule, getEmployeeAssignments],
   )
 
-  // Guardar estado global antes de cambiar
-  const saveGlobalState = useCallback(
-    (date: string, employeeId: string) => {
-      if (!schedule || !onAssignmentUpdate) return
-      
-      const employeeName = employees.find((e) => e.id === employeeId)?.name || employeeId
-      const dateObj = new Date(date)
-      const dateFormatted = format(dateObj, "d 'de' MMMM", { locale: es })
-      const description = `Cambio en ${employeeName} - ${dateFormatted}`
-      
-      saveState(schedule.id, schedule.assignments, description)
-    },
-    [schedule, employees, saveState],
-  )
-
-  // Deshacer cambio global
-  const handleGlobalUndo = useCallback(() => {
-    if (!canUndo || !schedule || !onAssignmentUpdate) return
-
-    const restoredState = undo()
-    if (!restoredState) return
-
-    const restoredAssignments = restoredState.assignments
-
-    Object.entries(restoredAssignments).forEach(([date, dateAssignments]) => {
-      Object.entries(dateAssignments).forEach(([employeeId, assignments]) => {
-        const normalizedAssignments = Array.isArray(assignments)
-          ? (typeof assignments[0] === "string"
-              ? (assignments as string[]).map((shiftId: string) => ({ shiftId, type: "shift" as const }))
-              : (assignments as ShiftAssignment[]))
-          : []
-
-        onAssignmentUpdate(date, employeeId, normalizedAssignments, {
-          scheduleId: schedule.id,
-        })
-      })
-    })
-  }, [canUndo, schedule, onAssignmentUpdate, undo])
-
   // Deshacer cambio de una celda específica
   const handleCellUndo = useCallback(
     (date: string, employeeId: string) => {
@@ -209,31 +166,15 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     [schedule, onAssignmentUpdate, cellUndoHistory],
   )
 
-  // Manejar atajo de teclado Ctrl+Z
-  useEffect(() => {
-    if (readonly) return
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
-        e.preventDefault()
-        handleGlobalUndo()
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [readonly, handleGlobalUndo])
-
   // Handlers
   const handleCellClick = useCallback(
     (date: string, employeeId: string) => {
       if (!readonly && (onShiftUpdate || onAssignmentUpdate)) {
         saveCellState(date, employeeId)
-        saveGlobalState(date, employeeId)
         setSelectedCell({ date, employeeId })
       }
     },
-    [readonly, onShiftUpdate, onAssignmentUpdate, saveCellState, saveGlobalState]
+    [readonly, onShiftUpdate, onAssignmentUpdate, saveCellState]
   )
 
   const handleShiftUpdate = useCallback(
@@ -263,7 +204,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
       if (!onAssignmentUpdate) return
       
       saveCellState(date, employeeId)
-      saveGlobalState(date, employeeId)
       
       const assignments = getEmployeeAssignments(employeeId, date)
       if (assignments.length === 0) return
@@ -299,14 +239,13 @@ export const ScheduleGrid = memo(function ScheduleGrid({
 
       onAssignmentUpdate(date, employeeId, updatedAssignments, { scheduleId: schedule?.id })
     },
-    [getEmployeeAssignments, getShiftInfo, onAssignmentUpdate, schedule?.id, saveCellState, saveGlobalState]
+    [getEmployeeAssignments, getShiftInfo, onAssignmentUpdate, schedule?.id, saveCellState]
   )
 
   const handleQuickAssignments = useCallback(
     (date: string, employeeId: string, assignments: ShiftAssignment[]) => {
       // Guardar estado antes de actualizar
       saveCellState(date, employeeId)
-      saveGlobalState(date, employeeId)
       
       // Cerrar la celda inmediatamente antes de actualizar
       setSelectedCell(null)
@@ -321,7 +260,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
         onShiftUpdate(date, employeeId, shiftIds)
       }
     },
-    [onAssignmentUpdate, onShiftUpdate, schedule?.id, saveCellState, saveGlobalState]
+    [onAssignmentUpdate, onShiftUpdate, schedule?.id, saveCellState]
   )
 
   // Obtener empleado y fecha seleccionados
@@ -364,29 +303,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
 
   return (
     <>
-      {/* Botón global de deshacer */}
-      {!readonly && (
-        <div className="mb-4 flex items-center justify-end gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleGlobalUndo}
-            disabled={!canUndo}
-            className="gap-2"
-            title={lastChangeDescription || "Deshacer último cambio"}
-          >
-            <Undo2 className="h-4 w-4" />
-            Deshacer
-            {lastChangeDescription && (
-              <span className="ml-2 text-xs text-muted-foreground max-w-[200px] truncate">
-                ({lastChangeDescription})
-              </span>
-            )}
-            <span className="ml-2 text-xs text-muted-foreground">Ctrl+Z</span>
-          </Button>
-        </div>
-      )}
-
       <Card className="overflow-hidden border border-border bg-card">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
@@ -448,8 +364,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                         onQuickAssignments={handleQuickAssignments}
                         cellUndoHistory={cellUndoHistory}
                         handleCellUndo={handleCellUndo}
-                        handleGlobalUndo={handleGlobalUndo}
-                        canUndo={canUndo}
                       />
                     )}
                   </React.Fragment>

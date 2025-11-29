@@ -51,8 +51,6 @@ interface EmployeeRowProps {
   // Undo props
   cellUndoHistory: Map<string, ShiftAssignment[]>
   handleCellUndo: (date: string, employeeId: string) => void
-  handleGlobalUndo: () => void
-  canUndo: boolean
 }
 
 export function EmployeeRow({
@@ -89,13 +87,11 @@ export function EmployeeRow({
   onQuickAssignments,
   cellUndoHistory,
   handleCellUndo,
-  handleGlobalUndo,
-  canUndo,
 }: EmployeeRowProps) {
   return (
     <tr
       key={employee.id}
-      className={`border-b border-border last:border-b-0 ${
+      className={`border-b-2 border-black last:border-b-0 ${
         dragOverEmployeeId === employee.id ? "bg-primary/5" : ""
       } ${draggedEmployeeId === employee.id ? "opacity-50" : ""}`}
       draggable={!readonly}
@@ -106,7 +102,7 @@ export function EmployeeRow({
       onDrop={(e) => onDrop(e, employee.id)}
     >
       <td
-        className="border-r border-border px-6 py-4 text-lg font-medium text-foreground align-top"
+        className="border-r-2 border-black px-6 py-4 text-lg font-medium text-foreground align-top"
         style={
           separatorColor
             ? { backgroundColor: hexToRgba(separatorColor, 0.1) }
@@ -220,8 +216,6 @@ export function EmployeeRow({
             readonly={readonly}
             hasCellHistory={hasCellHistory}
             onCellUndo={() => handleCellUndo(dateStr, employee.id)}
-            onGlobalUndo={handleGlobalUndo}
-            canUndo={canUndo}
           />
         )
       })}

@@ -38,8 +38,6 @@ interface ScheduleCellProps {
   readonly?: boolean
   hasCellHistory?: boolean
   onCellUndo?: () => void
-  onGlobalUndo?: () => void
-  canUndo?: boolean
 }
 
 export function ScheduleCell({
@@ -64,8 +62,6 @@ export function ScheduleCell({
   readonly = false,
   hasCellHistory = false,
   onCellUndo,
-  onGlobalUndo,
-  canUndo = false,
 }: ScheduleCellProps) {
   const hasBackgroundStyle = !!backgroundStyle
   const hoverClass = hasBackgroundStyle
@@ -81,7 +77,7 @@ export function ScheduleCell({
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <td
-          className={`border-r border-border px-4 py-4 last:border-r-0 relative group ${
+          className={`border-r-2 border-black px-4 py-4 last:border-r-0 relative group ${
             isClickable ? `cursor-pointer transition-all ${hoverClass} active:brightness-90` : ""
           } ${selectedClass}`}
           style={backgroundStyle}
@@ -165,12 +161,6 @@ export function ScheduleCell({
                 </ContextMenuItem>
               </>
             )}
-            <ContextMenuSeparator />
-            <ContextMenuItem onClick={() => onGlobalUndo?.()} disabled={!canUndo}>
-              <Undo2 className="mr-2 h-4 w-4" />
-              Deshacer último cambio
-              <span className="ml-auto text-xs text-muted-foreground">Ctrl+Z</span>
-            </ContextMenuItem>
           </>
         )}
       </ContextMenuContent>
