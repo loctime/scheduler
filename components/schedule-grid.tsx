@@ -746,11 +746,32 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                 <React.Fragment key={item.type === "employee" ? `emp-${item.data.id}` : `sep-${item.data.id}`}>
                   {/* Renderizar separador o empleado */}
                   {item.type === "separator" ? (
-                    <tr key={item.data.id} className="border-b border-border bg-muted/30 group hover:bg-muted/50 transition-colors">
+                    <tr 
+                      key={item.data.id} 
+                      className="group transition-colors"
+                      style={(() => {
+                        const separatorColor = item.data.color
+                        return separatorColor 
+                          ? {
+                              borderBottomColor: separatorColor,
+                              borderBottomWidth: '2px',
+                              backgroundColor: hexToRgba(separatorColor, 0.1)
+                            }
+                          : {
+                              borderBottomColor: 'rgb(var(--border))',
+                              backgroundColor: 'rgb(var(--muted) / 0.3)'
+                            }
+                      })()}
+                    >
                       <td colSpan={weekDays.length + 1} className="px-6 py-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3 flex-1">
-                            <div className="h-px bg-border flex-1"></div>
+                            <div 
+                              className="h-px flex-1"
+                              style={{
+                                backgroundColor: item.data.color || 'rgb(var(--border))'
+                              }}
+                            ></div>
                             {editingSeparatorId === item.data.id ? (
                               <div className="flex items-center gap-2">
                                 <Input
@@ -805,16 +826,16 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                               <h3
                                 className="text-sm font-semibold text-foreground uppercase tracking-wide cursor-pointer hover:text-primary transition-colors"
                                 onClick={() => !readonly && handleEditSeparator(item.data)}
-                                style={
-                                  item.data.color 
-                                    ? { color: item.data.color }
-                                    : undefined
-                                }
                               >
                                 {item.data.nombre}
                               </h3>
                             )}
-                            <div className="h-px bg-border flex-1"></div>
+                            <div 
+                              className="h-px flex-1"
+                              style={{
+                                backgroundColor: item.data.color || 'rgb(var(--border))'
+                              }}
+                            ></div>
                           </div>
                           {!readonly && editingSeparatorId !== item.data.id && (
                             <div className="flex items-center gap-1 ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -966,15 +987,15 @@ export const ScheduleGrid = memo(function ScheduleGrid({
 
                         return (
                           <td
-                      key={day.toISOString()}
-                      className={`border-r border-border px-4 py-4 last:border-r-0 relative ${
-                        isClickable
-                          ? `cursor-pointer transition-all ${hoverClass} active:brightness-90`
-                          : ""
-                      } ${selectedClass}`}
-                      style={backgroundStyle}
+                            key={day.toISOString()}
+                            className={`border-r border-border px-4 py-4 last:border-r-0 relative ${
+                              isClickable
+                                ? `cursor-pointer transition-all ${hoverClass} active:brightness-90`
+                                : ""
+                            } ${selectedClass}`}
+                            style={backgroundStyle}
                             onClick={() => handleCellClick(dateStr, item.data.id)}
-                    >
+                          >
                       {showExtraActions && (
                         <div className="absolute -top-1 right-1" onClick={(event) => event.stopPropagation()}>
                           <DropdownMenu
