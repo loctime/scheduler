@@ -48,13 +48,13 @@ export function InlineShiftSelector({ shifts, mediosTurnos, onSelectAssignments 
   // Por ahora mostramos todos los turnos configurados como opciones rápidas
   // El usuario puede nombrarlos "Mañana", "Tarde", "Noche", etc.
   return (
-    <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
-      <div className="grid grid-cols-3 gap-1">
+    <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+      <div className="grid grid-cols-3 gap-1.5">
         <Button
           type="button"
           size="sm"
           variant={specialType === "franco" ? "default" : "outline"}
-          className="h-6 text-[11px] px-1.5"
+          className="h-8 text-xs px-2"
           onClick={(e) => {
             e.stopPropagation()
             setSpecialType("franco")
@@ -67,7 +67,7 @@ export function InlineShiftSelector({ shifts, mediosTurnos, onSelectAssignments 
           type="button"
           size="sm"
           variant={specialType === "medio_franco" ? "default" : "outline"}
-          className="h-6 text-[11px] px-1.5"
+          className="h-8 text-xs px-2"
           onClick={(e) => {
             e.stopPropagation()
             setSpecialType("medio_franco")
@@ -79,7 +79,7 @@ export function InlineShiftSelector({ shifts, mediosTurnos, onSelectAssignments 
           type="button"
           size="sm"
           variant={specialType === "shift" ? "default" : "outline"}
-          className="h-6 text-[11px] px-1.5"
+          className="h-8 text-xs px-2"
           onClick={(e) => {
             e.stopPropagation()
             setSpecialType("shift")
@@ -90,9 +90,9 @@ export function InlineShiftSelector({ shifts, mediosTurnos, onSelectAssignments 
       </div>
 
       {specialType === "shift" && (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1.5">
           {shifts.length === 0 ? (
-            <span className="text-[10px] text-muted-foreground">No hay turnos</span>
+            <span className="text-xs text-muted-foreground">No hay turnos</span>
           ) : (
             shifts.map((shift) => (
               <Button
@@ -100,14 +100,14 @@ export function InlineShiftSelector({ shifts, mediosTurnos, onSelectAssignments 
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-6 px-1.5 text-[11px]"
+                className="h-8 px-2.5 text-xs"
                 onClick={(e) => {
                   e.stopPropagation()
                   handleSelectShift(shift)
                 }}
               >
                 <span
-                  className="inline-block h-2 w-2 rounded-full mr-1"
+                  className="inline-block h-2.5 w-2.5 rounded-full mr-1.5"
                   style={{ backgroundColor: shift.color }}
                 />
                 {shift.name}
@@ -118,16 +118,16 @@ export function InlineShiftSelector({ shifts, mediosTurnos, onSelectAssignments 
       )}
 
       {specialType === "medio_franco" && (
-        <div className="space-y-1">
+        <div className="space-y-2">
           {mediosTurnos && mediosTurnos.length > 0 && (
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1.5">
               {mediosTurnos.map((medio) => (
                 <Button
                   key={medio.id}
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="h-6 px-1.5 text-[11px]"
+                  className="h-8 px-2.5 text-xs"
                   onClick={(e) => {
                     e.stopPropagation()
                     handleSelectMedioFranco({
@@ -142,10 +142,10 @@ export function InlineShiftSelector({ shifts, mediosTurnos, onSelectAssignments 
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-1">
+          <div className="grid grid-cols-2 gap-1.5">
             <Input
               type="time"
-              className="h-6 px-1.5 text-[11px]"
+              className="h-8 px-2 text-xs"
               placeholder="Inicio"
               value={medioFrancoTime.startTime}
               onClick={(e) => e.stopPropagation()}
@@ -169,7 +169,7 @@ export function InlineShiftSelector({ shifts, mediosTurnos, onSelectAssignments 
             />
             <Input
               type="time"
-              className="h-6 px-1.5 text-[11px]"
+              className="h-8 px-2 text-xs"
               placeholder="Fin"
               value={medioFrancoTime.endTime}
               onClick={(e) => e.stopPropagation()}
