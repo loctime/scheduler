@@ -33,6 +33,8 @@ interface GeneralViewProps {
   onExportWeekExcel: (weekStartDate: Date, weekDays: Date[], weekSchedule: Horario | null) => Promise<void>
   onPreviousMonth: () => void
   onNextMonth: () => void
+  user?: any
+  onMarkWeekComplete?: (weekStartDate: Date, completed: boolean) => Promise<void>
 }
 
 export function GeneralView({
@@ -53,6 +55,8 @@ export function GeneralView({
   onExportWeekExcel,
   onPreviousMonth,
   onNextMonth,
+  user,
+  onMarkWeekComplete,
 }: GeneralViewProps) {
   // Crear un mapa de semanas expandidas usando la fecha de inicio de semana como clave
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(() => {
@@ -141,6 +145,8 @@ export function GeneralView({
               employeeStats={employeeMonthlyStats}
               open={isExpanded}
               onOpenChange={(open) => handleWeekToggle(weekStartDate, open)}
+              user={user}
+              onMarkComplete={onMarkWeekComplete}
             />
           )
         })}

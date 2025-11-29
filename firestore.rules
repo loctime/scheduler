@@ -202,15 +202,27 @@ service cloud.firestore {
         && (isStringOrNull('createdBy') || request.resource.data.createdBy == uid())
         && isStringOrNull('createdByName')
         && isStringOrNull('modifiedBy')
-        && isStringOrNull('modifiedByName');
+        && isStringOrNull('modifiedByName')
+        && (request.resource.data.completada == null || request.resource.data.completada is bool)
+        && (request.resource.data.completadaPor == null || request.resource.data.completadaPor is string)
+        && (request.resource.data.completadaPorNombre == null || request.resource.data.completadaPorNombre is string)
+        && (request.resource.data.completadaEn == null || request.resource.data.completadaEn is timestamp);
       allow update: if isAuth()
-        && nonEmptyString('nombre')
-        && nonEmptyString('weekStart')
-        && nonEmptyString('semanaInicio')
-        && nonEmptyString('semanaFin')
-        && request.resource.data.assignments is map
-        && (isStringOrNull('modifiedBy') || request.resource.data.modifiedBy == uid())
-        && isStringOrNull('modifiedByName');
+        && (!('nombre' in request.resource.data) || nonEmptyString('nombre'))
+        && (!('weekStart' in request.resource.data) || nonEmptyString('weekStart'))
+        && (!('semanaInicio' in request.resource.data) || nonEmptyString('semanaInicio'))
+        && (!('semanaFin' in request.resource.data) || nonEmptyString('semanaFin'))
+        && (!('assignments' in request.resource.data) || request.resource.data.assignments is map)
+        && (!('modifiedBy' in request.resource.data) || isStringOrNull('modifiedBy'))
+        && (!('modifiedByName' in request.resource.data) || isStringOrNull('modifiedByName'))
+        && (!('completada' in request.resource.data) || request.resource.data.completada is bool)
+        && (!('completadaPor' in request.resource.data) || request.resource.data.completadaPor is string || request.resource.data.completadaPor == null)
+        && (!('completadaPorNombre' in request.resource.data) || request.resource.data.completadaPorNombre is string || request.resource.data.completadaPorNombre == null)
+        && (!('completadaEn' in request.resource.data) || request.resource.data.completadaEn is timestamp || request.resource.data.completadaEn == null)
+        && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp)
+        && (!('createdAt' in request.resource.data) || request.resource.data.createdAt is timestamp)
+        && (!('createdBy' in request.resource.data) || isStringOrNull('createdBy'))
+        && (!('createdByName' in request.resource.data) || isStringOrNull('createdByName'));
       allow delete: if isAuth();
     }
     

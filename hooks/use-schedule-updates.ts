@@ -1,4 +1,4 @@
-import { useCallback } from "react"
+import { useCallback, useState } from "react"
 import { collection, addDoc, updateDoc, doc, serverTimestamp, getDoc } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { format, startOfWeek, addDays } from "date-fns"
@@ -26,6 +26,78 @@ export function useScheduleUpdates({
 }: UseScheduleUpdatesProps) {
   const { toast } = useToast()
   const { config } = useConfig()
+  const [pendingEdit, setPendingEdit] = useState<{
+    date: string
+    employeeId: string
+    assignments: ShiftAssignment[]
+    options?: { scheduleId?: string }
+    resolve: (value: boolean) => void
+  } | null>(null)
+
+  const handleMarkWeekComplete = useCallback(
+    async (weekStartDate: Date, completed: boolean) => {
+      if (!db || !user) {
+        toast({
+          title: "Error",
+          description: "Firebase no está configurado o no hay usuario autenticado",
+          variant: "destructive",
+        })
+        return
+      }
+
+      try {
+        const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+        const weekSchedule = getWeekSchedule(weekStartDate)
+
+        if (!weekSchedule) {
+          toast({
+            title: "Error",
+            description: "No se encontró el horario de esta semana",
+            variant: "destructive",
+          })
+          return
+        }
+
+        const userName = user?.displayName || user?.email || "Usuario desconocido"
+        const userId = user?.uid || ""
+
+        const updateData: any = {
+          updatedAt: serverTimestamp(),
+          modifiedBy: userId || null,
+          modifiedByName: userName || null,
+        }
+
+        if (completed) {
+          updateData.completada = true
+          updateData.completadaPor = userId
+          updateData.completadaPorNombre = userName
+          updateData.completadaEn = serverTimestamp()
+        } else {
+          updateData.completada = false
+          updateData.completadaPor = null
+          updateData.completadaPorNombre = null
+          updateData.completadaEn = null
+        }
+
+        await updateDoc(doc(db, COLLECTIONS.SCHEDULES, weekSchedule.id), updateData)
+
+        toast({
+          title: completed ? "Semana marcada como completada" : "Semana desmarcada",
+          description: completed
+            ? "La semana ha sido marcada como finalizada"
+            : "La semana ya no está marcada como completada",
+        })
+      } catch (error: any) {
+        console.error("Error al marcar semana como completada:", error)
+        toast({
+          title: "Error",
+          description: error.message || "Ocurrió un error al actualizar el estado de la semana",
+          variant: "destructive",
+        })
+      }
+    },
+    [user, getWeekSchedule, toast],
+  )
 
   const handleAssignmentUpdate = useCallback(
     async (
@@ -63,6 +135,69 @@ export function useScheduleUpdates({
           return
         }
 
+        // Determinar la semana basada en la fecha
+        const dateObj = new Date(date)
+        const weekStartDate = startOfWeek(dateObj, { weekStartsOn })
+        const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+        const weekEndStr = format(addDays(weekStartDate, 6), "yyyy-MM-dd")
+        const userName = user?.displayName || user?.email || "Usuario desconocido"
+        const userId = user?.uid || ""
+
+        let scheduleId: string
+        let currentAssignments: Record<string, Record<string, any>> = {}
+        let scheduleNombre = `Semana del ${weekStartStr}`
+
+        // Obtener el horario de esa semana específica
+        let weekSchedule: Horario | null = null
+        if (options?.scheduleId) {
+          weekSchedule = schedules.find((s) => s.id === options.scheduleId) || null
+        }
+        if (!weekSchedule) {
+          weekSchedule = getWeekSchedule(weekStartDate)
+        }
+
+        // Verificar si la semana está completada y mostrar diálogo de confirmación
+        if (weekSchedule?.completada === true) {
+          return new Promise<void>((resolve, reject) => {
+            setPendingEdit({
+              date,
+              employeeId,
+              assignments,
+              options,
+              resolve: (shouldContinue: boolean) => {
+                if (shouldContinue) {
+                  handleAssignmentUpdateInternal(date, employeeId, assignments, options)
+                    .then(() => resolve())
+                    .catch(reject)
+                } else {
+                  resolve()
+                }
+              },
+            })
+          })
+        }
+
+        return handleAssignmentUpdateInternal(date, employeeId, assignments, options)
+      } catch (error: any) {
+        console.error("Error al actualizar asignaciones:", error)
+        toast({
+          title: "Error",
+          description: error.message || "Ocurrió un error al actualizar los turnos",
+          variant: "destructive",
+        })
+      }
+    },
+    [user, employees, shifts, config, toast, getWeekSchedule, weekStartsOn, schedules],
+  )
+
+  const handleAssignmentUpdateInternal = useCallback(
+    async (
+      date: string,
+      employeeId: string,
+      assignments: ShiftAssignment[],
+      options?: { scheduleId?: string },
+    ) => {
+      try {
         // Determinar la semana basada en la fecha
         const dateObj = new Date(date)
         const weekStartDate = startOfWeek(dateObj, { weekStartsOn })
@@ -259,6 +394,20 @@ export function useScheduleUpdates({
             updateData.createdByName = weekSchedule.createdByName
           }
           
+          // Preservar campos de completada si existen
+          if (weekSchedule.completada !== undefined) {
+            updateData.completada = weekSchedule.completada
+          }
+          if (weekSchedule.completadaPor !== undefined) {
+            updateData.completadaPor = weekSchedule.completadaPor
+          }
+          if (weekSchedule.completadaPorNombre !== undefined) {
+            updateData.completadaPorNombre = weekSchedule.completadaPorNombre
+          }
+          if (weekSchedule.completadaEn !== undefined) {
+            updateData.completadaEn = weekSchedule.completadaEn
+          }
+          
           await updateDoc(doc(db, COLLECTIONS.SCHEDULES, scheduleId), updateData)
 
           toast({
@@ -280,6 +429,9 @@ export function useScheduleUpdates({
 
   return {
     handleAssignmentUpdate,
+    handleMarkWeekComplete,
+    pendingEdit,
+    setPendingEdit,
   }
 }
 

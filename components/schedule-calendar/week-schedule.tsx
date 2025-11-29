@@ -2,12 +2,13 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Download, Loader2, ChevronDown, ChevronUp } from "lucide-react"
+import { Download, Loader2, ChevronDown, ChevronUp, CheckCircle2, Circle } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { ScheduleGrid, type EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { Empleado, Turno, Horario, MedioTurno } from "@/lib/types"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Badge } from "@/components/ui/badge"
 
 interface WeekScheduleProps {
   weekDays: Date[]
@@ -28,6 +29,8 @@ interface WeekScheduleProps {
   title?: string
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  user?: any
+  onMarkComplete?: (weekStartDate: Date, completed: boolean) => Promise<void>
 }
 
 export function WeekSchedule({
@@ -49,6 +52,8 @@ export function WeekSchedule({
   title,
   open,
   onOpenChange,
+  user,
+  onMarkComplete,
 }: WeekScheduleProps) {
   const weekStartDate = weekDays[0]
   const weekEndDate = weekDays[weekDays.length - 1]
@@ -62,11 +67,25 @@ export function WeekSchedule({
     )}`
   const hasExportHandlers = Boolean(onExportImage && onExportPDF)
   const canShowActions = showActions && hasExportHandlers
+  const isCompleted = weekSchedule?.completada === true
+  const [isMarkingComplete, setIsMarkingComplete] = useState(false)
 
   // Si no se proporciona open/onOpenChange, usar estado interno
   const [internalOpen, setInternalOpen] = useState(false)
   const isOpen = open !== undefined ? open : internalOpen
   const handleOpenChange = onOpenChange || setInternalOpen
+
+  const handleMarkComplete = async () => {
+    if (!onMarkComplete) return
+    setIsMarkingComplete(true)
+    try {
+      await onMarkComplete(weekStartDate, !isCompleted)
+    } catch (error) {
+      console.error("Error al marcar semana como completada:", error)
+    } finally {
+      setIsMarkingComplete(false)
+    }
+  }
 
   return (
     <Collapsible
@@ -88,37 +107,55 @@ export function WeekSchedule({
                 <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform" />
               )}
               <h3 className="text-2xl font-semibold text-foreground">{headerTitle}</h3>
+              {isCompleted && (
+                <Badge variant="default" className="ml-2 bg-green-600 hover:bg-green-700">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Completada
+                </Badge>
+              )}
             </div>
           </button>
         </CollapsibleTrigger>
-        {canShowActions && (
-          <div className="flex gap-2 ml-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex gap-2 ml-4" onClick={(e) => e.stopPropagation()}>
+          {!readonly && user && onMarkComplete && (
             <Button
-              variant="outline"
+              variant={isCompleted ? "default" : "outline"}
               size="sm"
-              onClick={() => onExportImage?.(weekStartDate, weekEndDate)}
-              disabled={exporting}
-              aria-label="Exportar semana como imagen"
+              onClick={handleMarkComplete}
+              disabled={isMarkingComplete}
+              aria-label={isCompleted ? "Desmarcar semana como completada" : "Marcar semana como completada"}
+              className={isCompleted ? "bg-green-600 hover:bg-green-700" : ""}
             >
-              {exporting ? (
+              {isMarkingComplete ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Exportando...
+                  {isCompleted ? "Desmarcando..." : "Marcando..."}
                 </>
               ) : (
                 <>
-                  <Download className="mr-2 h-4 w-4" />
-                  Imagen
+                  {isCompleted ? (
+                    <>
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Listo
+                    </>
+                  ) : (
+                    <>
+                      <Circle className="mr-2 h-4 w-4" />
+                      Marcar como listo
+                    </>
+                  )}
                 </>
               )}
             </Button>
-            {onExportExcel && (
+          )}
+          {canShowActions && (
+            <>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={onExportExcel}
+                onClick={() => onExportImage?.(weekStartDate, weekEndDate)}
                 disabled={exporting}
-                aria-label="Exportar semana como Excel"
+                aria-label="Exportar semana como imagen"
               >
                 {exporting ? (
                   <>
@@ -128,32 +165,53 @@ export function WeekSchedule({
                 ) : (
                   <>
                     <Download className="mr-2 h-4 w-4" />
-                    Excel
+                    Imagen
                   </>
                 )}
               </Button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onExportPDF?.(weekStartDate, weekEndDate)}
-              disabled={exporting}
-              aria-label="Exportar semana como PDF"
-            >
-              {exporting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Exportando...
-                </>
-              ) : (
-                <>
-                  <Download className="mr-2 h-4 w-4" />
-                  PDF
-                </>
+              {onExportExcel && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onExportExcel}
+                  disabled={exporting}
+                  aria-label="Exportar semana como Excel"
+                >
+                  {exporting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Exportando...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-4 w-4" />
+                      Excel
+                    </>
+                  )}
+                </Button>
               )}
-            </Button>
-          </div>
-        )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onExportPDF?.(weekStartDate, weekEndDate)}
+                disabled={exporting}
+                aria-label="Exportar semana como PDF"
+              >
+                {exporting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Exportando...
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-4 w-4" />
+                    PDF
+                  </>
+                )}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
       <CollapsibleContent 
         id={weekId} 

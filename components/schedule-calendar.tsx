@@ -18,6 +18,16 @@ import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { GeneralView } from "@/components/schedule-calendar/general-view"
 import { EmployeeView } from "@/components/schedule-calendar/employee-view"
 import { ShiftView } from "@/components/schedule-calendar/shift-view"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface ScheduleCalendarProps {
   user: any
@@ -189,7 +199,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     setEmployeeWeekStart((prev) => startOfWeek(prev, { weekStartsOn }))
   }, [weekStartsOn])
 
-  const { handleAssignmentUpdate } = useScheduleUpdates({
+  const { handleAssignmentUpdate, handleMarkWeekComplete, pendingEdit, setPendingEdit } = useScheduleUpdates({
     user,
     employees,
     shifts,
@@ -409,6 +419,21 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
   return (
     <div className="space-y-6">
+      <AlertDialog open={pendingEdit !== null} onOpenChange={(open) => !open && pendingEdit && setPendingEdit(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Semana completada</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta semana fue completada y marcada como listo. ¿Está seguro que desea editarla?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => pendingEdit?.resolve(false)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => pendingEdit?.resolve(true)}>Sí, editar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Tabs
         value={activeTab}
         onValueChange={(value) => setActiveTab(value as "general" | "employee" | "shifts")}
@@ -439,6 +464,8 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
             onExportWeekExcel={handleExportWeekExcel}
             onPreviousMonth={goToPreviousMonth}
             onNextMonth={goToNextMonth}
+            user={user}
+            onMarkWeekComplete={handleMarkWeekComplete}
           />
         </TabsContent>
 

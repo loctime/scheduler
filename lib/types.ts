@@ -45,6 +45,10 @@ export interface Horario {
       [empleadoId: string]: ShiftAssignmentValue // array de IDs (string[]) o asignaciones con horarios ajustados (ShiftAssignment[])
     }
   }
+  completada?: boolean // Indica si la semana fue marcada como finalizada
+  completadaPor?: string // ID del usuario que marcó como completada
+  completadaPorNombre?: string // Nombre del usuario que marcó como completada
+  completadaEn?: any // Timestamp de cuando fue marcada como completada
   createdAt?: any
   updatedAt?: any
   createdBy?: string
