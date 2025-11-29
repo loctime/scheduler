@@ -59,7 +59,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   const [dragOverEmployeeId, setDragOverEmployeeId] = useState<string | null>(null)
   const [editingSeparatorId, setEditingSeparatorId] = useState<string | null>(null)
   const [separatorEditName, setSeparatorEditName] = useState("")
-  const [hoveredGapIndex, setHoveredGapIndex] = useState<number | null>(null)
   
   const { config } = useConfig()
   const { updateEmployeeOrder, addSeparator, updateSeparator, deleteSeparator } = useEmployeeOrder()
@@ -762,38 +761,17 @@ export const ScheduleGrid = memo(function ScheduleGrid({
             </tr>
           </thead>
           <tbody>
-            {/* Botón para agregar separador al inicio de la primera columna */}
-            {!readonly && (
-              <tr className="border-b border-border">
-                <td className="border-r border-border bg-muted/30 px-6 py-2">
-                  <div className="flex items-center justify-start">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-3 text-xs rounded-full bg-background border border-border shadow-sm hover:bg-primary hover:text-primary-foreground"
-                      onClick={() => {
-                        const suggestedPuestoId = getSuggestedPuestoId(0)
-                        handleAddSeparator(0, suggestedPuestoId)
-                      }}
-                      title="Agregar separador"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Agregar separador
-                    </Button>
-                  </div>
-                </td>
-                {weekDays.map((day) => (
-                  <td key={day.toISOString()} className="border-r border-border last:border-r-0"></td>
-                ))}
-              </tr>
-            )}
             {orderedItems.map((item, itemIndex) => {
+              // Mostrar botón para agregar separador solo en empleados
+              const showAddButton = !readonly && item.type === "employee"
+              const insertIndex = itemIndex
+              const suggestedPuestoId = showAddButton ? getSuggestedPuestoId(insertIndex) : undefined
+
               return (
                 <React.Fragment key={item.type === "employee" ? `emp-${item.data.id}` : `sep-${item.data.id}`}>
-
                   {/* Renderizar separador o empleado */}
                   {item.type === "separator" ? (
-                    <tr key={item.data.id} className="border-b border-border bg-muted/30">
+                    <tr key={item.data.id} className="border-b border-border bg-muted/30 group hover:bg-muted/50 transition-colors">
                       <td colSpan={weekDays.length + 1} className="px-6 py-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3 flex-1">
@@ -823,6 +801,21 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                                 >
                                   <Check className="h-4 w-4" />
                                 </Button>
+                                {!readonly && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={() => {
+                                      handleDeleteSeparator(item.data.id)
+                                      setEditingSeparatorId(null)
+                                      setSeparatorEditName("")
+                                    }}
+                                    title="Eliminar separador"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </div>
                             ) : (
                               <h3
@@ -840,24 +833,24 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                             <div className="h-px bg-border flex-1"></div>
                           </div>
                           {!readonly && editingSeparatorId !== item.data.id && (
-                            <div className="flex items-center gap-1 ml-4">
+                            <div className="flex items-center gap-1 ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-6 w-6 p-0"
+                                className="h-7 w-7 p-0 hover:bg-accent"
                                 onClick={() => handleEditSeparator(item.data)}
                                 title="Editar separador"
                               >
-                                <Edit2 className="h-3 w-3" />
+                                <Edit2 className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                                className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                                 onClick={() => handleDeleteSeparator(item.data.id)}
                                 title="Eliminar separador"
                               >
-                                <Trash2 className="h-3 w-3" />
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           )}
@@ -879,18 +872,36 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                       onDrop={(e) => handleDrop(e, item.data.id)}
                     >
                       <td className="border-r border-border bg-muted/30 px-6 py-4 text-lg font-medium text-foreground align-top">
-                        <div className="flex items-start gap-2">
-                          {!readonly && (
-                            <button
-                              type="button"
-                              className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors touch-none"
-                              draggable={false}
-                              aria-label="Arrastrar para reordenar"
-                            >
-                              <GripVertical className="h-5 w-5" />
-                            </button>
+                        <div className="flex flex-col gap-1">
+                          {/* Botón sutil para agregar separador antes de este empleado */}
+                          {showAddButton && (
+                            <div className="flex items-center justify-start -mt-1 mb-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 w-5 p-0 rounded-full opacity-30 hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary hover:bg-primary/10"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleAddSeparator(insertIndex, suggestedPuestoId)
+                                }}
+                                title="Agregar separador"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
                           )}
-                          <div className="space-y-1 flex-1">
+                          <div className="flex items-start gap-2">
+                            {!readonly && (
+                              <button
+                                type="button"
+                                className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors touch-none"
+                                draggable={false}
+                                aria-label="Arrastrar para reordenar"
+                              >
+                                <GripVertical className="h-5 w-5" />
+                              </button>
+                            )}
+                            <div className="space-y-1 flex-1">
                             <div className="flex items-center gap-2">
                               {item.data.puestoId && puestoMap.has(item.data.puestoId) && (
                                 <span
@@ -921,6 +932,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                               </div>
                             </div>
                           )}
+                            </div>
                           </div>
                         </div>
                       </td>

@@ -1,11 +1,22 @@
 "use client"
 
 import { useCallback } from "react"
-import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore"
+import { doc, setDoc, serverTimestamp, getDoc, Timestamp } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
 import { Separador } from "@/lib/types"
+
+// Helper para eliminar campos undefined de un objeto (Firebase no acepta undefined)
+function removeUndefinedFields<T extends Record<string, any>>(obj: T): T {
+  const cleaned = { ...obj }
+  Object.keys(cleaned).forEach((key) => {
+    if (cleaned[key] === undefined) {
+      delete cleaned[key]
+    }
+  })
+  return cleaned
+}
 
 export function useEmployeeOrder() {
   const { user } = useData()
@@ -61,12 +72,13 @@ export function useEmployeeOrder() {
         const currentConfig = configSnap.exists() ? configSnap.data() : {}
         const currentSeparadores: Separador[] = currentConfig.separadores || []
 
+        const now = Timestamp.now()
         const newSeparator: Separador = {
           id: `separador-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           nombre: nombre.toUpperCase(),
           tipo: puestoId ? "puesto" : "personalizado",
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
+          createdAt: now,
+          updatedAt: now,
         }
         
         // Solo agregar puestoId si existe (no undefined)
@@ -74,13 +86,13 @@ export function useEmployeeOrder() {
           newSeparator.puestoId = puestoId
         }
 
-        const updatedSeparadores = [...currentSeparadores, newSeparator]
+        const updatedSeparadores = [...currentSeparadores, removeUndefinedFields(newSeparator)]
 
         await setDoc(
           configRef,
           {
             ...currentConfig,
-            separadores: updatedSeparadores,
+            separadores: updatedSeparadores.map(s => removeUndefinedFields(s)),
             updatedAt: serverTimestamp(),
             updatedBy: user.uid,
             updatedByName: user.displayName || user.email || "",
@@ -115,17 +127,22 @@ export function useEmployeeOrder() {
         const currentConfig = configSnap.exists() ? configSnap.data() : {}
         const currentSeparadores: Separador[] = currentConfig.separadores || []
 
-        const updatedSeparadores = currentSeparadores.map((s) =>
-          s.id === separatorId
-            ? { ...updatedSeparator, updatedAt: serverTimestamp() }
-            : s
-        )
+        const updatedSeparadores = currentSeparadores.map((s) => {
+          if (s.id === separatorId) {
+            const cleaned = removeUndefinedFields(updatedSeparator)
+            return { ...cleaned, updatedAt: Timestamp.now() }
+          }
+          return s
+        })
+
+        // Limpiar todos los separadores de campos undefined antes de guardar
+        const cleanedSeparadores = updatedSeparadores.map(s => removeUndefinedFields(s))
 
         await setDoc(
           configRef,
           {
             ...currentConfig,
-            separadores: updatedSeparadores,
+            separadores: cleanedSeparadores,
             updatedAt: serverTimestamp(),
             updatedBy: user.uid,
             updatedByName: user.displayName || user.email || "",

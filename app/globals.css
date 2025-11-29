@@ -135,6 +135,13 @@
   box-shadow: none !important;
 }
 
+/* Durante la exportación, cualquier contenedor con scroll debe mostrar todo su contenido */
+.exporting-image .overflow-x-auto,
+.exporting-image .overflow-y-auto,
+.exporting-image .overflow-auto {
+  overflow: visible !important;
+}
+
 /* Bordes solo en las celdas de tablas durante la exportación */
 .exporting-image table,
 .exporting-image th,
