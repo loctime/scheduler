@@ -87,6 +87,27 @@ export function WeekSchedule({
     }
   }
 
+  // Handler para exportar que abre la semana si está cerrada
+  const handleExportImage = async () => {
+    if (!isOpen && handleOpenChange) {
+      // Abrir la semana primero
+      handleOpenChange(true)
+      // Esperar a que la animación termine (300ms según la duración de la animación)
+      await new Promise(resolve => setTimeout(resolve, 400))
+    }
+    onExportImage?.(weekStartDate, weekEndDate)
+  }
+
+  const handleExportPDF = async () => {
+    if (!isOpen && handleOpenChange) {
+      // Abrir la semana primero
+      handleOpenChange(true)
+      // Esperar a que la animación termine
+      await new Promise(resolve => setTimeout(resolve, 400))
+    }
+    onExportPDF?.(weekStartDate, weekEndDate)
+  }
+
   return (
     <Collapsible
       open={isOpen}
@@ -153,7 +174,7 @@ export function WeekSchedule({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onExportImage?.(weekStartDate, weekEndDate)}
+                onClick={handleExportImage}
                 disabled={exporting}
                 aria-label="Exportar semana como imagen"
               >
@@ -193,7 +214,7 @@ export function WeekSchedule({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onExportPDF?.(weekStartDate, weekEndDate)}
+                onClick={handleExportPDF}
                 disabled={exporting}
                 aria-label="Exportar semana como PDF"
               >

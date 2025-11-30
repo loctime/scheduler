@@ -177,25 +177,35 @@ export function useExportSchedule() {
         htmlElement.style.maxWidth = `${tableWidth}px`
       }
 
+      // Agregar margen abajo y a la derecha antes de exportar
+      const marginRight = 20
+      const marginBottom = 20
+      const originalPadding = htmlElement.style.padding || getComputedStyle(htmlElement).padding
+      htmlElement.style.padding = `0 ${marginRight}px ${marginBottom}px 0`
+      htmlElement.style.boxSizing = "content-box"
+
       const domtoimage = await import("dom-to-image-more")
 
       // Aumentar la escala para una imagen más grande y de mayor resolución
       const scale = 4 // Aumentar a 4x para mejor calidad y tamaño más grande
       
-      // Usar el ancho real de la tabla, no del contenedor
+      // Usar el ancho real de la tabla, no del contenedor, más los márgenes
       const actualWidth = table ? table.scrollWidth : element.scrollWidth
       const actualHeight = table ? table.scrollHeight : element.scrollHeight
       
       const dataUrl = await domtoimage.toPng(htmlElement, {
         quality: 1.0,
         bgcolor: "#ffffff",
-        width: actualWidth * scale,
-        height: actualHeight * scale,
+        width: (actualWidth + marginRight) * scale,
+        height: (actualHeight + marginBottom) * scale,
         style: {
           transform: `scale(${scale})`,
           transformOrigin: 'top left',
         },
       })
+
+      // Restaurar padding original
+      htmlElement.style.padding = originalPadding
 
       const link = document.createElement("a")
       link.download = filename
@@ -286,6 +296,13 @@ export function useExportSchedule() {
         htmlElement.style.maxWidth = `${tableWidth}px`
       }
 
+      // Agregar margen abajo y a la derecha antes de exportar
+      const marginRight = 20
+      const marginBottom = 20
+      const originalPadding = htmlElement.style.padding || getComputedStyle(htmlElement).padding
+      htmlElement.style.padding = `0 ${marginRight}px ${marginBottom}px 0`
+      htmlElement.style.boxSizing = "content-box"
+
       const [domtoimage, jsPDF] = await Promise.all([
         import("dom-to-image-more"),
         import("jspdf").then(m => m.default),
@@ -294,20 +311,23 @@ export function useExportSchedule() {
       // Aumentar la escala para una imagen más grande y de mayor resolución
       const scale = 4 // Aumentar a 4x para mejor calidad y tamaño más grande
       
-      // Usar el ancho real de la tabla, no del contenedor
+      // Usar el ancho real de la tabla, no del contenedor, más los márgenes
       const actualWidth = table ? table.scrollWidth : element.scrollWidth
       const actualHeight = table ? table.scrollHeight : element.scrollHeight
       
       const dataUrl = await domtoimage.toPng(htmlElement, {
         quality: 1.0,
         bgcolor: "#ffffff",
-        width: actualWidth * scale,
-        height: actualHeight * scale,
+        width: (actualWidth + marginRight) * scale,
+        height: (actualHeight + marginBottom) * scale,
         style: {
           transform: `scale(${scale})`,
           transformOrigin: 'top left',
         },
       })
+
+      // Restaurar padding original
+      htmlElement.style.padding = originalPadding
 
       const pdf = new jsPDF("l", "mm", "a4")
       const pdfWidth = pdf.internal.pageSize.getWidth()
