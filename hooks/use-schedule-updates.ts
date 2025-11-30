@@ -1,11 +1,14 @@
 import { useCallback, useState } from "react"
-import { collection, addDoc, updateDoc, doc, serverTimestamp, getDoc } from "firebase/firestore"
+import { collection, addDoc, doc, serverTimestamp, getDoc } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { format, startOfWeek, addDays } from "date-fns"
 import { Empleado, Turno, Horario, ShiftAssignment } from "@/lib/types"
 import { validateScheduleAssignments, validateDailyHours } from "@/lib/validations"
 import { useToast } from "@/hooks/use-toast"
 import { useConfig } from "@/hooks/use-config"
+import { createHistoryEntry, saveHistoryEntry, updateSchedulePreservingFields } from "@/lib/firestore-helpers"
+import { updateAssignmentInAssignments } from "@/lib/schedule-utils"
+import { logger } from "@/lib/logger"
 
 interface UseScheduleUpdatesProps {
   user: any
@@ -138,7 +141,7 @@ export function useScheduleUpdates({
             : "La semana ya no está marcada como completada",
         })
       } catch (error: any) {
-        console.error("Error al marcar semana como completada:", error)
+        logger.error("Error al marcar semana como completada:", error)
         toast({
           title: "Error",
           description: error.message || "Ocurrió un error al actualizar el estado de la semana",
@@ -229,7 +232,7 @@ export function useScheduleUpdates({
 
         return handleAssignmentUpdateInternal(date, employeeId, assignments, options)
       } catch (error: any) {
-        console.error("Error al actualizar asignaciones:", error)
+        logger.error("Error al actualizar asignaciones:", error)
         toast({
           title: "Error",
           description: error.message || "Ocurrió un error al actualizar los turnos",
@@ -306,19 +309,10 @@ export function useScheduleUpdates({
           const scheduleRef = await addDoc(collection(db, COLLECTIONS.SCHEDULES), newScheduleData)
           scheduleId = scheduleRef.id
 
-          // Guardar en historial como "creado"
-          await addDoc(collection(db, COLLECTIONS.HISTORIAL), {
-            horarioId: scheduleId,
-            nombre: scheduleNombre,
-            semanaInicio: weekStartStr,
-            semanaFin: weekEndStr,
-            assignments: currentAssignments,
-            createdAt: serverTimestamp(),
-            createdBy: userId,
-            createdByName: userName,
-            accion: "creado" as const,
-            versionAnterior: false,
-          })
+          // Guardar en historial usando helper
+          const newSchedule = { id: scheduleId, ...newScheduleData } as Horario
+          const historyEntry = createHistoryEntry(newSchedule, "creado", user, weekStartStr, weekEndStr)
+          await saveHistoryEntry(historyEntry)
 
           toast({
             title: "Horario creado",
@@ -329,33 +323,17 @@ export function useScheduleUpdates({
           scheduleId = weekSchedule.id
           scheduleNombre = weekSchedule.nombre || scheduleNombre
 
-          // Guardar versión anterior en historial antes de actualizar
-          const historyData = {
-            horarioId: weekSchedule.id,
-            nombre: scheduleNombre,
-            semanaInicio: weekSchedule.semanaInicio || weekStartStr,
-            semanaFin: weekSchedule.semanaFin || weekEndStr,
-            assignments: { ...weekSchedule.assignments },
-            createdAt: weekSchedule.updatedAt || weekSchedule.createdAt || serverTimestamp(),
-            createdBy: weekSchedule.createdBy || weekSchedule.modifiedBy || userId,
-            createdByName: weekSchedule.createdByName || weekSchedule.modifiedByName || userName,
-            accion: "modificado" as const,
-            versionAnterior: true,
-          }
+          // Guardar versión anterior en historial usando helper
+          const historyEntry = createHistoryEntry(weekSchedule, "modificado", user, weekStartStr, weekEndStr)
+          await saveHistoryEntry(historyEntry)
 
-          await addDoc(collection(db, COLLECTIONS.HISTORIAL), historyData)
-
-          // Actualizar assignments
-          currentAssignments = {
-            ...weekSchedule.assignments,
-          }
-          if (!currentAssignments[date]) {
-            currentAssignments[date] = {}
-          }
-          currentAssignments[date] = {
-            ...currentAssignments[date],
-            [employeeId]: assignments,
-          }
+          // Actualizar assignments usando helper
+          currentAssignments = updateAssignmentInAssignments(
+            weekSchedule.assignments as any,
+            date,
+            employeeId,
+            assignments
+          )
         }
 
         // Validar solapamientos (filtrar francos y medio francos)
@@ -418,7 +396,7 @@ export function useScheduleUpdates({
           // Ya no mostramos toast cuando se exceden las horas máximas diarias, ya que ahora los
           // usuarios pueden extender turnos manualmente y esperan ese comportamiento.
           if (!dailyValidation.valid) {
-            console.debug(
+            logger.debug(
               "[useScheduleUpdates] Horas máximas por día excedidas:",
               employees.find((e) => e.id === employeeId)?.name || employeeId,
               dailyValidation.message
@@ -447,7 +425,7 @@ export function useScheduleUpdates({
               throw new Error(`El usuario no tiene un rol válido. Rol actual: ${userRole || 'ninguno'}. Se requiere: 'user', 'admin' o 'maxdev'`)
             }
           } catch (roleError: any) {
-            console.error('[ScheduleCalendar] Error verificando rol:', roleError)
+            logger.error('[ScheduleCalendar] Error verificando rol:', roleError)
             if (roleError.message.includes('no tiene un documento')) {
               throw roleError
             }
@@ -465,30 +443,7 @@ export function useScheduleUpdates({
             modifiedByName: userName || null,
           }
           
-          // Incluir campos inmutables
-          if (weekSchedule.createdAt !== undefined && weekSchedule.createdAt !== null) {
-            updateData.createdAt = weekSchedule.createdAt
-          }
-          if (weekSchedule.createdBy !== undefined) {
-            updateData.createdBy = weekSchedule.createdBy
-          }
-          if (weekSchedule.createdByName !== undefined) {
-            updateData.createdByName = weekSchedule.createdByName
-          }
-          
-          // Preservar campos de completada si existen
-          if (weekSchedule.completada !== undefined) {
-            updateData.completada = weekSchedule.completada
-          }
-          if (weekSchedule.completadaPor !== undefined) {
-            updateData.completadaPor = weekSchedule.completadaPor
-          }
-          if (weekSchedule.completadaPorNombre !== undefined) {
-            updateData.completadaPorNombre = weekSchedule.completadaPorNombre
-          }
-          if (weekSchedule.completadaEn !== undefined) {
-            updateData.completadaEn = weekSchedule.completadaEn
-          }
+          // Los campos inmutables se preservarán automáticamente con updateSchedulePreservingFields
           
           // Si se está editando un horario completado, actualizar el snapshot de empleados
           if (weekSchedule.completada === true) {
@@ -580,15 +535,8 @@ export function useScheduleUpdates({
             }
           }
           
-          // Eliminar valores undefined del objeto (Firestore no los acepta)
-          const cleanUpdateData: any = {}
-          Object.keys(updateData).forEach((key) => {
-            if (updateData[key] !== undefined) {
-              cleanUpdateData[key] = updateData[key]
-            }
-          })
-          
-          await updateDoc(doc(db, COLLECTIONS.SCHEDULES, scheduleId), cleanUpdateData)
+          // Actualizar usando helper que preserva campos automáticamente
+          await updateSchedulePreservingFields(scheduleId, weekSchedule, updateData)
 
           toast({
             title: "Turnos actualizados",
@@ -596,7 +544,7 @@ export function useScheduleUpdates({
           })
         }
       } catch (error: any) {
-        console.error("Error al actualizar asignaciones:", error)
+        logger.error("Error al actualizar asignaciones:", error)
         toast({
           title: "Error",
           description: error.message || "Ocurrió un error al actualizar los turnos",

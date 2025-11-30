@@ -1,8 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore"
-import { db, COLLECTIONS } from "@/lib/firebase"
+import { useState, useCallback, useMemo } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { format, subMonths, addMonths, startOfWeek } from "date-fns"
 import { useData } from "@/contexts/data-context"
@@ -11,6 +9,7 @@ import { useConfig } from "@/hooks/use-config"
 import { getCustomMonthRange, getMonthWeeks } from "@/lib/utils"
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { useScheduleUpdates } from "@/hooks/use-schedule-updates"
+import { useSchedulesListener } from "@/hooks/use-schedules-listener"
 import { calculateExtraHours } from "@/lib/validations"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { GeneralView } from "@/components/schedule-calendar/general-view"
@@ -41,7 +40,6 @@ const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAss
 }
 
 export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
-  const [schedules, setSchedules] = useState<Horario[]>([])
   const { employees, shifts, loading: dataLoading } = useData()
   const { config } = useConfig()
   const { toast } = useToast()
@@ -61,11 +59,12 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     [currentMonth, monthStartDay, weekStartsOn],
   )
 
-  // Función helper para obtener el horario de una semana específica
-  const getWeekSchedule = useCallback((weekStartDate: Date) => {
-    const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
-    return schedules.find((s) => s.weekStart === weekStartStr) || null
-  }, [schedules])
+  // Usar hook centralizado para listener de schedules
+  const { schedules, loading: schedulesLoading, getWeekSchedule } = useSchedulesListener({
+    user,
+    monthRange,
+    enabled: !!user,
+  })
 
   const getDateAssignments = useCallback(
     (date: Date) => {
@@ -97,38 +96,6 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   }, [])
 
 
-  useEffect(() => {
-    // Solo crear listeners si el usuario está autenticado
-    if (!user || !db) {
-      return
-    }
-
-    let unsubscribeSchedules: (() => void) | null = null
-
-    const schedulesQuery = query(collection(db, COLLECTIONS.SCHEDULES), orderBy("weekStart", "desc"))
-    unsubscribeSchedules = onSnapshot(
-      schedulesQuery,
-      (snapshot) => {
-        const schedulesData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Horario[]
-        setSchedules(schedulesData)
-      },
-      (error) => {
-        console.error("Error en listener de horarios:", error)
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los horarios. Verifica tus permisos.",
-          variant: "destructive",
-        })
-      },
-    )
-
-    return () => {
-      if (unsubscribeSchedules) unsubscribeSchedules()
-    }
-  }, [user, toast])
 
   const handleExportMonthImage = useCallback(async () => {
     await exportImage(

@@ -13,6 +13,7 @@ import {
   query,
   where,
   getDocs,
+  writeBatch,
 } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { DashboardLayout } from "@/components/dashboard-layout"
@@ -36,6 +37,7 @@ import { es } from "date-fns/locale"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
 import { Skeleton } from "@/components/ui/skeleton"
+import { logger } from "@/lib/logger"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   AlertDialog,
@@ -114,7 +116,7 @@ export default function EmpleadosPage() {
       setEditingField(null)
       setInlineValue("")
     } catch (error: any) {
-      console.error("[DEBUG] Error al actualizar campo:", error)
+      logger.error("[DEBUG] Error al actualizar campo:", error)
       toast({
         title: "Error",
         description: error.message || "Ocurrió un error al actualizar",
@@ -177,7 +179,7 @@ export default function EmpleadosPage() {
       setDialogOpen(false)
       setBulkNames("")
     } catch (error: any) {
-      console.error("[DEBUG] ❌ Error general al crear empleado:", error)
+      logger.error("[DEBUG] Error general al crear empleado:", error)
       
       toast({
         title: "Error",
@@ -191,44 +193,43 @@ export default function EmpleadosPage() {
     setEmployeeToDelete({ id, name })
     
     // Obtener información de la última semana completada antes de abrir el modal
+    // Optimizado: obtener solo semanas completadas con límite
     if (db) {
       try {
-        const schedulesQuery = query(collection(db, COLLECTIONS.SCHEDULES))
-        const schedulesSnapshot = await getDocs(schedulesQuery)
+        // Query optimizada: obtener semanas completadas
+        // Nota: Para usar where + orderBy necesitaríamos un índice compuesto
+        // Por ahora obtenemos todas las completadas y ordenamos en cliente
+        const completedQuery = query(
+          collection(db, COLLECTIONS.SCHEDULES),
+          where("completada", "==", true),
+        )
+        const schedulesSnapshot = await getDocs(completedQuery)
         
-        const allSchedules = schedulesSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Horario[]
-        
-        // Filtrar semanas completadas y encontrar la más reciente
-        const completedSchedules = allSchedules.filter((s) => s.completada === true)
+        const completedSchedules = schedulesSnapshot.docs
+          .map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as Horario[]
+          .filter((s) => s.weekStart)
+          .sort((a, b) => {
+            if (!a.weekStart || !b.weekStart) return 0
+            return b.weekStart.localeCompare(a.weekStart)
+          })
         
         if (completedSchedules.length > 0) {
-          const sortedCompleted = completedSchedules
-            .filter((s) => s.weekStart)
-            .sort((a, b) => {
-              if (!a.weekStart || !b.weekStart) return 0
-              return b.weekStart.localeCompare(a.weekStart)
-            })
+          const lastCompleted = completedSchedules[0]
+          const weekStartDate = parseISO(lastCompleted.weekStart!)
+          const weekEndDate = addDays(weekStartDate, 6)
           
-          if (sortedCompleted.length > 0) {
-            const lastCompleted = sortedCompleted[0]
-            const weekStartDate = parseISO(lastCompleted.weekStart!)
-            const weekEndDate = addDays(weekStartDate, 6)
-            
-            setLastCompletedWeekInfo({
-              start: format(weekStartDate, "d 'de' MMMM 'de' yyyy", { locale: es }),
-              end: format(weekEndDate, "d 'de' MMMM 'de' yyyy", { locale: es }),
-            })
-          } else {
-            setLastCompletedWeekInfo(null)
-          }
+          setLastCompletedWeekInfo({
+            start: format(weekStartDate, "d 'de' MMMM 'de' yyyy", { locale: es }),
+            end: format(weekEndDate, "d 'de' MMMM 'de' yyyy", { locale: es }),
+          })
         } else {
           setLastCompletedWeekInfo(null)
         }
       } catch (error) {
-        console.error("Error al obtener información de semanas completadas:", error)
+        logger.error("Error al obtener información de semanas completadas:", error)
         setLastCompletedWeekInfo(null)
       }
     }
@@ -243,36 +244,45 @@ export default function EmpleadosPage() {
 
     setIsDeleting(true)
     try {
-      // Obtener todos los horarios
+      // Optimizar: obtener solo semanas completadas para encontrar la última
+      const completedQuery = query(
+        collection(db, COLLECTIONS.SCHEDULES),
+        where("completada", "==", true),
+      )
+      const completedSnapshot = await getDocs(completedQuery)
+      
+      // Encontrar la última semana completada (marcada como "listo")
+      const completedSchedules = completedSnapshot.docs
+        .map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Horario[]
+        .filter((s) => s.weekStart)
+        .sort((a, b) => {
+          if (!a.weekStart || !b.weekStart) return 0
+          return b.weekStart.localeCompare(a.weekStart)
+        })
+      
+      let lastCompletedWeekStart: string | null = null
+      if (completedSchedules.length > 0) {
+        lastCompletedWeekStart = completedSchedules[0].weekStart || null
+      }
+      
+      // Obtener todos los horarios para filtrar en cliente
+      // Nota: Para optimizar más necesitaríamos índices compuestos en Firestore
+      if (!db) {
+        throw new Error("Firebase no está configurado")
+      }
+      
       const schedulesQuery = query(collection(db, COLLECTIONS.SCHEDULES))
       const schedulesSnapshot = await getDocs(schedulesQuery)
       
-      // Encontrar la última semana completada (marcada como "listo")
+      // Filtrar solo los horarios que son futuros a la última semana completada
       const allSchedules = schedulesSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as Horario[]
       
-      // Filtrar semanas completadas y encontrar la más reciente
-      const completedSchedules = allSchedules.filter((s) => s.completada === true)
-      let lastCompletedWeekStart: string | null = null
-      
-      if (completedSchedules.length > 0) {
-        // Ordenar por weekStart descendente y tomar la más reciente
-        const sortedCompleted = completedSchedules
-          .filter((s) => s.weekStart)
-          .sort((a, b) => {
-            if (!a.weekStart || !b.weekStart) return 0
-            return b.weekStart.localeCompare(a.weekStart)
-          })
-        
-        if (sortedCompleted.length > 0) {
-          lastCompletedWeekStart = sortedCompleted[0].weekStart || null
-        }
-      }
-      
-      // Filtrar solo los horarios que son futuros a la última semana completada
-      // Si no hay semanas completadas, eliminar de todos los horarios no completados
       const schedulesToUpdate = allSchedules.filter((schedule) => {
         // No tocar semanas completadas
         if (schedule.completada === true) {
@@ -292,10 +302,13 @@ export default function EmpleadosPage() {
         return false
       })
       
-      // Eliminar asignaciones del empleado solo en horarios seleccionados
-      const deletePromises = schedulesToUpdate.map(async (schedule) => {
+      // Eliminar asignaciones del empleado solo en horarios seleccionados usando batch writes
+      const BATCH_LIMIT = 500 // Límite de Firestore
+      const updates: Array<{ scheduleId: string; updateData: any }> = []
+      
+      for (const schedule of schedulesToUpdate) {
         const scheduleDoc = schedulesSnapshot.docs.find((doc) => doc.id === schedule.id)
-        if (!scheduleDoc) return
+        if (!scheduleDoc) continue
         
         const updatedAssignments = { ...schedule.assignments }
         let hasChanges = false
@@ -308,19 +321,37 @@ export default function EmpleadosPage() {
           }
         })
         
-        // Solo actualizar si hay cambios
+        // Agregar a la lista de actualizaciones si hay cambios
         if (hasChanges) {
-          return updateDoc(scheduleDoc.ref, {
-            assignments: updatedAssignments,
-            updatedAt: serverTimestamp(),
+          updates.push({
+            scheduleId: schedule.id,
+            updateData: {
+              assignments: updatedAssignments,
+              updatedAt: serverTimestamp(),
+            },
           })
         }
-      })
+      }
       
-      await Promise.all(deletePromises)
+      // Ejecutar actualizaciones en batches
+      if (updates.length > 0 && db) {
+        for (let i = 0; i < updates.length; i += BATCH_LIMIT) {
+          const batch = writeBatch(db)
+          const batchUpdates = updates.slice(i, i + BATCH_LIMIT)
+          
+          for (const { scheduleId, updateData } of batchUpdates) {
+            const scheduleRef = doc(db, COLLECTIONS.SCHEDULES, scheduleId)
+            batch.update(scheduleRef, updateData)
+          }
+          
+          await batch.commit()
+        }
+      }
       
       // Eliminar el empleado del sistema
-      await deleteDoc(doc(db, COLLECTIONS.EMPLOYEES, employeeToDelete.id))
+      if (db) {
+        await deleteDoc(doc(db, COLLECTIONS.EMPLOYEES, employeeToDelete.id))
+      }
       
       // Refrescar datos del contexto
       await refreshEmployees()

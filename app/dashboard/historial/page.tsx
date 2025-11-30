@@ -20,6 +20,7 @@ import { es } from "date-fns/locale"
 import { ScheduleGrid } from "@/components/schedule-grid"
 import { useData } from "@/contexts/data-context"
 import { HistorialItem, Horario } from "@/lib/types"
+import { logger } from "@/lib/logger"
 
 const ITEMS_PER_PAGE = 20
 
@@ -44,15 +45,20 @@ export default function HistorialPage() {
     const unsubscribeHistorial = onSnapshot(historialQuery, (snapshot) => {
       setHistorial(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as HistorialItem)))
     }, (error) => {
-      console.error("Error en listener de historial:", error)
+      logger.error("Error en listener de historial:", error)
     })
 
-    // Obtener horarios actuales
-    const schedulesQuery = query(collection(db, COLLECTIONS.SCHEDULES), orderBy("weekStart", "desc"))
+    // Obtener horarios actuales (solo los necesarios para el historial)
+    // Ya tiene limit(50) en historial, pero schedules podría beneficiarse de límite también
+    const schedulesQuery = query(
+      collection(db, COLLECTIONS.SCHEDULES),
+      orderBy("weekStart", "desc"),
+      // Nota: Agregar límite requeriría considerar el uso. Por ahora mantenemos sin límite
+    )
     const unsubscribeSchedules = onSnapshot(schedulesQuery, (snapshot) => {
       setSchedules(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Horario)))
     }, (error) => {
-      console.error("Error en listener de horarios:", error)
+      logger.error("Error en listener de horarios:", error)
     })
 
     return () => {
