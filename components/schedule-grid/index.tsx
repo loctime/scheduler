@@ -335,7 +335,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                     {item.type === "separator" ? (
                       <SeparatorRow
                         separator={item.data}
-                        weekDaysCount={weekDays.length}
+                        weekDays={weekDays}
                         editingSeparatorId={editingSeparatorId}
                         separatorEditName={separatorEditName}
                         separatorEditColor={separatorEditColor}
