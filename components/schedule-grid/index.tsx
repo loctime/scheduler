@@ -46,6 +46,7 @@ interface ScheduleGridProps {
   isFirstWeek?: boolean // Indica si es la primera semana del mes
   isScheduleCompleted?: boolean // Indica si el horario está completado
   lastCompletedWeekStart?: string | null // Fecha de inicio de la última semana completada (formato yyyy-MM-dd)
+  onClearEmployeeRow?: (employeeId: string) => Promise<boolean> // Función optimizada para limpiar fila del empleado
 }
 
 export const ScheduleGrid = memo(function ScheduleGrid({
@@ -63,6 +64,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   isFirstWeek = false,
   isScheduleCompleted = false,
   lastCompletedWeekStart,
+  onClearEmployeeRow: externalOnClearEmployeeRow,
 }: ScheduleGridProps) {
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
   const [extraMenuOpenKey, setExtraMenuOpenKey] = useState<string | null>(null)
@@ -333,6 +335,12 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   // Función para limpiar todas las asignaciones de un empleado para toda la semana
   const handleClearEmployeeRow = useCallback(
     async (employeeId: string) => {
+      // Si hay una función externa optimizada, usarla
+      if (externalOnClearEmployeeRow) {
+        return await externalOnClearEmployeeRow(employeeId)
+      }
+
+      // Fallback a la implementación anterior si no hay función externa
       if (!onAssignmentUpdate || readonly || !schedule) return false
 
       try {
@@ -384,7 +392,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
         return false
       }
     },
-    [onAssignmentUpdate, weekDays, schedule, readonly, employeesToUse, toast]
+    [externalOnClearEmployeeRow, onAssignmentUpdate, weekDays, schedule, readonly, employeesToUse, toast]
   )
 
   // Obtener empleado y fecha seleccionados

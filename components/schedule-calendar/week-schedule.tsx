@@ -527,6 +527,154 @@ export function WeekSchedule({
     }
   }, [weekDays, employees, weekSchedule, weekStartDate, user, readonly, toast])
 
+  // Función para limpiar la fila de un empleado específico
+  const handleClearEmployeeRow = useCallback(async (employeeId: string): Promise<boolean> => {
+    if (readonly || !db || !user || !weekSchedule) {
+      return false
+    }
+
+    try {
+      const employee = employees.find((emp) => emp.id === employeeId)
+      const employeeName = employee?.name || "empleado"
+
+      // Recolectar todas las celdas que necesitan ser limpiadas
+      const updatesToClear: Array<{ date: string }> = []
+
+      for (const day of weekDays) {
+        const dateStr = format(day, "yyyy-MM-dd")
+        
+        // Verificar si el empleado tiene asignaciones en este día
+        const hasAssignments = weekSchedule.assignments?.[dateStr]?.[employeeId]
+        
+        if (hasAssignments) {
+          updatesToClear.push({ date: dateStr })
+        }
+      }
+
+      console.log(`[Limpiar fila empleado] Total de celdas a limpiar para ${employeeName}: ${updatesToClear.length}`)
+
+      if (updatesToClear.length === 0) {
+        toast({
+          title: "No hay asignaciones",
+          description: `${employeeName} no tiene asignaciones para limpiar.`,
+          variant: "default",
+        })
+        return false
+      }
+
+      // Obtener el schedule actual directamente de Firestore para tener el estado más reciente
+      const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+      let currentSchedule = weekSchedule
+      let scheduleId: string | null = null
+
+      if (currentSchedule?.id) {
+        scheduleId = currentSchedule.id
+        // Leer directamente de Firestore para obtener el estado más reciente
+        try {
+          const scheduleDoc = await getDoc(doc(db, COLLECTIONS.SCHEDULES, scheduleId))
+          if (scheduleDoc.exists()) {
+            currentSchedule = { id: scheduleDoc.id, ...scheduleDoc.data() } as Horario
+            console.log(`[Limpiar fila empleado] Schedule leído directamente de Firestore`)
+          }
+        } catch (error) {
+          console.error(`[Limpiar fila empleado] Error al leer schedule de Firestore:`, error)
+        }
+      }
+
+      // Construir el objeto completo de assignments eliminando las asignaciones del empleado
+      const newAssignments: Record<string, Record<string, ShiftAssignment[]>> = currentSchedule.assignments 
+        ? JSON.parse(JSON.stringify(currentSchedule.assignments)) // Deep copy
+        : {}
+
+      // Eliminar todas las asignaciones del empleado
+      for (const { date } of updatesToClear) {
+        if (newAssignments[date] && newAssignments[date][employeeId]) {
+          delete newAssignments[date][employeeId]
+          console.log(`[Limpiar fila empleado] Eliminada asignación en memoria: ${date} - ${employeeId}`)
+        }
+        // Si la fecha queda vacía, eliminarla también
+        if (newAssignments[date] && Object.keys(newAssignments[date]).length === 0) {
+          delete newAssignments[date]
+        }
+      }
+
+      // Actualizar schedule en Firestore
+      scheduleId = currentSchedule.id
+      const userName = user?.displayName || user?.email || "Usuario desconocido"
+      const userId = user?.uid || ""
+
+      // Guardar versión anterior en historial
+      await addDoc(collection(db, COLLECTIONS.HISTORIAL), {
+        horarioId: scheduleId,
+        nombre: currentSchedule.nombre || `Semana del ${weekStartStr}`,
+        semanaInicio: currentSchedule.semanaInicio || weekStartStr,
+        semanaFin: currentSchedule.semanaFin || format(addDays(weekStartDate, 6), "yyyy-MM-dd"),
+        assignments: currentSchedule.assignments || {},
+        createdAt: currentSchedule.updatedAt || currentSchedule.createdAt || serverTimestamp(),
+        createdBy: currentSchedule.createdBy || currentSchedule.modifiedBy || userId,
+        createdByName: currentSchedule.createdByName || currentSchedule.modifiedByName || userName,
+        accion: "modificado" as const,
+        versionAnterior: true,
+      })
+
+      // Preparar datos de actualización
+      const updateData: any = {
+        assignments: newAssignments,
+        updatedAt: serverTimestamp(),
+        modifiedBy: userId,
+        modifiedByName: userName,
+      }
+
+      // Preservar campos existentes
+      if (currentSchedule.createdAt !== undefined && currentSchedule.createdAt !== null) {
+        updateData.createdAt = currentSchedule.createdAt
+      }
+      if (currentSchedule.createdBy !== undefined) {
+        updateData.createdBy = currentSchedule.createdBy
+      }
+      if (currentSchedule.createdByName !== undefined) {
+        updateData.createdByName = currentSchedule.createdByName
+      }
+      if (currentSchedule.completada !== undefined) {
+        updateData.completada = currentSchedule.completada
+      }
+      if (currentSchedule.completadaPor !== undefined) {
+        updateData.completadaPor = currentSchedule.completadaPor
+      }
+      if (currentSchedule.completadaPorNombre !== undefined) {
+        updateData.completadaPorNombre = currentSchedule.completadaPorNombre
+      }
+      if (currentSchedule.completadaEn !== undefined) {
+        updateData.completadaEn = currentSchedule.completadaEn
+      }
+      if (currentSchedule.empleadosSnapshot !== undefined) {
+        updateData.empleadosSnapshot = currentSchedule.empleadosSnapshot
+      }
+      if (currentSchedule.ordenEmpleadosSnapshot !== undefined) {
+        updateData.ordenEmpleadosSnapshot = currentSchedule.ordenEmpleadosSnapshot
+      }
+
+      // Actualizar en Firestore
+      await updateDoc(doc(db, COLLECTIONS.SCHEDULES, scheduleId), updateData)
+      console.log(`[Limpiar fila empleado] Schedule actualizado con todas las asignaciones del empleado eliminadas de una vez`)
+
+      toast({
+        title: "Fila limpiada",
+        description: `Se limpiaron todas las asignaciones de ${employeeName}.`,
+      })
+
+      return true
+    } catch (error: any) {
+      console.error("Error al limpiar fila del empleado:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Ocurrió un error al limpiar la fila del empleado",
+        variant: "destructive",
+      })
+      return false
+    }
+  }, [weekDays, employees, weekSchedule, weekStartDate, user, readonly, toast])
+
   // Handler para exportar que abre la semana si está cerrada
   const handleExportImage = async () => {
     if (!isOpen && handleOpenChange) {
@@ -734,6 +882,7 @@ export function WeekSchedule({
             readonly={readonly}
             isScheduleCompleted={isCompleted}
             lastCompletedWeekStart={lastCompletedWeekStart}
+            onClearEmployeeRow={!readonly && user ? handleClearEmployeeRow : undefined}
           />
         </div>
       </CollapsibleContent>
