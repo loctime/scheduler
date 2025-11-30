@@ -176,14 +176,18 @@ export function EmployeeRow({
         const extendedStart = primaryShift?.startTime ? adjustTime(primaryShift.startTime, -30) : undefined
         const extendedEnd = primaryShift?.endTime ? adjustTime(primaryShift.endTime, 30) : undefined
         // Verificar si tiene horas extras comparando con el horario base del turno
-        const hasExtraBefore = !!extendedStart && 
+        const hasExtraBefore = Boolean(
+          extendedStart && 
           primaryShiftAssignment?.startTime && 
           primaryShiftAssignment.startTime === extendedStart &&
           primaryShiftAssignment.startTime !== primaryShift?.startTime
-        const hasExtraAfter = !!extendedEnd && 
+        )
+        const hasExtraAfter = Boolean(
+          extendedEnd && 
           primaryShiftAssignment?.endTime && 
           primaryShiftAssignment.endTime === extendedEnd &&
           primaryShiftAssignment.endTime !== primaryShift?.endTime
+        )
         const showExtraActions =
           isClickable &&
           !!onAssignmentUpdate &&
