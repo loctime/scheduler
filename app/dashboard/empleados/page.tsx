@@ -205,11 +205,12 @@ export default function EmpleadosPage() {
         )
         const schedulesSnapshot = await getDocs(completedQuery)
         
-        const completedSchedules = schedulesSnapshot.docs
-          .map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          })) as Horario[]
+        const allSchedules = schedulesSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Horario[]
+        
+        const completedSchedules = allSchedules
           .filter((s) => s.weekStart)
           .sort((a, b) => {
             if (!a.weekStart || !b.weekStart) return 0
@@ -252,11 +253,12 @@ export default function EmpleadosPage() {
       const completedSnapshot = await getDocs(completedQuery)
       
       // Encontrar la última semana completada (marcada como "listo")
-      const completedSchedules = completedSnapshot.docs
-        .map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Horario[]
+      const allCompletedSchedules = completedSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Horario[]
+      
+      const completedSchedules = allCompletedSchedules
         .filter((s) => s.weekStart)
         .sort((a, b) => {
           if (!a.weekStart || !b.weekStart) return 0
