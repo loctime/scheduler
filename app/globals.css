@@ -174,6 +174,34 @@
   display: none !important;
 }
 
+/* Eliminar espacios en blanco del Card y contenedores durante la exportación */
+.exporting-image [class*="Card"],
+.exporting-image [class*="card"] {
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.exporting-image .overflow-x-auto,
+.exporting-image .overflow-hidden {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.exporting-image .pt-2,
+.exporting-image [class*="pt-"],
+.exporting-image [class*="pb-"],
+.exporting-image [class*="px-"],
+.exporting-image [class*="py-"] {
+  padding: 0 !important;
+}
+
+.exporting-image .space-y-6,
+.exporting-image .space-y-2 {
+  gap: 0 !important;
+}
+
 /* Hacer las celdas más compactas durante la exportación */
 .exporting-image td,
 .exporting-image th {

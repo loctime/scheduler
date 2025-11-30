@@ -136,6 +136,24 @@ export function useExportSchedule() {
     try {
       disablePseudoElements()
 
+      // Eliminar padding y márgenes del elemento y sus hijos
+      const originalStyles = new Map<HTMLElement, { padding: string; margin: string }>()
+      const removeSpacing = (el: HTMLElement) => {
+        originalStyles.set(el, {
+          padding: el.style.padding || getComputedStyle(el).padding,
+          margin: el.style.margin || getComputedStyle(el).margin,
+        })
+        el.style.padding = "0"
+        el.style.margin = "0"
+      }
+      
+      removeSpacing(htmlElement)
+      htmlElement.querySelectorAll("*").forEach((el) => {
+        if (el instanceof HTMLElement) {
+          removeSpacing(el)
+        }
+      })
+
       // mostrar todo el contenido
       htmlElement.style.overflow = "visible"
       htmlElement.style.overflowX = "visible"
@@ -165,6 +183,12 @@ export function useExportSchedule() {
       link.click()
 
       restoreFlexDivs(cleanedFlex)
+
+      // Restaurar estilos originales
+      originalStyles.forEach((styles, el) => {
+        el.style.padding = styles.padding
+        el.style.margin = styles.margin
+      })
 
       toast({
         title: "OK",
@@ -203,6 +227,24 @@ export function useExportSchedule() {
     try {
       disablePseudoElements()
 
+      // Eliminar padding y márgenes del elemento y sus hijos
+      const originalStyles = new Map<HTMLElement, { padding: string; margin: string }>()
+      const removeSpacing = (el: HTMLElement) => {
+        originalStyles.set(el, {
+          padding: el.style.padding || getComputedStyle(el).padding,
+          margin: el.style.margin || getComputedStyle(el).margin,
+        })
+        el.style.padding = "0"
+        el.style.margin = "0"
+      }
+      
+      removeSpacing(htmlElement)
+      htmlElement.querySelectorAll("*").forEach((el) => {
+        if (el instanceof HTMLElement) {
+          removeSpacing(el)
+        }
+      })
+
       htmlElement.style.overflow = "visible"
       htmlElement.style.overflowX = "visible"
       htmlElement.style.overflowY = "visible"
@@ -239,6 +281,12 @@ export function useExportSchedule() {
       pdf.save(filename)
 
       restoreFlexDivs(cleanedFlex)
+
+      // Restaurar estilos originales
+      originalStyles.forEach((styles, el) => {
+        el.style.padding = styles.padding
+        el.style.margin = styles.margin
+      })
 
       toast({
         title: "PDF exportado",
