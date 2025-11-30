@@ -162,15 +162,35 @@ export function useExportSchedule() {
       // limpiar celdas
       const cleanedFlex = cleanFlexDivs(htmlElement)
 
+      // Ajustar contenedores al ancho real de la tabla para eliminar espacios en blanco
+      const table = htmlElement.querySelector("table")
+      if (table) {
+        const tableWidth = table.scrollWidth
+        const containers = htmlElement.querySelectorAll(".overflow-x-auto, .overflow-hidden, [class*='Card'], [class*='card']")
+        containers.forEach((container) => {
+          if (container instanceof HTMLElement) {
+            container.style.width = `${tableWidth}px`
+            container.style.maxWidth = `${tableWidth}px`
+          }
+        })
+        htmlElement.style.width = `${tableWidth}px`
+        htmlElement.style.maxWidth = `${tableWidth}px`
+      }
+
       const domtoimage = await import("dom-to-image-more")
 
       // Aumentar la escala para una imagen más grande y de mayor resolución
       const scale = 4 // Aumentar a 4x para mejor calidad y tamaño más grande
+      
+      // Usar el ancho real de la tabla, no del contenedor
+      const actualWidth = table ? table.scrollWidth : element.scrollWidth
+      const actualHeight = table ? table.scrollHeight : element.scrollHeight
+      
       const dataUrl = await domtoimage.toPng(htmlElement, {
         quality: 1.0,
         bgcolor: "#ffffff",
-        width: element.scrollWidth * scale,
-        height: element.scrollHeight * scale,
+        width: actualWidth * scale,
+        height: actualHeight * scale,
         style: {
           transform: `scale(${scale})`,
           transformOrigin: 'top left',
@@ -251,6 +271,21 @@ export function useExportSchedule() {
 
       const cleanedFlex = cleanFlexDivs(htmlElement)
 
+      // Ajustar contenedores al ancho real de la tabla para eliminar espacios en blanco
+      const table = htmlElement.querySelector("table")
+      if (table) {
+        const tableWidth = table.scrollWidth
+        const containers = htmlElement.querySelectorAll(".overflow-x-auto, .overflow-hidden, [class*='Card'], [class*='card']")
+        containers.forEach((container) => {
+          if (container instanceof HTMLElement) {
+            container.style.width = `${tableWidth}px`
+            container.style.maxWidth = `${tableWidth}px`
+          }
+        })
+        htmlElement.style.width = `${tableWidth}px`
+        htmlElement.style.maxWidth = `${tableWidth}px`
+      }
+
       const [domtoimage, jsPDF] = await Promise.all([
         import("dom-to-image-more"),
         import("jspdf").then(m => m.default),
@@ -258,11 +293,16 @@ export function useExportSchedule() {
 
       // Aumentar la escala para una imagen más grande y de mayor resolución
       const scale = 4 // Aumentar a 4x para mejor calidad y tamaño más grande
+      
+      // Usar el ancho real de la tabla, no del contenedor
+      const actualWidth = table ? table.scrollWidth : element.scrollWidth
+      const actualHeight = table ? table.scrollHeight : element.scrollHeight
+      
       const dataUrl = await domtoimage.toPng(htmlElement, {
         quality: 1.0,
         bgcolor: "#ffffff",
-        width: element.scrollWidth * scale,
-        height: element.scrollHeight * scale,
+        width: actualWidth * scale,
+        height: actualHeight * scale,
         style: {
           transform: `scale(${scale})`,
           transformOrigin: 'top left',

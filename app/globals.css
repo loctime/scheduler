@@ -181,12 +181,17 @@
   margin: 0 !important;
   border: none !important;
   box-shadow: none !important;
+  width: fit-content !important;
+  max-width: 100% !important;
 }
 
 .exporting-image .overflow-x-auto,
 .exporting-image .overflow-hidden {
   padding: 0 !important;
   margin: 0 !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+  overflow: visible !important;
 }
 
 .exporting-image .pt-2,
@@ -200,6 +205,12 @@
 .exporting-image .space-y-6,
 .exporting-image .space-y-2 {
   gap: 0 !important;
+}
+
+/* Asegurar que la tabla y sus contenedores se ajusten al contenido */
+.exporting-image table {
+  width: auto !important;
+  max-width: 100% !important;
 }
 
 /* Hacer las celdas más compactas durante la exportación */
