@@ -98,6 +98,14 @@ export function ScheduleCell({
               <RotateCcw className="h-3 w-3" />
             </button>
           )}
+          {/* Indicador de horario modificado (puntito) - solo visible en exportación */}
+          {(hasExtraBefore || hasExtraAfter) && (
+            <div
+              className="schedule-cell-indicator absolute bottom-1 right-1 z-10 h-2 w-2 rounded-full bg-primary shadow-sm hidden"
+              title={hasExtraBefore && hasExtraAfter ? "Horario modificado (+30 min antes y después)" : hasExtraBefore ? "Horario modificado (+30 min antes)" : "Horario modificado (+30 min después)"}
+              aria-label="Horario modificado"
+            />
+          )}
       {showExtraActions && (
         <div className="absolute -top-1 right-1" onClick={(event) => event.stopPropagation()}>
           <DropdownMenu open={extraMenuOpenKey === cellKey} onOpenChange={onExtraMenuOpenChange}>

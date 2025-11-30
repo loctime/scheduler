@@ -165,8 +165,17 @@
 }
 
 /* Ocultar el botón "+Extra" durante la exportación */
-.exporting-image td > div.absolute {
+.exporting-image td > div.absolute:not(.schedule-cell-indicator) {
   display: none !important;
+}
+
+/* Mostrar el indicador de horario modificado solo durante la exportación */
+.schedule-cell-indicator {
+  display: none !important;
+}
+
+.exporting-image .schedule-cell-indicator {
+  display: block !important;
 }
 
 /* Ocultar las estadísticas de empleados (francos y horas extras) durante la exportación */
