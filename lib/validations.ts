@@ -158,11 +158,37 @@ export function calculateDailyHours(
         const shift = shiftMap.get(assignment.shiftId)
         if (shift) {
           // Usar horarios ajustados si existen, sino usar los del turno base
+          // Esto permite que las horas extras (30 min antes/después) se calculen correctamente
           const tempShift: any = { ...shift }
-          if (assignment.startTime) tempShift.startTime = assignment.startTime
-          if (assignment.endTime) tempShift.endTime = assignment.endTime
-          if (assignment.startTime2) tempShift.startTime2 = assignment.startTime2
-          if (assignment.endTime2) tempShift.endTime2 = assignment.endTime2
+          
+          // CRÍTICO: Usar los valores ajustados del assignment si existen y son válidos
+          // Verificar si el assignment tiene valores ajustados
+          // Si el campo tiene un valor string válido, usarlo (indica que fue ajustado)
+          
+          // Para startTime: si tiene un valor válido, usarlo
+          if (assignment.startTime && typeof assignment.startTime === 'string' && assignment.startTime.trim() !== '') {
+            tempShift.startTime = assignment.startTime
+          }
+          
+          // Para endTime: si tiene un valor válido, usarlo (CRÍTICO para horas extras después)
+          // Esto es lo más importante: si endTime tiene un valor, DEBE usarse para el cálculo
+          // Verificar explícitamente si el campo existe y tiene valor
+          // IMPORTANTE: Si assignment.endTime existe (incluso si es igual al turno base), usarlo
+          // porque podría haber sido ajustado y luego restaurado, pero aún así debe usarse
+          if (assignment.endTime !== undefined && assignment.endTime !== null) {
+            const endTimeStr = String(assignment.endTime).trim()
+            if (endTimeStr !== '') {
+              tempShift.endTime = endTimeStr
+            }
+          }
+          
+          if (assignment.startTime2 && typeof assignment.startTime2 === 'string' && assignment.startTime2.trim() !== '') {
+            tempShift.startTime2 = assignment.startTime2
+          }
+          
+          if (assignment.endTime2 && typeof assignment.endTime2 === 'string' && assignment.endTime2.trim() !== '') {
+            tempShift.endTime2 = assignment.endTime2
+          }
           
           totalHours += calculateShiftHours(tempShift, minutosDescanso, horasMinimasParaDescanso)
         }

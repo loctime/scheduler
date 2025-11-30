@@ -168,3 +168,8 @@
 .exporting-image td > div.absolute {
   display: none !important;
 }
+
+/* Ocultar las estadísticas de empleados (francos y horas extras) durante la exportación */
+.exporting-image .employee-stats {
+  display: none !important;
+}

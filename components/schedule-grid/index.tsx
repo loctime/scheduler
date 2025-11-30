@@ -217,25 +217,43 @@ export const ScheduleGrid = memo(function ScheduleGrid({
       const shift = assignment.shiftId ? getShiftInfo(assignment.shiftId) : undefined
       if (!shift || !shift.startTime || !shift.endTime) return
 
-      const updatedAssignments = assignments.map((item, idx) => (idx === targetIndex ? assignment : item))
+      // Usar los valores actuales del assignment (si existen) o los del turno base
+      const currentStartTime = assignment.startTime || shift.startTime
+      const currentEndTime = assignment.endTime || shift.endTime
+
+      // Calcular los horarios extendidos desde los valores actuales
+      const extendedStart = adjustTime(currentStartTime, -30)
+      const extendedEnd = adjustTime(currentEndTime, 30)
+
+      // Calcular los horarios extendidos desde el turno base (para comparar)
+      const baseExtendedStart = adjustTime(shift.startTime, -30)
+      const baseExtendedEnd = adjustTime(shift.endTime, 30)
 
       if (type === "before") {
-        const extendedStart = adjustTime(shift.startTime, -30)
-        if (!extendedStart) return
-        if (assignment.startTime === extendedStart) {
+        if (!extendedStart || !baseExtendedStart) return
+        // Si ya tiene el horario extendido (30 min antes del turno base), eliminarlo
+        // Si el valor actual es igual al extendido desde el turno base, significa que ya tiene la hora extra
+        if (assignment.startTime === baseExtendedStart) {
+          // Ya tiene la hora extra, eliminarla para restaurar al horario base
           delete assignment.startTime
         } else {
-          assignment.startTime = extendedStart
+          // No tiene la hora extra o tiene un valor diferente, aplicar el extendido desde el turno base
+          assignment.startTime = baseExtendedStart
         }
       } else {
-        const extendedEnd = adjustTime(shift.endTime, 30)
-        if (!extendedEnd) return
-        if (assignment.endTime === extendedEnd) {
+        if (!extendedEnd || !baseExtendedEnd) return
+        // Si ya tiene el horario extendido (30 min después del turno base), eliminarlo
+        // Si el valor actual es igual al extendido desde el turno base, significa que ya tiene la hora extra
+        if (assignment.endTime === baseExtendedEnd) {
+          // Ya tiene la hora extra, eliminarla para restaurar al horario base
           delete assignment.endTime
         } else {
-          assignment.endTime = extendedEnd
+          // No tiene la hora extra o tiene un valor diferente, aplicar el extendido desde el turno base
+          assignment.endTime = baseExtendedEnd
         }
       }
+
+      const updatedAssignments = assignments.map((item, idx) => (idx === targetIndex ? assignment : item))
 
       onAssignmentUpdate(date, employeeId, updatedAssignments, { scheduleId: schedule?.id })
     },

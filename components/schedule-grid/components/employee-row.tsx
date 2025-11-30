@@ -143,7 +143,7 @@ export function EmployeeRow({
                 <p className="text-2xl font-bold">{employee.name}</p>
               </div>
               {employeeStats && employeeStats[employee.id] && (
-                <div className="text-base text-muted-foreground space-y-0.5">
+                <div className="employee-stats text-base text-muted-foreground space-y-0.5">
                   <div className="flex items-center gap-1">
                     <span className="font-bold text-foreground">Francos:</span>
                     <span className="font-semibold">{formatStatValue(employeeStats[employee.id].francos)}</span>
@@ -175,8 +175,15 @@ export function EmployeeRow({
         const primaryShift = primaryShiftAssignment && primaryShiftAssignment.shiftId ? getShiftInfo(primaryShiftAssignment.shiftId) : undefined
         const extendedStart = primaryShift?.startTime ? adjustTime(primaryShift.startTime, -30) : undefined
         const extendedEnd = primaryShift?.endTime ? adjustTime(primaryShift.endTime, 30) : undefined
-        const hasExtraBefore = !!extendedStart && primaryShiftAssignment?.startTime === extendedStart
-        const hasExtraAfter = !!extendedEnd && primaryShiftAssignment?.endTime === extendedEnd
+        // Verificar si tiene horas extras comparando con el horario base del turno
+        const hasExtraBefore = !!extendedStart && 
+          primaryShiftAssignment?.startTime && 
+          primaryShiftAssignment.startTime === extendedStart &&
+          primaryShiftAssignment.startTime !== primaryShift?.startTime
+        const hasExtraAfter = !!extendedEnd && 
+          primaryShiftAssignment?.endTime && 
+          primaryShiftAssignment.endTime === extendedEnd &&
+          primaryShiftAssignment.endTime !== primaryShift?.endTime
         const showExtraActions =
           isClickable &&
           !!onAssignmentUpdate &&
