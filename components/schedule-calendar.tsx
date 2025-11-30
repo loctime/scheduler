@@ -164,13 +164,58 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     await exportPDF(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.pdf`)
   }, [exportPDF])
 
+  // Extraer turnos de semanas completadas si no hay turnos activos
+  const shiftsToUse = useMemo(() => {
+    if (shifts.length > 0) {
+      return shifts
+    }
+    
+    // Si no hay turnos activos, extraer de semanas completadas
+    // Los turnos se mostrarán usando los horarios de las asignaciones directamente
+    // Crear turnos "fantasma" básicos solo para mantener compatibilidad
+    const shiftIdsFromCompleted = new Set<string>()
+    schedules.forEach((schedule) => {
+      if (schedule.completada === true && schedule.assignments) {
+        Object.values(schedule.assignments).forEach((dateAssignments) => {
+          if (dateAssignments && typeof dateAssignments === 'object') {
+            Object.values(dateAssignments).forEach((assignmentValue) => {
+              if (Array.isArray(assignmentValue)) {
+                assignmentValue.forEach((assignment) => {
+                  if (typeof assignment === 'string') {
+                    shiftIdsFromCompleted.add(assignment)
+                  } else if (assignment && typeof assignment === 'object' && 'shiftId' in assignment && assignment.shiftId) {
+                    shiftIdsFromCompleted.add(assignment.shiftId)
+                  }
+                })
+              }
+            })
+          }
+        })
+      }
+    })
+    
+    // Crear turnos "fantasma" básicos para los IDs encontrados
+    // Estos turnos solo se usarán para mantener compatibilidad
+    // Los horarios reales se obtendrán de las asignaciones (ShiftAssignment)
+    return Array.from(shiftIdsFromCompleted).map((shiftId) => ({
+      id: shiftId,
+      name: `Turno ${shiftId}`,
+      startTime: undefined,
+      endTime: undefined,
+      color: '#808080',
+      userId: user?.uid || '',
+      createdAt: null,
+      updatedAt: null,
+    } as Turno))
+  }, [shifts, schedules, user])
+
   const employeeMonthlyStats = useMemo<Record<string, EmployeeMonthlyStats>>(() => {
     const stats: Record<string, EmployeeMonthlyStats> = {}
     employees.forEach((employee) => {
       stats[employee.id] = { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0 }
     })
 
-    if (employees.length === 0 || shifts.length === 0) {
+    if (employees.length === 0 || shiftsToUse.length === 0) {
       return stats
     }
 
@@ -224,7 +269,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
           }
 
           // Calcular horas extras: simplemente contar los 30 minutos agregados
-          const extraHours = calculateExtraHours(normalizedAssignments, shifts)
+          const extraHours = calculateExtraHours(normalizedAssignments, shiftsToUse)
           if (extraHours > 0) {
             // Acumular en el total del mes
             stats[employeeId].horasExtrasMes += extraHours
@@ -248,7 +293,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     return stats
   }, [
     employees,
-    shifts,
+    shiftsToUse,
     monthWeeks,
     monthRange.startDate,
     monthRange.endDate,
@@ -277,7 +322,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
       <GeneralView
         dataLoading={dataLoading}
         employees={employees}
-        shifts={shifts}
+        shifts={shiftsToUse}
         monthRange={monthRange}
         monthWeeks={monthWeeks}
         exporting={exporting}

@@ -102,11 +102,21 @@ export function GeneralView({
     return <LoadingStateCard />
   }
 
-  if (employees.length === 0) {
+  // Verificar si hay semanas completadas en el rango del mes
+  const hasCompletedWeeks = useMemo(() => {
+    return monthWeeks.some((weekDays) => {
+      const weekSchedule = getWeekSchedule(weekDays[0])
+      return weekSchedule?.completada === true
+    })
+  }, [monthWeeks, getWeekSchedule])
+
+  // Si no hay empleados ni turnos activos, pero hay semanas completadas, mostrar el calendario
+  // (las semanas completadas tienen sus propios snapshots de empleados)
+  if (employees.length === 0 && !hasCompletedWeeks) {
     return <EmptyStateCard message="No hay empleados registrados. Agrega empleados para crear horarios." />
   }
 
-  if (shifts.length === 0) {
+  if (shifts.length === 0 && !hasCompletedWeeks) {
     return <EmptyStateCard message="No hay turnos configurados. Agrega turnos para crear horarios." />
   }
 
@@ -130,9 +140,36 @@ export function GeneralView({
 
           // Calcular horas extras para esta semana específica
           const weekStats: Record<string, EmployeeMonthlyStats> = {}
-          employees.forEach((employee) => {
+          
+          // Si la semana está completada y tiene snapshot, usar empleados del snapshot
+          // Si no hay empleados activos pero hay snapshot, usar el snapshot
+          const employeesForWeek = (() => {
+            if (weekSchedule?.completada === true && weekSchedule?.empleadosSnapshot && weekSchedule.empleadosSnapshot.length > 0) {
+              // Si hay snapshot, usar empleados del snapshot
+              const snapshotEmployees = weekSchedule.empleadosSnapshot.map((snapshotEmp) => ({
+                id: snapshotEmp.id,
+                name: snapshotEmp.name,
+                email: snapshotEmp.email,
+                phone: snapshotEmp.phone,
+                userId: '', // No disponible en snapshot
+              } as Empleado))
+              
+              // Si hay empleados activos, combinar (priorizar activos)
+              if (employees.length > 0) {
+                const activeEmployeesMap = new Map(employees.map((emp) => [emp.id, emp]))
+                return snapshotEmployees.map((snapshotEmp) => 
+                  activeEmployeesMap.get(snapshotEmp.id) || snapshotEmp
+                )
+              }
+              
+              return snapshotEmployees
+            }
+            return employees
+          })()
+          
+          employeesForWeek.forEach((employee) => {
             weekStats[employee.id] = {
-              ...employeeMonthlyStats[employee.id],
+              ...employeeMonthlyStats[employee.id] || { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0 },
               horasExtrasSemana: 0,
             }
           })
@@ -182,7 +219,7 @@ export function GeneralView({
               weekDays={weekDays}
               weekIndex={weekIndex}
               weekSchedule={weekSchedule}
-              employees={employees}
+              employees={employeesForWeek}
               shifts={shifts}
               monthRange={monthRange}
               onAssignmentUpdate={onAssignmentUpdate}
