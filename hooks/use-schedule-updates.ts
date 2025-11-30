@@ -198,6 +198,15 @@ export function useScheduleUpdates({
       options?: { scheduleId?: string },
     ) => {
       try {
+        if (!db) {
+          toast({
+            title: "Error",
+            description: "Firebase no está configurado",
+            variant: "destructive",
+          })
+          return
+        }
+
         // Determinar la semana basada en la fecha
         const dateObj = new Date(date)
         const weekStartDate = startOfWeek(dateObj, { weekStartsOn })

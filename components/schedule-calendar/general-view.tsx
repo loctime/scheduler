@@ -4,9 +4,10 @@ import { useState, useMemo, useCallback, useEffect } from "react"
 import { MonthHeader } from "@/components/schedule-calendar/month-header"
 import { WeekSchedule } from "@/components/schedule-calendar/week-schedule"
 import { EmptyStateCard, LoadingStateCard } from "@/components/schedule-calendar/state-card"
-import type { Horario, Empleado, Turno, MedioTurno, ShiftAssignment } from "@/lib/types"
+import type { Horario, Empleado, Turno, MedioTurno, ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { format } from "date-fns"
+import { calculateExtraHours } from "@/lib/validations"
 
 type AssignmentUpdateHandler = (
   date: string,
@@ -127,6 +128,54 @@ export function GeneralView({
           const weekKey = format(weekStartDate, "yyyy-MM-dd")
           const isExpanded = expandedWeeks.has(weekKey)
 
+          // Calcular horas extras para esta semana específica
+          const weekStats: Record<string, EmployeeMonthlyStats> = {}
+          employees.forEach((employee) => {
+            weekStats[employee.id] = {
+              ...employeeMonthlyStats[employee.id],
+              horasExtrasSemana: 0,
+            }
+          })
+
+          if (weekSchedule?.assignments) {
+            const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAssignment[] => {
+              if (!value || !Array.isArray(value) || value.length === 0) return []
+              if (typeof value[0] === "string") {
+                return (value as string[]).map((shiftId) => ({ shiftId, type: "shift" as const }))
+              }
+              return (value as ShiftAssignment[]).map((assignment) => ({
+                ...assignment,
+                type: assignment.type || "shift",
+              }))
+            }
+
+            weekDays.forEach((day) => {
+              const dateStr = format(day, "yyyy-MM-dd")
+              const dateAssignments = weekSchedule.assignments[dateStr]
+              if (!dateAssignments) return
+
+              Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
+                if (!weekStats[employeeId]) {
+                  weekStats[employeeId] = {
+                    ...employeeMonthlyStats[employeeId],
+                    horasExtrasSemana: 0,
+                  }
+                }
+
+                const normalizedAssignments = normalizeAssignments(assignmentValue)
+                if (normalizedAssignments.length === 0) {
+                  return
+                }
+
+                // Calcular horas extras para este día
+                const extraHours = calculateExtraHours(normalizedAssignments, shifts)
+                if (extraHours > 0) {
+                  weekStats[employeeId].horasExtrasSemana += extraHours
+                }
+              })
+            })
+          }
+
           return (
             <WeekSchedule
               key={weekIndex}
@@ -142,7 +191,7 @@ export function GeneralView({
               onExportExcel={() => onExportWeekExcel(weekStartDate, weekDays, weekSchedule)}
               exporting={exporting}
               mediosTurnos={mediosTurnos}
-              employeeStats={employeeMonthlyStats}
+              employeeStats={weekStats}
               open={isExpanded}
               onOpenChange={(open) => handleWeekToggle(weekStartDate, open)}
               user={user}

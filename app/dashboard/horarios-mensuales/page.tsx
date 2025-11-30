@@ -17,7 +17,7 @@ import { WeekSchedule } from "@/components/schedule-calendar/week-schedule"
 import { getCustomMonthRange, getMonthWeeks } from "@/lib/utils"
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
-import { calculateDailyHours } from "@/lib/validations"
+import { calculateDailyHours, calculateExtraHours } from "@/lib/validations"
 import { ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
 
 const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAssignment[] => {
@@ -219,14 +219,9 @@ export default function HorariosMensualesPage() {
             stats[employeeId].francos += francosCount
           }
 
-          const dailyHours = calculateDailyHours(
-            normalizedAssignments,
-            shifts,
-            minutosDescanso,
-            horasMinimasParaDescanso,
-          )
-          if (dailyHours > 8) {
-            const extraHours = dailyHours - 8
+          // Calcular horas extras: simplemente contar los 30 minutos agregados
+          const extraHours = calculateExtraHours(normalizedAssignments, shifts)
+          if (extraHours > 0) {
             // Acumular en el total del mes
             stats[employeeId].horasExtrasMes += extraHours
             // Acumular en la semana actual
@@ -236,12 +231,11 @@ export default function HorariosMensualesPage() {
       })
     })
 
-    // Asignar las horas extras de la última semana como horasExtrasSemana
-    if (lastWeekStartStr && weeklyExtras[lastWeekStartStr]) {
-      Object.entries(weeklyExtras[lastWeekStartStr]).forEach(([employeeId, weekExtra]) => {
-        stats[employeeId].horasExtrasSemana = weekExtra
-      })
-    }
+    // Inicializar horasExtrasSemana con 0 para todos los empleados
+    // Se calculará por semana cuando se muestre cada semana
+    Object.keys(stats).forEach((employeeId) => {
+      stats[employeeId].horasExtrasSemana = 0
+    })
 
     return stats
   }, [employees, shifts, config, monthStartDay, weekStartsOn, schedules])
@@ -328,21 +322,62 @@ export default function HorariosMensualesPage() {
                             </span>
                           </AccordionTrigger>
                           <AccordionContent>
-                            <WeekSchedule
-                              weekDays={week.weekDays}
-                              weekIndex={0}
-                              weekSchedule={week.schedule}
-                              employees={employees}
-                              shifts={shifts}
-                              monthRange={monthRange}
-                              onExportImage={handleExportWeekImage}
-                              onExportPDF={handleExportWeekPDF}
-                              onExportExcel={() => handleExportWeekExcel(week.weekStartDate, week.weekDays, week.schedule)}
-                              exporting={exporting}
-                              mediosTurnos={config?.mediosTurnos}
-                              employeeStats={employeeStats}
-                              readonly={true}
-                            />
+                            {(() => {
+                              // Calcular horas extras para esta semana específica
+                              const weekStats: Record<string, EmployeeMonthlyStats> = {}
+                              employees.forEach((employee) => {
+                                weekStats[employee.id] = {
+                                  ...employeeStats[employee.id],
+                                  horasExtrasSemana: 0,
+                                }
+                              })
+
+                              if (week.schedule?.assignments) {
+                                week.weekDays.forEach((day) => {
+                                  const dateStr = format(day, "yyyy-MM-dd")
+                                  const dateAssignments = week.schedule?.assignments[dateStr]
+                                  if (!dateAssignments) return
+
+                                  Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
+                                    if (!weekStats[employeeId]) {
+                                      weekStats[employeeId] = {
+                                        ...employeeStats[employeeId],
+                                        horasExtrasSemana: 0,
+                                      }
+                                    }
+
+                                    const normalizedAssignments = normalizeAssignments(assignmentValue)
+                                    if (normalizedAssignments.length === 0) {
+                                      return
+                                    }
+
+                                    // Calcular horas extras para este día
+                                    const extraHours = calculateExtraHours(normalizedAssignments, shifts)
+                                    if (extraHours > 0) {
+                                      weekStats[employeeId].horasExtrasSemana += extraHours
+                                    }
+                                  })
+                                })
+                              }
+
+                              return (
+                                <WeekSchedule
+                                  weekDays={week.weekDays}
+                                  weekIndex={0}
+                                  weekSchedule={week.schedule}
+                                  employees={employees}
+                                  shifts={shifts}
+                                  monthRange={monthRange}
+                                  onExportImage={handleExportWeekImage}
+                                  onExportPDF={handleExportWeekPDF}
+                                  onExportExcel={() => handleExportWeekExcel(week.weekStartDate, week.weekDays, week.schedule)}
+                                  exporting={exporting}
+                                  mediosTurnos={config?.mediosTurnos}
+                                  employeeStats={weekStats}
+                                  readonly={true}
+                                />
+                              )
+                            })()}
                           </AccordionContent>
                         </AccordionItem>
                       ))}

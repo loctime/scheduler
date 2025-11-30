@@ -1,5 +1,6 @@
 import { Turno, Empleado } from "@/lib/types"
 import { ShiftOverlap } from "@/lib/types"
+import { adjustTime } from "@/lib/utils"
 
 /**
  * Valida si dos turnos se solapan en horario
@@ -115,6 +116,44 @@ export function calculateShiftHours(
   }
 
   return totalHours
+}
+
+/**
+ * Calcula las horas extras basándose en los 30 minutos agregados (antes/después)
+ * Retorna la cantidad de horas extras: 0.5 por cada 30 min antes + 0.5 por cada 30 min después
+ */
+export function calculateExtraHours(
+  assignments: any[],
+  shifts: Turno[]
+): number {
+  const shiftMap = new Map(shifts.map((s) => [s.id, s]))
+  let extraHours = 0
+
+  assignments.forEach((assignment) => {
+    // Ignorar francos y medio francos
+    if (assignment.type === "franco" || assignment.type === "medio_franco") {
+      return
+    }
+
+    if (assignment.shiftId) {
+      const shift = shiftMap.get(assignment.shiftId)
+      if (shift && shift.startTime && shift.endTime) {
+        // Verificar si tiene 30 min antes (startTime ajustado 30 min antes del turno base)
+        const baseStart30MinBefore = adjustTime(shift.startTime, -30)
+        if (assignment.startTime && assignment.startTime === baseStart30MinBefore) {
+          extraHours += 0.5 // 30 minutos = 0.5 horas
+        }
+
+        // Verificar si tiene 30 min después (endTime ajustado 30 min después del turno base)
+        const baseEnd30MinAfter = adjustTime(shift.endTime, 30)
+        if (assignment.endTime && assignment.endTime === baseEnd30MinAfter) {
+          extraHours += 0.5 // 30 minutos = 0.5 horas
+        }
+      }
+    }
+  })
+
+  return extraHours
 }
 
 /**

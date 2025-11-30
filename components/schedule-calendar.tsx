@@ -13,7 +13,7 @@ import { useConfig } from "@/hooks/use-config"
 import { getCustomMonthRange, getMonthWeeks } from "@/lib/utils"
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { useScheduleUpdates } from "@/hooks/use-schedule-updates"
-import { calculateDailyHours } from "@/lib/validations"
+import { calculateDailyHours, calculateExtraHours } from "@/lib/validations"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { GeneralView } from "@/components/schedule-calendar/general-view"
 import { EmployeeView } from "@/components/schedule-calendar/employee-view"
@@ -332,9 +332,8 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     const minutosDescanso = config?.minutosDescanso ?? 30
     const horasMinimasParaDescanso = config?.horasMinimasParaDescanso ?? 6
 
-    // Mapa para rastrear horas extras por semana (para obtener la última semana)
+    // Mapa para rastrear horas extras por semana
     const weeklyExtras: Record<string, Record<string, number>> = {}
-    let lastWeekStartStr: string | null = null
 
     monthWeeks.forEach((weekDays) => {
       const weekSchedule = getWeekSchedule(weekDays[0])
@@ -348,8 +347,6 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
           weeklyExtras[weekStartStr][employee.id] = 0
         })
       }
-      // Actualizar la última semana procesada
-      lastWeekStartStr = weekStartStr
 
       weekDays.forEach((day) => {
         if (day < monthRange.startDate || day > monthRange.endDate) return
@@ -381,14 +378,9 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
             stats[employeeId].francos += francosCount
           }
 
-          const dailyHours = calculateDailyHours(
-            normalizedAssignments,
-            shifts,
-            minutosDescanso,
-            horasMinimasParaDescanso,
-          )
-          if (dailyHours > 8) {
-            const extraHours = dailyHours - 8
+          // Calcular horas extras: simplemente contar los 30 minutos agregados
+          const extraHours = calculateExtraHours(normalizedAssignments, shifts)
+          if (extraHours > 0) {
             // Acumular en el total del mes
             stats[employeeId].horasExtrasMes += extraHours
             // Acumular en la semana actual
@@ -398,12 +390,15 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
       })
     })
 
-    // Asignar las horas extras de la última semana como horasExtrasSemana
-    if (lastWeekStartStr && weeklyExtras[lastWeekStartStr]) {
-      Object.entries(weeklyExtras[lastWeekStartStr]).forEach(([employeeId, weekExtra]) => {
-        stats[employeeId].horasExtrasSemana = weekExtra
-      })
-    }
+    // Almacenar el mapa de horas extras por semana en el objeto stats
+    // Esto permitirá que cada semana use sus propias horas extras
+    Object.keys(stats).forEach((employeeId) => {
+      // Inicializar horasExtrasSemana con 0, se actualizará por semana cuando se muestre
+      stats[employeeId].horasExtrasSemana = 0
+    })
+
+    // Agregar el mapa de weeklyExtras a stats para que pueda ser usado por semana
+    ;(stats as any).__weeklyExtras = weeklyExtras
 
     return stats
   }, [
