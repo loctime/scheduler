@@ -68,7 +68,7 @@ export function useExportSchedule() {
         el.style.border = "none"
         el.style.boxShadow = "none"
         el.style.display = "block"
-        el.style.padding = "12px 16px"  // Agregar más padding para dar más espacio a los textos
+        el.style.padding = "4px 8px"  // Padding reducido para celdas más compactas
       })
       
       // También agregar padding a los spans dentro del header
@@ -84,7 +84,7 @@ export function useExportSchedule() {
             display: spanEl.style.display || "",
             padding: spanEl.style.padding || "",
           })
-          spanEl.style.padding = "6px 10px"  // Padding adicional en los spans para más espacio
+          spanEl.style.padding = "2px 4px"  // Padding reducido para más compacidad
         }
       })
     })

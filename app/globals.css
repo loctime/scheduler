@@ -173,3 +173,69 @@
 .exporting-image .employee-stats {
   display: none !important;
 }
+
+/* Hacer las celdas más compactas durante la exportación */
+.exporting-image td,
+.exporting-image th {
+  padding: 6px 10px !important;
+}
+
+/* Aumentar el tamaño de los textos durante la exportación */
+.exporting-image th {
+  font-size: 2rem !important; /* Más grande que text-3xl */
+  font-weight: 700 !important;
+}
+
+.exporting-image th span {
+  font-size: 1.5rem !important; /* text-2xl equivalente */
+  font-weight: 600 !important;
+}
+
+.exporting-image td {
+  font-size: 1.25rem !important; /* text-xl equivalente */
+}
+
+.exporting-image td p,
+.exporting-image td span,
+.exporting-image td div {
+  font-size: 1.375rem !important; /* Más grande que text-xl */
+  font-weight: 600 !important;
+}
+
+/* Textos específicos más grandes */
+.exporting-image td .text-xl {
+  font-size: 1.625rem !important; /* Más grande que text-2xl */
+  font-weight: 700 !important;
+}
+
+.exporting-image td .text-lg {
+  font-size: 1.5rem !important; /* text-2xl equivalente */
+  font-weight: 600 !important;
+}
+
+.exporting-image td .text-base {
+  font-size: 1.375rem !important; /* Más grande que text-xl */
+  font-weight: 600 !important;
+}
+
+.exporting-image td .text-2xl {
+  font-size: 1.75rem !important; /* Más grande */
+  font-weight: 700 !important;
+}
+
+/* Nombres de empleados más grandes */
+.exporting-image td p.text-2xl {
+  font-size: 1.75rem !important; /* Más grande */
+  font-weight: 700 !important;
+}
+
+/* Horarios y francos más visibles */
+.exporting-image td .font-bold {
+  font-size: 1.5rem !important;
+  font-weight: 700 !important;
+}
+
+.exporting-image td .font-semibold {
+  font-size: 1.375rem !important;
+  font-weight: 600 !important;
+}
