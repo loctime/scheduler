@@ -40,6 +40,8 @@ export default function ConfiguracionPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [config, setConfig] = useState<Configuracion>({
+    nombreEmpresa: "Empleado",
+    colorEmpresa: undefined,
     mesInicioDia: 1,
     horasMaximasPorDia: 8,
     semanaInicioDia: 1, // Lunes por defecto
@@ -90,6 +92,8 @@ export default function ConfiguracionPage() {
         } else {
           // Configuración por defecto
           const defaultConfig: Configuracion = {
+            nombreEmpresa: "Empleado",
+            colorEmpresa: undefined,
             mesInicioDia: 1,
             horasMaximasPorDia: 8,
             semanaInicioDia: 1,
@@ -148,6 +152,8 @@ export default function ConfiguracionPage() {
       
       // Preparar datos asegurándonos de que todos los campos estén presentes
       const dataToSave: any = {
+        nombreEmpresa: config.nombreEmpresa || "Empleado",
+        colorEmpresa: config.colorEmpresa || undefined,
         mesInicioDia: config.mesInicioDia,
         horasMaximasPorDia: config.horasMaximasPorDia,
         semanaInicioDia: config.semanaInicioDia,
@@ -208,6 +214,53 @@ export default function ConfiguracionPage() {
           <h2 className="text-3xl font-bold tracking-tight">Configuración</h2>
           <p className="text-muted-foreground">Gestiona las opciones generales del sistema</p>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Configuración General</CardTitle>
+            <CardDescription>Configuración básica de la empresa</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="nombreEmpresa">Nombre de la empresa</Label>
+              <Input
+                id="nombreEmpresa"
+                type="text"
+                placeholder="Empleado"
+                value={config.nombreEmpresa || ""}
+                onChange={(e) => setConfig({ ...config, nombreEmpresa: e.target.value })}
+              />
+              <p className="text-sm text-muted-foreground">
+                Este nombre se mostrará en la columna de empleados en la grilla de horarios
+              </p>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <Label htmlFor="colorEmpresa">Color de fondo de la celda</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="colorEmpresa"
+                  type="color"
+                  value={config.colorEmpresa || "#ffffff"}
+                  onChange={(e) => setConfig({ ...config, colorEmpresa: e.target.value })}
+                  className="h-10 w-20 p-1 cursor-pointer"
+                />
+                <Input
+                  type="text"
+                  placeholder="#ffffff"
+                  value={config.colorEmpresa || ""}
+                  onChange={(e) => setConfig({ ...config, colorEmpresa: e.target.value || undefined })}
+                  className="flex-1"
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Color de fondo de la celda del nombre de empresa. Déjalo vacío para usar el color por defecto.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

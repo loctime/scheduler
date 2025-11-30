@@ -1,19 +1,68 @@
 "use client"
 
-import React from "react"
+import React, { useMemo } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { useConfig } from "@/hooks/use-config"
+import { hexToRgba } from "../utils/schedule-grid-utils"
 
 interface GridHeaderProps {
   weekDays: Date[]
 }
 
 export function GridHeader({ weekDays }: GridHeaderProps) {
+  const { config } = useConfig()
+  const nombreEmpresa = config?.nombreEmpresa || "Empleado"
+  const colorEmpresa = config?.colorEmpresa
+
+  // Calcular el tamaño de fuente y si necesitamos truncar
+  // Ancho disponible: 220px (min-w) - 48px (px-6 = 24px cada lado) = ~172px
+  // Considerando fuente bold y diferentes tamaños:
+  // - text-3xl (~30px): ~5-6 caracteres/línea → 15-18 chars en 3 líneas
+  // - text-2xl (~24px): ~6-7 caracteres/línea → 18-21 chars en 3 líneas  
+  // - text-xl (~20px): ~8-9 caracteres/línea → 24-27 chars en 3 líneas
+  // - text-lg (~18px): ~9-10 caracteres/línea → 27-30 chars en 3 líneas
+  // - text-base (~16px): ~10-11 caracteres/línea → 30-33 chars en 3 líneas
+  
+  const { fontSize, displayText } = useMemo(() => {
+    const length = nombreEmpresa.length
+    
+    // Límites aproximados de caracteres por tamaño de fuente (máximo 3 líneas)
+    if (length <= 18) {
+      return { fontSize: "text-3xl", displayText: nombreEmpresa }
+    } else if (length <= 24) {
+      return { fontSize: "text-2xl", displayText: nombreEmpresa }
+    } else if (length <= 30) {
+      return { fontSize: "text-xl", displayText: nombreEmpresa }
+    } else if (length <= 36) {
+      return { fontSize: "text-lg", displayText: nombreEmpresa }
+    } else if (length <= 42) {
+      return { fontSize: "text-base", displayText: nombreEmpresa }
+    } else {
+      // Si es muy largo, truncar a 42 caracteres y usar text-base
+      return { fontSize: "text-base", displayText: nombreEmpresa.substring(0, 42) + "..." }
+    }
+  }, [nombreEmpresa])
+
+  // Calcular el estilo de fondo si hay color configurado
+  const rowStyle = useMemo(() => {
+    if (colorEmpresa) {
+      return {
+        backgroundColor: hexToRgba(colorEmpresa, 0.3),
+      }
+    }
+    return undefined
+  }, [colorEmpresa])
+
   return (
     <thead>
-      <tr className="border-b-2 border-black bg-muted/50">
-        <th className="min-w-[220px] border-r-2 border-black px-6 py-4 text-left text-3xl font-bold text-foreground">
-          Empleado
+      <tr className="border-b-2 border-black bg-muted/50" style={rowStyle}>
+        <th 
+          className="min-w-[220px] max-w-[220px] border-r-2 border-black px-6 py-4 text-left font-bold text-foreground"
+        >
+          <div className={`${fontSize} break-words leading-tight line-clamp-3`}>
+            {displayText}
+          </div>
         </th>
         {weekDays.map((day) => (
           <th

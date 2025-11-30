@@ -102,6 +102,8 @@ export interface Separador {
 
 export interface Configuracion {
   id?: string
+  nombreEmpresa?: string // Nombre de la empresa
+  colorEmpresa?: string // Color de fondo de la celda del nombre de empresa (hex)
   mesInicioDia: number // Día del mes en que empieza (1-28)
   horasMaximasPorDia: number // Horas máximas por día
   semanaInicioDia: number // Día de la semana que inicia (0=domingo, 1=lunes, etc.)

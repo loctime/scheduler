@@ -19,6 +19,8 @@ export function useConfig() {
     
     // Configuración por defecto
     const defaultConfig: Configuracion = {
+      nombreEmpresa: "Empleado",
+      colorEmpresa: undefined, // Sin color por defecto
       mesInicioDia: 1,
       horasMaximasPorDia: 8,
       semanaInicioDia: 1,
