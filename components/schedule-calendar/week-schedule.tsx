@@ -12,6 +12,16 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp } from "firebase/firestore"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface WeekScheduleProps {
   weekDays: Date[]
@@ -92,6 +102,10 @@ export function WeekSchedule({
   const [isMarkingComplete, setIsMarkingComplete] = useState(false)
   const [isCopying, setIsCopying] = useState(false)
   const [isClearing, setIsClearing] = useState(false)
+  const [confirmCopyDialogOpen, setConfirmCopyDialogOpen] = useState(false)
+  const [confirmClearDialogOpen, setConfirmClearDialogOpen] = useState(false)
+  const [confirmClearRowDialogOpen, setConfirmClearRowDialogOpen] = useState(false)
+  const [pendingClearRowEmployeeId, setPendingClearRowEmployeeId] = useState<string | null>(null)
   const { toast } = useToast()
 
   // Si no se proporciona open/onOpenChange, usar estado interno
@@ -113,6 +127,22 @@ export function WeekSchedule({
 
   // Función para copiar semana anterior
   const handleCopyPreviousWeek = useCallback(async () => {
+    if (!getWeekSchedule || readonly || !db || !user) {
+      return
+    }
+
+    // Si la semana está completada, pedir confirmación
+    if (isCompleted) {
+      setConfirmCopyDialogOpen(true)
+      return
+    }
+
+    // Ejecutar copia directamente
+    await executeCopyPreviousWeek()
+  }, [getWeekSchedule, readonly, db, user, isCompleted, weekStartDate, weekDays, employees, weekSchedule, toast])
+
+  // Función que ejecuta la copia de semana anterior
+  const executeCopyPreviousWeek = useCallback(async () => {
     if (!getWeekSchedule || readonly || !db || !user) {
       return
     }
@@ -377,6 +407,22 @@ export function WeekSchedule({
       return
     }
 
+    // Si la semana está completada, pedir confirmación
+    if (isCompleted) {
+      setConfirmClearDialogOpen(true)
+      return
+    }
+
+    // Ejecutar limpieza directamente
+    await executeClearWeek()
+  }, [readonly, db, user, isCompleted, weekDays, employees, weekSchedule, weekStartDate, toast])
+
+  // Función que ejecuta la limpieza de semana
+  const executeClearWeek = useCallback(async () => {
+    if (readonly || !db || !user) {
+      return
+    }
+
     setIsClearing(true)
     try {
       // Recolectar todas las celdas que necesitan ser limpiadas
@@ -527,8 +573,8 @@ export function WeekSchedule({
     }
   }, [weekDays, employees, weekSchedule, weekStartDate, user, readonly, toast])
 
-  // Función para limpiar la fila de un empleado específico
-  const handleClearEmployeeRow = useCallback(async (employeeId: string): Promise<boolean> => {
+  // Función que ejecuta la limpieza de fila del empleado
+  const executeClearEmployeeRow = useCallback(async (employeeId: string): Promise<boolean> => {
     if (readonly || !db || !user || !weekSchedule) {
       return false
     }
@@ -674,6 +720,43 @@ export function WeekSchedule({
       return false
     }
   }, [weekDays, employees, weekSchedule, weekStartDate, user, readonly, toast])
+
+  // Función para limpiar la fila de un empleado específico
+  const handleClearEmployeeRow = useCallback(async (employeeId: string): Promise<boolean> => {
+    if (readonly || !db || !user || !weekSchedule) {
+      return false
+    }
+
+    // Si la semana está completada, pedir confirmación
+    if (isCompleted) {
+      setPendingClearRowEmployeeId(employeeId)
+      setConfirmClearRowDialogOpen(true)
+      return false
+    }
+
+    // Ejecutar limpieza directamente
+    return await executeClearEmployeeRow(employeeId)
+  }, [readonly, db, user, weekSchedule, isCompleted, executeClearEmployeeRow])
+
+  // Handlers para confirmar acciones en semanas completadas
+  const handleConfirmCopy = useCallback(async () => {
+    setConfirmCopyDialogOpen(false)
+    await executeCopyPreviousWeek()
+  }, [executeCopyPreviousWeek])
+
+  const handleConfirmClear = useCallback(async () => {
+    setConfirmClearDialogOpen(false)
+    await executeClearWeek()
+  }, [executeClearWeek])
+
+  const handleConfirmClearRow = useCallback(async () => {
+    const employeeId = pendingClearRowEmployeeId
+    setConfirmClearRowDialogOpen(false)
+    setPendingClearRowEmployeeId(null)
+    if (employeeId) {
+      await executeClearEmployeeRow(employeeId)
+    }
+  }, [pendingClearRowEmployeeId, executeClearEmployeeRow])
 
   // Handler para exportar que abre la semana si está cerrada
   const handleExportImage = async () => {
@@ -886,6 +969,55 @@ export function WeekSchedule({
           />
         </div>
       </CollapsibleContent>
+
+      {/* Diálogos de confirmación para semanas completadas */}
+      <AlertDialog open={confirmCopyDialogOpen} onOpenChange={setConfirmCopyDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Confirmar copia de semana anterior?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta semana está marcada como completada. Al copiar la semana anterior, se modificarán las asignaciones actuales.
+              ¿Estás seguro de que deseas continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmCopy}>Confirmar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmClearDialogOpen} onOpenChange={setConfirmClearDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Confirmar limpieza de semana?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta semana está marcada como completada. Al limpiar la semana, se eliminarán todas las asignaciones.
+              ¿Estás seguro de que deseas continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmClear}>Confirmar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmClearRowDialogOpen} onOpenChange={setConfirmClearRowDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Confirmar limpieza de fila?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta semana está marcada como completada. Al limpiar la fila del empleado, se eliminarán todas sus asignaciones de la semana.
+              ¿Estás seguro de que deseas continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingClearRowEmployeeId(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmClearRow}>Confirmar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Collapsible>
   )
 }
