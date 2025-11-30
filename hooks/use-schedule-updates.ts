@@ -545,6 +545,7 @@ export function useScheduleUpdates({
     [user, employees, shifts, config, toast, getWeekSchedule, weekStartsOn, schedules],
   )
 
+
   return {
     handleAssignmentUpdate,
     handleMarkWeekComplete,

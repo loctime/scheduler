@@ -43,7 +43,6 @@ interface ScheduleGridProps {
   employeeStats?: Record<string, EmployeeMonthlyStats>
   isFirstWeek?: boolean // Indica si es la primera semana del mes
   isScheduleCompleted?: boolean // Indica si el horario está completado
-  onRemoveEmployeeFromWeek?: (employeeId: string) => void // Handler para eliminar empleado de la semana
 }
 
 export const ScheduleGrid = memo(function ScheduleGrid({
@@ -59,7 +58,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   employeeStats,
   isFirstWeek = false,
   isScheduleCompleted = false,
-  onRemoveEmployeeFromWeek,
 }: ScheduleGridProps) {
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
   const [extraMenuOpenKey, setExtraMenuOpenKey] = useState<string | null>(null)
@@ -422,8 +420,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                         onQuickAssignments={handleQuickAssignments}
                         cellUndoHistory={cellUndoHistory}
                         handleCellUndo={handleCellUndo}
-                        onRemoveEmployeeFromWeek={onRemoveEmployeeFromWeek}
-                        canRemoveEmployee={!isScheduleCompleted && !readonly}
                       />
                     )}
                   </React.Fragment>

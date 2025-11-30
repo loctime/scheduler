@@ -5,19 +5,9 @@ import { format } from "date-fns"
 import { Empleado, ShiftAssignment, MedioTurno, Turno } from "@/lib/types"
 import type { EmployeeMonthlyStats } from "../index"
 import { Button } from "@/components/ui/button"
-import { GripVertical, Plus, X } from "lucide-react"
+import { GripVertical, Plus } from "lucide-react"
 import { hexToRgba, formatStatValue } from "../utils/schedule-grid-utils"
 import { ScheduleCell } from "./schedule-cell"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 
 interface EmployeeRowProps {
   employee: Empleado
@@ -62,8 +52,6 @@ interface EmployeeRowProps {
   cellUndoHistory: Map<string, ShiftAssignment[]>
   handleCellUndo: (date: string, employeeId: string) => void
   // Remove employee props
-  onRemoveEmployeeFromWeek?: (employeeId: string) => void
-  canRemoveEmployee?: boolean
 }
 
 export function EmployeeRow({
@@ -100,21 +88,7 @@ export function EmployeeRow({
   onQuickAssignments,
   cellUndoHistory,
   handleCellUndo,
-  onRemoveEmployeeFromWeek,
-  canRemoveEmployee = false,
 }: EmployeeRowProps) {
-  const [showRemoveDialog, setShowRemoveDialog] = React.useState(false)
-
-  const handleRemoveClick = () => {
-    setShowRemoveDialog(true)
-  }
-
-  const handleConfirmRemove = () => {
-    if (onRemoveEmployeeFromWeek) {
-      onRemoveEmployeeFromWeek(employee.id)
-    }
-    setShowRemoveDialog(false)
-  }
   return (
     <tr
       key={employee.id}
@@ -137,59 +111,21 @@ export function EmployeeRow({
         }
       >
         <div className="flex flex-col gap-1">
-          {/* Botones de acción: agregar separador y eliminar empleado */}
-          {(showAddButton || (canRemoveEmployee && onRemoveEmployeeFromWeek)) && (
-            <div className="flex items-center justify-between -mt-1 mb-1">
-              {showAddButton && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 w-5 p-0 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onAddSeparator(employeeIndex)
-                  }}
-                  title="Agregar separador"
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-              )}
-              {!showAddButton && <div />}
-              {canRemoveEmployee && onRemoveEmployeeFromWeek && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-5 w-5 p-0 rounded-full text-destructive hover:text-destructive hover:bg-destructive/10 transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleRemoveClick()
-                    }}
-                    title="Eliminar de esta semana"
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                  <AlertDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Eliminar empleado de esta semana</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          ¿Estás seguro de que quieres eliminar a <strong>{employee.name}</strong> de esta semana?
-                          <br />
-                          <br />
-                          Se eliminarán todas sus asignaciones de esta semana. Esta acción no afectará otras semanas.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleConfirmRemove} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                          Eliminar
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </>
-              )}
+          {/* Botón de acción: agregar separador */}
+          {showAddButton && (
+            <div className="flex items-center justify-start -mt-1 mb-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onAddSeparator(employeeIndex)
+                }}
+                title="Agregar separador"
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
             </div>
           )}
           <div className="flex items-start gap-2">
