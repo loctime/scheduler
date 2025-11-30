@@ -3,21 +3,17 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { collection, query, orderBy, onSnapshot } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
-import { format, subMonths, addMonths, startOfWeek, addDays, subWeeks, addWeeks } from "date-fns"
-import { es } from "date-fns/locale"
+import { format, subMonths, addMonths, startOfWeek } from "date-fns"
 import { useData } from "@/contexts/data-context"
 import { Horario, ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
 import { useConfig } from "@/hooks/use-config"
 import { getCustomMonthRange, getMonthWeeks } from "@/lib/utils"
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { useScheduleUpdates } from "@/hooks/use-schedule-updates"
-import { calculateDailyHours, calculateExtraHours } from "@/lib/validations"
+import { calculateExtraHours } from "@/lib/validations"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { GeneralView } from "@/components/schedule-calendar/general-view"
-import { EmployeeView } from "@/components/schedule-calendar/employee-view"
-import { ShiftView } from "@/components/schedule-calendar/shift-view"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,14 +51,6 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   const weekStartsOn = (config?.semanaInicioDia || 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
 
   const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [employeeMonth, setEmployeeMonth] = useState(new Date())
-  const [shiftMonth, setShiftMonth] = useState(new Date())
-  const [activeTab, setActiveTab] = useState<"general" | "employee" | "shifts">("general")
-  const [employeeViewMode, setEmployeeViewMode] = useState<"week" | "month">("week")
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState("")
-  const [employeeWeekStart, setEmployeeWeekStart] = useState(() =>
-    startOfWeek(new Date(), { weekStartsOn }),
-  )
 
   const monthRange = useMemo(
     () => getCustomMonthRange(currentMonth, monthStartDay),
@@ -71,61 +59,6 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   const monthWeeks = useMemo(
     () => getMonthWeeks(currentMonth, monthStartDay, weekStartsOn),
     [currentMonth, monthStartDay, weekStartsOn],
-  )
-  const employeeMonthRange = useMemo(
-    () => getCustomMonthRange(employeeMonth, monthStartDay),
-    [employeeMonth, monthStartDay],
-  )
-  const employeeMonthWeeks = useMemo(
-    () => getMonthWeeks(employeeMonth, monthStartDay, weekStartsOn),
-    [employeeMonth, monthStartDay, weekStartsOn],
-  )
-  const shiftMonthRange = useMemo(
-    () => getCustomMonthRange(shiftMonth, monthStartDay),
-    [shiftMonth, monthStartDay],
-  )
-  const shiftMonthDays = useMemo(() => {
-    const days: Date[] = []
-    let cursor = new Date(shiftMonthRange.startDate)
-    while (cursor <= shiftMonthRange.endDate) {
-      days.push(cursor)
-      cursor = addDays(cursor, 1)
-    }
-    return days
-  }, [shiftMonthRange])
-  const employeeWeekDays = useMemo(
-    () => Array.from({ length: 7 }, (_, index) => addDays(employeeWeekStart, index)),
-    [employeeWeekStart],
-  )
-  const employeeWeekRange = useMemo(() => {
-    if (employeeWeekDays.length === 0) {
-      return null
-    }
-    return {
-      startDate: employeeWeekDays[0],
-      endDate: employeeWeekDays[employeeWeekDays.length - 1],
-    }
-  }, [employeeWeekDays])
-  const selectedEmployee = useMemo(
-    () => employees.find((employee) => employee.id === selectedEmployeeId) ?? null,
-    [employees, selectedEmployeeId],
-  )
-  const filteredEmployees = useMemo(() => (selectedEmployee ? [selectedEmployee] : []), [selectedEmployee])
-  const employeeWeekLabel = useMemo(() => {
-    if (!employeeWeekRange) return ""
-    return `Semana del ${format(employeeWeekRange.startDate, "d 'de' MMMM", { locale: es })} al ${format(
-      employeeWeekRange.endDate,
-      "d 'de' MMMM",
-      { locale: es },
-    )}`
-  }, [employeeWeekRange])
-  const employeeMonthRangeLabel = useMemo(
-    () => format(employeeMonthRange.startDate, "MMMM yyyy", { locale: es }),
-    [employeeMonthRange],
-  )
-  const shiftMonthLabel = useMemo(
-    () => format(shiftMonthRange.startDate, "MMMM yyyy", { locale: es }),
-    [shiftMonthRange],
   )
 
   // Función helper para obtener el horario de una semana específica
@@ -145,59 +78,6 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     [weekStartsOn, getWeekSchedule],
   )
 
-  const employeeWeekSchedule = useMemo(
-    () => (employeeWeekDays.length ? getWeekSchedule(employeeWeekDays[0]) : null),
-    [employeeWeekDays, getWeekSchedule],
-  )
-
-  const shiftAssignmentsByDay = useMemo(() => {
-    const matrix: Record<string, Record<string, string[]>> = {}
-    const employeeNameMap = new Map(employees.map((employee) => [employee.id, employee.name]))
-
-    shiftMonthDays.forEach((day) => {
-      const dateStr = format(day, "yyyy-MM-dd")
-      const dateAssignments = getDateAssignments(day)
-      if (!dateAssignments) {
-        return
-      }
-
-      Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
-        const employeeName = employeeNameMap.get(employeeId)
-        if (!employeeName) return
-        const normalizedAssignments = normalizeAssignments(assignmentValue)
-        normalizedAssignments.forEach((assignment) => {
-          if (assignment.type !== "shift" || !assignment.shiftId) return
-          if (!matrix[dateStr]) {
-            matrix[dateStr] = {}
-          }
-          if (!matrix[dateStr][assignment.shiftId]) {
-            matrix[dateStr][assignment.shiftId] = []
-          }
-          if (!matrix[dateStr][assignment.shiftId].includes(employeeName)) {
-            matrix[dateStr][assignment.shiftId].push(employeeName)
-          }
-        })
-      })
-    })
-
-    return matrix
-  }, [shiftMonthDays, getDateAssignments, employees])
-
-  const hasShiftAssignments = useMemo(() => {
-    return Object.values(shiftAssignmentsByDay).some((shiftMap) =>
-      Object.values(shiftMap).some((names) => names.length > 0),
-    )
-  }, [shiftAssignmentsByDay])
-
-  useEffect(() => {
-    if (!selectedEmployeeId && employees.length > 0) {
-      setSelectedEmployeeId(employees[0].id)
-    }
-  }, [employees, selectedEmployeeId])
-
-  useEffect(() => {
-    setEmployeeWeekStart((prev) => startOfWeek(prev, { weekStartsOn }))
-  }, [weekStartsOn])
 
   const { handleAssignmentUpdate, handleMarkWeekComplete, pendingEdit, setPendingEdit } = useScheduleUpdates({
     user,
@@ -216,41 +96,6 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     setCurrentMonth((prev) => addMonths(prev, 1))
   }, [])
 
-  const goToPreviousWeek = useCallback(() => {
-    setEmployeeWeekStart((prev) => startOfWeek(subWeeks(prev, 1), { weekStartsOn }))
-  }, [weekStartsOn])
-
-  const goToNextWeek = useCallback(() => {
-    setEmployeeWeekStart((prev) => startOfWeek(addWeeks(prev, 1), { weekStartsOn }))
-  }, [weekStartsOn])
-
-  const goToCurrentWeek = useCallback(() => {
-    setEmployeeWeekStart(startOfWeek(new Date(), { weekStartsOn }))
-  }, [weekStartsOn])
-
-  const goToPreviousEmployeeMonth = useCallback(() => {
-    setEmployeeMonth((prev) => subMonths(prev, 1))
-  }, [])
-
-  const goToNextEmployeeMonth = useCallback(() => {
-    setEmployeeMonth((prev) => addMonths(prev, 1))
-  }, [])
-
-  const goToCurrentEmployeeMonth = useCallback(() => {
-    setEmployeeMonth(new Date())
-  }, [])
-
-  const goToPreviousShiftMonth = useCallback(() => {
-    setShiftMonth((prev) => subMonths(prev, 1))
-  }, [])
-
-  const goToNextShiftMonth = useCallback(() => {
-    setShiftMonth((prev) => addMonths(prev, 1))
-  }, [])
-
-  const goToCurrentShiftMonth = useCallback(() => {
-    setShiftMonth(new Date())
-  }, [])
 
   useEffect(() => {
     // Solo crear listeners si el usuario está autenticado
@@ -429,86 +274,27 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Tabs
-        value={activeTab}
-        onValueChange={(value) => setActiveTab(value as "general" | "employee" | "shifts")}
-        className="space-y-6"
-      >
-        <TabsList className="grid w-full grid-cols-3 md:w-auto">
-          <TabsTrigger value="general">Vista general</TabsTrigger>
-          <TabsTrigger value="employee">Por empleado</TabsTrigger>
-          <TabsTrigger value="shifts">Por turnos</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="general" className="space-y-6">
-          <GeneralView
-            dataLoading={dataLoading}
-            employees={employees}
-            shifts={shifts}
-            monthRange={monthRange}
-            monthWeeks={monthWeeks}
-            exporting={exporting}
-            mediosTurnos={config?.mediosTurnos}
-            employeeMonthlyStats={employeeMonthlyStats}
-            getWeekSchedule={getWeekSchedule}
-            onAssignmentUpdate={handleAssignmentUpdate}
-            onExportMonthImage={handleExportMonthImage}
-            onExportMonthPDF={handleExportMonthPDF}
-            onExportWeekImage={handleExportWeekImage}
-            onExportWeekPDF={handleExportWeekPDF}
-            onExportWeekExcel={handleExportWeekExcel}
-            onPreviousMonth={goToPreviousMonth}
-            onNextMonth={goToNextMonth}
-            user={user}
-            onMarkWeekComplete={handleMarkWeekComplete}
-          />
-        </TabsContent>
-
-        <TabsContent value="employee" className="space-y-6">
-          <EmployeeView
-            dataLoading={dataLoading}
-            employees={employees}
-            shifts={shifts}
-            mediosTurnos={config?.mediosTurnos}
-            selectedEmployeeId={selectedEmployeeId}
-            selectedEmployeeName={selectedEmployee?.name}
-            onEmployeeChange={setSelectedEmployeeId}
-            employeeViewMode={employeeViewMode}
-            onViewModeChange={setEmployeeViewMode}
-            employeeWeekLabel={employeeWeekLabel}
-            employeeWeekDays={employeeWeekDays}
-            employeeWeekSchedule={employeeWeekSchedule}
-            employeeWeekRange={employeeWeekRange}
-            filteredEmployees={filteredEmployees}
-            employeeMonthRange={employeeMonthRange}
-            employeeMonthRangeLabel={employeeMonthRangeLabel}
-            employeeMonthWeeks={employeeMonthWeeks}
-            getWeekSchedule={getWeekSchedule}
-            onPreviousWeek={goToPreviousWeek}
-            onCurrentWeek={goToCurrentWeek}
-            onNextWeek={goToNextWeek}
-            onPreviousMonth={goToPreviousEmployeeMonth}
-            onCurrentMonth={goToCurrentEmployeeMonth}
-            onNextMonth={goToNextEmployeeMonth}
-            exporting={exporting}
-          />
-        </TabsContent>
-
-        <TabsContent value="shifts" className="space-y-6">
-          <ShiftView
-            dataLoading={dataLoading}
-            employees={employees}
-            shifts={shifts}
-            shiftMonthDays={shiftMonthDays}
-            shiftMonthLabel={shiftMonthLabel}
-            shiftAssignmentsByDay={shiftAssignmentsByDay}
-            hasShiftAssignments={hasShiftAssignments}
-            onPreviousMonth={goToPreviousShiftMonth}
-            onCurrentMonth={goToCurrentShiftMonth}
-            onNextMonth={goToNextShiftMonth}
-          />
-        </TabsContent>
-      </Tabs>
+      <GeneralView
+        dataLoading={dataLoading}
+        employees={employees}
+        shifts={shifts}
+        monthRange={monthRange}
+        monthWeeks={monthWeeks}
+        exporting={exporting}
+        mediosTurnos={config?.mediosTurnos}
+        employeeMonthlyStats={employeeMonthlyStats}
+        getWeekSchedule={getWeekSchedule}
+        onAssignmentUpdate={handleAssignmentUpdate}
+        onExportMonthImage={handleExportMonthImage}
+        onExportMonthPDF={handleExportMonthPDF}
+        onExportWeekImage={handleExportWeekImage}
+        onExportWeekPDF={handleExportWeekPDF}
+        onExportWeekExcel={handleExportWeekExcel}
+        onPreviousMonth={goToPreviousMonth}
+        onNextMonth={goToNextMonth}
+        user={user}
+        onMarkWeekComplete={handleMarkWeekComplete}
+      />
     </div>
   )
 }

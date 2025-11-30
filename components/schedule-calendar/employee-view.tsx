@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScheduleGrid } from "@/components/schedule-grid"
 import { WeekSchedule } from "@/components/schedule-calendar/week-schedule"
+import { EmployeeMonthCalendar } from "@/components/schedule-calendar/employee-month-calendar"
 import { EmptyStateCard, LoadingStateCard } from "@/components/schedule-calendar/state-card"
 import type { Empleado, Turno, Horario, MedioTurno } from "@/lib/types"
 
@@ -34,6 +35,7 @@ interface EmployeeViewProps {
   onCurrentMonth: () => void
   onNextMonth: () => void
   exporting: boolean
+  weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6
 }
 
 export function EmployeeView({
@@ -62,6 +64,7 @@ export function EmployeeView({
   onCurrentMonth,
   onNextMonth,
   exporting,
+  weekStartsOn,
 }: EmployeeViewProps) {
   if (dataLoading) {
     return <LoadingStateCard />
@@ -160,48 +163,16 @@ export function EmployeeView({
           />
         </Card>
       ) : (
-        <div className="space-y-6">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-xl font-semibold">{selectedEmployeeName}</p>
-              <p className="text-sm text-muted-foreground capitalize">{employeeMonthRangeLabel}</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={onPreviousMonth}>
-                Mes anterior
-              </Button>
-              <Button variant="outline" size="sm" onClick={onCurrentMonth}>
-                Mes actual
-              </Button>
-              <Button variant="outline" size="sm" onClick={onNextMonth}>
-                Mes siguiente
-              </Button>
-            </div>
-          </div>
-          <div id="employee-month-container" className="space-y-6">
-            {employeeMonthWeeks.map((weekDays, weekIndex) => {
-              const weekStartDate = weekDays[0]
-              const weekSchedule = getWeekSchedule(weekStartDate)
-              const weekKey = `${selectedEmployeeId}-${weekStartDate.toISOString()}`
-
-              return (
-                <WeekSchedule
-                  key={weekKey}
-                  weekDays={weekDays}
-                  weekIndex={weekIndex}
-                  weekSchedule={weekSchedule}
-                  employees={filteredEmployees}
-                  shifts={shifts}
-                  monthRange={employeeMonthRange}
-                  mediosTurnos={mediosTurnos}
-                  exporting={exporting}
-                  readonly
-                  showActions={false}
-                />
-              )
-            })}
-          </div>
-        </div>
+        <EmployeeMonthCalendar
+          selectedEmployeeId={selectedEmployeeId}
+          selectedEmployeeName={selectedEmployeeName}
+          monthRange={employeeMonthRange}
+          employees={filteredEmployees}
+          shifts={shifts}
+          mediosTurnos={mediosTurnos}
+          getWeekSchedule={getWeekSchedule}
+          weekStartsOn={weekStartsOn}
+        />
       )}
     </div>
   )
