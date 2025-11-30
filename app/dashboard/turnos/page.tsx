@@ -11,6 +11,7 @@ import {
   doc,
   serverTimestamp,
   deleteField,
+  getDoc,
 } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { DashboardLayout } from "@/components/dashboard-layout"
@@ -102,6 +103,14 @@ export default function TurnosPage() {
 
     try {
       if (editingShift) {
+        console.log("🔵 [TURNOS] Iniciando actualización de turno")
+        console.log("🔵 [TURNOS] Turno a editar:", {
+          id: editingShift.id,
+          name: editingShift.name,
+          userId: editingShift.userId,
+          currentUserId: user?.uid,
+        })
+        
         const updateData: any = {
           name: formData.name,
           color: formData.color,
@@ -122,7 +131,57 @@ export default function TurnosPage() {
           updateData.endTime2 = deleteField()
         }
         
-        await updateDoc(doc(db, COLLECTIONS.SHIFTS, editingShift.id), updateData)
+        // Crear una copia para logging sin las funciones especiales
+        const logData: any = {}
+        for (const key in updateData) {
+          const value = updateData[key]
+          if (value && typeof value === 'object' && value.constructor && value.constructor.name === 'FieldValue') {
+            if (value._methodName === 'serverTimestamp') {
+              logData[key] = "[ServerTimestamp]"
+            } else if (value._methodName === 'delete') {
+              logData[key] = "[DeleteField]"
+            } else {
+              logData[key] = `[${value.constructor.name}]`
+            }
+          } else {
+            logData[key] = value
+          }
+        }
+        console.log("🔵 [TURNOS] Datos a actualizar:", logData)
+        console.log("🔵 [TURNOS] Keys en updateData:", Object.keys(updateData))
+        console.log("🔵 [TURNOS] ¿Tiene createdAt en updateData?:", 'createdAt' in updateData)
+        console.log("🔵 [TURNOS] Verificando permisos:", {
+          isAuth: !!user,
+          userId: user?.uid,
+          shiftUserId: editingShift.userId,
+          match: user?.uid === editingShift.userId,
+        })
+        
+        const shiftRef = doc(db, COLLECTIONS.SHIFTS, editingShift.id)
+        console.log("🔵 [TURNOS] Referencia del documento:", shiftRef.path)
+        
+        // Leer el documento actual desde Firestore para verificar sus datos
+        const currentDoc = await getDoc(shiftRef)
+        if (currentDoc.exists()) {
+          const currentData = currentDoc.data()
+          console.log("🔵 [TURNOS] Datos actuales del documento en Firestore:", {
+            userId: currentData.userId,
+            name: currentData.name,
+            hasUserId: 'userId' in currentData,
+            allFields: Object.keys(currentData),
+          })
+          console.log("🔵 [TURNOS] Comparación userId:", {
+            documentUserId: currentData.userId,
+            currentUserUid: user?.uid,
+            match: currentData.userId === user?.uid,
+          })
+        } else {
+          console.error("❌ [TURNOS] El documento no existe en Firestore")
+        }
+        
+        await updateDoc(shiftRef, updateData)
+        console.log("✅ [TURNOS] Turno actualizado exitosamente")
+        
         toast({
           title: "Turno actualizado",
           description: "El turno se ha actualizado correctamente",
@@ -156,6 +215,26 @@ export default function TurnosPage() {
       await refreshShifts()
       setDialogOpen(false)
     } catch (error: any) {
+      console.error("❌ [TURNOS] Error al guardar turno:", error)
+      console.error("❌ [TURNOS] Detalles del error:", {
+        code: error.code,
+        message: error.message,
+        stack: error.stack,
+      })
+      
+      // Si es un error de permisos, mostrar información adicional
+      if (error.code === "permission-denied") {
+        console.error("❌ [TURNOS] Error de permisos - Información de depuración:", {
+          userId: user?.uid,
+          editingShift: editingShift ? {
+            id: editingShift.id,
+            userId: editingShift.userId,
+            name: editingShift.name,
+          } : null,
+          isAuth: !!user,
+        })
+      }
+      
       toast({
         title: "Error",
         description: error.message || "Ocurrió un error al guardar el turno",

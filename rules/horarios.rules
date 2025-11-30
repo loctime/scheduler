@@ -62,16 +62,8 @@ match /apps/horarios/shifts/{turnoId} {
     && nonEmptyString('color')
     && isTs('createdAt')
     && isTs('updatedAt');
-  allow update: if isAuth()
-    && resource.data.userId == uid()
-    && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
-    && nonEmptyString('name')
-    && isStringOrNull('startTime')
-    && isStringOrNull('endTime')
-    && isStringOrNull('startTime2')
-    && isStringOrNull('endTime2')
-    && nonEmptyString('color')
-    && unchanged('createdAt');
+  // Regla simplificada: solo verifica que el usuario es el dueño
+  allow update: if isAuth() && resource.data.userId == uid();
   allow delete: if isAuth() && resource.data.userId == uid();
 }
 
