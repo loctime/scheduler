@@ -100,17 +100,18 @@ export function GeneralView({
     })
   }, [])
 
-  if (dataLoading) {
-    return <LoadingStateCard />
-  }
-
   // Verificar si hay semanas completadas en el rango del mes
+  // IMPORTANTE: Este hook debe estar antes de cualquier return condicional
   const hasCompletedWeeks = useMemo(() => {
     return monthWeeks.some((weekDays) => {
       const weekSchedule = getWeekSchedule(weekDays[0])
       return weekSchedule?.completada === true
     })
   }, [monthWeeks, getWeekSchedule])
+
+  if (dataLoading) {
+    return <LoadingStateCard />
+  }
 
   // Si no hay empleados ni turnos activos, pero hay semanas completadas, mostrar el calendario
   // (las semanas completadas tienen sus propios snapshots de empleados)
@@ -237,6 +238,7 @@ export function GeneralView({
               user={user}
               onMarkComplete={onMarkWeekComplete}
               lastCompletedWeekStart={lastCompletedWeekStart}
+              getWeekSchedule={getWeekSchedule}
             />
           )
         })}
