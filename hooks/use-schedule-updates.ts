@@ -363,9 +363,28 @@ export function useScheduleUpdates({
           .filter((a) => a.type !== "franco" && a.type !== "medio_franco" && a.shiftId)
           .map((a) => a.shiftId!)
         if (shiftIds.length > 0) {
+          // Si la semana está completada, usar empleados del snapshot para la validación
+          const employeesForValidation = (() => {
+            if (weekSchedule?.completada === true && weekSchedule?.empleadosSnapshot) {
+              // Combinar empleados activos con snapshot
+              const activeEmployeesMap = new Map(employees.map((emp) => [emp.id, emp]))
+              return weekSchedule.empleadosSnapshot.map((snapshotEmp) => {
+                const activeEmp = activeEmployeesMap.get(snapshotEmp.id)
+                return activeEmp || {
+                  id: snapshotEmp.id,
+                  name: snapshotEmp.name,
+                  email: snapshotEmp.email,
+                  phone: snapshotEmp.phone,
+                  userId: '',
+                } as Empleado
+              })
+            }
+            return employees
+          })()
+          
           const overlaps = validateScheduleAssignments(
             { [date]: { [employeeId]: shiftIds } },
-            employees,
+            employeesForValidation,
             shifts
           )
           const relevantOverlaps = overlaps.filter(
@@ -473,41 +492,84 @@ export function useScheduleUpdates({
           
           // Si se está editando un horario completado, actualizar el snapshot de empleados
           if (weekSchedule.completada === true) {
-            const empleadosEnSemana = new Set<string>()
-            
             // Obtener IDs de empleados que tienen asignaciones después de la actualización
+            const empleadosConAsignaciones = new Set<string>()
             Object.values(currentAssignments).forEach((dateAssignments) => {
               if (dateAssignments && typeof dateAssignments === 'object') {
                 Object.keys(dateAssignments).forEach((employeeId) => {
-                  empleadosEnSemana.add(employeeId)
+                  empleadosConAsignaciones.add(employeeId)
                 })
               }
             })
             
-            // Agregar empleados del orden personalizado
-            if (config?.ordenEmpleados) {
-              config.ordenEmpleados.forEach((id) => {
-                if (employees.some((emp) => emp.id === id)) {
-                  empleadosEnSemana.add(id)
+            // Crear mapa de empleados activos para búsqueda rápida
+            const activeEmployeesMap = new Map(employees.map((emp) => [emp.id, emp]))
+            
+            // Crear mapa del snapshot existente para preservar empleados eliminados
+            const existingSnapshotMap = new Map()
+            if (weekSchedule.empleadosSnapshot) {
+              weekSchedule.empleadosSnapshot.forEach((snapshotEmp) => {
+                existingSnapshotMap.set(snapshotEmp.id, snapshotEmp)
+              })
+            }
+            
+            // Crear set de IDs del snapshot original para validar qué empleados pertenecen
+            const originalSnapshotIds = new Set(
+              weekSchedule.empleadosSnapshot?.map((e) => e.id) || []
+            )
+            
+            // Solo incluir empleados que:
+            // 1. Tienen asignaciones Y estaban en el snapshot original, O
+            // 2. Están en el snapshot original (aunque no tengan asignaciones actuales)
+            const empleadosSnapshot: any[] = []
+            
+            // Primero, agregar todos los empleados del snapshot original (preservar historial)
+            if (weekSchedule.empleadosSnapshot) {
+              weekSchedule.empleadosSnapshot.forEach((snapshotEmp) => {
+                const activeEmp = activeEmployeesMap.get(snapshotEmp.id)
+                
+                if (activeEmp) {
+                  // Si el empleado existe activamente, usar datos actuales pero mantener del snapshot
+                  const snapshot: any = {
+                    id: activeEmp.id,
+                    name: activeEmp.name,
+                  }
+                  if (activeEmp.email !== undefined) snapshot.email = activeEmp.email || null
+                  if (activeEmp.phone !== undefined) snapshot.phone = activeEmp.phone || null
+                  empleadosSnapshot.push(snapshot)
+                } else {
+                  // Si el empleado fue eliminado, preservar datos del snapshot original
+                  empleadosSnapshot.push({
+                    id: snapshotEmp.id,
+                    name: snapshotEmp.name,
+                    email: snapshotEmp.email || null,
+                    phone: snapshotEmp.phone || null,
+                  })
                 }
               })
             }
             
-            // Actualizar snapshot de empleados (solo incluir campos que tienen valor)
-            const empleadosSnapshot = employees
-              .filter((emp) => empleadosEnSemana.has(emp.id))
-              .map((emp) => {
-                const snapshot: any = {
-                  id: emp.id,
-                  name: emp.name,
+            // Si hay un empleado con asignaciones que NO está en el snapshot original,
+            // agregarlo (caso raro: alguien editó manualmente el documento)
+            empleadosConAsignaciones.forEach((employeeId) => {
+              if (!originalSnapshotIds.has(employeeId)) {
+                const activeEmp = activeEmployeesMap.get(employeeId)
+                if (activeEmp) {
+                  // Solo agregar si es un empleado activo (no crear genéricos)
+                  const snapshot: any = {
+                    id: activeEmp.id,
+                    name: activeEmp.name,
+                  }
+                  if (activeEmp.email !== undefined) snapshot.email = activeEmp.email || null
+                  if (activeEmp.phone !== undefined) snapshot.phone = activeEmp.phone || null
+                  empleadosSnapshot.push(snapshot)
                 }
-                if (emp.email) snapshot.email = emp.email
-                if (emp.phone) snapshot.phone = emp.phone
-                return snapshot
-              })
+              }
+            })
             
+            // Preservar el orden del snapshot original, no usar el orden de config
             updateData.empleadosSnapshot = empleadosSnapshot
-            updateData.ordenEmpleadosSnapshot = config?.ordenEmpleados || weekSchedule.ordenEmpleadosSnapshot || []
+            updateData.ordenEmpleadosSnapshot = weekSchedule.ordenEmpleadosSnapshot || []
           } else {
             // Preservar snapshot si existe (aunque no esté completado)
             if (weekSchedule.empleadosSnapshot !== undefined) {

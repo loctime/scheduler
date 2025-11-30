@@ -2,7 +2,7 @@ import { useCallback, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import type { Empleado, Turno, Horario, ShiftAssignment } from "@/lib/types"
+import type { Empleado, Turno, Horario, ShiftAssignment, Separador } from "@/lib/types"
 
 export function useExportSchedule() {
   const [exporting, setExporting] = useState(false)
@@ -361,49 +361,79 @@ export function useExportSchedule() {
     }
   }, [])
 
+  // Función helper para convertir color hex a RGB sin #
+  const hexToRgb = (hex: string): string => {
+    if (!hex) return "FFFFFF"
+    const cleanHex = hex.replace("#", "").trim()
+    if (cleanHex.length === 6) {
+      return cleanHex.toUpperCase()
+    }
+    if (cleanHex.length === 3) {
+      // Expandir formato corto #RGB a #RRGGBB
+      return cleanHex.split("").map(c => c + c).join("").toUpperCase()
+    }
+    return "FFFFFF"
+  }
+
+  // Función helper para determinar color de texto según contraste
+  const getTextColor = (bgColor: string): string => {
+    const rgb = hexToRgb(bgColor)
+    const r = parseInt(rgb.substring(0, 2), 16)
+    const g = parseInt(rgb.substring(2, 4), 16)
+    const b = parseInt(rgb.substring(4, 6), 16)
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return luminance > 0.5 ? "000000" : "FFFFFF"
+  }
+
   // Función para exportar a Excel
   const exportExcel = useCallback(async (
     weekDays: Date[],
     employees: Empleado[],
     shifts: Turno[],
     schedule: Horario | null,
-    filename: string
+    filename: string,
+    config?: { 
+      separadores?: Separador[], 
+      ordenEmpleados?: string[], 
+      colorEmpresa?: string,
+      nombreEmpresa?: string 
+    }
   ) => {
     setExporting(true)
     try {
-      const XLSX = await import("xlsx")
+      const XLSX = await import("xlsx-js-style")
 
       // Crear matriz de datos
       const data: any[][] = []
 
       // Fila de encabezados: Empleado + días de la semana
-      const headerRow = ["Empleado"]
+      const headerRow = [config?.nombreEmpresa || "Empleado"]
       weekDays.forEach((day) => {
         headerRow.push(format(day, "EEE d MMM", { locale: es }))
       })
       data.push(headerRow)
 
-      // Función helper para obtener el texto del turno
-      const getShiftText = (assignment: ShiftAssignment | string, shiftMap: Map<string, Turno>): string => {
+      // Función helper para obtener el texto del turno (con formato de líneas)
+      const getShiftText = (assignment: ShiftAssignment | string, shiftMap: Map<string, Turno>): { text: string, color?: string } => {
         if (typeof assignment === "string") {
           const shift = shiftMap.get(assignment)
-          return shift?.name || ""
+          return { text: shift?.name || "", color: shift?.color }
         }
         
         if (assignment.type === "franco") {
-          return "FRANCO"
+          return { text: "FRANCO" }
         }
         
         if (assignment.type === "medio_franco") {
           if (assignment.startTime && assignment.endTime) {
-            return `${assignment.startTime} - ${assignment.endTime} (1/2 Franco)`
+            return { text: `${assignment.startTime} - ${assignment.endTime}\n(1/2 Franco)`, color: "#22c55e" } // Verde por defecto
           }
-          return "1/2 Franco"
+          return { text: "1/2 Franco", color: "#22c55e" }
         }
         
         if (assignment.shiftId) {
           const shift = shiftMap.get(assignment.shiftId)
-          if (!shift) return ""
+          if (!shift) return { text: "" }
           
           const start = assignment.startTime || shift.startTime
           const end = assignment.endTime || shift.endTime
@@ -412,61 +442,268 @@ export function useExportSchedule() {
           
           if (start && end) {
             if (start2 && end2) {
-              return `${start} - ${end}\n${start2} - ${end2}`
+              // Turno cortado: una línea arriba, otra abajo
+              return { text: `${start} - ${end}\n${start2} - ${end2}`, color: shift.color }
             }
-            return `${start} - ${end}`
+            return { text: `${start} - ${end}`, color: shift.color }
           }
-          return shift.name
+          return { text: shift.name, color: shift.color }
         }
         
-        return ""
+        return { text: "" }
       }
 
       // Crear mapa de turnos para búsqueda rápida
       const shiftMap = new Map(shifts.map((s) => [s.id, s]))
+      
+      // Crear mapa de separadores
+      const separadorMap = new Map((config?.separadores || []).map((s) => [s.id, s]))
+      
+      // Crear mapa de empleados
+      const employeeMap = new Map(employees.map((e) => [e.id, e]))
 
-      // Filas de datos: una por empleado
-      employees.forEach((employee) => {
-        const row = [employee.name]
-        
-        weekDays.forEach((day) => {
-          const dateStr = format(day, "yyyy-MM-dd")
-          const assignments = schedule?.assignments[dateStr]?.[employee.id]
+      // Obtener orden de elementos (empleados y separadores)
+      let orderedItemIds: string[] = []
+      if (config?.ordenEmpleados && config.ordenEmpleados.length > 0) {
+        const employeeIds = new Set(employees.map((e) => e.id))
+        const separatorIds = new Set((config.separadores || []).map((s) => s.id))
+        const validOrder = config.ordenEmpleados.filter((id) => employeeIds.has(id) || separatorIds.has(id))
+        const newEmployees = employees.filter((emp) => !validOrder.includes(emp.id)).map((emp) => emp.id)
+        orderedItemIds = [...validOrder, ...newEmployees]
+      } else {
+        orderedItemIds = employees.map((emp) => emp.id)
+      }
+
+      let currentRow = 1 // Empezar después del header
+
+      // Procesar elementos ordenados (empleados y separadores)
+      orderedItemIds.forEach((id) => {
+        // Verificar si es un separador
+        if (separadorMap.has(id)) {
+          const separator = separadorMap.get(id)!
+          const row: any[] = [separator.nombre]
+          weekDays.forEach(() => row.push(""))
+          data.push(row)
+          currentRow++
+        }
+        // Verificar si es un empleado
+        else if (employeeMap.has(id)) {
+          const employee = employeeMap.get(id)!
+          const row: any[] = [employee.name]
           
-          if (!assignments || (Array.isArray(assignments) && assignments.length === 0)) {
-            row.push("-")
-          } else {
-            // Convertir a array de ShiftAssignment
-            let assignmentArray: ShiftAssignment[] = []
-            if (Array.isArray(assignments)) {
-              if (assignments.length > 0 && typeof assignments[0] === "string") {
-                // Formato antiguo: string[]
-                assignmentArray = (assignments as string[]).map((shiftId) => ({
-                  shiftId,
-                  type: "shift" as const,
-                }))
+          weekDays.forEach((day) => {
+            const dateStr = format(day, "yyyy-MM-dd")
+            const assignments = schedule?.assignments[dateStr]?.[employee.id]
+            
+            if (!assignments || (Array.isArray(assignments) && assignments.length === 0)) {
+              row.push("-")
+            } else {
+              // Convertir a array de ShiftAssignment
+              let assignmentArray: ShiftAssignment[] = []
+              if (Array.isArray(assignments)) {
+                if (assignments.length > 0 && typeof assignments[0] === "string") {
+                  assignmentArray = (assignments as string[]).map((shiftId) => ({
+                    shiftId,
+                    type: "shift" as const,
+                  }))
+                } else {
+                  assignmentArray = assignments as ShiftAssignment[]
+                }
+              }
+              
+              // Convertir asignaciones a texto (múltiples turnos separados por \n)
+              const shiftTexts = assignmentArray.map((a) => getShiftText(a, shiftMap)).filter(s => s.text)
+              
+              if (shiftTexts.length === 0) {
+                row.push("-")
               } else {
-                // Formato nuevo: ShiftAssignment[]
-                assignmentArray = assignments as ShiftAssignment[]
+                // Combinar textos con \n (cada turno en una línea)
+                const combinedText = shiftTexts.map(s => s.text).join("\n")
+                row.push(combinedText)
               }
             }
-            
-            // Convertir asignaciones a texto
-            const texts = assignmentArray.map((a) => getShiftText(a, shiftMap)).filter(Boolean)
-            row.push(texts.join("\n") || "-")
-          }
-        })
-        
-        data.push(row)
+          })
+          
+          data.push(row)
+          currentRow++
+        }
       })
 
       // Crear workbook y worksheet
       const ws = XLSX.utils.aoa_to_sheet(data)
       
+      // Aplicar estilos
+      const range = XLSX.utils.decode_range(ws["!ref"] || "A1")
+      
+      // Estilo para encabezados (fila 0) - más grandes y en negrita
+      for (let col = 0; col <= range.e.c; col++) {
+        const cellRef = XLSX.utils.encode_cell({ r: 0, c: col })
+        if (!ws[cellRef]) ws[cellRef] = {}
+        ws[cellRef].s = {
+          fill: { fgColor: { rgb: "E0E0E0" } },
+          font: { bold: true, sz: 12 },
+          alignment: { wrapText: true, vertical: "center", horizontal: "center" },
+          border: {
+            top: { style: "thin", color: { rgb: "000000" } },
+            bottom: { style: "thin", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "000000" } },
+            right: { style: "thin", color: { rgb: "000000" } },
+          }
+        }
+      }
+      
+      // Inicializar array de merges para combinar celdas
+      const merges: any[] = []
+      
+      // Rastrear el último separador encontrado para aplicar su color a empleados
+      let lastSeparator: Separador | null = null
+      
+      // Aplicar estilos a filas de datos
+      currentRow = 1
+      orderedItemIds.forEach((id) => {
+        // Verificar si es un separador
+        if (separadorMap.has(id)) {
+          const separator = separadorMap.get(id)!
+          lastSeparator = separator
+          const separatorColor = hexToRgb(separator.color || "#D3D3D3")
+          const separatorTextColor = getTextColor(separator.color || "#D3D3D3")
+          
+          // Combinar celdas de la fila del separador (desde columna 0 hasta la última)
+          merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: range.e.c } })
+          
+          // Aplicar estilo solo a la primera celda (las demás se combinarán)
+          const cellRef = XLSX.utils.encode_cell({ r: currentRow, c: 0 })
+          if (!ws[cellRef]) ws[cellRef] = {}
+          ws[cellRef].s = {
+            fill: { fgColor: { rgb: separatorColor } },
+            font: { bold: true, color: { rgb: separatorTextColor }, sz: 12 },
+            alignment: { wrapText: true, vertical: "center", horizontal: "center" },
+            border: {
+              top: { style: "thin", color: { rgb: "000000" } },
+              bottom: { style: "thin", color: { rgb: "000000" } },
+              left: { style: "thin", color: { rgb: "000000" } },
+              right: { style: "thin", color: { rgb: "000000" } },
+            }
+          }
+          
+          // Limpiar las otras celdas de la fila (se combinarán)
+          for (let col = 1; col <= range.e.c; col++) {
+            const cellRef = XLSX.utils.encode_cell({ r: currentRow, c: col })
+            if (ws[cellRef]) {
+              delete ws[cellRef]
+            }
+          }
+          
+          currentRow++
+        }
+        // Verificar si es un empleado
+        else if (employeeMap.has(id)) {
+          const employee = employeeMap.get(id)!
+          
+          // Color de fondo para columna de empleado: usar color del separador si existe, sino colorEmpresa
+          const employeeBgColor = lastSeparator 
+            ? hexToRgb(lastSeparator.color || "#D3D3D3")
+            : (config?.colorEmpresa ? hexToRgb(config.colorEmpresa) : "FFFFFF")
+          const employeeTextColor = getTextColor(lastSeparator?.color || config?.colorEmpresa || "#FFFFFF")
+          
+          const employeeCellRef = XLSX.utils.encode_cell({ r: currentRow, c: 0 })
+          if (!ws[employeeCellRef]) ws[employeeCellRef] = {}
+          ws[employeeCellRef].s = {
+            fill: { fgColor: { rgb: employeeBgColor } },
+            font: { bold: true, color: { rgb: employeeTextColor }, sz: 12 },
+            alignment: { wrapText: true, vertical: "center", horizontal: "center" },
+            border: {
+              top: { style: "thin", color: { rgb: "000000" } },
+              bottom: { style: "thin", color: { rgb: "000000" } },
+              left: { style: "thin", color: { rgb: "000000" } },
+              right: { style: "thin", color: { rgb: "000000" } },
+            }
+          }
+          
+          // Aplicar estilos a celdas de turnos
+          weekDays.forEach((day, dayIndex) => {
+            const dateStr = format(day, "yyyy-MM-dd")
+            const assignments = schedule?.assignments[dateStr]?.[employee.id]
+            const cellRef = XLSX.utils.encode_cell({ r: currentRow, c: dayIndex + 1 })
+            
+            if (!ws[cellRef]) ws[cellRef] = {}
+            
+            if (!assignments || (Array.isArray(assignments) && assignments.length === 0)) {
+              ws[cellRef].s = {
+                font: { bold: true, sz: 12 },
+                alignment: { wrapText: true, vertical: "center", horizontal: "center" },
+                border: {
+                  top: { style: "thin", color: { rgb: "000000" } },
+                  bottom: { style: "thin", color: { rgb: "000000" } },
+                  left: { style: "thin", color: { rgb: "000000" } },
+                  right: { style: "thin", color: { rgb: "000000" } },
+                }
+              }
+            } else {
+              // Convertir a array de ShiftAssignment
+              let assignmentArray: ShiftAssignment[] = []
+              if (Array.isArray(assignments)) {
+                if (assignments.length > 0 && typeof assignments[0] === "string") {
+                  assignmentArray = (assignments as string[]).map((shiftId) => ({
+                    shiftId,
+                    type: "shift" as const,
+                  }))
+                } else {
+                  assignmentArray = assignments as ShiftAssignment[]
+                }
+              }
+              
+              // Obtener color del primer turno (o el más común si hay varios)
+              const shiftTexts = assignmentArray.map((a) => getShiftText(a, shiftMap)).filter(s => s.text)
+              const primaryColor = shiftTexts[0]?.color || "FFFFFF"
+              const bgColor = hexToRgb(primaryColor)
+              const textColor = getTextColor(primaryColor)
+              
+              ws[cellRef].s = {
+                fill: { fgColor: { rgb: bgColor } },
+                font: { bold: true, color: { rgb: textColor }, sz: 12 },
+                alignment: { wrapText: true, vertical: "center", horizontal: "center" },
+                border: {
+                  top: { style: "thin", color: { rgb: "000000" } },
+                  bottom: { style: "thin", color: { rgb: "000000" } },
+                  left: { style: "thin", color: { rgb: "000000" } },
+                  right: { style: "thin", color: { rgb: "000000" } },
+                }
+              }
+            }
+          })
+          
+          currentRow++
+        }
+      })
+      
+      // Aplicar los merges al worksheet
+      if (merges.length > 0) {
+        ws["!merges"] = merges
+      }
+      
       // Ajustar ancho de columnas
-      const colWidths = [{ wch: 20 }] // Columna de empleado
-      weekDays.forEach(() => colWidths.push({ wch: 15 }))
+      const colWidths = [{ wch: 25 }] // Columna de empleado más ancha
+      weekDays.forEach(() => colWidths.push({ wch: 18 })) // Columnas de días más anchas
       ws["!cols"] = colWidths
+      
+      // Ajustar altura de filas (más altas para que se vea mejor el texto con wrap)
+      const rowHeights: any[] = []
+      // Header
+      rowHeights.push({ hpt: 30 })
+      
+      // Aplicar alturas según el tipo de fila
+      currentRow = 1
+      orderedItemIds.forEach((id) => {
+        if (separadorMap.has(id)) {
+          // Separadores más chicos
+          rowHeights.push({ hpt: 25 })
+        } else if (employeeMap.has(id)) {
+          // Filas de empleados más altas para acomodar múltiples líneas
+          rowHeights.push({ hpt: 50 })
+        }
+      })
+      ws["!rows"] = rowHeights
 
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, "Horario")

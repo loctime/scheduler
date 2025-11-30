@@ -6,7 +6,7 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { format, subMonths, addMonths, startOfWeek } from "date-fns"
 import { useData } from "@/contexts/data-context"
-import { Horario, ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
+import { Horario, ShiftAssignment, ShiftAssignmentValue, Turno } from "@/lib/types"
 import { useConfig } from "@/hooks/use-config"
 import { getCustomMonthRange, getMonthWeeks } from "@/lib/utils"
 import { useExportSchedule } from "@/hooks/use-export-schedule"
@@ -155,9 +155,15 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
       employees,
       shifts,
       weekSchedule,
-      `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.xlsx`
+      `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.xlsx`,
+      {
+        separadores: config?.separadores,
+        ordenEmpleados: config?.ordenEmpleados,
+        colorEmpresa: config?.colorEmpresa,
+        nombreEmpresa: config?.nombreEmpresa
+      }
     )
-  }, [exportExcel, employees, shifts])
+  }, [exportExcel, employees, shifts, config])
 
   const handleExportWeekPDF = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
     const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
