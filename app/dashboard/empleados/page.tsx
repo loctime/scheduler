@@ -10,6 +10,9 @@ import {
   deleteDoc,
   doc,
   serverTimestamp,
+  query,
+  where,
+  getDocs,
 } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { DashboardLayout } from "@/components/dashboard-layout"
@@ -32,12 +35,26 @@ import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Horario } from "@/lib/types"
 
 export default function EmpleadosPage() {
   const { employees, loading: dataLoading, refreshEmployees, user } = useData()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [bulkNames, setBulkNames] = useState("")
   const { toast } = useToast()
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [employeeToDelete, setEmployeeToDelete] = useState<{ id: string; name: string } | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   
   // Estados para edición inline
   const [editingField, setEditingField] = useState<{id: string, field: string} | null>(null)
@@ -167,25 +184,73 @@ export default function EmpleadosPage() {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar este empleado?")) return
+  const handleDeleteClick = (id: string, name: string) => {
+    setEmployeeToDelete({ id, name })
+    setDeleteDialogOpen(true)
+  }
 
-    if (!db) {
-      toast({
-        title: "Error",
-        description: "Firebase no está configurado",
-        variant: "destructive",
-      })
+  const handleDelete = async () => {
+    if (!employeeToDelete || !db) {
       return
     }
 
+    setIsDeleting(true)
     try {
-      await deleteDoc(doc(db, COLLECTIONS.EMPLOYEES, id))
+      // Obtener todos los horarios
+      const schedulesQuery = query(collection(db, COLLECTIONS.SCHEDULES))
+      const schedulesSnapshot = await getDocs(schedulesQuery)
+      
+      // Filtrar solo los horarios NO completados (completada !== true)
+      // Esto incluye horarios donde completada es false, null o undefined
+      const incompleteSchedules = schedulesSnapshot.docs.filter((scheduleDoc) => {
+        const schedule = scheduleDoc.data() as Horario
+        return schedule.completada !== true // Solo horarios que NO están completados
+      })
+      
+      // Eliminar asignaciones del empleado solo en horarios no completados
+      const deletePromises = incompleteSchedules.map(async (scheduleDoc) => {
+        const schedule = scheduleDoc.data() as Horario
+        
+        // Verificación adicional: NO actualizar si está completado
+        if (schedule.completada === true) {
+          console.log(`[handleDelete] Saltando horario completado: ${schedule.id}`)
+          return
+        }
+        
+        const updatedAssignments = { ...schedule.assignments }
+        let hasChanges = false
+        
+        // Eliminar el empleado de todas las fechas de este horario
+        Object.keys(updatedAssignments).forEach((date) => {
+          if (updatedAssignments[date][employeeToDelete.id]) {
+            delete updatedAssignments[date][employeeToDelete.id]
+            hasChanges = true
+          }
+        })
+        
+        // Solo actualizar si hay cambios
+        if (hasChanges) {
+          return updateDoc(scheduleDoc.ref, {
+            assignments: updatedAssignments,
+            updatedAt: serverTimestamp(),
+          })
+        }
+      })
+      
+      await Promise.all(deletePromises)
+      
+      // Eliminar el empleado del sistema
+      await deleteDoc(doc(db, COLLECTIONS.EMPLOYEES, employeeToDelete.id))
+      
       // Refrescar datos del contexto
       await refreshEmployees()
+      
+      setDeleteDialogOpen(false)
+      setEmployeeToDelete(null)
+      
       toast({
         title: "Empleado eliminado",
-        description: "El empleado se ha eliminado correctamente",
+        description: "El empleado se ha eliminado de todos los horarios no completados",
       })
     } catch (error: any) {
       toast({
@@ -193,6 +258,8 @@ export default function EmpleadosPage() {
         description: error.message || "Ocurrió un error al eliminar el empleado",
         variant: "destructive",
       })
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -343,7 +410,7 @@ export default function EmpleadosPage() {
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              onClick={() => handleDelete(employee.id)}
+                              onClick={() => handleDeleteClick(employee.id, employee.name)}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
@@ -396,6 +463,40 @@ export default function EmpleadosPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Eliminar empleado</AlertDialogTitle>
+              <AlertDialogDescription>
+                ¿Estás seguro de que quieres eliminar a <strong>{employeeToDelete?.name}</strong>?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Esta acción:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                <li>Eliminará al empleado del sistema</li>
+                <li>Eliminará sus asignaciones de todos los horarios <strong>no completados</strong></li>
+                <li>Mantendrá sus asignaciones en horarios ya marcados como "listos" (para el historial)</li>
+              </ul>
+              <p className="text-sm text-muted-foreground font-semibold">
+                Esta acción no se puede deshacer.
+              </p>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? "Eliminando..." : "Eliminar"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   )

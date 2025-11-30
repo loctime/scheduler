@@ -42,6 +42,8 @@ interface ScheduleGridProps {
   mediosTurnos?: MedioTurno[] // Medios turnos configurados
   employeeStats?: Record<string, EmployeeMonthlyStats>
   isFirstWeek?: boolean // Indica si es la primera semana del mes
+  isScheduleCompleted?: boolean // Indica si el horario está completado
+  onRemoveEmployeeFromWeek?: (employeeId: string) => void // Handler para eliminar empleado de la semana
 }
 
 export const ScheduleGrid = memo(function ScheduleGrid({
@@ -56,6 +58,8 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   mediosTurnos = [],
   employeeStats,
   isFirstWeek = false,
+  isScheduleCompleted = false,
+  onRemoveEmployeeFromWeek,
 }: ScheduleGridProps) {
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
   const [extraMenuOpenKey, setExtraMenuOpenKey] = useState<string | null>(null)
@@ -63,6 +67,36 @@ export const ScheduleGrid = memo(function ScheduleGrid({
 
   const { config } = useConfig()
   const { updateEmployeeOrder, addSeparator, updateSeparator, deleteSeparator } = useEmployeeOrder()
+
+  // Combinar empleados actuales con snapshot cuando el horario está completado
+  const employeesToUse = useMemo(() => {
+    if (isScheduleCompleted && schedule?.empleadosSnapshot) {
+      // Crear un mapa de empleados actuales
+      const currentEmployeesMap = new Map(employees.map((emp) => [emp.id, emp]))
+      const combined: Empleado[] = []
+      
+      // Primero agregar empleados del snapshot (mantener orden y datos históricos)
+      schedule.empleadosSnapshot.forEach((snapshotEmp) => {
+        const currentEmp = currentEmployeesMap.get(snapshotEmp.id)
+        if (currentEmp) {
+          // Si el empleado existe actualmente, usar datos actuales pero mantener estructura
+          combined.push(currentEmp)
+        } else {
+          // Si el empleado fue eliminado, usar datos del snapshot
+          combined.push({
+            id: snapshotEmp.id,
+            name: snapshotEmp.name,
+            email: snapshotEmp.email,
+            phone: snapshotEmp.phone,
+            userId: '', // No disponible en snapshot, pero necesario para el tipo
+          } as Empleado)
+        }
+      })
+      
+      return combined
+    }
+    return employees
+  }, [employees, schedule, isScheduleCompleted])
 
   // Hook para datos del grid
   const {
@@ -74,11 +108,14 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     getEmployeeAssignments,
     getShiftInfo,
   } = useScheduleGridData({
-    employees,
+    employees: employeesToUse,
     shifts,
     separadores: config?.separadores,
-    ordenEmpleados: config?.ordenEmpleados,
+    ordenEmpleados: isScheduleCompleted && schedule?.ordenEmpleadosSnapshot 
+      ? schedule.ordenEmpleadosSnapshot 
+      : config?.ordenEmpleados,
     schedule,
+    isScheduleCompleted,
   })
 
   // Hook para estilos de celdas
@@ -385,6 +422,8 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                         onQuickAssignments={handleQuickAssignments}
                         cellUndoHistory={cellUndoHistory}
                         handleCellUndo={handleCellUndo}
+                        onRemoveEmployeeFromWeek={onRemoveEmployeeFromWeek}
+                        canRemoveEmployee={!isScheduleCompleted && !readonly}
                       />
                     )}
                   </React.Fragment>

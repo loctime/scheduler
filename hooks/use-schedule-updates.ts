@@ -72,14 +72,64 @@ export function useScheduleUpdates({
           updateData.completadaPor = userId
           updateData.completadaPorNombre = userName
           updateData.completadaEn = serverTimestamp()
+          
+          // Guardar snapshot de empleados que estaban visibles cuando se completó
+          const empleadosEnSemana = new Set<string>()
+          
+          // Obtener IDs de empleados que tienen asignaciones
+          if (weekSchedule.assignments) {
+            Object.values(weekSchedule.assignments).forEach((dateAssignments) => {
+              if (dateAssignments && typeof dateAssignments === 'object') {
+                Object.keys(dateAssignments).forEach((employeeId) => {
+                  empleadosEnSemana.add(employeeId)
+                })
+              }
+            })
+          }
+          
+          // Agregar empleados del orden personalizado (para mantener estructura visual)
+          if (config?.ordenEmpleados) {
+            config.ordenEmpleados.forEach((id) => {
+              if (employees.some((emp) => emp.id === id)) {
+                empleadosEnSemana.add(id)
+              }
+            })
+          }
+          
+          // Crear snapshot de empleados (solo incluir campos que tienen valor)
+          const empleadosSnapshot = employees
+            .filter((emp) => empleadosEnSemana.has(emp.id))
+            .map((emp) => {
+              const snapshot: any = {
+                id: emp.id,
+                name: emp.name,
+              }
+              if (emp.email) snapshot.email = emp.email
+              if (emp.phone) snapshot.phone = emp.phone
+              return snapshot
+            })
+          
+          updateData.empleadosSnapshot = empleadosSnapshot
+          updateData.ordenEmpleadosSnapshot = config?.ordenEmpleados || []
         } else {
           updateData.completada = false
           updateData.completadaPor = null
           updateData.completadaPorNombre = null
           updateData.completadaEn = null
+          // Limpiar snapshot cuando se desmarca
+          updateData.empleadosSnapshot = null
+          updateData.ordenEmpleadosSnapshot = null
         }
 
-        await updateDoc(doc(db, COLLECTIONS.SCHEDULES, weekSchedule.id), updateData)
+        // Eliminar valores undefined del objeto (Firestore no los acepta)
+        const cleanUpdateData: any = {}
+        Object.keys(updateData).forEach((key) => {
+          if (updateData[key] !== undefined) {
+            cleanUpdateData[key] = updateData[key]
+          }
+        })
+
+        await updateDoc(doc(db, COLLECTIONS.SCHEDULES, weekSchedule.id), cleanUpdateData)
 
         toast({
           title: completed ? "Semana marcada como completada" : "Semana desmarcada",
@@ -227,6 +277,10 @@ export function useScheduleUpdates({
         if (!weekSchedule) {
           weekSchedule = getWeekSchedule(weekStartDate)
         }
+
+        // Permitir editar si el usuario confirmó (el modal ya lo maneja)
+        // Esta verificación ya no es necesaria porque handleAssignmentUpdate
+        // ya muestra el modal y solo llama a esta función si el usuario confirmó
 
         // Si no existe horario, crearlo. Si existe, actualizarlo
         if (!weekSchedule) {
@@ -417,7 +471,62 @@ export function useScheduleUpdates({
             updateData.completadaEn = weekSchedule.completadaEn
           }
           
-          await updateDoc(doc(db, COLLECTIONS.SCHEDULES, scheduleId), updateData)
+          // Si se está editando un horario completado, actualizar el snapshot de empleados
+          if (weekSchedule.completada === true) {
+            const empleadosEnSemana = new Set<string>()
+            
+            // Obtener IDs de empleados que tienen asignaciones después de la actualización
+            Object.values(currentAssignments).forEach((dateAssignments) => {
+              if (dateAssignments && typeof dateAssignments === 'object') {
+                Object.keys(dateAssignments).forEach((employeeId) => {
+                  empleadosEnSemana.add(employeeId)
+                })
+              }
+            })
+            
+            // Agregar empleados del orden personalizado
+            if (config?.ordenEmpleados) {
+              config.ordenEmpleados.forEach((id) => {
+                if (employees.some((emp) => emp.id === id)) {
+                  empleadosEnSemana.add(id)
+                }
+              })
+            }
+            
+            // Actualizar snapshot de empleados (solo incluir campos que tienen valor)
+            const empleadosSnapshot = employees
+              .filter((emp) => empleadosEnSemana.has(emp.id))
+              .map((emp) => {
+                const snapshot: any = {
+                  id: emp.id,
+                  name: emp.name,
+                }
+                if (emp.email) snapshot.email = emp.email
+                if (emp.phone) snapshot.phone = emp.phone
+                return snapshot
+              })
+            
+            updateData.empleadosSnapshot = empleadosSnapshot
+            updateData.ordenEmpleadosSnapshot = config?.ordenEmpleados || weekSchedule.ordenEmpleadosSnapshot || []
+          } else {
+            // Preservar snapshot si existe (aunque no esté completado)
+            if (weekSchedule.empleadosSnapshot !== undefined) {
+              updateData.empleadosSnapshot = weekSchedule.empleadosSnapshot
+            }
+            if (weekSchedule.ordenEmpleadosSnapshot !== undefined) {
+              updateData.ordenEmpleadosSnapshot = weekSchedule.ordenEmpleadosSnapshot
+            }
+          }
+          
+          // Eliminar valores undefined del objeto (Firestore no los acepta)
+          const cleanUpdateData: any = {}
+          Object.keys(updateData).forEach((key) => {
+            if (updateData[key] !== undefined) {
+              cleanUpdateData[key] = updateData[key]
+            }
+          })
+          
+          await updateDoc(doc(db, COLLECTIONS.SCHEDULES, scheduleId), cleanUpdateData)
 
           toast({
             title: "Turnos actualizados",

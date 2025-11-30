@@ -49,6 +49,14 @@ export interface Horario {
   completadaPor?: string // ID del usuario que marcó como completada
   completadaPorNombre?: string // Nombre del usuario que marcó como completada
   completadaEn?: any // Timestamp de cuando fue marcada como completada
+  // Snapshot de empleados cuando se completó (para mantener historial incluso si se eliminan empleados)
+  empleadosSnapshot?: Array<{
+    id: string
+    name: string
+    email?: string
+    phone?: string
+  }>
+  ordenEmpleadosSnapshot?: string[] // Orden de empleados cuando se completó
   createdAt?: any
   updatedAt?: any
   createdBy?: string

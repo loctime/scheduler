@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Download, Loader2, ChevronDown, ChevronUp, CheckCircle2, Circle } from "lucide-react"
 import { format } from "date-fns"
@@ -17,7 +17,7 @@ interface WeekScheduleProps {
   employees: Empleado[]
   shifts: Turno[]
   monthRange: { startDate: Date; endDate: Date }
-  onAssignmentUpdate?: (date: string, employeeId: string, assignments: any[]) => void
+  onAssignmentUpdate?: (date: string, employeeId: string, assignments: any[], options?: { scheduleId?: string }) => void
   onExportImage?: (weekStartDate: Date, weekEndDate: Date) => void
   onExportPDF?: (weekStartDate: Date, weekEndDate: Date) => void
   onExportExcel?: () => void
@@ -86,6 +86,25 @@ export function WeekSchedule({
       setIsMarkingComplete(false)
     }
   }
+
+  // Handler para eliminar empleado de esta semana
+  const handleRemoveEmployeeFromWeek = useCallback(async (employeeId: string) => {
+    if (!onAssignmentUpdate || !weekSchedule) return
+    
+    // Verificar que la semana no esté completada
+    if (weekSchedule.completada === true) {
+      return
+    }
+    
+    // Eliminar todas las asignaciones del empleado en esta semana
+    // Esperar a que todas las actualizaciones se completen
+    const updatePromises = weekDays.map((day) => {
+      const dateStr = format(day, "yyyy-MM-dd")
+      return onAssignmentUpdate(dateStr, employeeId, [], { scheduleId: weekSchedule.id })
+    })
+    
+    await Promise.all(updatePromises)
+  }, [onAssignmentUpdate, weekSchedule, weekDays])
 
   // Handler para exportar que abre la semana si está cerrada
   const handleExportImage = async () => {
@@ -249,6 +268,8 @@ export function WeekSchedule({
             mediosTurnos={mediosTurnos}
             employeeStats={employeeStats}
             readonly={readonly}
+            isScheduleCompleted={isCompleted}
+            onRemoveEmployeeFromWeek={handleRemoveEmployeeFromWeek}
           />
         </div>
       </CollapsibleContent>
