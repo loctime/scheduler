@@ -22,6 +22,7 @@ interface SeparatorRowProps {
   onCancel: () => void
   onEdit: (separator: Separador) => void
   onDelete: (separatorId: string) => void
+  isFirstSeparator?: boolean
 }
 
 export function SeparatorRow({
@@ -37,6 +38,7 @@ export function SeparatorRow({
   onCancel,
   onEdit,
   onDelete,
+  isFirstSeparator = false,
 }: SeparatorRowProps) {
   const isEditing = editingSeparatorId === separator.id
   const separatorColor = separator.color
@@ -150,46 +152,48 @@ export function SeparatorRow({
           </div>
         </td>
       </tr>
-      <tr
-        className="transition-colors"
-        style={(() => {
-          return separatorColor
-            ? {
-                borderBottomColor: separatorColor,
-                borderBottomWidth: "2px",
-                backgroundColor: hexToRgba(separatorColor, 0.1),
-              }
-            : {
-                borderBottomColor: "#000000",
-                borderBottomWidth: "2px",
-                backgroundColor: "rgb(var(--muted) / 0.3)",
-              }
-        })()}
-      >
-        <td
-          className="border-r-2 border-black px-4 py-0.5"
-          style={
-            separatorColor
-              ? { backgroundColor: hexToRgba(separatorColor, 0.1) }
-              : { backgroundColor: "rgb(var(--muted) / 0.3)" }
-          }
-        ></td>
-        {weekDays.map((day) => (
+      {!isFirstSeparator && (
+        <tr
+          className="transition-colors"
+          style={(() => {
+            return separatorColor
+              ? {
+                  borderBottomColor: separatorColor,
+                  borderBottomWidth: "2px",
+                  backgroundColor: hexToRgba(separatorColor, 0.1),
+                }
+              : {
+                  borderBottomColor: "#000000",
+                  borderBottomWidth: "2px",
+                  backgroundColor: "rgb(var(--muted) / 0.3)",
+                }
+          })()}
+        >
           <td
-            key={day.toISOString()}
-            className="border-r-2 border-black px-2 py-0.5 text-center last:border-r-0"
+            className="border-r-2 border-black px-4 py-0.5"
             style={
               separatorColor
                 ? { backgroundColor: hexToRgba(separatorColor, 0.1) }
                 : { backgroundColor: "rgb(var(--muted) / 0.3)" }
             }
-          >
-            <span className="text-xs font-semibold text-muted-foreground capitalize">
-              {format(day, "EEEE", { locale: es })}
-            </span>
-          </td>
-        ))}
-      </tr>
+          ></td>
+          {weekDays.map((day) => (
+            <td
+              key={day.toISOString()}
+              className="border-r-2 border-black px-2 py-0.5 text-center last:border-r-0"
+              style={
+                separatorColor
+                  ? { backgroundColor: hexToRgba(separatorColor, 0.1) }
+                  : { backgroundColor: "rgb(var(--muted) / 0.3)" }
+              }
+            >
+              <span className="text-xs font-semibold text-muted-foreground capitalize">
+                {format(day, "EEEE", { locale: es })}
+              </span>
+            </td>
+          ))}
+        </tr>
+      )}
     </>
   )
 }

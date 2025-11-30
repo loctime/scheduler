@@ -329,6 +329,8 @@ export const ScheduleGrid = memo(function ScheduleGrid({
               {orderedItems.map((item, itemIndex) => {
                 const showAddButton = !readonly && item.type === "employee"
                 const insertIndex = itemIndex
+                // Detectar si es el primer separador (está en el índice 0)
+                const isFirstSeparator = item.type === "separator" && itemIndex === 0
 
                 return (
                   <React.Fragment key={item.type === "employee" ? `emp-${item.data.id}` : `sep-${item.data.id}`}>
@@ -346,6 +348,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                         onCancel={handleCancelEdit}
                         onEdit={handleEditSeparator}
                         onDelete={handleDeleteSeparator}
+                        isFirstSeparator={isFirstSeparator}
                       />
                     ) : (
                       <EmployeeRow
