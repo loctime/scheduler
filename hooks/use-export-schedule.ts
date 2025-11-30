@@ -147,7 +147,7 @@ export function useExportSchedule() {
       const domtoimage = await import("dom-to-image-more")
 
       // Aumentar la escala para una imagen más grande y de mayor resolución
-      const scale = 3 // Aumentar de 1x a 3x para mejor calidad y tamaño
+      const scale = 4 // Aumentar a 4x para mejor calidad y tamaño más grande
       const dataUrl = await domtoimage.toPng(htmlElement, {
         quality: 1.0,
         bgcolor: "#ffffff",
@@ -215,7 +215,7 @@ export function useExportSchedule() {
       ])
 
       // Aumentar la escala para una imagen más grande y de mayor resolución
-      const scale = 3 // Aumentar a 3x para mejor calidad y tamaño
+      const scale = 4 // Aumentar a 4x para mejor calidad y tamaño más grande
       const dataUrl = await domtoimage.toPng(htmlElement, {
         quality: 1.0,
         bgcolor: "#ffffff",

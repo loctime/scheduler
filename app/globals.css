@@ -180,13 +180,29 @@
   padding: 6px 10px !important;
 }
 
-/* Reducir el ancho mínimo de las columnas para que se vea más grande */
+/* Ajustar las columnas al contenido sin espacios perdidos pero manteniendo legibilidad */
+.exporting-image table {
+  width: auto !important;
+  table-layout: auto !important;
+}
+
 .exporting-image th.min-w-\[220px\] {
-  min-width: 160px !important;
+  min-width: auto !important;
+  width: auto !important;
+  padding: 6px 8px !important;
 }
 
 .exporting-image th.min-w-\[180px\] {
-  min-width: 140px !important;
+  min-width: auto !important;
+  width: auto !important;
+  padding: 6px 8px !important;
+}
+
+.exporting-image td {
+  width: auto !important;
+  min-width: auto !important;
+  padding: 6px 8px !important;
+  white-space: normal !important;
 }
 
 /* Aumentar el tamaño de los textos durante la exportación */
