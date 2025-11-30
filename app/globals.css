@@ -180,6 +180,15 @@
   padding: 6px 10px !important;
 }
 
+/* Reducir el ancho mínimo de las columnas para que se vea más grande */
+.exporting-image th.min-w-\[220px\] {
+  min-width: 160px !important;
+}
+
+.exporting-image th.min-w-\[180px\] {
+  min-width: 140px !important;
+}
+
 /* Aumentar el tamaño de los textos durante la exportación */
 .exporting-image th {
   font-size: 2rem !important; /* Más grande que text-3xl */
