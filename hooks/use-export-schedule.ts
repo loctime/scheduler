@@ -385,6 +385,23 @@ export function useExportSchedule() {
     return luminance > 0.5 ? "000000" : "FFFFFF"
   }
 
+  // Función helper para suavizar colores (aumentar luminosidad ligeramente)
+  const softenColor = (hex: string, factor: number = 0.15): string => {
+    // Asegurarse de que el hex no tenga #
+    const cleanHex = hex.replace("#", "").trim()
+    const rgb = hexToRgb(cleanHex)
+    const r = parseInt(rgb.substring(0, 2), 16)
+    const g = parseInt(rgb.substring(2, 4), 16)
+    const b = parseInt(rgb.substring(4, 6), 16)
+    
+    // Mezclar con blanco para suavizar (factor: 0 = color original, 1 = blanco)
+    const newR = Math.round(r + (255 - r) * factor)
+    const newG = Math.round(g + (255 - g) * factor)
+    const newB = Math.round(b + (255 - b) * factor)
+    
+    return `${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`.toUpperCase()
+  }
+
   // Función para exportar a Excel
   const exportExcel = useCallback(async (
     weekDays: Date[],
@@ -421,14 +438,14 @@ export function useExportSchedule() {
         }
         
         if (assignment.type === "franco") {
-          return { text: "FRANCO" }
+          return { text: "FRANCO", color: "#22c55e" } // Verde (igual que medio franco) - hardcodeado
         }
         
         if (assignment.type === "medio_franco") {
           if (assignment.startTime && assignment.endTime) {
-            return { text: `${assignment.startTime} - ${assignment.endTime}\n(1/2 Franco)`, color: "#22c55e" } // Verde por defecto
+            return { text: `${assignment.startTime} - ${assignment.endTime}\n(1/2 Franco)`, color: "#22c55e" } // Verde por defecto - hardcodeado
           }
-          return { text: "1/2 Franco", color: "#22c55e" }
+          return { text: "1/2 Franco", color: "#22c55e" } // Verde por defecto - hardcodeado
         }
         
         if (assignment.shiftId) {
@@ -565,8 +582,10 @@ export function useExportSchedule() {
         if (separadorMap.has(id)) {
           const separator = separadorMap.get(id)!
           lastSeparator = separator
-          const separatorColor = hexToRgb(separator.color || "#D3D3D3")
-          const separatorTextColor = getTextColor(separator.color || "#D3D3D3")
+          // Suavizar el color del separador
+          const softenedSeparatorColor = softenColor(separator.color || "#D3D3D3")
+          const separatorColor = hexToRgb(softenedSeparatorColor)
+          const separatorTextColor = getTextColor(softenedSeparatorColor)
           
           // Combinar celdas de la fila del separador (desde columna 0 hasta la última)
           merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: range.e.c } })
@@ -601,10 +620,13 @@ export function useExportSchedule() {
           const employee = employeeMap.get(id)!
           
           // Color de fondo para columna de empleado: usar color del separador si existe, sino colorEmpresa
-          const employeeBgColor = lastSeparator 
-            ? hexToRgb(lastSeparator.color || "#D3D3D3")
-            : (config?.colorEmpresa ? hexToRgb(config.colorEmpresa) : "FFFFFF")
-          const employeeTextColor = getTextColor(lastSeparator?.color || config?.colorEmpresa || "#FFFFFF")
+          const employeeBaseColor = lastSeparator 
+            ? (lastSeparator.color || "#D3D3D3")
+            : (config?.colorEmpresa || "#FFFFFF")
+          // Suavizar el color del empleado
+          const softenedEmployeeColor = softenColor(employeeBaseColor)
+          const employeeBgColor = hexToRgb(softenedEmployeeColor)
+          const employeeTextColor = getTextColor(softenedEmployeeColor)
           
           const employeeCellRef = XLSX.utils.encode_cell({ r: currentRow, c: 0 })
           if (!ws[employeeCellRef]) ws[employeeCellRef] = {}
@@ -656,8 +678,10 @@ export function useExportSchedule() {
               // Obtener color del primer turno (o el más común si hay varios)
               const shiftTexts = assignmentArray.map((a) => getShiftText(a, shiftMap)).filter(s => s.text)
               const primaryColor = shiftTexts[0]?.color || "FFFFFF"
-              const bgColor = hexToRgb(primaryColor)
-              const textColor = getTextColor(primaryColor)
+              // Suavizar el color antes de usarlo
+              const softenedColor = softenColor(primaryColor)
+              const bgColor = hexToRgb(softenedColor)
+              const textColor = getTextColor(softenedColor)
               
               ws[cellRef].s = {
                 fill: { fgColor: { rgb: bgColor } },
@@ -697,7 +721,7 @@ export function useExportSchedule() {
       orderedItemIds.forEach((id) => {
         if (separadorMap.has(id)) {
           // Separadores más chicos
-          rowHeights.push({ hpt: 25 })
+          rowHeights.push({ hpt: 20 })
         } else if (employeeMap.has(id)) {
           // Filas de empleados más altas para acomodar múltiples líneas
           rowHeights.push({ hpt: 50 })

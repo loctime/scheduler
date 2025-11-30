@@ -11,6 +11,9 @@ interface UseScheduleGridDataProps {
   ordenEmpleados?: string[]
   schedule: Horario | HistorialItem | null
   isScheduleCompleted?: boolean
+  currentWeekStart?: string // Fecha de inicio de la semana actual (formato yyyy-MM-dd)
+  lastCompletedWeekStart?: string | null // Fecha de inicio de la última semana completada (formato yyyy-MM-dd)
+  allEmployees?: Empleado[] // Todos los empleados (para determinar cuáles son nuevos)
 }
 
 export function useScheduleGridData({
@@ -20,6 +23,9 @@ export function useScheduleGridData({
   ordenEmpleados = [],
   schedule,
   isScheduleCompleted = false,
+  currentWeekStart,
+  lastCompletedWeekStart,
+  allEmployees = [],
 }: UseScheduleGridDataProps) {
   // Memoizar mapa de turnos para búsqueda O(1)
   const shiftMap = useMemo(() => {
@@ -34,48 +40,87 @@ export function useScheduleGridData({
 
   // Filtrar empleados: si el horario está completado, mostrar empleados del snapshot
   // Si no hay snapshot, usar la lógica anterior (compatibilidad con horarios antiguos)
+  // Si la semana es pasada (no completada), solo mostrar empleados que existían entonces
   const filteredEmployees = useMemo(() => {
-    if (!isScheduleCompleted) {
-      // Si no está completado, mostrar todos los empleados
-      return employees
+    // Si está completado, usar lógica de snapshot
+    if (isScheduleCompleted) {
+      // Si está completado y tiene snapshot, usar empleados del snapshot
+      if (schedule?.empleadosSnapshot && schedule.empleadosSnapshot.length > 0) {
+        const snapshotIds = new Set(schedule.empleadosSnapshot.map((e) => e.id))
+        return employees.filter((emp) => snapshotIds.has(emp.id))
+      }
+      
+      // Fallback: si no hay snapshot, usar lógica anterior (compatibilidad)
+      const employeeIdsToShow = new Set<string>()
+      
+      // Agregar empleados que tienen asignaciones
+      if (schedule?.assignments) {
+        Object.values(schedule.assignments).forEach((dateAssignments) => {
+          if (dateAssignments && typeof dateAssignments === 'object') {
+            Object.keys(dateAssignments).forEach((employeeId) => {
+              employeeIdsToShow.add(employeeId)
+            })
+          }
+        })
+      }
+      
+      // Agregar empleados que están en el orden personalizado
+      if (ordenEmpleados && ordenEmpleados.length > 0) {
+        ordenEmpleados.forEach((id) => {
+          if (employees.some((emp) => emp.id === id)) {
+            employeeIdsToShow.add(id)
+          }
+        })
+      }
+      
+      // Si no hay empleados para mostrar, mostrar todos (por seguridad)
+      if (employeeIdsToShow.size === 0) {
+        return employees
+      }
+      
+      return employees.filter((emp) => employeeIdsToShow.has(emp.id))
     }
     
-    // Si está completado y tiene snapshot, usar empleados del snapshot
-    if (schedule?.empleadosSnapshot && schedule.empleadosSnapshot.length > 0) {
-      const snapshotIds = new Set(schedule.empleadosSnapshot.map((e) => e.id))
-      return employees.filter((emp) => snapshotIds.has(emp.id))
+    // Si no está completado, verificar si es una semana pasada
+    // Si hay última semana completada y la semana actual es anterior o igual a ella,
+    // solo mostrar empleados que existían en ese momento
+    if (lastCompletedWeekStart && currentWeekStart && currentWeekStart <= lastCompletedWeekStart) {
+      // Esta es una semana pasada (no completada), solo mostrar empleados que tienen asignaciones
+      // o que estaban en el orden personalizado en ese momento
+      const employeeIdsToShow = new Set<string>()
+      
+      // Agregar empleados que tienen asignaciones en esta semana
+      if (schedule?.assignments) {
+        Object.values(schedule.assignments).forEach((dateAssignments) => {
+          if (dateAssignments && typeof dateAssignments === 'object') {
+            Object.keys(dateAssignments).forEach((employeeId) => {
+              employeeIdsToShow.add(employeeId)
+            })
+          }
+        })
+      }
+      
+      // Agregar empleados que están en el orden personalizado
+      if (ordenEmpleados && ordenEmpleados.length > 0) {
+        ordenEmpleados.forEach((id) => {
+          if (employees.some((emp) => emp.id === id)) {
+            employeeIdsToShow.add(id)
+          }
+        })
+      }
+      
+      // Si no hay empleados para mostrar, mostrar todos (por seguridad)
+      if (employeeIdsToShow.size === 0) {
+        return employees
+      }
+      
+      return employees.filter((emp) => employeeIdsToShow.has(emp.id))
     }
     
-    // Fallback: si no hay snapshot, usar lógica anterior (compatibilidad)
-    const employeeIdsToShow = new Set<string>()
-    
-    // Agregar empleados que tienen asignaciones
-    if (schedule?.assignments) {
-      Object.values(schedule.assignments).forEach((dateAssignments) => {
-        if (dateAssignments && typeof dateAssignments === 'object') {
-          Object.keys(dateAssignments).forEach((employeeId) => {
-            employeeIdsToShow.add(employeeId)
-          })
-        }
-      })
-    }
-    
-    // Agregar empleados que están en el orden personalizado
-    if (ordenEmpleados && ordenEmpleados.length > 0) {
-      ordenEmpleados.forEach((id) => {
-        if (employees.some((emp) => emp.id === id)) {
-          employeeIdsToShow.add(id)
-        }
-      })
-    }
-    
-    // Si no hay empleados para mostrar, mostrar todos (por seguridad)
-    if (employeeIdsToShow.size === 0) {
-      return employees
-    }
-    
-    return employees.filter((emp) => employeeIdsToShow.has(emp.id))
-  }, [employees, schedule, isScheduleCompleted, ordenEmpleados])
+    // Si no está completado y es una semana futura (o no hay última semana completada),
+    // mostrar todos los empleados (incluyendo los nuevos)
+    return employees
+  }, [employees, schedule, isScheduleCompleted, ordenEmpleados, currentWeekStart, lastCompletedWeekStart])
 
   // Obtener orden de elementos (empleados y separadores) desde configuración o usar orden por defecto
   const orderedItemIds = useMemo(() => {

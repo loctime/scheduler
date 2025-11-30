@@ -28,6 +28,7 @@ export interface EmployeeMonthlyStats {
 interface ScheduleGridProps {
   weekDays: Date[]
   employees: Empleado[]
+  allEmployees?: Empleado[]
   shifts: Turno[]
   schedule: Horario | HistorialItem | null
   onShiftUpdate?: (date: string, employeeId: string, shiftIds: string[]) => void // formato antiguo (compatibilidad)
@@ -43,11 +44,13 @@ interface ScheduleGridProps {
   employeeStats?: Record<string, EmployeeMonthlyStats>
   isFirstWeek?: boolean // Indica si es la primera semana del mes
   isScheduleCompleted?: boolean // Indica si el horario está completado
+  lastCompletedWeekStart?: string | null // Fecha de inicio de la última semana completada (formato yyyy-MM-dd)
 }
 
 export const ScheduleGrid = memo(function ScheduleGrid({
   weekDays,
   employees,
+  allEmployees,
   shifts,
   schedule,
   onShiftUpdate,
@@ -58,6 +61,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   employeeStats,
   isFirstWeek = false,
   isScheduleCompleted = false,
+  lastCompletedWeekStart,
 }: ScheduleGridProps) {
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
   const [extraMenuOpenKey, setExtraMenuOpenKey] = useState<string | null>(null)
@@ -96,6 +100,11 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     return employees
   }, [employees, schedule, isScheduleCompleted])
 
+  // Obtener la fecha de inicio de la semana actual
+  const currentWeekStart = useMemo(() => {
+    return format(weekDays[0], "yyyy-MM-dd")
+  }, [weekDays])
+
   // Hook para datos del grid
   const {
     shiftMap,
@@ -114,6 +123,9 @@ export const ScheduleGrid = memo(function ScheduleGrid({
       : config?.ordenEmpleados,
     schedule,
     isScheduleCompleted,
+    currentWeekStart,
+    lastCompletedWeekStart,
+    allEmployees: allEmployees || employees, // Todos los empleados (sin filtrar) para el filtrado correcto
   })
 
   // Hook para estilos de celdas

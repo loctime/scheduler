@@ -15,6 +15,7 @@ interface WeekScheduleProps {
   weekIndex: number
   weekSchedule: Horario | null
   employees: Empleado[]
+  allEmployees?: Empleado[]
   shifts: Turno[]
   monthRange: { startDate: Date; endDate: Date }
   onAssignmentUpdate?: (date: string, employeeId: string, assignments: any[], options?: { scheduleId?: string }) => void
@@ -31,6 +32,7 @@ interface WeekScheduleProps {
   onOpenChange?: (open: boolean) => void
   user?: any
   onMarkComplete?: (weekStartDate: Date, completed: boolean) => Promise<void>
+  lastCompletedWeekStart?: string | null
 }
 
 export function WeekSchedule({
@@ -38,6 +40,7 @@ export function WeekSchedule({
   weekIndex,
   weekSchedule,
   employees,
+  allEmployees,
   shifts,
   monthRange,
   onAssignmentUpdate,
@@ -54,6 +57,7 @@ export function WeekSchedule({
   onOpenChange,
   user,
   onMarkComplete,
+  lastCompletedWeekStart,
 }: WeekScheduleProps) {
   const weekStartDate = weekDays[0]
   const weekEndDate = weekDays[weekDays.length - 1]
@@ -243,6 +247,7 @@ export function WeekSchedule({
           <ScheduleGrid
             weekDays={weekDays}
             employees={employees}
+            allEmployees={allEmployees || employees}
             shifts={shifts}
             schedule={weekSchedule}
             onAssignmentUpdate={onAssignmentUpdate}
@@ -251,6 +256,7 @@ export function WeekSchedule({
             employeeStats={employeeStats}
             readonly={readonly}
             isScheduleCompleted={isCompleted}
+            lastCompletedWeekStart={lastCompletedWeekStart}
           />
         </div>
       </CollapsibleContent>

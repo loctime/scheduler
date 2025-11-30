@@ -36,6 +36,7 @@ interface GeneralViewProps {
   onNextMonth: () => void
   user?: any
   onMarkWeekComplete?: (weekStartDate: Date, completed: boolean) => Promise<void>
+  lastCompletedWeekStart?: string | null
 }
 
 export function GeneralView({
@@ -58,6 +59,7 @@ export function GeneralView({
   onNextMonth,
   user,
   onMarkWeekComplete,
+  lastCompletedWeekStart,
 }: GeneralViewProps) {
   // Crear un mapa de semanas expandidas usando la fecha de inicio de semana como clave
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(() => {
@@ -220,6 +222,7 @@ export function GeneralView({
               weekIndex={weekIndex}
               weekSchedule={weekSchedule}
               employees={employeesForWeek}
+              allEmployees={employees}
               shifts={shifts}
               monthRange={monthRange}
               onAssignmentUpdate={onAssignmentUpdate}
@@ -233,6 +236,7 @@ export function GeneralView({
               onOpenChange={(open) => handleWeekToggle(weekStartDate, open)}
               user={user}
               onMarkComplete={onMarkWeekComplete}
+              lastCompletedWeekStart={lastCompletedWeekStart}
             />
           )
         })}

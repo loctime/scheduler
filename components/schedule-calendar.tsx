@@ -215,6 +215,22 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     } as Turno))
   }, [shifts, schedules, user])
 
+  // Calcular la última semana completada
+  const lastCompletedWeekStart = useMemo(() => {
+    const completedSchedules = schedules.filter((s) => s.completada === true && s.weekStart)
+    if (completedSchedules.length === 0) return null
+    
+    // Ordenar por weekStart descendente y tomar la más reciente
+    const sorted = completedSchedules
+      .filter((s) => s.weekStart)
+      .sort((a, b) => {
+        if (!a.weekStart || !b.weekStart) return 0
+        return b.weekStart.localeCompare(a.weekStart)
+      })
+    
+    return sorted.length > 0 ? sorted[0].weekStart : null
+  }, [schedules])
+
   const employeeMonthlyStats = useMemo<Record<string, EmployeeMonthlyStats>>(() => {
     const stats: Record<string, EmployeeMonthlyStats> = {}
     employees.forEach((employee) => {
@@ -345,6 +361,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         onNextMonth={goToNextMonth}
         user={user}
         onMarkWeekComplete={handleMarkWeekComplete}
+        lastCompletedWeekStart={lastCompletedWeekStart}
       />
     </div>
   )
