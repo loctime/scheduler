@@ -5,7 +5,7 @@ import { format } from "date-fns"
 import { Empleado, ShiftAssignment, MedioTurno, Turno } from "@/lib/types"
 import type { EmployeeMonthlyStats } from "../index"
 import { Button } from "@/components/ui/button"
-import { GripVertical, Plus } from "lucide-react"
+import { GripVertical, Plus, Trash2 } from "lucide-react"
 import { hexToRgba, formatStatValue } from "../utils/schedule-grid-utils"
 import { ScheduleCell } from "./schedule-cell"
 
@@ -51,7 +51,8 @@ interface EmployeeRowProps {
   // Undo props
   cellUndoHistory: Map<string, ShiftAssignment[]>
   handleCellUndo: (date: string, employeeId: string) => void
-  // Remove employee props
+  // Clear employee row
+  onClearEmployeeRow?: (employeeId: string) => Promise<boolean>
 }
 
 export function EmployeeRow({
@@ -88,6 +89,7 @@ export function EmployeeRow({
   onQuickAssignments,
   cellUndoHistory,
   handleCellUndo,
+  onClearEmployeeRow,
 }: EmployeeRowProps) {
   return (
     <tr
@@ -142,6 +144,22 @@ export function EmployeeRow({
             <div className="space-y-1 flex-1">
               <div className="flex items-center gap-2">
                 <p className="text-2xl font-bold">{employee.name}</p>
+                {!readonly && onClearEmployeeRow && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      const cleared = await onClearEmployeeRow(employee.id)
+                      // No mostramos toast aquí, el componente padre puede manejarlo si es necesario
+                    }}
+                    title="Limpiar todas las asignaciones de este empleado"
+                    aria-label="Limpiar fila del empleado"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </div>
               {employeeStats && employeeStats[employee.id] && (
                 <div className="employee-stats text-base text-muted-foreground space-y-0.5">

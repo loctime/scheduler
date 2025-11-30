@@ -9,6 +9,7 @@ import { ShiftSelectorPopover } from "../shift-selector-popover"
 import { adjustTime } from "@/lib/utils"
 import { useConfig } from "@/hooks/use-config"
 import { useEmployeeOrder } from "@/hooks/use-employee-order"
+import { useToast } from "@/hooks/use-toast"
 import { useScheduleGridData } from "./hooks/use-schedule-grid-data"
 import { useCellBackgroundStyles } from "./hooks/use-cell-background-styles"
 import { useDragAndDrop } from "./hooks/use-drag-and-drop"
@@ -68,6 +69,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   const [cellUndoHistory, setCellUndoHistory] = useState<Map<string, ShiftAssignment[]>>(new Map())
 
   const { config } = useConfig()
+  const { toast } = useToast()
   const { updateEmployeeOrder, addSeparator, updateSeparator, deleteSeparator } = useEmployeeOrder()
 
   // Combinar empleados actuales con snapshot cuando el horario está completado
@@ -328,6 +330,63 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     [onAssignmentUpdate, onShiftUpdate, schedule?.id, saveCellState]
   )
 
+  // Función para limpiar todas las asignaciones de un empleado para toda la semana
+  const handleClearEmployeeRow = useCallback(
+    async (employeeId: string) => {
+      if (!onAssignmentUpdate || readonly || !schedule) return false
+
+      try {
+        const employee = employeesToUse.find((emp) => emp.id === employeeId)
+        const employeeName = employee?.name || "empleado"
+
+        let clearedCount = 0
+
+        // Limpiar asignaciones del empleado para todos los días de la semana
+        for (const day of weekDays) {
+          const dateStr = format(day, "yyyy-MM-dd")
+          
+          // Verificar si el empleado tiene asignaciones en este día
+          const hasAssignments = schedule.assignments?.[dateStr]?.[employeeId]
+          
+          if (hasAssignments) {
+            // Limpiar las asignaciones (pasar array vacío)
+            await onAssignmentUpdate(
+              dateStr,
+              employeeId,
+              [],
+              { scheduleId: schedule.id }
+            )
+            clearedCount++
+          }
+        }
+
+        if (clearedCount > 0) {
+          toast({
+            title: "Fila limpiada",
+            description: `Se limpiaron todas las asignaciones de ${employeeName}.`,
+          })
+        } else {
+          toast({
+            title: "No hay asignaciones",
+            description: `${employeeName} no tiene asignaciones para limpiar.`,
+            variant: "default",
+          })
+        }
+
+        return clearedCount > 0
+      } catch (error: any) {
+        console.error("Error al limpiar fila del empleado:", error)
+        toast({
+          title: "Error",
+          description: error.message || "Ocurrió un error al limpiar la fila del empleado",
+          variant: "destructive",
+        })
+        return false
+      }
+    },
+    [onAssignmentUpdate, weekDays, schedule, readonly, employeesToUse, toast]
+  )
+
   // Obtener empleado y fecha seleccionados
   const selectedEmployee = selectedCell ? employees.find((e) => e.id === selectedCell.employeeId) : null
   const selectedDate = selectedCell
@@ -432,6 +491,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                         onQuickAssignments={handleQuickAssignments}
                         cellUndoHistory={cellUndoHistory}
                         handleCellUndo={handleCellUndo}
+                        onClearEmployeeRow={handleClearEmployeeRow}
                       />
                     )}
                   </React.Fragment>
