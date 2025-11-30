@@ -13,7 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import type { UseWeekActionsReturn } from "@/hooks/use-week-actions"
+import type { WeekActionsReturn } from "@/hooks/use-week-actions"
 
 interface WeekScheduleActionsProps {
   readonly: boolean
@@ -28,7 +28,7 @@ interface WeekScheduleActionsProps {
   onExportImage?: () => void
   onExportPDF?: () => void
   onExportExcel?: () => void
-  weekActions: UseWeekActionsReturn
+  weekActions: WeekActionsReturn
 }
 
 export function WeekScheduleActions({

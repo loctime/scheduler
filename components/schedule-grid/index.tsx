@@ -76,30 +76,35 @@ export const ScheduleGrid = memo(function ScheduleGrid({
 
   // Combinar empleados actuales con snapshot cuando el horario está completado
   const employeesToUse = useMemo(() => {
-    if (isScheduleCompleted && schedule?.empleadosSnapshot) {
-      // Crear un mapa de empleados actuales
-      const currentEmployeesMap = new Map(employees.map((emp) => [emp.id, emp]))
-      const combined: Empleado[] = []
-      
-      // Primero agregar empleados del snapshot (mantener orden y datos históricos)
-      schedule.empleadosSnapshot.forEach((snapshotEmp) => {
-        const currentEmp = currentEmployeesMap.get(snapshotEmp.id)
-        if (currentEmp) {
-          // Si el empleado existe actualmente, usar datos actuales pero mantener estructura
-          combined.push(currentEmp)
-        } else {
-          // Si el empleado fue eliminado, usar datos del snapshot
-          combined.push({
-            id: snapshotEmp.id,
-            name: snapshotEmp.name,
-            email: snapshotEmp.email,
-            phone: snapshotEmp.phone,
-            userId: '', // No disponible en snapshot, pero necesario para el tipo
-          } as Empleado)
-        }
-      })
-      
-      return combined
+    // Verificar que es un Horario (no HistorialItem) y tiene snapshot
+    // HistorialItem tiene 'horarioId', Horario no
+    if (isScheduleCompleted && schedule && !('horarioId' in schedule)) {
+      const horarioSchedule = schedule as Horario
+      if (horarioSchedule.empleadosSnapshot) {
+        // Crear un mapa de empleados actuales
+        const currentEmployeesMap = new Map(employees.map((emp) => [emp.id, emp]))
+        const combined: Empleado[] = []
+        
+        // Primero agregar empleados del snapshot (mantener orden y datos históricos)
+        horarioSchedule.empleadosSnapshot.forEach((snapshotEmp) => {
+          const currentEmp = currentEmployeesMap.get(snapshotEmp.id)
+          if (currentEmp) {
+            // Si el empleado existe actualmente, usar datos actuales pero mantener estructura
+            combined.push(currentEmp)
+          } else {
+            // Si el empleado fue eliminado, usar datos del snapshot
+            combined.push({
+              id: snapshotEmp.id,
+              name: snapshotEmp.name,
+              email: snapshotEmp.email,
+              phone: snapshotEmp.phone,
+              userId: '', // No disponible en snapshot, pero necesario para el tipo
+            } as Empleado)
+          }
+        })
+        
+        return combined
+      }
     }
     return employees
   }, [employees, schedule, isScheduleCompleted])
@@ -122,8 +127,8 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     employees: employeesToUse,
     shifts,
     separadores: config?.separadores,
-    ordenEmpleados: isScheduleCompleted && schedule?.ordenEmpleadosSnapshot 
-      ? schedule.ordenEmpleadosSnapshot 
+    ordenEmpleados: isScheduleCompleted && schedule && !('horarioId' in schedule) && (schedule as Horario).ordenEmpleadosSnapshot
+      ? (schedule as Horario).ordenEmpleadosSnapshot
       : config?.ordenEmpleados,
     schedule,
     isScheduleCompleted,

@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react"
-import { collection, addDoc, doc, serverTimestamp, getDoc } from "firebase/firestore"
+import { collection, addDoc, doc, serverTimestamp, getDoc, updateDoc } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { format, startOfWeek, addDays } from "date-fns"
 import { Empleado, Turno, Horario, ShiftAssignment } from "@/lib/types"
@@ -124,15 +124,8 @@ export function useScheduleUpdates({
           updateData.ordenEmpleadosSnapshot = null
         }
 
-        // Eliminar valores undefined del objeto (Firestore no los acepta)
-        const cleanUpdateData: any = {}
-        Object.keys(updateData).forEach((key) => {
-          if (updateData[key] !== undefined) {
-            cleanUpdateData[key] = updateData[key]
-          }
-        })
-
-        await updateDoc(doc(db, COLLECTIONS.SCHEDULES, weekSchedule.id), cleanUpdateData)
+        // Actualizar usando helper que preserva campos automáticamente
+        await updateSchedulePreservingFields(weekSchedule.id, weekSchedule, updateData)
 
         toast({
           title: completed ? "Semana marcada como completada" : "Semana desmarcada",

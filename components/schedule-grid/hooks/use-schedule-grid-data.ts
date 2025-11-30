@@ -44,10 +44,14 @@ export function useScheduleGridData({
   const filteredEmployees = useMemo(() => {
     // Si está completado, usar lógica de snapshot
     if (isScheduleCompleted) {
-      // Si está completado y tiene snapshot, usar empleados del snapshot
-      if (schedule?.empleadosSnapshot && schedule.empleadosSnapshot.length > 0) {
-        const snapshotIds = new Set(schedule.empleadosSnapshot.map((e) => e.id))
-        return employees.filter((emp) => snapshotIds.has(emp.id))
+      // Verificar que es un Horario (no HistorialItem) y tiene snapshot
+      // HistorialItem tiene 'horarioId', Horario no
+      if (schedule && !('horarioId' in schedule)) {
+        const horarioSchedule = schedule as Horario
+        if (horarioSchedule.empleadosSnapshot && horarioSchedule.empleadosSnapshot.length > 0) {
+          const snapshotIds = new Set(horarioSchedule.empleadosSnapshot.map((e) => e.id))
+          return employees.filter((emp) => snapshotIds.has(emp.id))
+        }
       }
       
       // Fallback: si no hay snapshot, usar lógica anterior (compatibilidad)

@@ -71,7 +71,7 @@ export function createHistoryEntry(
     createdAt: schedule.updatedAt || schedule.createdAt || serverTimestamp(),
     createdBy: schedule.createdBy || schedule.modifiedBy || userId,
     createdByName: schedule.createdByName || schedule.modifiedByName || userName,
-    accion,
+    accion: action,
     versionAnterior: action === "modificado",
   }
 }
