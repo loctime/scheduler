@@ -243,6 +243,9 @@ export function useScheduleUpdates({
       assignments: ShiftAssignment[],
       options?: { scheduleId?: string },
     ) => {
+      // Declarar weekSchedule fuera del try para que esté disponible en el catch
+      let weekSchedule: Horario | null = null
+      
       try {
         if (!db) {
           toast({
@@ -266,7 +269,6 @@ export function useScheduleUpdates({
         let scheduleNombre = `Semana del ${weekStartStr}`
 
         // Obtener el horario de esa semana específica
-        let weekSchedule: Horario | null = null
         if (options?.scheduleId) {
           weekSchedule = schedules.find((s) => s.id === options.scheduleId) || null
         }
