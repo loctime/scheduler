@@ -49,7 +49,7 @@ interface WeekGroup {
 export default function HorariosMensualesPage() {
   const [schedules, setSchedules] = useState<Horario[]>([])
   const { employees, shifts, loading: dataLoading, user } = useData()
-  const { config } = useConfig()
+  const { config } = useConfig(user)
   const { toast } = useToast()
   const { exporting, exportImage, exportPDF, exportExcel } = useExportSchedule()
   const weekStartsOn = (config?.semanaInicioDia || 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
@@ -59,7 +59,11 @@ export default function HorariosMensualesPage() {
   useEffect(() => {
     if (!user || !db) return
 
-    const schedulesQuery = query(collection(db, COLLECTIONS.SCHEDULES), orderBy("weekStart", "desc"))
+    const schedulesQuery = query(
+      collection(db, COLLECTIONS.SCHEDULES),
+      where("createdBy", "==", user.uid),
+      orderBy("weekStart", "desc")
+    )
     const unsubscribeSchedules = onSnapshot(
       schedulesQuery,
       (snapshot) => {

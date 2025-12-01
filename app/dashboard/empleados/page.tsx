@@ -196,11 +196,12 @@ export default function EmpleadosPage() {
     // Optimizado: obtener solo semanas completadas con límite
     if (db) {
       try {
-        // Query optimizada: obtener semanas completadas
-        // Nota: Para usar where + orderBy necesitaríamos un índice compuesto
-        // Por ahora obtenemos todas las completadas y ordenamos en cliente
+        // Query optimizada: obtener semanas completadas del usuario
+        // Nota: Para usar múltiples where + orderBy necesitaríamos un índice compuesto
+        // Por ahora obtenemos todas las completadas del usuario y ordenamos en cliente
         const completedQuery = query(
           collection(db, COLLECTIONS.SCHEDULES),
+          where("createdBy", "==", user.uid),
           where("completada", "==", true),
         )
         const schedulesSnapshot = await getDocs(completedQuery)
@@ -245,9 +246,10 @@ export default function EmpleadosPage() {
 
     setIsDeleting(true)
     try {
-      // Optimizar: obtener solo semanas completadas para encontrar la última
+      // Optimizar: obtener solo semanas completadas del usuario para encontrar la última
       const completedQuery = query(
         collection(db, COLLECTIONS.SCHEDULES),
+        where("createdBy", "==", user.uid),
         where("completada", "==", true),
       )
       const completedSnapshot = await getDocs(completedQuery)
@@ -270,13 +272,16 @@ export default function EmpleadosPage() {
         lastCompletedWeekStart = completedSchedules[0].weekStart || null
       }
       
-      // Obtener todos los horarios para filtrar en cliente
+      // Obtener todos los horarios del usuario para filtrar en cliente
       // Nota: Para optimizar más necesitaríamos índices compuestos en Firestore
       if (!db) {
         throw new Error("Firebase no está configurado")
       }
       
-      const schedulesQuery = query(collection(db, COLLECTIONS.SCHEDULES))
+      const schedulesQuery = query(
+        collection(db, COLLECTIONS.SCHEDULES),
+        where("createdBy", "==", user.uid)
+      )
       const schedulesSnapshot = await getDocs(schedulesQuery)
       
       // Filtrar solo los horarios que son futuros a la última semana completada

@@ -69,8 +69,9 @@ export function createHistoryEntry(
     weekStart: schedule.weekStart || weekStartStr || schedule.semanaInicio,
     assignments: { ...schedule.assignments },
     createdAt: schedule.updatedAt || schedule.createdAt || serverTimestamp(),
-    createdBy: schedule.createdBy || schedule.modifiedBy || userId,
-    createdByName: schedule.createdByName || schedule.modifiedByName || userName,
+    // Siempre usar el userId del usuario actual para el historial
+    createdBy: userId,
+    createdByName: userName,
     accion: action,
     versionAnterior: action === "modificado",
   }

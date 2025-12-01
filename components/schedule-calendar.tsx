@@ -41,7 +41,7 @@ const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAss
 
 export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   const { employees, shifts, loading: dataLoading } = useData()
-  const { config } = useConfig()
+  const { config } = useConfig(user)
   const { toast } = useToast()
   const { exporting, exportImage, exportPDF, exportExcel } = useExportSchedule()
 

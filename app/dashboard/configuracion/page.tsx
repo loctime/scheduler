@@ -84,7 +84,7 @@ export default function ConfiguracionPage() {
 
       try {
         setLoading(true)
-        const configRef = doc(db, COLLECTIONS.CONFIG, "general")
+        const configRef = doc(db, COLLECTIONS.CONFIG, user.uid)
         const configSnap = await getDoc(configRef)
 
         if (configSnap.exists()) {

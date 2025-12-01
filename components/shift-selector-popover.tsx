@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Turno, ShiftAssignment } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { useConfig } from "@/hooks/use-config"
+import { useData } from "@/contexts/data-context"
 import { useShiftSelector } from "@/hooks/use-shift-selector"
 import { SpecialTypeSelector } from "@/components/shift-selector/special-type-selector"
 import { ShiftItem } from "@/components/shift-selector/shift-item"
@@ -42,7 +43,8 @@ export function ShiftSelectorPopover({
   date,
 }: ShiftSelectorPopoverProps) {
   const { toast } = useToast()
-  const { config } = useConfig()
+  const { user } = useData()
+  const { config } = useConfig(user)
 
   const {
     tempSelected,

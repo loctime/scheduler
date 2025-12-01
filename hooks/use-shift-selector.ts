@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Turno, ShiftAssignment } from "@/lib/types"
 import { useConfig } from "@/hooks/use-config"
+import { useData } from "@/contexts/data-context"
 import { adjustTime } from "@/lib/utils"
 
 interface UseShiftSelectorProps {
@@ -16,7 +17,8 @@ export function useShiftSelector({
   shifts,
   open,
 }: UseShiftSelectorProps) {
-  const { config } = useConfig()
+  const { user } = useData()
+  const { config } = useConfig(user)
   const [tempSelected, setTempSelected] = useState<string[]>(selectedShiftIds)
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null)
   const [adjustedTimes, setAdjustedTimes] = useState<Record<string, Partial<ShiftAssignment>>>({})

@@ -47,12 +47,11 @@ export function useSchedulesListener({
       ? format(addMonths(monthRange.endDate, 3), "yyyy-MM-dd")
       : format(defaultEndDate, "yyyy-MM-dd")
 
-    // Query base - ordenado por weekStart descendente
+    // Query base - filtrado por createdBy y ordenado por weekStart descendente
     const schedulesQuery = query(
       collection(db, COLLECTIONS.SCHEDULES),
+      where("createdBy", "==", user.uid),
       orderBy("weekStart", "desc"),
-      // Nota: limit y where juntos requieren índice compuesto
-      // Por ahora filtramos en cliente para mantener flexibilidad
     )
 
     const unsubscribe = onSnapshot(
@@ -64,6 +63,7 @@ export function useSchedulesListener({
         })) as Horario[]
 
         // Filtrar schedules por rango de fechas en el cliente
+        // Ya están filtrados por createdBy en la query, solo necesitamos filtrar por fecha
         // Mantener todas las semanas completadas (para historial)
         const filteredSchedules = schedulesData.filter((schedule) => {
           if (!schedule.weekStart) return false

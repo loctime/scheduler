@@ -40,20 +40,24 @@ export default function HistorialPage() {
   useEffect(() => {
     if (!user || !db) return
 
-    // Obtener historial ordenado por fecha descendente
-    const historialQuery = query(collection(db, COLLECTIONS.HISTORIAL), orderBy("createdAt", "desc"), limit(50))
+    // Obtener historial ordenado por fecha descendente, filtrado por usuario
+    const historialQuery = query(
+      collection(db, COLLECTIONS.HISTORIAL),
+      where("createdBy", "==", user.uid),
+      orderBy("createdAt", "desc"),
+      limit(50)
+    )
     const unsubscribeHistorial = onSnapshot(historialQuery, (snapshot) => {
       setHistorial(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as HistorialItem)))
     }, (error) => {
       logger.error("Error en listener de historial:", error)
     })
 
-    // Obtener horarios actuales (solo los necesarios para el historial)
-    // Ya tiene limit(50) en historial, pero schedules podría beneficiarse de límite también
+    // Obtener horarios actuales (solo los necesarios para el historial), filtrados por usuario
     const schedulesQuery = query(
       collection(db, COLLECTIONS.SCHEDULES),
-      orderBy("weekStart", "desc"),
-      // Nota: Agregar límite requeriría considerar el uso. Por ahora mantenemos sin límite
+      where("createdBy", "==", user.uid),
+      orderBy("weekStart", "desc")
     )
     const unsubscribeSchedules = onSnapshot(schedulesQuery, (snapshot) => {
       setSchedules(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Horario)))

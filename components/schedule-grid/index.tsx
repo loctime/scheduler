@@ -10,6 +10,7 @@ import { adjustTime } from "@/lib/utils"
 import { useConfig } from "@/hooks/use-config"
 import { useEmployeeOrder } from "@/hooks/use-employee-order"
 import { useToast } from "@/hooks/use-toast"
+import { useData } from "@/contexts/data-context"
 import { useScheduleGridData } from "./hooks/use-schedule-grid-data"
 import { useCellBackgroundStyles } from "./hooks/use-cell-background-styles"
 import { useDragAndDrop } from "./hooks/use-drag-and-drop"
@@ -70,7 +71,8 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   const [extraMenuOpenKey, setExtraMenuOpenKey] = useState<string | null>(null)
   const [cellUndoHistory, setCellUndoHistory] = useState<Map<string, ShiftAssignment[]>>(new Map())
 
-  const { config } = useConfig()
+  const { user } = useData()
+  const { config } = useConfig(user)
   const { toast } = useToast()
   const { updateEmployeeOrder, addSeparator, updateSeparator, deleteSeparator } = useEmployeeOrder()
 

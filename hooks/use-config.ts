@@ -5,17 +5,18 @@ import { doc, onSnapshot } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { Configuracion } from "@/lib/types"
 
-export function useConfig() {
+export function useConfig(user?: { uid: string } | null) {
   const [config, setConfig] = useState<Configuracion | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!db) {
+    if (!db || !user?.uid) {
       setLoading(false)
       return
     }
 
-    const configRef = doc(db, COLLECTIONS.CONFIG, "general")
+    // Usar userId como ID del documento de configuración
+    const configRef = doc(db, COLLECTIONS.CONFIG, user.uid)
     
     // Configuración por defecto
     const defaultConfig: Configuracion = {
@@ -53,7 +54,7 @@ export function useConfig() {
     return () => {
       unsubscribe()
     }
-  }, [])
+  }, [user?.uid])
 
   return { config, loading }
 }

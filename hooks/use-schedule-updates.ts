@@ -28,7 +28,7 @@ export function useScheduleUpdates({
   getWeekSchedule,
 }: UseScheduleUpdatesProps) {
   const { toast } = useToast()
-  const { config } = useConfig()
+  const { config } = useConfig(user)
   const [pendingEdit, setPendingEdit] = useState<{
     date: string
     employeeId: string

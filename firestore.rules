@@ -102,11 +102,6 @@ service cloud.firestore {
       return !(field in request.resource.data) || request.resource.data[field] is string || request.resource.data[field] == null;
     }
     
-    // Helper para validar campos que pueden ser string, null, o eliminados (no presentes)
-    function isStringOrNullOrMissing(field) {
-      return !(field in request.resource.data) || request.resource.data[field] is string || request.resource.data[field] == null;
-    }
-    
     // Lectura pública por flag booleano del doc
     function publicRead(flagField) {
       return resource.data[flagField] == true;
@@ -187,7 +182,7 @@ service cloud.firestore {
     
     // Colección: apps/horarios/schedules
     match /apps/horarios/schedules/{horarioId} {
-      allow read: if isAuth();
+      allow read: if isAuth() && resource.data.createdBy == uid();
       allow create: if isAuth()
         && nonEmptyString('nombre')
         && nonEmptyString('weekStart')
@@ -196,7 +191,8 @@ service cloud.firestore {
         && request.resource.data.assignments is map
         && isTs('createdAt')
         && isTs('updatedAt')
-        && (isStringOrNull('createdBy') || request.resource.data.createdBy == uid())
+        && nonEmptyString('createdBy')
+        && request.resource.data.createdBy == uid()
         && isStringOrNull('createdByName')
         && isStringOrNull('modifiedBy')
         && isStringOrNull('modifiedByName')
@@ -205,6 +201,7 @@ service cloud.firestore {
         && (request.resource.data.completadaPorNombre == null || request.resource.data.completadaPorNombre is string)
         && (request.resource.data.completadaEn == null || request.resource.data.completadaEn is timestamp);
       allow update: if isAuth()
+        && resource.data.createdBy == uid()
         && (!('nombre' in request.resource.data) || nonEmptyString('nombre'))
         && (!('weekStart' in request.resource.data) || nonEmptyString('weekStart'))
         && (!('semanaInicio' in request.resource.data) || nonEmptyString('semanaInicio'))
@@ -217,15 +214,15 @@ service cloud.firestore {
         && (!('completadaPorNombre' in request.resource.data) || request.resource.data.completadaPorNombre is string || request.resource.data.completadaPorNombre == null)
         && (!('completadaEn' in request.resource.data) || request.resource.data.completadaEn is timestamp || request.resource.data.completadaEn == null)
         && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp)
-        && (!('createdAt' in request.resource.data) || request.resource.data.createdAt is timestamp)
-        && (!('createdBy' in request.resource.data) || isStringOrNull('createdBy'))
-        && (!('createdByName' in request.resource.data) || isStringOrNull('createdByName'));
-      allow delete: if isAuth();
+        && unchanged('createdAt')
+        && unchanged('createdBy')
+        && (!('createdByName' in request.resource.data) || request.resource.data.createdByName == resource.data.createdByName);
+      allow delete: if isAuth() && resource.data.createdBy == uid();
     }
     
     // Colección: apps/horarios/historial
     match /apps/horarios/historial/{historialId} {
-      allow read: if isAuth();
+      allow read: if isAuth() && resource.data.createdBy == uid();
       allow create: if isAuth()
         && nonEmptyString('horarioId')
         && nonEmptyString('nombre')
@@ -234,19 +231,20 @@ service cloud.firestore {
         && request.resource.data.assignments is map
         && (request.resource.data.accion == 'creado' || request.resource.data.accion == 'modificado')
         && isTs('createdAt')
-        && (isStringOrNull('createdBy') || request.resource.data.createdBy == uid())
+        && nonEmptyString('createdBy')
+        && request.resource.data.createdBy == uid()
         && isStringOrNull('createdByName')
         && (isBool('versionAnterior') || !('versionAnterior' in request.resource.data));
       allow update: if false; // Historial es inmutable
-      allow delete: if isAuth();
+      allow delete: if isAuth() && resource.data.createdBy == uid();
     }
     
     // Colección: apps/horarios/config
     match /apps/horarios/config/{configId} {
-      // Permitir lectura a cualquier usuario autenticado
-      allow read: if isAuth();
-      // Permitir crear/actualizar a cualquier usuario autenticado
-      allow create, update: if isAuth();
+      // Cada usuario solo puede leer/editar su propia configuración (configId debe ser su uid)
+      allow read: if isAuth() && configId == uid();
+      allow create: if isAuth() && configId == uid();
+      allow update: if isAuth() && configId == uid();
       allow delete: if false; // No permitir eliminar configuración
     }
     

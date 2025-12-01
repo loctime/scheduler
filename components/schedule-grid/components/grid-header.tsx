@@ -4,6 +4,7 @@ import React, { useMemo } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { useConfig } from "@/hooks/use-config"
+import { useData } from "@/contexts/data-context"
 import { hexToRgba } from "../utils/schedule-grid-utils"
 
 interface GridHeaderProps {
@@ -11,7 +12,8 @@ interface GridHeaderProps {
 }
 
 export function GridHeader({ weekDays }: GridHeaderProps) {
-  const { config } = useConfig()
+  const { user } = useData()
+  const { config } = useConfig(user)
   const nombreEmpresa = config?.nombreEmpresa || "Empleado"
   const colorEmpresa = config?.colorEmpresa
 
