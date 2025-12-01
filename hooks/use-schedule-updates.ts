@@ -536,9 +536,17 @@ export function useScheduleUpdates({
           logger.debug("Actualizando schedule:", {
             scheduleId,
             userId,
+            weekScheduleCreatedBy: weekSchedule.createdBy,
             hasCreatedBy: !!weekSchedule.createdBy,
             updateDataKeys: Object.keys(updateData),
+            updateDataCreatedBy: updateData.createdBy,
           })
+          
+          // Verificar que el schedule tenga createdBy antes de actualizar
+          if (!weekSchedule.createdBy) {
+            throw new Error(`El schedule ${scheduleId} no tiene createdBy. Esto no debería pasar con schedules nuevos.`)
+          }
+          
           await updateSchedulePreservingFields(scheduleId, weekSchedule, updateData)
 
           toast({

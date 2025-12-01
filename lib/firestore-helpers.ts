@@ -15,9 +15,13 @@ export function preserveScheduleFields(
   if (currentSchedule.createdAt !== undefined && currentSchedule.createdAt !== null) {
     preserved.createdAt = currentSchedule.createdAt
   }
-  // createdBy siempre debe estar presente y preservarse
-  if (currentSchedule.createdBy !== undefined && currentSchedule.createdBy !== null) {
+  // createdBy SIEMPRE debe preservarse si existe en el schedule actual
+  // Esto es crítico para las reglas de seguridad
+  if (currentSchedule.createdBy) {
     preserved.createdBy = currentSchedule.createdBy
+  }
+  if (currentSchedule.createdByName) {
+    preserved.createdByName = currentSchedule.createdByName
   }
   if (currentSchedule.createdByName !== undefined) {
     preserved.createdByName = currentSchedule.createdByName

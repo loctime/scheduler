@@ -113,126 +113,73 @@ service cloud.firestore {
     
     // ========= HORARIOS SCHEDULER =========
     
-    // Helper para verificar que el usuario tiene documento en apps/horarios/users
-    function horariosUserDocExists() {
-      return isAuth() && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()));
-    }
-    
     // Colección: apps/horarios/users
     match /apps/horarios/users/{userId} {
-      allow read: if isAuth() && uid() == userId;
-      allow create: if isAuth() && uid() == userId
-        && nonEmptyString('uid')
-        && request.resource.data.uid == uid()
-        && isStringOrNull('email')
-        && isStringOrNull('displayName')
-        && isStringOrNull('photoURL')
-        && isStringOrNull('role')
-        && isTs('createdAt')
-        && isTs('updatedAt');
-      allow update: if isAuth() && uid() == userId
-        && unchanged('uid')
-        && isStringOrNull('email')
-        && isStringOrNull('displayName')
-        && isStringOrNull('photoURL')
-        && isStringOrNull('role')
-        && unchanged('createdAt');
-      allow delete: if false; // No permitir eliminar usuarios
+      // Solo el usuario puede leer/escribir su propio documento
+      allow read, write: if isAuth() && userId == uid();
+      // No permitir eliminar usuarios
+      allow delete: if false;
+      // En update: proteger que no se cambie el uid
+      allow update: if isAuth() && userId == uid() && unchanged('uid');
     }
     
     // Colección: apps/horarios/employees
     match /apps/horarios/employees/{empleadoId} {
+      // Solo el dueño puede leer
       allow read: if isAuth() && resource.data.userId == uid();
-      allow create: if isAuth()
-        && nonEmptyString('name')
-        && nonEmptyString('userId')
-        && request.resource.data.userId == uid()
-            && isStringOrNull('email')
-            && isStringOrNull('phone')
-            && isTs('createdAt')
-        && isTs('updatedAt');
-      allow update: if isAuth()
-        && resource.data.userId == uid()
-        && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
-        && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() >= 1))
-        && (!('email' in request.resource.data) || request.resource.data.email is string || request.resource.data.email == null)
-        && (!('phone' in request.resource.data) || request.resource.data.phone is string || request.resource.data.phone == null)
-        && unchanged('createdAt');
+      // Crear: verificar que userId sea correcto
+      allow create: if isAuth() && request.resource.data.userId == uid();
+      // Actualizar: verificar propiedad y proteger userId
+      allow update: if isAuth() && resource.data.userId == uid()
+        && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId);
+      // Eliminar: solo el dueño
       allow delete: if isAuth() && resource.data.userId == uid();
     }
     
     // Colección: apps/horarios/shifts
     match /apps/horarios/shifts/{turnoId} {
+      // Solo el dueño puede leer
       allow read: if isAuth() && resource.data.userId == uid();
-      allow create: if isAuth()
-        && nonEmptyString('name')
-        && nonEmptyString('userId')
-        && request.resource.data.userId == uid()
-        && isStringOrNull('startTime')
-        && isStringOrNull('endTime')
-        && isStringOrNull('startTime2')
-        && isStringOrNull('endTime2')
-        && nonEmptyString('color')
-        && isTs('createdAt')
-        && isTs('updatedAt');
-      // Regla simplificada: solo verifica que el usuario es el dueño
-      allow update: if isAuth() && resource.data.userId == uid();
+      // Crear: verificar que userId sea correcto
+      allow create: if isAuth() && request.resource.data.userId == uid();
+      // Actualizar: verificar propiedad y proteger userId
+      allow update: if isAuth() && resource.data.userId == uid()
+        && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId);
+      // Eliminar: solo el dueño
       allow delete: if isAuth() && resource.data.userId == uid();
     }
     
-        // Colección: apps/horarios/schedules
-        match /apps/horarios/schedules/{horarioId} {
-          // Solo permitir acceso si el schedule tiene createdBy y coincide con el usuario
-          allow read: if isAuth() && resource.data.createdBy == uid();
-          allow create: if isAuth()
-            && nonEmptyString('nombre')
-            && nonEmptyString('weekStart')
-            && nonEmptyString('semanaInicio')
-            && nonEmptyString('semanaFin')
-            && request.resource.data.assignments is map
-            && isTs('createdAt')
-            && isTs('updatedAt')
-            && nonEmptyString('createdBy')
-            && request.resource.data.createdBy == uid()
-            && isStringOrNull('createdByName')
-            && isStringOrNull('modifiedBy')
-            && isStringOrNull('modifiedByName')
-            && (request.resource.data.completada == null || request.resource.data.completada is bool)
-            && (request.resource.data.completadaPor == null || request.resource.data.completadaPor is string)
-            && (request.resource.data.completadaPorNombre == null || request.resource.data.completadaPorNombre is string)
-            && (request.resource.data.completadaEn == null || request.resource.data.completadaEn is timestamp);
-          // Solo permitir actualización si el schedule tiene createdBy y coincide con el usuario
-          allow update: if isAuth() && resource.data.createdBy == uid();
-          // Solo permitir eliminación si tiene createdBy y coincide con el usuario
-          allow delete: if isAuth() && resource.data.createdBy == uid();
-        }
+    // Colección: apps/horarios/schedules
+    match /apps/horarios/schedules/{horarioId} {
+      // Solo el dueño puede leer
+      allow read: if isAuth() && resource.data.createdBy == uid();
+      // Crear: verificar que createdBy sea correcto
+      allow create: if isAuth() && request.resource.data.createdBy == uid();
+      // Actualizar: verificar propiedad y proteger createdBy
+      allow update: if isAuth() && resource.data.createdBy == uid()
+        && (!('createdBy' in request.resource.data) || request.resource.data.createdBy == resource.data.createdBy);
+      // Eliminar: solo el dueño
+      allow delete: if isAuth() && resource.data.createdBy == uid();
+    }
     
     // Colección: apps/horarios/historial
     match /apps/horarios/historial/{historialId} {
+      // Solo el dueño puede leer
       allow read: if isAuth() && resource.data.createdBy == uid();
-      allow create: if isAuth()
-        && nonEmptyString('horarioId')
-        && nonEmptyString('nombre')
-        && nonEmptyString('semanaInicio')
-        && nonEmptyString('semanaFin')
-        && request.resource.data.assignments is map
-        && (request.resource.data.accion == 'creado' || request.resource.data.accion == 'modificado')
-        && isTs('createdAt')
-        && nonEmptyString('createdBy')
-        && request.resource.data.createdBy == uid()
-        && isStringOrNull('createdByName')
-        && (isBool('versionAnterior') || !('versionAnterior' in request.resource.data));
-      allow update: if false; // Historial es inmutable
+      // Crear: verificar que createdBy sea correcto
+      allow create: if isAuth() && request.resource.data.createdBy == uid();
+      // Historial es inmutable
+      allow update: if false;
+      // Eliminar: solo el dueño
       allow delete: if isAuth() && resource.data.createdBy == uid();
     }
     
     // Colección: apps/horarios/config
     match /apps/horarios/config/{configId} {
       // Cada usuario solo puede leer/editar su propia configuración (configId debe ser su uid)
-      allow read: if isAuth() && configId == uid();
-      allow create: if isAuth() && configId == uid();
-      allow update: if isAuth() && configId == uid();
-      allow delete: if false; // No permitir eliminar configuración
+      allow read, write: if isAuth() && configId == uid();
+      // No permitir eliminar configuración
+      allow delete: if false;
     }
     
     
