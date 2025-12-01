@@ -309,7 +309,7 @@ export function useWeekActions({
       }
       
       // Si el schedule no tiene createdBy (schedule antiguo), establecerlo ahora
-      if (!currentSchedule.createdBy && userId) {
+      if (!weekSchedule.createdBy && userId) {
         updateData.createdBy = userId
         updateData.createdByName = userName || null
       }
