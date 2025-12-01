@@ -21,6 +21,7 @@ interface GeneralViewProps {
   employees: Empleado[]
   shifts: Turno[]
   monthRange: { startDate: Date; endDate: Date }
+  currentMonth: Date
   monthWeeks: Date[][]
   exporting: boolean
   mediosTurnos?: MedioTurno[]
@@ -44,6 +45,7 @@ export function GeneralView({
   employees,
   shifts,
   monthRange,
+  currentMonth,
   monthWeeks,
   exporting,
   mediosTurnos,
@@ -127,6 +129,7 @@ export function GeneralView({
     <div className="space-y-6">
       <MonthHeader
         monthRange={monthRange}
+        currentMonth={currentMonth}
         onPreviousMonth={onPreviousMonth}
         onNextMonth={onNextMonth}
         onExportImage={onExportMonthImage}

@@ -8,6 +8,7 @@ import { useMemo } from "react"
 
 interface MonthHeaderProps {
   monthRange: { startDate: Date; endDate: Date }
+  currentMonth: Date
   onPreviousMonth: () => void
   onNextMonth: () => void
   onExportImage: () => void
@@ -63,6 +64,7 @@ function getMainMonth(startDate: Date, endDate: Date): Date {
 
 export function MonthHeader({
   monthRange,
+  currentMonth,
   onPreviousMonth,
   onNextMonth,
   onExportImage,
@@ -70,8 +72,8 @@ export function MonthHeader({
   exporting,
 }: MonthHeaderProps) {
   const mainMonth = useMemo(() => {
-    return getMainMonth(monthRange.startDate, monthRange.endDate)
-  }, [monthRange.startDate, monthRange.endDate])
+    return currentMonth
+  }, [currentMonth])
 
   return (
     <div className="flex items-center justify-between">

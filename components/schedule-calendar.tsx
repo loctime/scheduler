@@ -327,6 +327,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         employees={employees}
         shifts={shiftsToUse}
         monthRange={monthRange}
+        currentMonth={currentMonth}
         monthWeeks={monthWeeks}
         exporting={exporting}
         mediosTurnos={config?.mediosTurnos}
