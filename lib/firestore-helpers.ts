@@ -135,7 +135,17 @@ export async function updateSchedulePreservingFields(
 
   const finalUpdateData = preserveScheduleFields(currentSchedule, cleanUpdateData)
   
-  await updateDoc(doc(db, COLLECTIONS.SCHEDULES, scheduleId), finalUpdateData)
+  // Limpiar valores undefined y null problemáticos del objeto final (Firestore no acepta undefined)
+  const finalCleanData: any = {}
+  Object.keys(finalUpdateData).forEach((key) => {
+    const value = finalUpdateData[key]
+    // Solo incluir si no es undefined
+    if (value !== undefined) {
+      finalCleanData[key] = value
+    }
+  })
+  
+  await updateDoc(doc(db, COLLECTIONS.SCHEDULES, scheduleId), finalCleanData)
 }
 
 /**

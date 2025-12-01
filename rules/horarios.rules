@@ -118,10 +118,7 @@ match /apps/horarios/schedules/{horarioId} {
       // Si no tiene createdBy o es null/undefined, debe establecerse al uid del usuario
       ((resource.data.createdBy == null || !('createdBy' in resource.data)) && request.resource.data.createdBy == uid())
     )
-    && (!('createdByName' in request.resource.data) || isStringOrNull('createdByName'))
-    // Validar campos preservados (snapshots de empleados)
-    && (!('empleadosSnapshot' in request.resource.data) || request.resource.data.empleadosSnapshot is list)
-    && (!('ordenEmpleadosSnapshot' in request.resource.data) || request.resource.data.ordenEmpleadosSnapshot is list);
+    && (!('createdByName' in request.resource.data) || isStringOrNull('createdByName'));
   // Permitir eliminación si tiene createdBy y coincide, o si no tiene createdBy o es null/undefined (schedules antiguos)
   allow delete: if isAuth() && (
     (resource.data.createdBy != null && resource.data.createdBy == uid()) ||

@@ -535,6 +535,12 @@ export function useScheduleUpdates({
           }
           
           // Actualizar usando helper que preserva campos automáticamente
+          logger.debug("Actualizando schedule:", {
+            scheduleId,
+            userId,
+            hasCreatedBy: !!weekSchedule.createdBy,
+            updateDataKeys: Object.keys(updateData),
+          })
           await updateSchedulePreservingFields(scheduleId, weekSchedule, updateData)
 
           toast({
@@ -544,6 +550,17 @@ export function useScheduleUpdates({
         }
       } catch (error: any) {
         logger.error("Error al actualizar asignaciones:", error)
+        logger.error("Error details:", {
+          code: error.code,
+          message: error.message,
+          userId: user?.uid,
+          weekSchedule: weekSchedule ? {
+            id: weekSchedule.id,
+            createdBy: weekSchedule.createdBy,
+            weekStart: weekSchedule.weekStart,
+            hasCreatedBy: !!weekSchedule.createdBy,
+          } : null,
+        })
         toast({
           title: "Error",
           description: error.message || "Ocurrió un error al actualizar los turnos",
