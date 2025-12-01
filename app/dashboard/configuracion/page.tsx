@@ -103,13 +103,26 @@ export default function ConfiguracionPage() {
             horasMinimasParaDescanso: 6,
             mediosTurnos: [],
           }
-          await setDoc(configRef, {
-            ...defaultConfig,
+          
+          // Limpiar undefined antes de guardar (Firestore no acepta undefined)
+          const configToSave: any = {
+            nombreEmpresa: defaultConfig.nombreEmpresa,
+            mesInicioDia: defaultConfig.mesInicioDia,
+            horasMaximasPorDia: defaultConfig.horasMaximasPorDia,
+            semanaInicioDia: defaultConfig.semanaInicioDia,
+            mostrarFinesDeSemana: defaultConfig.mostrarFinesDeSemana,
+            formatoHora24: defaultConfig.formatoHora24,
+            minutosDescanso: defaultConfig.minutosDescanso,
+            horasMinimasParaDescanso: defaultConfig.horasMinimasParaDescanso,
+            mediosTurnos: defaultConfig.mediosTurnos,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             updatedBy: user.uid,
             updatedByName: user.displayName || user.email,
-          })
+          }
+          // No incluir colorEmpresa si es undefined
+          
+          await setDoc(configRef, configToSave)
           setConfig(defaultConfig)
         }
       } catch (error: any) {
@@ -148,12 +161,12 @@ export default function ConfiguracionPage() {
 
     try {
       setSaving(true)
-      const configRef = doc(db, COLLECTIONS.CONFIG, "general")
+      const configRef = doc(db, COLLECTIONS.CONFIG, user.uid)
       
       // Preparar datos asegurándonos de que todos los campos estén presentes
+      // Eliminar campos undefined ya que Firestore no los acepta
       const dataToSave: any = {
         nombreEmpresa: config.nombreEmpresa || "Empleado",
-        colorEmpresa: config.colorEmpresa || undefined,
         mesInicioDia: config.mesInicioDia,
         horasMaximasPorDia: config.horasMaximasPorDia,
         semanaInicioDia: config.semanaInicioDia,
@@ -165,6 +178,11 @@ export default function ConfiguracionPage() {
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
         updatedByName: user.displayName || user.email || "",
+      }
+      
+      // Solo agregar colorEmpresa si tiene un valor (no undefined)
+      if (config.colorEmpresa !== undefined && config.colorEmpresa !== null) {
+        dataToSave.colorEmpresa = config.colorEmpresa
       }
 
       // Si el documento no existe, agregar createdAt
