@@ -70,7 +70,9 @@ export function SpecialTypeSelector({
               <div className="grid grid-cols-2 gap-2">
                 {mediosTurnos.map((medioTurno) => {
                   const isSelected = selectedMedioTurnoId === medioTurno.id
-                  const displayName = medioTurno.nombre || `${medioTurno.startTime} - ${medioTurno.endTime}`
+                  const formatTime = (time: string) => time.endsWith(":00") ? time.slice(0, -3) : time
+                  const formatRange = (start: string, end: string) => `${formatTime(start)} a ${formatTime(end)}`
+                  const displayName = medioTurno.nombre || formatRange(medioTurno.startTime, medioTurno.endTime)
                   return (
                     <Button
                       key={medioTurno.id}
@@ -87,7 +89,7 @@ export function SpecialTypeSelector({
                     >
                       <span className="font-medium">{displayName}</span>
                       <span className="ml-2 text-muted-foreground">
-                        ({medioTurno.startTime} - {medioTurno.endTime})
+                        ({formatRange(medioTurno.startTime, medioTurno.endTime)})
                       </span>
                     </Button>
                   )

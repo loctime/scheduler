@@ -174,10 +174,19 @@ export function ShiftItem({
         <div className="pl-7 space-y-2">
           <div className="text-base font-semibold text-foreground">
             {shift.startTime && shift.endTime
-              ? `${shift.startTime} - ${shift.endTime}`
+              ? (() => {
+                  const formatTime = (time: string) => time.endsWith(":00") ? time.slice(0, -3) : time
+                  return `${formatTime(shift.startTime)} a ${formatTime(shift.endTime)}`
+                })()
               : "Sin horario"}
             {shift.startTime2 && shift.endTime2 && (
-              <span className="text-base"> / {shift.startTime2} - {shift.endTime2}</span>
+              <span className="text-base">
+                {" / "}
+                {(() => {
+                  const formatTime = (time: string) => time.endsWith(":00") ? time.slice(0, -3) : time
+                  return `${formatTime(shift.startTime2)} a ${formatTime(shift.endTime2)}`
+                })()}
+              </span>
             )}
           </div>
           

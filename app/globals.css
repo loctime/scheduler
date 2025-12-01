@@ -312,3 +312,66 @@
   font-size: 1.375rem !important;
   font-weight: 600 !important;
 }
+
+/* Animaciones para el overlay de exportación - Martillo y Yunque */
+@keyframes hammer-strike {
+  0%, 100% {
+    transform: translateX(-50%) rotate(-20deg) translateY(0);
+  }
+  10% {
+    transform: translateX(-50%) rotate(-15deg) translateY(5px);
+  }
+  20% {
+    transform: translateX(-50%) rotate(45deg) translateY(25px);
+  }
+  25% {
+    transform: translateX(-50%) rotate(50deg) translateY(30px);
+  }
+  30% {
+    transform: translateX(-50%) rotate(45deg) translateY(25px);
+  }
+  40% {
+    transform: translateX(-50%) rotate(-15deg) translateY(5px);
+  }
+  50% {
+    transform: translateX(-50%) rotate(-20deg) translateY(0);
+  }
+  60% {
+    transform: translateX(-50%) rotate(-15deg) translateY(5px);
+  }
+  70% {
+    transform: translateX(-50%) rotate(45deg) translateY(25px);
+  }
+  75% {
+    transform: translateX(-50%) rotate(50deg) translateY(30px);
+  }
+  80% {
+    transform: translateX(-50%) rotate(45deg) translateY(25px);
+  }
+  90% {
+    transform: translateX(-50%) rotate(-15deg) translateY(5px);
+  }
+}
+
+@keyframes impact-sparks {
+  0%, 50%, 100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  20%, 30% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(2);
+  }
+  25% {
+    opacity: 0.8;
+    transform: translate(-50%, -50%) scale(2.5);
+  }
+}
+
+.animate-hammer-strike {
+  animation: hammer-strike 1.5s ease-in-out infinite;
+}
+
+.animate-impact-sparks {
+  animation: impact-sparks 1.5s ease-in-out infinite;
+}

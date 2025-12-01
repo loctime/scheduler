@@ -1,6 +1,29 @@
 import { ShiftAssignment, Turno } from "@/lib/types"
 
 /**
+ * Formatea una hora omitiendo :00 si los minutos son 0
+ * Ejemplo: "11:00" -> "11", "11:30" -> "11:30"
+ */
+function formatTime(time: string): string {
+  if (!time) return time
+  // Si termina en :00, remover los minutos
+  if (time.endsWith(":00")) {
+    return time.slice(0, -3)
+  }
+  return time
+}
+
+/**
+ * Formatea un rango de tiempo (start - end) omitiendo :00 cuando corresponda
+ * Ejemplo: "11:00 - 15:00" -> "11 a 15", "11:00 - 15:30" -> "11 a 15:30"
+ */
+function formatTimeRange(start: string, end: string): string {
+  const formattedStart = formatTime(start)
+  const formattedEnd = formatTime(end)
+  return `${formattedStart} a ${formattedEnd}`
+}
+
+/**
  * Obtener horario para mostrar (ajustado o base) - retorna array de líneas
  */
 export function getShiftDisplayTime(
@@ -11,7 +34,7 @@ export function getShiftDisplayTime(
   // Si es medio franco, usar sus horarios directamente
   if (assignment?.type === "medio_franco") {
     if (assignment.startTime && assignment.endTime) {
-      return [`${assignment.startTime} - ${assignment.endTime}`]
+      return [formatTimeRange(assignment.startTime, assignment.endTime)]
     }
     return ["1/2 Franco"]
   }
@@ -32,10 +55,10 @@ export function getShiftDisplayTime(
     const end2 = assignment.endTime2 || shift.endTime2
 
     if (start && end) {
-      const first = `${start} - ${end}`
+      const first = formatTimeRange(start, end)
       if (start2 && end2) {
         // Retornar en dos líneas separadas
-        return [first, `${start2} - ${end2}`]
+        return [first, formatTimeRange(start2, end2)]
       }
       return [first]
     }
@@ -43,10 +66,10 @@ export function getShiftDisplayTime(
 
   // Usar horarios del turno base
   if (shift.startTime && shift.endTime) {
-    const first = `${shift.startTime} - ${shift.endTime}`
+    const first = formatTimeRange(shift.startTime, shift.endTime)
     if (shift.startTime2 && shift.endTime2) {
       // Retornar en dos líneas separadas
-      return [first, `${shift.startTime2} - ${shift.endTime2}`]
+      return [first, formatTimeRange(shift.startTime2, shift.endTime2)]
     }
     return [first]
   }

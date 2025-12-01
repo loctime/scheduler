@@ -256,11 +256,19 @@ export default function TurnosPage() {
                       <CardTitle className="text-card-foreground">{shift.name}</CardTitle>
                       <CardDescription className="text-muted-foreground">
                         {(() => {
+                          const formatTime = (time: string) => {
+                            if (!time) return time
+                            return time.endsWith(":00") ? time.slice(0, -3) : time
+                          }
+                          const formatRange = (start: string, end: string) => {
+                            return `${formatTime(start)} a ${formatTime(end)}`
+                          }
+                          
                           const firstShift = shift.startTime && shift.endTime
-                            ? `${shift.startTime} - ${shift.endTime}`
+                            ? formatRange(shift.startTime, shift.endTime)
                             : null
                           const secondShift = shift.startTime2 && shift.endTime2
-                            ? `${shift.startTime2} - ${shift.endTime2}`
+                            ? formatRange(shift.startTime2, shift.endTime2)
                             : null
                           
                           if (firstShift && secondShift) {
