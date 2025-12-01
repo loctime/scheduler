@@ -30,7 +30,7 @@ export function useEmployeeOrder() {
       }
 
       try {
-        const configRef = doc(db, COLLECTIONS.CONFIG, "general")
+        const configRef = doc(db, COLLECTIONS.CONFIG, user.uid)
         
         // Obtener la configuración actual para preservar otros campos
         const configSnap = await getDoc(configRef)
@@ -67,7 +67,7 @@ export function useEmployeeOrder() {
       }
 
       try {
-        const configRef = doc(db, COLLECTIONS.CONFIG, "general")
+        const configRef = doc(db, COLLECTIONS.CONFIG, user.uid)
         const configSnap = await getDoc(configRef)
         const currentConfig = configSnap.exists() ? configSnap.data() : {}
         const currentSeparadores: Separador[] = currentConfig.separadores || []
@@ -122,7 +122,7 @@ export function useEmployeeOrder() {
       }
 
       try {
-        const configRef = doc(db, COLLECTIONS.CONFIG, "general")
+        const configRef = doc(db, COLLECTIONS.CONFIG, user.uid)
         const configSnap = await getDoc(configRef)
         const currentConfig = configSnap.exists() ? configSnap.data() : {}
         const currentSeparadores: Separador[] = currentConfig.separadores || []
@@ -172,7 +172,7 @@ export function useEmployeeOrder() {
       }
 
       try {
-        const configRef = doc(db, COLLECTIONS.CONFIG, "general")
+        const configRef = doc(db, COLLECTIONS.CONFIG, user.uid)
         const configSnap = await getDoc(configRef)
         const currentConfig = configSnap.exists() ? configSnap.data() : {}
         const currentSeparadores: Separador[] = currentConfig.separadores || []
