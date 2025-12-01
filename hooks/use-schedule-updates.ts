@@ -438,11 +438,7 @@ export function useScheduleUpdates({
             modifiedByName: userName || null,
           }
           
-          // Si el schedule no tiene createdBy (schedule antiguo), establecerlo ahora
-          if (!weekSchedule.createdBy && userId) {
-            updateData.createdBy = userId
-            updateData.createdByName = userName || null
-          }
+          // createdBy ya debe estar establecido en schedules existentes
           
           // Los campos inmutables se preservarán automáticamente con updateSchedulePreservingFields
           

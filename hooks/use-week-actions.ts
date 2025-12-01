@@ -212,12 +212,6 @@ export function useWeekActions({
         modifiedBy: userId,
         modifiedByName: userName,
       }
-      
-      // Si el schedule no tiene createdBy (schedule antiguo), establecerlo ahora
-      if (!currentSchedule.createdBy && userId) {
-        updateData.createdBy = userId
-        updateData.createdByName = userName || null
-      }
 
       // Actualizar usando helper que preserva campos
       await updateSchedulePreservingFields(scheduleId, currentSchedule, updateData)
@@ -307,12 +301,6 @@ export function useWeekActions({
         modifiedBy: userId,
         modifiedByName: userName,
       }
-      
-      // Si el schedule no tiene createdBy (schedule antiguo), establecerlo ahora
-      if (!weekSchedule.createdBy && userId) {
-        updateData.createdBy = userId
-        updateData.createdByName = userName || null
-      }
 
       // Actualizar usando helper que preserva campos
       await updateSchedulePreservingFields(scheduleId, weekSchedule, updateData)
@@ -392,12 +380,6 @@ export function useWeekActions({
           updatedAt: serverTimestamp(),
           modifiedBy: userId,
           modifiedByName: userName,
-        }
-        
-        // Si el schedule no tiene createdBy (schedule antiguo), establecerlo ahora
-        if (!weekSchedule.createdBy && userId) {
-          updateData.createdBy = userId
-          updateData.createdByName = userName || null
         }
 
         // Actualizar usando helper que preserva campos
