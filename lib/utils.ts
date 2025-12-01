@@ -28,6 +28,24 @@ export function adjustTime(timeStr: string | undefined, minutes: number): string
 }
 
 /**
+ * Determina el mes correcto para mostrar basándose en la fecha actual y mesInicioDia
+ * Si el día actual es menor a mesInicioDia, muestra el mes anterior (el rango que termina en el mes actual)
+ * Si el día actual es mayor o igual a mesInicioDia, muestra el mes actual (el rango que comienza en el mes actual)
+ */
+export function getInitialMonthForRange(currentDate: Date, monthStartDay: number): Date {
+  const dayOfMonth = currentDate.getDate()
+  
+  // Si el día actual es menor al día de inicio del mes, estamos en el rango que termina en este mes
+  // Por lo tanto, debemos mostrar el mes anterior
+  if (dayOfMonth < monthStartDay) {
+    return addMonths(currentDate, -1)
+  }
+  
+  // Si el día actual es mayor o igual al día de inicio, estamos en el rango que comienza en este mes
+  return currentDate
+}
+
+/**
  * Calcula el rango del mes personalizado basado en mesInicioDia
  */
 export function getCustomMonthRange(date: Date, monthStartDay: number) {

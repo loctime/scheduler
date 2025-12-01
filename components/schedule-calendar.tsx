@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { format, subMonths, addMonths, startOfWeek } from "date-fns"
 import { useData } from "@/contexts/data-context"
 import { Horario, ShiftAssignment, ShiftAssignmentValue, Turno } from "@/lib/types"
 import { useConfig } from "@/hooks/use-config"
-import { getCustomMonthRange, getMonthWeeks } from "@/lib/utils"
+import { getCustomMonthRange, getMonthWeeks, getInitialMonthForRange } from "@/lib/utils"
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { useScheduleUpdates } from "@/hooks/use-schedule-updates"
 import { useSchedulesListener } from "@/hooks/use-schedules-listener"
@@ -48,7 +48,21 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   const monthStartDay = config?.mesInicioDia || 1
   const weekStartsOn = (config?.semanaInicioDia || 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
 
+  // Rastrear si ya se inicializó para evitar sobrescribir cuando el usuario navega
+  const isInitialized = useRef(false)
+  
+  // Inicializar con el mes correcto basado en la fecha actual y mesInicioDia
   const [currentMonth, setCurrentMonth] = useState(new Date())
+  
+  // Actualizar el mes inicial cuando config esté disponible (si aún no se ha inicializado)
+  useEffect(() => {
+    if (config && !isInitialized.current) {
+      const today = new Date()
+      const initialMonth = getInitialMonthForRange(today, monthStartDay)
+      setCurrentMonth(initialMonth)
+      isInitialized.current = true
+    }
+  }, [config, monthStartDay])
 
   const monthRange = useMemo(
     () => getCustomMonthRange(currentMonth, monthStartDay),
