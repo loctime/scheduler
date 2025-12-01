@@ -206,11 +206,17 @@ export function useWeekActions({
       await saveHistoryEntry(historyEntry)
 
       // Preparar datos de actualización
-      const updateData = {
+      const updateData: any = {
         assignments: newAssignments,
         updatedAt: serverTimestamp(),
         modifiedBy: userId,
         modifiedByName: userName,
+      }
+      
+      // Si el schedule no tiene createdBy (schedule antiguo), establecerlo ahora
+      if (!currentSchedule.createdBy && userId) {
+        updateData.createdBy = userId
+        updateData.createdByName = userName || null
       }
 
       // Actualizar usando helper que preserva campos
@@ -295,11 +301,17 @@ export function useWeekActions({
       await saveHistoryEntry(historyEntry)
 
       // Preparar datos de actualización
-      const updateData = {
+      const updateData: any = {
         assignments: newAssignments,
         updatedAt: serverTimestamp(),
         modifiedBy: userId,
         modifiedByName: userName,
+      }
+      
+      // Si el schedule no tiene createdBy (schedule antiguo), establecerlo ahora
+      if (!currentSchedule.createdBy && userId) {
+        updateData.createdBy = userId
+        updateData.createdByName = userName || null
       }
 
       // Actualizar usando helper que preserva campos
@@ -375,11 +387,17 @@ export function useWeekActions({
         await saveHistoryEntry(historyEntry)
 
         // Preparar datos de actualización
-        const updateData = {
+        const updateData: any = {
           assignments: newAssignments,
           updatedAt: serverTimestamp(),
           modifiedBy: userId,
           modifiedByName: userName,
+        }
+        
+        // Si el schedule no tiene createdBy (schedule antiguo), establecerlo ahora
+        if (!weekSchedule.createdBy && userId) {
+          updateData.createdBy = userId
+          updateData.createdByName = userName || null
         }
 
         // Actualizar usando helper que preserva campos

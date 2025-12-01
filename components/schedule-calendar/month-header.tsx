@@ -72,8 +72,8 @@ export function MonthHeader({
   exporting,
 }: MonthHeaderProps) {
   const mainMonth = useMemo(() => {
-    return currentMonth
-  }, [currentMonth])
+    return getMainMonth(monthRange.startDate, monthRange.endDate)
+  }, [monthRange.startDate, monthRange.endDate])
 
   return (
     <div className="flex items-center justify-between">

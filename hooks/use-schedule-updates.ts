@@ -436,6 +436,12 @@ export function useScheduleUpdates({
             modifiedByName: userName || null,
           }
           
+          // Si el schedule no tiene createdBy (schedule antiguo), establecerlo ahora
+          if (!weekSchedule.createdBy && userId) {
+            updateData.createdBy = userId
+            updateData.createdByName = userName || null
+          }
+          
           // Los campos inmutables se preservarán automáticamente con updateSchedulePreservingFields
           
           // Si se está editando un horario completado, actualizar el snapshot de empleados

@@ -182,7 +182,11 @@ service cloud.firestore {
     
     // Colección: apps/horarios/schedules
     match /apps/horarios/schedules/{horarioId} {
-      allow read: if isAuth() && resource.data.createdBy == uid();
+      // Permitir lectura si el schedule tiene createdBy y coincide con el usuario, o si no tiene createdBy (schedules antiguos)
+      allow read: if isAuth() && (
+        (resource.data.createdBy != null && resource.data.createdBy == uid()) ||
+        (!('createdBy' in resource.data))
+      );
       allow create: if isAuth()
         && nonEmptyString('nombre')
         && nonEmptyString('weekStart')
@@ -200,8 +204,14 @@ service cloud.firestore {
         && (request.resource.data.completadaPor == null || request.resource.data.completadaPor is string)
         && (request.resource.data.completadaPorNombre == null || request.resource.data.completadaPorNombre is string)
         && (request.resource.data.completadaEn == null || request.resource.data.completadaEn is timestamp);
-      allow update: if isAuth()
-        && resource.data.createdBy == uid()
+      // Permitir actualización si el schedule tiene createdBy y coincide, o si no tiene createdBy (schedules antiguos)
+      // Si no tiene createdBy, establecerlo en la primera actualización
+      allow update: if isAuth() && (
+        // Caso 1: Schedule con createdBy existente - debe coincidir con el usuario
+        (resource.data.createdBy != null && resource.data.createdBy == uid()) ||
+        // Caso 2: Schedule sin createdBy (antiguo) - permitir actualización y establecer createdBy
+        (!('createdBy' in resource.data) && request.resource.data.createdBy == uid())
+      )
         && (!('nombre' in request.resource.data) || nonEmptyString('nombre'))
         && (!('weekStart' in request.resource.data) || nonEmptyString('weekStart'))
         && (!('semanaInicio' in request.resource.data) || nonEmptyString('semanaInicio'))
@@ -215,9 +225,18 @@ service cloud.firestore {
         && (!('completadaEn' in request.resource.data) || request.resource.data.completadaEn is timestamp || request.resource.data.completadaEn == null)
         && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp)
         && unchanged('createdAt')
-        && unchanged('createdBy')
-        && (!('createdByName' in request.resource.data) || request.resource.data.createdByName == resource.data.createdByName);
-      allow delete: if isAuth() && resource.data.createdBy == uid();
+        && (
+          // Si ya tiene createdBy, no debe cambiar
+          (resource.data.createdBy != null && unchanged('createdBy')) ||
+          // Si no tiene createdBy, debe establecerse al uid del usuario
+          (!('createdBy' in resource.data) && request.resource.data.createdBy == uid())
+        )
+        && (!('createdByName' in request.resource.data) || isStringOrNull('createdByName'));
+      // Permitir eliminación si tiene createdBy y coincide, o si no tiene createdBy (schedules antiguos)
+      allow delete: if isAuth() && (
+        (resource.data.createdBy != null && resource.data.createdBy == uid()) ||
+        (!('createdBy' in resource.data))
+      );
     }
     
     // Colección: apps/horarios/historial
