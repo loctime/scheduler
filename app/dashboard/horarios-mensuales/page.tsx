@@ -242,13 +242,19 @@ export default function HorariosMensualesPage() {
 
   const handleExportWeekImage = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
     const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
-    await exportImage(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.png`)
-  }, [exportImage])
+    await exportImage(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.png`, {
+      nombreEmpresa: config?.nombreEmpresa,
+      colorEmpresa: config?.colorEmpresa,
+    })
+  }, [exportImage, config])
 
   const handleExportWeekPDF = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
     const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
-    await exportPDF(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.pdf`)
-  }, [exportPDF])
+    await exportPDF(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.pdf`, {
+      nombreEmpresa: config?.nombreEmpresa,
+      colorEmpresa: config?.colorEmpresa,
+    })
+  }, [exportPDF, config])
 
   const handleExportWeekExcel = useCallback(async (weekStartDate: Date, weekDays: Date[], weekSchedule: Horario | null) => {
     await exportExcel(

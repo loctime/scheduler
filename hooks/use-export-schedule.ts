@@ -102,7 +102,84 @@ export function useExportSchedule() {
     })
   }
 
-  const exportImage = useCallback(async (elementId: string, filename: string) => {
+  // Función helper para convertir hex a rgba
+  const hexToRgba = (hex: string, alpha: number): string => {
+    const cleanHex = hex.replace("#", "").trim()
+    if (cleanHex.length === 6) {
+      const r = parseInt(cleanHex.substring(0, 2), 16)
+      const g = parseInt(cleanHex.substring(2, 4), 16)
+      const b = parseInt(cleanHex.substring(4, 6), 16)
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`
+    }
+    // Si el hex no es válido, devolver un color por defecto
+    return `rgba(211, 211, 211, ${alpha})`
+  }
+
+  // Función para agregar separador inferior con nombre de empresa
+  const addBottomSeparator = (table: HTMLTableElement, nombreEmpresa?: string, colorEmpresa?: string) => {
+    if (!nombreEmpresa) return null
+
+    const tbody = table.querySelector("tbody")
+    if (!tbody) return null
+
+    // Crear fila de separador
+    const separatorRow = document.createElement("tr")
+    separatorRow.className = "export-bottom-separator"
+    
+    const separatorColor = colorEmpresa || "#D3D3D3"
+    const backgroundColor = hexToRgba(separatorColor, 0.1)
+    
+    separatorRow.style.borderBottomColor = separatorColor
+    separatorRow.style.borderBottomWidth = "2px"
+    separatorRow.style.backgroundColor = backgroundColor
+
+    // Obtener número de columnas (empleado + días de la semana)
+    const headerRow = table.querySelector("thead tr")
+    const columnCount = headerRow ? headerRow.children.length : 8 // Por defecto 8 (empleado + 7 días)
+
+    // Crear celda que abarca todas las columnas
+    const cell = document.createElement("td")
+    cell.colSpan = columnCount
+    cell.className = "px-4 py-0.5"
+    cell.style.padding = "8px 16px"
+
+    // Crear contenido del separador (similar a SeparatorRow pero sin días de semana)
+    const separatorContent = document.createElement("div")
+    separatorContent.className = "flex items-center justify-center"
+    separatorContent.style.width = "100%"
+
+    // Línea izquierda
+    const lineLeft = document.createElement("div")
+    lineLeft.className = "h-px flex-1"
+    lineLeft.style.backgroundColor = separatorColor
+    separatorContent.appendChild(lineLeft)
+
+    // Nombre de empresa
+    const empresaName = document.createElement("span")
+    empresaName.className = "text-xs font-semibold uppercase tracking-wide"
+    empresaName.style.color = getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim() || '#000000'
+    empresaName.style.margin = "0 12px"
+    empresaName.textContent = nombreEmpresa
+    separatorContent.appendChild(empresaName)
+
+    // Línea derecha
+    const lineRight = document.createElement("div")
+    lineRight.className = "h-px flex-1"
+    lineRight.style.backgroundColor = separatorColor
+    separatorContent.appendChild(lineRight)
+
+    cell.appendChild(separatorContent)
+    separatorRow.appendChild(cell)
+    tbody.appendChild(separatorRow)
+
+    return separatorRow
+  }
+
+  const exportImage = useCallback(async (
+    elementId: string, 
+    filename: string,
+    config?: { nombreEmpresa?: string; colorEmpresa?: string }
+  ) => {
     const element = document.getElementById(elementId)
     if (!element) {
       toast({
@@ -132,6 +209,8 @@ export function useExportSchedule() {
       overflowX: htmlElement.style.overflowX,
       overflowY: htmlElement.style.overflowY,
     }
+
+    let bottomSeparatorRow: HTMLTableRowElement | null = null
 
     try {
       disablePseudoElements()
@@ -165,6 +244,11 @@ export function useExportSchedule() {
       // Ajustar contenedores al ancho real de la tabla para eliminar espacios en blanco
       const table = htmlElement.querySelector("table")
       if (table) {
+        // Agregar separador inferior antes de exportar
+        if (config?.nombreEmpresa) {
+          bottomSeparatorRow = addBottomSeparator(table, config.nombreEmpresa, config.colorEmpresa)
+        }
+
         const tableWidth = table.scrollWidth
         const containers = htmlElement.querySelectorAll(".overflow-x-auto, .overflow-hidden, [class*='Card'], [class*='card']")
         containers.forEach((container) => {
@@ -207,6 +291,11 @@ export function useExportSchedule() {
       // Restaurar padding original
       htmlElement.style.padding = originalPadding
 
+      // Remover separador inferior después de exportar
+      if (bottomSeparatorRow && bottomSeparatorRow.parentNode) {
+        bottomSeparatorRow.parentNode.removeChild(bottomSeparatorRow)
+      }
+
       const link = document.createElement("a")
       link.download = filename
       link.href = dataUrl
@@ -226,6 +315,10 @@ export function useExportSchedule() {
       })
     } catch (e) {
       console.error(e)
+      // Asegurar que el separador se elimine incluso si hay error
+      if (bottomSeparatorRow && bottomSeparatorRow.parentNode) {
+        bottomSeparatorRow.parentNode.removeChild(bottomSeparatorRow)
+      }
       toast({
         title: "Error",
         description: "No se pudo exportar.",
@@ -238,10 +331,14 @@ export function useExportSchedule() {
       htmlElement.style.overflowY = originalOverflow.overflowY
       setExporting(false)
     }
-  }, [])
+  }, [toast])
 
 
-  const exportPDF = useCallback(async (elementId: string, filename: string) => {
+  const exportPDF = useCallback(async (
+    elementId: string, 
+    filename: string,
+    config?: { nombreEmpresa?: string; colorEmpresa?: string }
+  ) => {
     const element = document.getElementById(elementId)
     if (!element) return
 
@@ -253,6 +350,8 @@ export function useExportSchedule() {
       overflowX: htmlElement.style.overflowX,
       overflowY: htmlElement.style.overflowY,
     }
+
+    let bottomSeparatorRow: HTMLTableRowElement | null = null
 
     try {
       disablePseudoElements()
@@ -284,6 +383,11 @@ export function useExportSchedule() {
       // Ajustar contenedores al ancho real de la tabla para eliminar espacios en blanco
       const table = htmlElement.querySelector("table")
       if (table) {
+        // Agregar separador inferior antes de exportar
+        if (config?.nombreEmpresa) {
+          bottomSeparatorRow = addBottomSeparator(table, config.nombreEmpresa, config.colorEmpresa)
+        }
+
         const tableWidth = table.scrollWidth
         const containers = htmlElement.querySelectorAll(".overflow-x-auto, .overflow-hidden, [class*='Card'], [class*='card']")
         containers.forEach((container) => {
@@ -329,6 +433,11 @@ export function useExportSchedule() {
       // Restaurar padding original
       htmlElement.style.padding = originalPadding
 
+      // Remover separador inferior después de exportar
+      if (bottomSeparatorRow && bottomSeparatorRow.parentNode) {
+        bottomSeparatorRow.parentNode.removeChild(bottomSeparatorRow)
+      }
+
       const pdf = new jsPDF("l", "mm", "a4")
       const pdfWidth = pdf.internal.pageSize.getWidth()
 
@@ -352,6 +461,17 @@ export function useExportSchedule() {
         title: "PDF exportado",
         description: "Se generó correctamente.",
       })
+    } catch (e) {
+      console.error(e)
+      // Asegurar que el separador se elimine incluso si hay error
+      if (bottomSeparatorRow && bottomSeparatorRow.parentNode) {
+        bottomSeparatorRow.parentNode.removeChild(bottomSeparatorRow)
+      }
+      toast({
+        title: "Error",
+        description: "No se pudo exportar el PDF.",
+        variant: "destructive",
+      })
     } finally {
       enablePseudoElements()
       htmlElement.style.overflow = originalOverflow.overflow
@@ -359,7 +479,7 @@ export function useExportSchedule() {
       htmlElement.style.overflowY = originalOverflow.overflowY
       setExporting(false)
     }
-  }, [])
+  }, [toast])
 
   // Función helper para convertir color hex a RGB sin #
   const hexToRgb = (hex: string): string => {

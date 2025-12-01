@@ -100,21 +100,32 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   const handleExportMonthImage = useCallback(async () => {
     await exportImage(
       "schedule-month-container",
-      `horario-${format(monthRange.startDate, "yyyy-MM-dd")}.png`
+      `horario-${format(monthRange.startDate, "yyyy-MM-dd")}.png`,
+      {
+        nombreEmpresa: config?.nombreEmpresa,
+        colorEmpresa: config?.colorEmpresa,
+      }
     )
-  }, [exportImage, monthRange.startDate])
+  }, [exportImage, monthRange.startDate, config])
 
   const handleExportMonthPDF = useCallback(async () => {
     await exportPDF(
       "schedule-month-container",
-      `horario-${format(monthRange.startDate, "yyyy-MM-dd")}.pdf`
+      `horario-${format(monthRange.startDate, "yyyy-MM-dd")}.pdf`,
+      {
+        nombreEmpresa: config?.nombreEmpresa,
+        colorEmpresa: config?.colorEmpresa,
+      }
     )
-  }, [exportPDF, monthRange.startDate])
+  }, [exportPDF, monthRange.startDate, config])
 
   const handleExportWeekImage = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
     const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
-    await exportImage(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.png`)
-  }, [exportImage])
+    await exportImage(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.png`, {
+      nombreEmpresa: config?.nombreEmpresa,
+      colorEmpresa: config?.colorEmpresa,
+    })
+  }, [exportImage, config])
 
   const handleExportWeekExcel = useCallback(async (weekStartDate: Date, weekDays: Date[], weekSchedule: Horario | null) => {
     await exportExcel(
@@ -134,8 +145,11 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
   const handleExportWeekPDF = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
     const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
-    await exportPDF(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.pdf`)
-  }, [exportPDF])
+    await exportPDF(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.pdf`, {
+      nombreEmpresa: config?.nombreEmpresa,
+      colorEmpresa: config?.colorEmpresa,
+    })
+  }, [exportPDF, config])
 
   // Extraer turnos de semanas completadas si no hay turnos activos
   const shiftsToUse = useMemo(() => {
