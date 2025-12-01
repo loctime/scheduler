@@ -16,6 +16,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { WeekSchedule } from "@/components/schedule-calendar/week-schedule"
 import { getCustomMonthRange, getMonthWeeks } from "@/lib/utils"
 import { useExportSchedule } from "@/hooks/use-export-schedule"
+import { ExportOverlay } from "@/components/export-overlay"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { calculateDailyHours, calculateExtraHours } from "@/lib/validations"
 import { ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
@@ -271,8 +272,10 @@ export default function HorariosMensualesPage() {
   }, [exportExcel, employees, shifts])
 
   return (
-    <DashboardLayout user={user}>
-      <div className="space-y-6">
+    <>
+      <ExportOverlay isExporting={exporting} message="Exportando horario..." />
+      <DashboardLayout user={user}>
+        <div className="space-y-6">
         <div>
           <h2 className="text-3xl font-bold text-foreground">Horarios Mensuales</h2>
           <p className="text-muted-foreground">
@@ -398,8 +401,9 @@ export default function HorariosMensualesPage() {
             })}
           </Accordion>
         )}
-      </div>
-    </DashboardLayout>
+        </div>
+      </DashboardLayout>
+    </>
   )
 }
 

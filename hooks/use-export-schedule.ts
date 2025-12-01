@@ -201,6 +201,10 @@ export function useExportSchedule() {
     }
 
     setExporting(true)
+    
+    // Esperar un frame para que el overlay se renderice
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    
     const htmlElement = element as HTMLElement
 
     // Guardar overflow original
@@ -343,6 +347,9 @@ export function useExportSchedule() {
     if (!element) return
 
     setExporting(true)
+    
+    // Esperar un frame para que el overlay se renderice
+    await new Promise((resolve) => requestAnimationFrame(resolve))
 
     const htmlElement = element as HTMLElement
     const originalOverflow = {

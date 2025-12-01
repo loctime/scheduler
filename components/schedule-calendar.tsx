@@ -13,6 +13,7 @@ import { useSchedulesListener } from "@/hooks/use-schedules-listener"
 import { calculateExtraHours } from "@/lib/validations"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { GeneralView } from "@/components/schedule-calendar/general-view"
+import { ExportOverlay } from "@/components/export-overlay"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -320,23 +321,25 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   ])
 
   return (
-    <div className="space-y-6">
-      <AlertDialog open={pendingEdit !== null} onOpenChange={(open) => !open && pendingEdit && setPendingEdit(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Semana completada</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta semana fue completada y marcada como listo. ¿Está seguro que desea editarla?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => pendingEdit?.resolve(false)}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => pendingEdit?.resolve(true)}>Sí, editar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+    <>
+      <ExportOverlay isExporting={exporting} message="Exportando horario..." />
+      <div className="space-y-6">
+        <AlertDialog open={pendingEdit !== null} onOpenChange={(open) => !open && pendingEdit && setPendingEdit(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Semana completada</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta semana fue completada y marcada como listo. ¿Está seguro que desea editarla?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => pendingEdit?.resolve(false)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => pendingEdit?.resolve(true)}>Sí, editar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-      <GeneralView
+        <GeneralView
         dataLoading={dataLoading}
         employees={employees}
         shifts={shiftsToUse}
@@ -359,6 +362,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         onMarkWeekComplete={handleMarkWeekComplete}
         lastCompletedWeekStart={lastCompletedWeekStart}
       />
-    </div>
+      </div>
+    </>
   )
 }

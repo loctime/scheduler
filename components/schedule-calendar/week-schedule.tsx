@@ -122,7 +122,14 @@ export function WeekSchedule({
   const handleExportImage = useCallback(async () => {
     if (!isOpen && handleOpenChange) {
       handleOpenChange(true)
-      await new Promise((resolve) => setTimeout(resolve, 400))
+      // Esperar a que termine la animación (300ms) + tiempo adicional para renderizado completo
+      await new Promise((resolve) => setTimeout(resolve, 600))
+      // Esperar múltiples frames para asegurar que todos los estilos se hayan aplicado
+      await new Promise((resolve) => requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(resolve)
+        })
+      }))
     }
     onExportImage?.(weekStartDate, weekEndDate)
   }, [isOpen, handleOpenChange, onExportImage, weekStartDate, weekEndDate])
@@ -130,7 +137,14 @@ export function WeekSchedule({
   const handleExportPDF = useCallback(async () => {
     if (!isOpen && handleOpenChange) {
       handleOpenChange(true)
-      await new Promise((resolve) => setTimeout(resolve, 400))
+      // Esperar a que termine la animación (300ms) + tiempo adicional para renderizado completo
+      await new Promise((resolve) => setTimeout(resolve, 600))
+      // Esperar múltiples frames para asegurar que todos los estilos se hayan aplicado
+      await new Promise((resolve) => requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(resolve)
+        })
+      }))
     }
     onExportPDF?.(weekStartDate, weekEndDate)
   }, [isOpen, handleOpenChange, onExportPDF, weekStartDate, weekEndDate])
