@@ -37,3 +37,4 @@ export function WeekScheduleHeader({ title, isOpen, isCompleted }: WeekScheduleH
   )
 }
 
+

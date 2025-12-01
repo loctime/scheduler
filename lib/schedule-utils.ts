@@ -106,3 +106,4 @@ export function hasAssignmentsOnDate(
     assignments[date][employeeId].length > 0)
 }
 
+
