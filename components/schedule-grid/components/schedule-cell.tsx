@@ -118,7 +118,7 @@ export function ScheduleCell({
           {/* Indicador de horario fijo - oculto en exportaciones */}
           {hasFixedSchedule && (
             <div
-              className="schedule-fixed-indicator absolute top-1 right-1 z-10 flex items-center gap-1 bg-primary/10 border border-primary/20 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="schedule-fixed-indicator absolute top-1 left-1 z-10 flex items-center gap-1 bg-primary/10 border border-primary/20 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
               title={`Horario fijo detectado (${suggestionWeeks || 0} semanas consecutivas)`}
               aria-label="Horario fijo"
             >
