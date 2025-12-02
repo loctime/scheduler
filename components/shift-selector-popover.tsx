@@ -10,7 +10,8 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { Turno, ShiftAssignment } from "@/lib/types"
+import { Badge } from "@/components/ui/badge"
+import { Turno, ShiftAssignment, Horario } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { useConfig } from "@/hooks/use-config"
 import { useData } from "@/contexts/data-context"
@@ -18,6 +19,9 @@ import { useShiftSelector } from "@/hooks/use-shift-selector"
 import { SpecialTypeSelector } from "@/components/shift-selector/special-type-selector"
 import { ShiftItem } from "@/components/shift-selector/shift-item"
 import { cn } from "@/lib/utils"
+import { getSuggestionForDay } from "@/lib/pattern-learning"
+import { format, parseISO, getDay } from "date-fns"
+import { Lock } from "lucide-react"
 
 interface ShiftSelectorPopoverProps {
   open: boolean
@@ -28,7 +32,10 @@ interface ShiftSelectorPopoverProps {
   onShiftChange?: (shiftIds: string[]) => void
   onAssignmentsChange?: (assignments: ShiftAssignment[]) => void
   employeeName: string
+  employeeId: string
   date: string
+  schedules?: Horario[]
+  weekStartDate?: Date
 }
 
 export function ShiftSelectorPopover({
@@ -40,11 +47,23 @@ export function ShiftSelectorPopover({
   onShiftChange,
   onAssignmentsChange,
   employeeName,
+  employeeId,
   date,
+  schedules = [],
+  weekStartDate,
 }: ShiftSelectorPopoverProps) {
   const { toast } = useToast()
   const { user } = useData()
   const { config } = useConfig(user)
+  
+  // Obtener sugerencia de patrón para este día
+  const suggestion = weekStartDate && schedules.length > 0
+    ? (() => {
+        const dayOfWeek = getDay(parseISO(date))
+        const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+        return getSuggestionForDay(employeeId, dayOfWeek, schedules, weekStartStr)
+      })()
+    : null
 
   const {
     tempSelected,
@@ -120,6 +139,17 @@ export function ShiftSelectorPopover({
   const handleQuickShiftSelect = (shiftId: string) => {
     const assignment = buildAssignmentFromShift(shiftId)
     finalizeAssignments([assignment], [shiftId])
+  }
+  
+  const handleApplySuggestion = () => {
+    if (suggestion && onAssignmentsChange) {
+      onAssignmentsChange(suggestion.assignments)
+      onOpenChange(false)
+      toast({
+        title: "Horario fijo aplicado",
+        description: `Se aplicó el horario fijo basado en ${suggestion.weeksMatched} semanas consecutivas.`,
+      })
+    }
   }
 
   const handleSave = () => {
@@ -208,6 +238,29 @@ export function ShiftSelectorPopover({
         </DialogHeader>
         
         <div className="flex-1 overflow-y-auto space-y-4 py-4">
+          {/* Mostrar sugerencia de horario fijo si existe */}
+          {suggestion && suggestion.isFixed && (
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Lock className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold text-primary">Horario Fijo Detectado</span>
+                <Badge variant="secondary" className="ml-auto">
+                  {suggestion.weeksMatched} semanas
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Este empleado ha tenido el mismo horario en este día durante {suggestion.weeksMatched} semanas consecutivas.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleApplySuggestion}
+                className="w-full"
+              >
+                Aplicar Horario Fijo
+              </Button>
+            </div>
+          )}
           {/* Opciones de franco */}
           <SpecialTypeSelector
             specialType={specialType}

@@ -21,6 +21,7 @@ import { WeekScheduleHeader } from "./week-schedule-header"
 import { WeekScheduleActions } from "./week-schedule-actions"
 import { isScheduleCompleted, shouldRequestConfirmation } from "@/lib/schedule-utils"
 import { logger } from "@/lib/logger"
+import { useConfig } from "@/hooks/use-config"
 
 interface WeekScheduleProps {
   weekDays: Date[]
@@ -46,6 +47,7 @@ interface WeekScheduleProps {
   onMarkComplete?: (weekStartDate: Date, completed: boolean) => Promise<void>
   lastCompletedWeekStart?: string | null
   getWeekSchedule?: (weekStartDate: Date) => Horario | null
+  allSchedules?: Horario[]
 }
 
 export function WeekSchedule({
@@ -72,6 +74,7 @@ export function WeekSchedule({
   onMarkComplete,
   lastCompletedWeekStart,
   getWeekSchedule,
+  allSchedules = [],
 }: WeekScheduleProps) {
   const weekStartDate = weekDays[0]
   const weekEndDate = weekDays[weekDays.length - 1]
@@ -95,6 +98,10 @@ export function WeekSchedule({
   const isOpen = open !== undefined ? open : internalOpen
   const handleOpenChange = onOpenChange || setInternalOpen
 
+  // Obtener configuración
+  const { config } = useConfig(user)
+  const weekStartsOn = (config?.semanaInicioDia || 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
+
   // Hook para acciones de semana
   const weekActions = useWeekActions({
     weekDays,
@@ -104,6 +111,9 @@ export function WeekSchedule({
     user: user || null,
     readonly,
     getWeekSchedule,
+    config,
+    allSchedules,
+    weekStartsOn,
   })
 
   const handleMarkComplete = useCallback(async () => {
@@ -207,6 +217,7 @@ export function WeekSchedule({
             mediosTurnos={mediosTurnos}
             employeeStats={employeeStats}
             readonly={readonly}
+            allSchedules={allSchedules}
             isScheduleCompleted={isCompleted}
             lastCompletedWeekStart={lastCompletedWeekStart}
             onClearEmployeeRow={!readonly && user ? handleClearEmployeeRow : undefined}

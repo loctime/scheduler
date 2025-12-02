@@ -355,6 +355,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         user={user}
         onMarkWeekComplete={handleMarkWeekComplete}
         lastCompletedWeekStart={lastCompletedWeekStart}
+        allSchedules={schedules}
       />
       </div>
     </>

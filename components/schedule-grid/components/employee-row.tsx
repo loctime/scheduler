@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { format } from "date-fns"
+import { format, getDay, parseISO } from "date-fns"
 import { Empleado, ShiftAssignment, MedioTurno, Turno } from "@/lib/types"
 import type { EmployeeMonthlyStats } from "../index"
 import { Button } from "@/components/ui/button"
@@ -53,6 +53,11 @@ interface EmployeeRowProps {
   handleCellUndo: (date: string, employeeId: string) => void
   // Clear employee row
   onClearEmployeeRow?: (employeeId: string) => Promise<boolean>
+  // Pattern suggestions
+  getSuggestion?: (employeeId: string, dayOfWeek: number) => any
+  // Manual fixed schedules
+  isManuallyFixed?: (employeeId: string, dayOfWeek: number) => boolean
+  onToggleFixed?: (date: string, employeeId: string, dayOfWeek: number) => void
 }
 
 export function EmployeeRow({
@@ -90,6 +95,9 @@ export function EmployeeRow({
   cellUndoHistory,
   handleCellUndo,
   onClearEmployeeRow,
+  getSuggestion,
+  isManuallyFixed,
+  onToggleFixed,
 }: EmployeeRowProps) {
   return (
     <tr
@@ -201,6 +209,12 @@ export function EmployeeRow({
 
         const undoCellKey = `${dateStr}-${employee.id}`
         const hasCellHistory = cellUndoHistory.has(undoCellKey)
+        
+        // Obtener sugerencia de patrón para este día
+        const dayOfWeek = getDay(parseISO(dateStr))
+        const suggestion = getSuggestion ? getSuggestion(employee.id, dayOfWeek) : null
+        const hasFixedSchedule = suggestion?.isFixed === true
+        const isManuallyFixedCell = isManuallyFixed ? isManuallyFixed(employee.id, dayOfWeek) : false
 
         return (
           <ScheduleCell
@@ -230,6 +244,10 @@ export function EmployeeRow({
             readonly={readonly}
             hasCellHistory={hasCellHistory}
             onCellUndo={() => handleCellUndo(dateStr, employee.id)}
+            hasFixedSchedule={hasFixedSchedule}
+            suggestionWeeks={suggestion?.weeksMatched}
+            isManuallyFixed={isManuallyFixedCell}
+            onToggleFixed={onToggleFixed}
           />
         )
       })}

@@ -122,6 +122,11 @@ export interface Configuracion {
   mediosTurnos?: MedioTurno[] // Medios turnos predefinidos para 1/2 franco
   separadores?: Separador[] // Separadores para organizar empleados
   ordenEmpleados?: string[] // Orden personalizado: puede incluir IDs de empleados o IDs de separadores
+  fixedSchedules?: Array<{ 
+    employeeId: string
+    dayOfWeek: number
+    assignments?: ShiftAssignment[] // Asignaciones guardadas cuando se marcó como fijo (opcional)
+  }> // Horarios marcados manualmente como fijos (día de semana: 0=domingo, 1=lunes, etc.)
   createdAt?: any
   updatedAt?: any
   updatedBy?: string

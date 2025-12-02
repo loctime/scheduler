@@ -11,10 +11,11 @@ import {
   ContextMenuTrigger,
   ContextMenuSeparator,
 } from "@/components/ui/context-menu"
-import { Check, RotateCcw, Undo2 } from "lucide-react"
+import { Check, RotateCcw, Undo2, Lock } from "lucide-react"
 import { ShiftAssignment, Turno, MedioTurno } from "@/lib/types"
 import { CellAssignments } from "./cell-assignments"
 import { InlineShiftSelector } from "./inline-shift-selector"
+import { getDay, parseISO } from "date-fns"
 
 interface ScheduleCellProps {
   date: string
@@ -38,6 +39,10 @@ interface ScheduleCellProps {
   readonly?: boolean
   hasCellHistory?: boolean
   onCellUndo?: () => void
+  hasFixedSchedule?: boolean
+  suggestionWeeks?: number
+  isManuallyFixed?: boolean
+  onToggleFixed?: (date: string, employeeId: string, dayOfWeek: number) => void
 }
 
 export function ScheduleCell({
@@ -62,6 +67,10 @@ export function ScheduleCell({
   readonly = false,
   hasCellHistory = false,
   onCellUndo,
+  hasFixedSchedule = false,
+  suggestionWeeks,
+  isManuallyFixed = false,
+  onToggleFixed,
 }: ScheduleCellProps) {
   const hasBackgroundStyle = !!backgroundStyle
   const hoverClass = hasBackgroundStyle
@@ -105,6 +114,17 @@ export function ScheduleCell({
               title={hasExtraBefore && hasExtraAfter ? "Horario modificado (+30 min antes y después)" : hasExtraBefore ? "Horario modificado (+30 min antes)" : "Horario modificado (+30 min después)"}
               aria-label="Horario modificado"
             />
+          )}
+          {/* Indicador de horario fijo */}
+          {hasFixedSchedule && (
+            <div
+              className="absolute top-1 right-1 z-10 flex items-center gap-1 bg-primary/10 border border-primary/20 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+              title={`Horario fijo detectado (${suggestionWeeks || 0} semanas consecutivas)`}
+              aria-label="Horario fijo"
+            >
+              <Lock className="h-3 w-3 text-primary" />
+              <span className="text-xs font-semibold text-primary">{suggestionWeeks}</span>
+            </div>
           )}
       {showExtraActions && (
         <div className="absolute -top-1 right-1" onClick={(event) => event.stopPropagation()}>
@@ -152,6 +172,26 @@ export function ScheduleCell({
           <CellAssignments assignments={assignments} getShiftInfo={getShiftInfo} />
         )}
       </div>
+      {/* Botón de candado para marcar como fijo (abajo al centro) */}
+      {!readonly && isClickable && onToggleFixed && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            const dayOfWeek = getDay(parseISO(date))
+            onToggleFixed(date, employeeId, dayOfWeek)
+          }}
+          className={`absolute bottom-1 left-1/2 -translate-x-1/2 z-10 flex h-5 w-5 items-center justify-center rounded transition-all ${
+            isManuallyFixed
+              ? "bg-primary text-primary-foreground opacity-100"
+              : "bg-muted/50 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-primary hover:text-primary-foreground"
+          }`}
+          title={isManuallyFixed ? "Desmarcar como horario fijo" : "Marcar como horario fijo"}
+          aria-label={isManuallyFixed ? "Desmarcar como horario fijo" : "Marcar como horario fijo"}
+        >
+          <Lock className={`h-3 w-3 ${isManuallyFixed ? "" : "opacity-60"}`} />
+        </button>
+      )}
     </td>
       </ContextMenuTrigger>
       <ContextMenuContent>

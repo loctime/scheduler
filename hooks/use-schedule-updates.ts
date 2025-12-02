@@ -1,14 +1,15 @@
 import { useCallback, useState } from "react"
 import { collection, addDoc, doc, serverTimestamp, getDoc, updateDoc } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
-import { format, startOfWeek, addDays } from "date-fns"
-import { Empleado, Turno, Horario, ShiftAssignment } from "@/lib/types"
+import { format, startOfWeek, addDays, getDay, parseISO } from "date-fns"
+import { Empleado, Turno, Horario, ShiftAssignment, Configuracion } from "@/lib/types"
 import { validateScheduleAssignments, validateDailyHours } from "@/lib/validations"
 import { useToast } from "@/hooks/use-toast"
 import { useConfig } from "@/hooks/use-config"
 import { createHistoryEntry, saveHistoryEntry, updateSchedulePreservingFields } from "@/lib/firestore-helpers"
-import { updateAssignmentInAssignments } from "@/lib/schedule-utils"
+import { updateAssignmentInAssignments, normalizeAssignments } from "@/lib/schedule-utils"
 import { logger } from "@/lib/logger"
+import { getSuggestionForDay } from "@/lib/pattern-learning"
 
 interface UseScheduleUpdatesProps {
   user: any
@@ -29,6 +30,90 @@ export function useScheduleUpdates({
 }: UseScheduleUpdatesProps) {
   const { toast } = useToast()
   const { config } = useConfig(user)
+
+  // Función para aplicar horarios fijos automáticamente al crear una nueva semana
+  const applyFixedSchedules = async (
+    weekStartDate: Date,
+    weekStartStr: string,
+    employees: Empleado[],
+    schedules: Horario[],
+    config: Configuracion | null,
+    weekStartsOn: number
+  ): Promise<Record<string, Record<string, ShiftAssignment[]>>> => {
+    const assignments: Record<string, Record<string, ShiftAssignment[]>> = {}
+    
+    if (!config?.fixedSchedules || config.fixedSchedules.length === 0) {
+      return assignments
+    }
+
+    // Para cada día de la semana
+    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+      const date = new Date(weekStartDate)
+      date.setDate(date.getDate() + dayOffset)
+      const dateStr = format(date, "yyyy-MM-dd")
+      const dayOfWeek = getDay(date)
+
+      // Buscar horarios fijos para este día
+      const fixedForDay = config.fixedSchedules.filter((fixed) => fixed.dayOfWeek === dayOfWeek)
+      
+        for (const fixed of fixedForDay) {
+          const employee = employees.find((e) => e.id === fixed.employeeId)
+          if (!employee) continue
+
+          let assignmentsToApply: ShiftAssignment[] | null = null
+
+          // 1. Primero verificar si hay asignaciones guardadas cuando se marcó como fijo
+          if (fixed.assignments && fixed.assignments.length > 0) {
+            assignmentsToApply = fixed.assignments
+          }
+          // 2. Si no, buscar sugerencia automática
+          else {
+            const suggestion = getSuggestionForDay(fixed.employeeId, dayOfWeek, schedules, weekStartStr)
+            if (suggestion && suggestion.assignments.length > 0) {
+              assignmentsToApply = suggestion.assignments
+            }
+          }
+
+          // 3. Si aún no hay, buscar en la última semana completada
+          if (!assignmentsToApply || assignmentsToApply.length === 0) {
+            const completedSchedules = schedules
+              .filter((s) => s.completada === true && s.weekStart && s.weekStart < weekStartStr)
+              .sort((a, b) => {
+                const dateA = a.weekStart || a.semanaInicio || ""
+                const dateB = b.weekStart || b.semanaInicio || ""
+                return dateB.localeCompare(dateA) // Más reciente primero
+              })
+
+            // Buscar en la última semana completada
+            for (const completedSchedule of completedSchedules) {
+              const completedWeekStart = parseISO(completedSchedule.weekStart || completedSchedule.semanaInicio)
+              const completedDate = new Date(completedWeekStart)
+              completedDate.setDate(completedDate.getDate() + dayOffset)
+              const completedDateStr = format(completedDate, "yyyy-MM-dd")
+              
+              const completedAssignments = completedSchedule.assignments[completedDateStr]
+              if (completedAssignments && completedAssignments[fixed.employeeId]) {
+                const normalized = normalizeAssignments(completedAssignments[fixed.employeeId])
+                if (normalized.length > 0) {
+                  assignmentsToApply = normalized
+                  break // Usar la primera semana completada que tenga asignaciones
+                }
+              }
+            }
+          }
+
+          // Aplicar si encontramos asignaciones
+          if (assignmentsToApply && assignmentsToApply.length > 0) {
+            if (!assignments[dateStr]) {
+              assignments[dateStr] = {}
+            }
+            assignments[dateStr][fixed.employeeId] = assignmentsToApply
+          }
+        }
+    }
+
+    return assignments
+  }
   const [pendingEdit, setPendingEdit] = useState<{
     date: string
     employeeId: string
@@ -283,11 +368,21 @@ export function useScheduleUpdates({
         // Si no existe horario, crearlo. Si existe, actualizarlo
         if (!weekSchedule) {
           // Crear nuevo horario con formato nuevo
-          currentAssignments = {
-            [date]: {
-              [employeeId]: assignments,
-            },
+          // Primero aplicar horarios fijos automáticamente
+          currentAssignments = await applyFixedSchedules(
+            weekStartDate,
+            weekStartStr,
+            employees,
+            schedules,
+            config,
+            weekStartsOn
+          )
+          
+          // Luego agregar/sobrescribir con la asignación actual
+          if (!currentAssignments[date]) {
+            currentAssignments[date] = {}
           }
+          currentAssignments[date][employeeId] = assignments
 
           const newScheduleData = {
             nombre: scheduleNombre,
