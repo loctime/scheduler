@@ -963,10 +963,10 @@ export function useExportSchedule() {
         employees: Empleado[],
         employeeMonthlyStats: Record<string, any>,
         monthRange: { startDate: Date; endDate: Date },
-        nombreEmpresa?: string,
         monthWeeks: Date[][],
         getWeekSchedule: (weekStartDate: Date) => Horario | null,
         shifts: Turno[],
+        nombreEmpresa?: string,
         config?: { minutosDescanso?: number; horasMinimasParaDescanso?: number }
       ) => {
         const pdfWidth = pdf.internal.pageSize.getWidth()
@@ -1221,10 +1221,10 @@ export function useExportSchedule() {
         employees,
         config?.employeeMonthlyStats || {},
         monthRange,
-        config?.nombreEmpresa,
         monthWeeks,
         getWeekSchedule,
         shifts,
+        config?.nombreEmpresa,
         { 
           minutosDescanso: config?.minutosDescanso ?? 30, 
           horasMinimasParaDescanso: config?.horasMinimasParaDescanso ?? 6 
