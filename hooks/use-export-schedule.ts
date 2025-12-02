@@ -2,7 +2,8 @@ import { useCallback, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import type { Empleado, Turno, Horario, ShiftAssignment, Separador, MedioTurno } from "@/lib/types"
+import type { Empleado, Turno, Horario, ShiftAssignment, Separador, MedioTurno, ShiftAssignmentValue } from "@/lib/types"
+import { calculateDailyHours } from "@/lib/validations"
 
 export function useExportSchedule() {
   const [exporting, setExporting] = useState(false)
@@ -890,6 +891,8 @@ export function useExportSchedule() {
       monthRange?: { startDate: Date; endDate: Date };
       mediosTurnos?: MedioTurno[];
       employeeMonthlyStats?: Record<string, any>;
+      minutosDescanso?: number;
+      horasMinimasParaDescanso?: number;
     }
   ) => {
     setExporting(true)
@@ -942,7 +945,293 @@ export function useExportSchedule() {
 
       const totalWeeks = monthWeeks.length
 
-      // Iterar sobre cada semana
+      // Función helper para normalizar asignaciones
+      const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAssignment[] => {
+        if (!value || !Array.isArray(value) || value.length === 0) return []
+        if (typeof value[0] === "string") {
+          return (value as string[]).map((shiftId) => ({ shiftId, type: "shift" as const }))
+        }
+        return (value as ShiftAssignment[]).map((assignment) => ({
+          ...assignment,
+          type: assignment.type || "shift",
+        }))
+      }
+
+      // Función para agregar página de dashboard
+      const addDashboardPage = (
+        pdf: any,
+        employees: Empleado[],
+        employeeMonthlyStats: Record<string, any>,
+        monthRange: { startDate: Date; endDate: Date },
+        nombreEmpresa?: string,
+        monthWeeks: Date[][],
+        getWeekSchedule: (weekStartDate: Date) => Horario | null,
+        shifts: Turno[],
+        config?: { minutosDescanso?: number; horasMinimasParaDescanso?: number }
+      ) => {
+        const pdfWidth = pdf.internal.pageSize.getWidth()
+        const pdfHeight = pdf.internal.pageSize.getHeight()
+        const margin = 15
+        const headerHeight = 25
+        const footerHeight = 20
+
+        // Header
+        pdf.setFontSize(18)
+        pdf.setFont(undefined, "bold")
+        const title = nombreEmpresa ? `Resumen Mensual - ${nombreEmpresa}` : "Resumen Mensual"
+        pdf.text(title, margin, headerHeight)
+        
+        pdf.setFontSize(11)
+        pdf.setFont(undefined, "normal")
+        const monthText = `${format(monthRange.startDate, "d 'de' MMMM", { locale: es })} - ${format(monthRange.endDate, "d 'de' MMMM, yyyy", { locale: es })}`
+        pdf.text(monthText, margin, headerHeight + 8)
+
+        // Recopilar TODOS los empleados únicos de TODAS las semanas
+        // Incluyendo empleados activos, de snapshots, y de asignaciones
+        const allEmployeeIds = new Set<string>()
+        const employeeMap = new Map<string, Empleado>()
+        
+        // 1. Agregar empleados activos
+        employees.forEach(emp => {
+          allEmployeeIds.add(emp.id)
+          employeeMap.set(emp.id, emp)
+        })
+        
+        // 2. Agregar empleados de snapshots de semanas completadas
+        monthWeeks.forEach((weekDays) => {
+          const weekSchedule = getWeekSchedule(weekDays[0])
+          if (weekSchedule?.empleadosSnapshot) {
+            weekSchedule.empleadosSnapshot.forEach((snapshotEmp) => {
+              allEmployeeIds.add(snapshotEmp.id)
+              if (!employeeMap.has(snapshotEmp.id)) {
+                employeeMap.set(snapshotEmp.id, {
+                  id: snapshotEmp.id,
+                  name: snapshotEmp.name,
+                  email: snapshotEmp.email,
+                  phone: snapshotEmp.phone,
+                  userId: '',
+                } as Empleado)
+              }
+            })
+          }
+        })
+        
+        // 3. Agregar empleados que aparecen en asignaciones (por si acaso no están en lista activa ni en snapshots)
+        monthWeeks.forEach((weekDays) => {
+          const weekSchedule = getWeekSchedule(weekDays[0])
+          if (weekSchedule?.assignments) {
+            Object.values(weekSchedule.assignments).forEach((dateAssignments) => {
+              if (dateAssignments && typeof dateAssignments === 'object') {
+                Object.keys(dateAssignments).forEach((employeeId) => {
+                  if (!allEmployeeIds.has(employeeId)) {
+                    allEmployeeIds.add(employeeId)
+                    // Si no está en el mapa, crear un empleado básico
+                    if (!employeeMap.has(employeeId)) {
+                      employeeMap.set(employeeId, {
+                        id: employeeId,
+                        name: `Empleado ${employeeId.substring(0, 8)}`,
+                        email: '',
+                        phone: '',
+                        userId: '',
+                      } as Empleado)
+                    }
+                  }
+                })
+              }
+            })
+          }
+        })
+
+        const allEmployees = Array.from(employeeMap.values()).sort((a, b) => a.name.localeCompare(b.name))
+
+        // Calcular métricas adicionales para cada empleado
+        const dashboardData = allEmployees.map((employee) => {
+          const stats = employeeMonthlyStats[employee.id] || { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0 }
+          
+          // Calcular horas trabajadas totales del mes
+          let totalHoursWorked = 0
+          let daysWorked = 0
+          let medioFrancos = 0
+          let francosCount = 0
+
+          monthWeeks.forEach((weekDays) => {
+            const weekSchedule = getWeekSchedule(weekDays[0])
+            if (!weekSchedule?.assignments) return
+
+            weekDays.forEach((day) => {
+              if (day < monthRange.startDate || day > monthRange.endDate) return
+
+              const dateStr = format(day, "yyyy-MM-dd")
+              const assignments = weekSchedule.assignments[dateStr]?.[employee.id]
+              if (!assignments || (Array.isArray(assignments) && assignments.length === 0)) return
+
+              const normalizedAssignments = normalizeAssignments(assignments)
+              if (normalizedAssignments.length === 0) return
+
+              // Contar francos y medio francos
+              normalizedAssignments.forEach((assignment) => {
+                if (assignment.type === "franco") {
+                  francosCount += 1
+                } else if (assignment.type === "medio_franco") {
+                  medioFrancos += 0.5
+                }
+              })
+
+              // Si no es franco completo, contar como día trabajado y calcular horas
+              const hasFullFranco = normalizedAssignments.some(a => a.type === "franco")
+              if (!hasFullFranco) {
+                daysWorked++
+                const dailyHours = calculateDailyHours(
+                  normalizedAssignments,
+                  shifts,
+                  config?.minutosDescanso ?? 30,
+                  config?.horasMinimasParaDescanso ?? 6
+                )
+                totalHoursWorked += dailyHours
+              }
+            })
+          })
+
+          // Usar francos calculados si stats.francos es 0 pero encontramos francos
+          const finalFrancos = stats.francos > 0 ? stats.francos : francosCount
+
+          const totalWeeks = monthWeeks.length
+          const avgHoursPerWeek = totalWeeks > 0 ? totalHoursWorked / totalWeeks : 0
+          const avgExtraHoursPerWeek = totalWeeks > 0 ? stats.horasExtrasMes / totalWeeks : 0
+
+          return {
+            name: employee.name,
+            francos: finalFrancos,
+            medioFrancos,
+            horasExtrasMes: stats.horasExtrasMes,
+            horasTrabajadas: totalHoursWorked,
+            diasTrabajados: daysWorked,
+            promedioHorasSemana: avgHoursPerWeek,
+            promedioHorasExtrasSemana: avgExtraHoursPerWeek,
+          }
+        })
+
+        // Crear tabla
+        const tableStartY = headerHeight + 20
+        const rowHeight = 8
+        const colWidths = [
+          pdfWidth * 0.30, // Nombre
+          pdfWidth * 0.12, // Francos
+          pdfWidth * 0.12, // Horas Trabajadas
+          pdfWidth * 0.12, // Horas Extras
+          pdfWidth * 0.12, // Días Trabajados
+          pdfWidth * 0.12, // Promedio/Semana
+        ]
+
+        // Encabezados de tabla
+        pdf.setFontSize(10)
+        pdf.setFont(undefined, "bold")
+        pdf.setFillColor(240, 240, 240)
+        pdf.rect(margin, tableStartY, pdfWidth - (margin * 2), rowHeight, 'F')
+        
+        // Bordes del encabezado
+        pdf.setDrawColor(200, 200, 200)
+        pdf.line(margin, tableStartY, pdfWidth - margin, tableStartY)
+        pdf.line(margin, tableStartY + rowHeight, pdfWidth - margin, tableStartY + rowHeight)
+        
+        const headers = ['Empleado', 'Francos', 'Horas Trab.', 'Horas Extras', 'Días Trab.', 'Prom./Sem.']
+        let currentX = margin + 3
+        headers.forEach((header, index) => {
+          pdf.text(header, currentX, tableStartY + 5.5)
+          // Línea vertical entre columnas
+          if (index < headers.length - 1) {
+            pdf.line(currentX + colWidths[index] - 1, tableStartY, currentX + colWidths[index] - 1, tableStartY + rowHeight)
+          }
+          currentX += colWidths[index]
+        })
+
+        // Filas de datos
+        pdf.setFontSize(9)
+        pdf.setFont(undefined, "normal")
+        let currentY = tableStartY + rowHeight
+
+        dashboardData.forEach((data, index) => {
+          // Alternar color de fondo para mejor legibilidad
+          if (index % 2 === 0) {
+            pdf.setFillColor(250, 250, 250)
+            pdf.rect(margin, currentY, pdfWidth - (margin * 2), rowHeight, 'F')
+          }
+
+          // Bordes
+          pdf.setDrawColor(220, 220, 220)
+          pdf.line(margin, currentY, pdfWidth - margin, currentY)
+
+          // Datos
+          let x = margin + 3
+          pdf.text(data.name.substring(0, 25), x, currentY + 5.5) // Truncar nombre si es muy largo
+          // Línea vertical
+          pdf.line(x + colWidths[0] - 1, currentY, x + colWidths[0] - 1, currentY + rowHeight)
+          x += colWidths[0]
+          
+          pdf.text(data.francos.toFixed(1), x, currentY + 5.5)
+          pdf.line(x + colWidths[1] - 1, currentY, x + colWidths[1] - 1, currentY + rowHeight)
+          x += colWidths[1]
+          
+          pdf.text(data.horasTrabajadas.toFixed(1), x, currentY + 5.5)
+          pdf.line(x + colWidths[2] - 1, currentY, x + colWidths[2] - 1, currentY + rowHeight)
+          x += colWidths[2]
+          
+          pdf.text(data.horasExtrasMes.toFixed(1), x, currentY + 5.5)
+          pdf.line(x + colWidths[3] - 1, currentY, x + colWidths[3] - 1, currentY + rowHeight)
+          x += colWidths[3]
+          
+          pdf.text(data.diasTrabajados.toString(), x, currentY + 5.5)
+          pdf.line(x + colWidths[4] - 1, currentY, x + colWidths[4] - 1, currentY + rowHeight)
+          x += colWidths[4]
+          
+          pdf.text(`${data.promedioHorasSemana.toFixed(1)}h`, x, currentY + 5.5)
+
+          currentY += rowHeight
+
+          // Si se acaba el espacio, agregar nueva página
+          if (currentY > pdfHeight - footerHeight - 20) {
+            pdf.addPage()
+            currentY = margin + rowHeight
+            // Re-dibujar encabezados
+            pdf.setFontSize(10)
+            pdf.setFont(undefined, "bold")
+            pdf.setFillColor(240, 240, 240)
+            pdf.rect(margin, margin, pdfWidth - (margin * 2), rowHeight, 'F')
+            currentX = margin + 2
+            headers.forEach((header, idx) => {
+              pdf.text(header, currentX, margin + 6)
+              currentX += colWidths[idx]
+            })
+            pdf.setFontSize(9)
+            pdf.setFont(undefined, "normal")
+          }
+        })
+
+        // Footer
+        pdf.setFontSize(10)
+        pdf.setFont(undefined, "normal")
+        const footerText = "Resumen de estadísticas mensuales"
+        pdf.text(footerText, margin, pdfHeight - 10)
+      }
+
+      // Agregar página de dashboard como PRIMERA página (antes de las semanas)
+      const monthRange = config?.monthRange || { startDate: monthWeeks[0][0], endDate: monthWeeks[monthWeeks.length - 1][6] }
+      addDashboardPage(
+        pdf,
+        employees,
+        config?.employeeMonthlyStats || {},
+        monthRange,
+        config?.nombreEmpresa,
+        monthWeeks,
+        getWeekSchedule,
+        shifts,
+        { 
+          minutosDescanso: config?.minutosDescanso ?? 30, 
+          horasMinimasParaDescanso: config?.horasMinimasParaDescanso ?? 6 
+        }
+      )
+
+      // Iterar sobre cada semana (empezar desde página 2, ya que la 1 es el dashboard)
       for (let weekIndex = 0; weekIndex < monthWeeks.length; weekIndex++) {
         const weekDays = monthWeeks[weekIndex]
         const weekStartDate = weekDays[0]
@@ -1081,10 +1370,8 @@ export function useExportSchedule() {
         htmlElement.style.overflowX = originalOverflow.overflowX
         htmlElement.style.overflowY = originalOverflow.overflowY
 
-        // Agregar nueva página si no es la primera
-        if (weekIndex > 0) {
-          pdf.addPage()
-        }
+        // Agregar nueva página para cada semana (el dashboard está en la página 1)
+        pdf.addPage()
 
         // Agregar header
         addHeader(pdf, weekIndex + 1, totalWeeks, weekStartDate, weekEndDate, config?.nombreEmpresa)

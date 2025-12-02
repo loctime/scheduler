@@ -309,6 +309,8 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         monthRange,
         mediosTurnos: config?.mediosTurnos,
         employeeMonthlyStats,
+        minutosDescanso: config?.minutosDescanso,
+        horasMinimasParaDescanso: config?.horasMinimasParaDescanso,
       }
     )
   }, [exportMonthPDF, monthWeeks, getWeekSchedule, employees, shiftsToUse, monthRange, config, employeeMonthlyStats])

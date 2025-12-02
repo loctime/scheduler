@@ -100,21 +100,52 @@ export function LoginForm() {
         description: "Tu cuenta ha sido creada exitosamente",
       })
     } catch (error: any) {
-      let errorMessage = "Ocurrió un error inesperado"
-      
+      // Si el email ya está en uso, intentar iniciar sesión
       if (error.code === "auth/email-already-in-use") {
-        errorMessage = "Este email ya está registrado"
-      } else if (error.code === "auth/invalid-email") {
-        errorMessage = "El email no es válido"
-      } else if (error.code === "auth/weak-password") {
-        errorMessage = "La contraseña es muy débil"
+        try {
+          // Intentar iniciar sesión con las credenciales proporcionadas
+          const signInResult = await signInWithEmailAndPassword(auth, email, password)
+          const user = signInResult.user
+
+          // Crear o actualizar el documento del usuario en Firestore para esta app
+          await createOrUpdateUserDoc(user)
+
+          toast({
+            title: "Registro completado",
+            description: "Tu cuenta ha sido vinculada a esta aplicación",
+          })
+        } catch (signInError: any) {
+          // Si el inicio de sesión falla, mostrar el error correspondiente
+          let errorMessage = "Este email ya está registrado en otra aplicación"
+          
+          if (signInError.code === "auth/wrong-password") {
+            errorMessage = "Este email ya está registrado. La contraseña proporcionada es incorrecta"
+          } else if (signInError.code === "auth/invalid-credential") {
+            errorMessage = "Este email ya está registrado. Las credenciales son incorrectas"
+          }
+          
+          toast({
+            title: "Error al registrar",
+            description: errorMessage,
+            variant: "destructive",
+          })
+        }
+      } else {
+        // Otros errores de creación de cuenta
+        let errorMessage = "Ocurrió un error inesperado"
+        
+        if (error.code === "auth/invalid-email") {
+          errorMessage = "El email no es válido"
+        } else if (error.code === "auth/weak-password") {
+          errorMessage = "La contraseña es muy débil"
+        }
+        
+        toast({
+          title: "Error al crear cuenta",
+          description: errorMessage,
+          variant: "destructive",
+        })
       }
-      
-      toast({
-        title: "Error al crear cuenta",
-        description: errorMessage,
-        variant: "destructive",
-      })
     } finally {
       setLoading(false)
     }
