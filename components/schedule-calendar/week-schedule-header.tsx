@@ -24,7 +24,7 @@ export function WeekScheduleHeader({ title, isOpen, isCompleted }: WeekScheduleH
           ) : (
             <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform" />
           )}
-          <h3 className="text-2xl font-semibold text-foreground">{title}</h3>
+          <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold text-foreground">{title}</h3>
           {isCompleted && (
             <Badge variant="default" className="ml-2 bg-green-600 hover:bg-green-700">
               <CheckCircle2 className="h-3 w-3 mr-1" />

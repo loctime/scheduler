@@ -229,8 +229,8 @@ export default function ConfiguracionPage() {
     <DashboardLayout user={user}>
       <div className="space-y-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Configuración</h2>
-          <p className="text-muted-foreground">Gestiona las opciones generales del sistema</p>
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Configuración</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">Gestiona las opciones generales del sistema</p>
         </div>
 
         <Card>

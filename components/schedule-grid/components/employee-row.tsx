@@ -113,7 +113,7 @@ export function EmployeeRow({
       onDrop={(e) => onDrop(e, employee.id)}
     >
       <td
-        className="border-r-2 border-black px-6 py-4 text-lg font-medium text-foreground align-top"
+        className="border-r-2 border-black px-2 sm:px-4 md:px-6 py-2 sm:py-3 md:py-4 text-sm sm:text-base md:text-lg font-medium text-foreground align-top"
         style={
           separatorColor
             ? { backgroundColor: hexToRgba(separatorColor, 0.1) }
@@ -138,23 +138,23 @@ export function EmployeeRow({
               </Button>
             </div>
           )}
-          <div className="flex items-start gap-2">
+          <div className="flex items-start gap-1 sm:gap-2">
             {!readonly && (
               <button
                 type="button"
-                className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors touch-none"
+                className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors touch-none shrink-0"
                 draggable={false}
                 aria-label="Arrastrar para reordenar"
               >
-                <GripVertical className="h-5 w-5" />
+                <GripVertical className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
             )}
-            <div className="space-y-1 flex-1">
+            <div className="space-y-1 flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <p className="text-2xl font-bold">{employee.name}</p>
+                <p className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold truncate">{employee.name}</p>
               </div>
               {employeeStats && employeeStats[employee.id] && (
-                <div className="employee-stats text-base text-muted-foreground space-y-0.5">
+                <div className="employee-stats text-xs sm:text-sm md:text-base text-muted-foreground space-y-0.5">
                   <div className="flex items-center gap-1">
                     <span className="font-bold text-foreground">Francos:</span>
                     <span className="font-semibold">{formatStatValue(employeeStats[employee.id].francos)}</span>

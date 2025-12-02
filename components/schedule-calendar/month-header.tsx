@@ -74,17 +74,23 @@ export function MonthHeader({
   }, [monthRange.startDate, monthRange.endDate])
 
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-4">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
         <Button variant="outline" size="icon" onClick={onPreviousMonth} aria-label="Mes anterior">
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <div className="flex items-center gap-3">
-          <h2 className="text-3xl font-bold text-foreground">
-            {format(monthRange.startDate, "d 'de' MMMM", { locale: es })} -{" "}
-            {format(monthRange.endDate, "d 'de' MMMM, yyyy", { locale: es })}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-3 flex-1 sm:flex-initial min-w-0">
+          <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-foreground truncate">
+            <span className="hidden sm:inline">
+              {format(monthRange.startDate, "d 'de' MMMM", { locale: es })} -{" "}
+              {format(monthRange.endDate, "d 'de' MMMM, yyyy", { locale: es })}
+            </span>
+            <span className="sm:hidden">
+              {format(monthRange.startDate, "d MMM", { locale: es })} -{" "}
+              {format(monthRange.endDate, "d MMM yyyy", { locale: es })}
+            </span>
           </h2>
-          <span className="text-2xl font-semibold text-muted-foreground">
+          <span className="text-sm sm:text-base md:text-lg lg:text-2xl font-semibold text-muted-foreground">
             {format(mainMonth, "MMMM", { locale: es }).toUpperCase()}
           </span>
         </div>
@@ -93,17 +99,19 @@ export function MonthHeader({
         </Button>
       </div>
 
-      <div className="flex gap-2">
-        <Button variant="outline" onClick={onExportPDF} disabled={exporting} aria-label="Exportar mes completo como PDF">
+      <div className="flex gap-2 w-full sm:w-auto">
+        <Button variant="outline" onClick={onExportPDF} disabled={exporting} aria-label="Exportar mes completo como PDF" className="flex-1 sm:flex-initial">
           {exporting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Exportando...
+              <span className="hidden sm:inline">Exportando...</span>
+              <span className="sm:hidden">Exportando</span>
             </>
           ) : (
             <>
               <Download className="mr-2 h-4 w-4" />
-              PDF (Mes completo)
+              <span className="hidden sm:inline">PDF (Mes completo)</span>
+              <span className="sm:hidden">PDF</span>
             </>
           )}
         </Button>

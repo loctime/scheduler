@@ -18,9 +18,11 @@ import { useSeparators } from "./hooks/use-separators"
 import { GridHeader } from "./components/grid-header"
 import { SeparatorRow } from "./components/separator-row"
 import { EmployeeRow } from "./components/employee-row"
+import { ScheduleGridMobile } from "./components/schedule-grid-mobile"
 import { hexToRgba } from "./utils/schedule-grid-utils"
 import type { GridItem } from "./hooks/use-schedule-grid-data"
 import { usePatternSuggestions } from "@/hooks/use-pattern-suggestions"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 
@@ -79,6 +81,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   const { user } = useData()
   const { config } = useConfig(user)
   const { toast } = useToast()
+  const isMobile = useIsMobile()
   const { updateEmployeeOrder, addSeparator, updateSeparator, deleteSeparator } = useEmployeeOrder()
 
   // Combinar empleados actuales con snapshot cuando el horario está completado
@@ -520,6 +523,53 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     [user, db, readonly, config?.fixedSchedules, toast, getEmployeeAssignments]
   )
 
+  // Preparar datos de días para vista móvil
+  const weekDaysData = useMemo(() => {
+    return weekDays.map((day) => ({
+      date: day,
+      dateStr: format(day, "yyyy-MM-dd"),
+      dayName: format(day, "EEEE", { locale: es }),
+      dayNumber: format(day, "d MMM", { locale: es }),
+    }))
+  }, [weekDays])
+
+  // Filtrar solo empleados (sin separadores) para vista móvil
+  const employeesForMobile = useMemo(() => {
+    return orderedItems
+      .filter((item) => item.type === "employee")
+      .map((item) => item.data as Empleado)
+  }, [orderedItems])
+
+  // Vista móvil
+  if (isMobile) {
+    return (
+      <>
+        <ScheduleGridMobile
+          weekDays={weekDays}
+          employees={employeesForMobile}
+          weekDaysData={weekDaysData}
+          getEmployeeAssignments={getEmployeeAssignments}
+          getCellBackgroundStyle={getCellBackgroundStyle}
+          getShiftInfo={getShiftInfo}
+          selectedCell={selectedCell}
+          isClickable={isClickable}
+          onCellClick={handleCellClick}
+          onQuickAssignments={handleQuickAssignments}
+          readonly={readonly}
+          employeeStats={employeeStats}
+          shifts={shifts}
+          mediosTurnos={mediosTurnos}
+          cellUndoHistory={cellUndoHistory}
+          handleCellUndo={handleCellUndo}
+          getSuggestion={getSuggestion}
+          isManuallyFixed={isManuallyFixed}
+          onToggleFixed={handleToggleFixed}
+        />
+      </>
+    )
+  }
+
+  // Vista desktop (tabla)
   return (
     <>
       <Card className="overflow-hidden border border-border bg-card">

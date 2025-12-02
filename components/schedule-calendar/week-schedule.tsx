@@ -183,7 +183,7 @@ export function WeekSchedule({
 
   return (
     <Collapsible open={isOpen} onOpenChange={handleOpenChange} className="space-y-2">
-      <div className="flex items-center justify-between rounded-lg border border-border bg-card p-4 shadow-sm transition-colors">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 rounded-lg border border-border bg-card p-3 sm:p-4 shadow-sm transition-colors">
         <WeekScheduleHeader title={headerTitle} isOpen={isOpen} isCompleted={isCompleted} />
         <WeekScheduleActions
           readonly={readonly}

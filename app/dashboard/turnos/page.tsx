@@ -215,10 +215,10 @@ export default function TurnosPage() {
   return (
     <DashboardLayout user={user}>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-3xl font-bold text-foreground">Turnos</h2>
-            <p className="text-muted-foreground">Configura los turnos de trabajo disponibles</p>
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">Turnos</h2>
+            <p className="text-sm sm:text-base text-muted-foreground">Configura los turnos de trabajo disponibles</p>
           </div>
           <Button onClick={() => handleOpenDialog()}>
             <Plus className="mr-2 h-4 w-4" />

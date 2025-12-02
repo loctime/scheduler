@@ -275,33 +275,33 @@ export default function HorariosMensualesPage() {
     <>
       <ExportOverlay isExporting={exporting} message="Exportando horario..." />
       <DashboardLayout user={user}>
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
         <div>
-          <h2 className="text-3xl font-bold text-foreground">Horarios Mensuales</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">Horarios Mensuales</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Vista jerárquica de todos los horarios organizados por mes y semana
           </p>
         </div>
 
         {dataLoading ? (
-          <Card className="p-12 text-center">
-            <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
-            <p className="mt-4 text-muted-foreground">Cargando datos...</p>
+          <Card className="p-6 sm:p-8 md:p-12 text-center">
+            <Loader2 className="mx-auto h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary" />
+            <p className="mt-4 text-sm sm:text-base text-muted-foreground">Cargando datos...</p>
           </Card>
         ) : employees.length === 0 ? (
-          <Card className="p-12 text-center">
-            <p className="text-muted-foreground">No hay empleados registrados. Agrega empleados para crear horarios.</p>
+          <Card className="p-6 sm:p-8 md:p-12 text-center">
+            <p className="text-sm sm:text-base text-muted-foreground">No hay empleados registrados. Agrega empleados para crear horarios.</p>
           </Card>
         ) : shifts.length === 0 ? (
-          <Card className="p-12 text-center">
-            <p className="text-muted-foreground">No hay turnos configurados. Agrega turnos para crear horarios.</p>
+          <Card className="p-6 sm:p-8 md:p-12 text-center">
+            <p className="text-sm sm:text-base text-muted-foreground">No hay turnos configurados. Agrega turnos para crear horarios.</p>
           </Card>
         ) : monthGroups.length === 0 ? (
-          <Card className="p-12 text-center">
-            <p className="text-muted-foreground">No hay horarios disponibles. Crea horarios para verlos aquí.</p>
+          <Card className="p-6 sm:p-8 md:p-12 text-center">
+            <p className="text-sm sm:text-base text-muted-foreground">No hay horarios disponibles. Crea horarios para verlos aquí.</p>
           </Card>
         ) : (
-          <Accordion type="multiple" className="space-y-4">
+          <Accordion type="multiple" className="space-y-3 sm:space-y-4">
             {monthGroups.map((month) => {
               const monthRange = getCustomMonthRange(month.monthDate, monthStartDay)
               const employeeStats = calculateMonthlyStats(month.monthDate)
@@ -310,26 +310,26 @@ export default function HorariosMensualesPage() {
                 <AccordionItem
                   key={month.monthKey}
                   value={month.monthKey}
-                  className="border rounded-lg px-4 bg-card"
+                  className="border rounded-lg px-3 sm:px-4 bg-card"
                 >
-                  <AccordionTrigger className="text-xl font-semibold hover:no-underline py-4">
-                    <div className="flex items-center justify-between w-full pr-4">
-                      <span>{month.monthName}</span>
-                      <span className="text-sm font-normal text-muted-foreground">
+                  <AccordionTrigger className="text-base sm:text-lg md:text-xl font-semibold hover:no-underline py-3 sm:py-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between w-full pr-2 sm:pr-4 gap-1 sm:gap-0">
+                      <span className="truncate">{month.monthName}</span>
+                      <span className="text-xs sm:text-sm font-normal text-muted-foreground shrink-0">
                         {month.weeks.length} {month.weeks.length === 1 ? "semana" : "semanas"}
                       </span>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>
-                    <Accordion type="multiple" className="space-y-3 mt-2">
+                    <Accordion type="multiple" className="space-y-2 sm:space-y-3 mt-2">
                       {month.weeks.map((week) => (
                         <AccordionItem
                           key={week.weekStartStr}
                           value={week.weekStartStr}
-                          className="border rounded-md px-3 bg-background"
+                          className="border rounded-md px-2 sm:px-3 bg-background"
                         >
-                          <AccordionTrigger className="text-lg font-medium hover:no-underline py-3">
-                            <span>
+                          <AccordionTrigger className="text-sm sm:text-base md:text-lg font-medium hover:no-underline py-2 sm:py-3">
+                            <span className="text-left">
                               Semana del {format(week.weekStartDate, "d", { locale: es })} -{" "}
                               {format(week.weekEndDate, "d 'de' MMMM", { locale: es })}
                             </span>

@@ -98,7 +98,7 @@ export function WeekScheduleActions({
 
   return (
     <>
-      <div className="flex gap-2 ml-4" onClick={(e) => e.stopPropagation()}>
+      <div className="flex flex-wrap gap-1 sm:gap-2 ml-2 sm:ml-4" onClick={(e) => e.stopPropagation()}>
         {!readonly && getWeekSchedule && onAssignmentUpdate && (
           <>
             <Button
