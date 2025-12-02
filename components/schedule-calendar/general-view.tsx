@@ -28,7 +28,6 @@ interface GeneralViewProps {
   employeeMonthlyStats: Record<string, EmployeeMonthlyStats>
   getWeekSchedule: (weekStartDate: Date) => Horario | null
   onAssignmentUpdate?: AssignmentUpdateHandler
-  onExportMonthImage: () => Promise<void>
   onExportMonthPDF: () => Promise<void>
   onExportWeekImage: (weekStartDate: Date, weekEndDate: Date) => Promise<void>
   onExportWeekPDF: (weekStartDate: Date, weekEndDate: Date) => Promise<void>
@@ -52,7 +51,6 @@ export function GeneralView({
   employeeMonthlyStats,
   getWeekSchedule,
   onAssignmentUpdate,
-  onExportMonthImage,
   onExportMonthPDF,
   onExportWeekImage,
   onExportWeekPDF,
@@ -132,7 +130,6 @@ export function GeneralView({
         currentMonth={currentMonth}
         onPreviousMonth={onPreviousMonth}
         onNextMonth={onNextMonth}
-        onExportImage={onExportMonthImage}
         onExportPDF={onExportMonthPDF}
         exporting={exporting}
       />

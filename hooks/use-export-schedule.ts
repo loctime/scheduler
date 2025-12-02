@@ -2,7 +2,7 @@ import { useCallback, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import type { Empleado, Turno, Horario, ShiftAssignment, Separador } from "@/lib/types"
+import type { Empleado, Turno, Horario, ShiftAssignment, Separador, MedioTurno } from "@/lib/types"
 
 export function useExportSchedule() {
   const [exporting, setExporting] = useState(false)
@@ -878,5 +878,268 @@ export function useExportSchedule() {
     }
   }, [toast])
 
-  return { exporting, exportImage, exportPDF, exportExcel }
+  const exportMonthPDF = useCallback(async (
+    monthWeeks: Date[][],
+    getWeekSchedule: (weekStartDate: Date) => Horario | null,
+    employees: Empleado[],
+    shifts: Turno[],
+    filename: string,
+    config?: { 
+      nombreEmpresa?: string; 
+      colorEmpresa?: string;
+      monthRange?: { startDate: Date; endDate: Date };
+      mediosTurnos?: MedioTurno[];
+      employeeMonthlyStats?: Record<string, any>;
+    }
+  ) => {
+    setExporting(true)
+    
+    try {
+      const [domtoimage, jsPDF] = await Promise.all([
+        import("dom-to-image-more"),
+        import("jspdf").then(m => m.default),
+      ])
+
+      const pdf = new jsPDF("l", "mm", "a4")
+      const pdfWidth = pdf.internal.pageSize.getWidth()
+      const pdfHeight = pdf.internal.pageSize.getHeight()
+      
+      // Margen para header y footer
+      const headerHeight = 20
+      const footerHeight = 20
+      const contentHeight = pdfHeight - headerHeight - footerHeight
+      const margin = 10
+
+      // Función para agregar header
+      const addHeader = (pdf: any, pageNum: number, totalPages: number, weekStartDate: Date, weekEndDate: Date, nombreEmpresa?: string) => {
+        pdf.setFontSize(16)
+        pdf.setFont(undefined, "bold")
+        
+        // Título del mes/empresa
+        if (nombreEmpresa) {
+          pdf.text(nombreEmpresa, margin, 15)
+        }
+        
+        // Fecha de la semana
+        pdf.setFontSize(12)
+        pdf.setFont(undefined, "normal")
+        const weekText = `Semana del ${format(weekStartDate, "d", { locale: es })} - ${format(weekEndDate, "d 'de' MMMM yyyy", { locale: es })}`
+        pdf.text(weekText, pdfWidth - margin - pdf.getTextWidth(weekText), 15)
+      }
+
+      // Función para agregar footer
+      const addFooter = (pdf: any, pageNum: number, totalPages: number) => {
+        pdf.setFontSize(10)
+        pdf.setFont(undefined, "normal")
+        const footerText = `Página ${pageNum} de ${totalPages}`
+        const footerWidth = pdf.getTextWidth(footerText)
+        pdf.text(footerText, (pdfWidth - footerWidth) / 2, pdfHeight - 5)
+        
+        // Línea separadora
+        pdf.setDrawColor(200, 200, 200)
+        pdf.line(margin, pdfHeight - footerHeight + 5, pdfWidth - margin, pdfHeight - footerHeight + 5)
+      }
+
+      const totalWeeks = monthWeeks.length
+
+      // Iterar sobre cada semana
+      for (let weekIndex = 0; weekIndex < monthWeeks.length; weekIndex++) {
+        const weekDays = monthWeeks[weekIndex]
+        const weekStartDate = weekDays[0]
+        const weekEndDate = weekDays[weekDays.length - 1]
+        const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
+        
+        // Esperar a que el elemento esté disponible
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        
+        const weekElement = document.getElementById(weekId)
+        if (!weekElement) {
+          console.warn(`No se encontró el elemento de la semana ${weekId}`)
+          continue
+        }
+
+        // Expandir la semana si está colapsada
+        const collapsible = weekElement.closest('[data-slot="collapsible"]')
+        if (collapsible) {
+          const isClosed = collapsible.getAttribute('data-state') === 'closed'
+          if (isClosed) {
+            const trigger = collapsible.querySelector('[data-slot="collapsible-trigger"]') as HTMLElement
+            if (trigger) {
+              trigger.click()
+              // Esperar a que se expanda (animación + renderizado)
+              await new Promise((resolve) => setTimeout(resolve, 600))
+              // Esperar múltiples frames para asegurar que todos los estilos se hayan aplicado
+              await new Promise((resolve) => requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(resolve)
+                })
+              }))
+            }
+          }
+        }
+
+        // Usar el elemento completo del CollapsibleContent (igual que exportPDF individual)
+        // El weekElement es el CollapsibleContent que contiene el ScheduleGrid
+        const htmlElement = weekElement as HTMLElement
+
+        // Verificar que el elemento esté visible y tenga contenido
+        const table = htmlElement.querySelector("table")
+        if (!table) {
+          console.warn(`No se encontró la tabla en la semana ${weekId}`)
+          continue
+        }
+
+        // Preparar el elemento para exportación (similar a exportPDF)
+        disablePseudoElements()
+
+        const originalOverflow = {
+          overflow: htmlElement.style.overflow,
+          overflowX: htmlElement.style.overflowX,
+          overflowY: htmlElement.style.overflowY,
+        }
+
+        let bottomSeparatorRow: HTMLTableRowElement | null = null
+
+        // Eliminar padding y márgenes
+        const originalStyles = new Map<HTMLElement, { padding: string; margin: string }>()
+        const removeSpacing = (el: HTMLElement) => {
+          originalStyles.set(el, {
+            padding: el.style.padding || getComputedStyle(el).padding,
+            margin: el.style.margin || getComputedStyle(el).margin,
+          })
+          el.style.padding = "0"
+          el.style.margin = "0"
+        }
+        
+        removeSpacing(htmlElement)
+        htmlElement.querySelectorAll("*").forEach((el) => {
+          if (el instanceof HTMLElement) {
+            removeSpacing(el)
+          }
+        })
+
+        htmlElement.style.overflow = "visible"
+        htmlElement.style.overflowX = "visible"
+        htmlElement.style.overflowY = "visible"
+
+        const cleanedFlex = cleanFlexDivs(htmlElement)
+
+        // Ajustar contenedores al ancho real de la tabla
+        if (table) {
+          // Agregar separador inferior antes de exportar
+          if (config?.nombreEmpresa) {
+            bottomSeparatorRow = addBottomSeparator(table, config.nombreEmpresa, config.colorEmpresa)
+          }
+
+          const tableWidth = table.scrollWidth
+          const containers = htmlElement.querySelectorAll(".overflow-x-auto, .overflow-hidden, [class*='Card'], [class*='card']")
+          containers.forEach((container) => {
+            if (container instanceof HTMLElement) {
+              container.style.width = `${tableWidth}px`
+              container.style.maxWidth = `${tableWidth}px`
+            }
+          })
+          htmlElement.style.width = `${tableWidth}px`
+          htmlElement.style.maxWidth = `${tableWidth}px`
+        }
+
+        // Agregar margen abajo y a la derecha antes de exportar
+        const marginRight = 20
+        const marginBottom = 20
+        const originalPadding = htmlElement.style.padding || getComputedStyle(htmlElement).padding
+        htmlElement.style.padding = `0 ${marginRight}px ${marginBottom}px 0`
+        htmlElement.style.boxSizing = "content-box"
+
+        const scale = 4
+        // Usar el ancho real de la tabla, no del contenedor, más los márgenes
+        const actualWidth = table ? table.scrollWidth : htmlElement.scrollWidth
+        const actualHeight = table ? table.scrollHeight : htmlElement.scrollHeight
+
+        // Capturar como imagen
+        const dataUrl = await domtoimage.toPng(htmlElement, {
+          quality: 1.0,
+          bgcolor: "#ffffff",
+          width: (actualWidth + marginRight) * scale,
+          height: (actualHeight + marginBottom) * scale,
+          style: {
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+          },
+        })
+
+        // Restaurar estilos
+        htmlElement.style.padding = originalPadding
+        if (bottomSeparatorRow && bottomSeparatorRow.parentNode) {
+          bottomSeparatorRow.parentNode.removeChild(bottomSeparatorRow)
+        }
+        restoreFlexDivs(cleanedFlex)
+        originalStyles.forEach((styles, el) => {
+          el.style.padding = styles.padding
+          el.style.margin = styles.margin
+        })
+        htmlElement.style.overflow = originalOverflow.overflow
+        htmlElement.style.overflowX = originalOverflow.overflowX
+        htmlElement.style.overflowY = originalOverflow.overflowY
+
+        // Agregar nueva página si no es la primera
+        if (weekIndex > 0) {
+          pdf.addPage()
+        }
+
+        // Agregar header
+        addHeader(pdf, weekIndex + 1, totalWeeks, weekStartDate, weekEndDate, config?.nombreEmpresa)
+
+        // Calcular dimensiones de la imagen para que quepa en la página
+        const img = new Image()
+        img.src = dataUrl
+        await new Promise(res => (img.onload = res))
+
+        const imgAspectRatio = img.width / img.height
+        const availableWidth = pdfWidth - (margin * 2)
+        const availableHeight = contentHeight - (margin * 2)
+
+        let imgWidth = availableWidth
+        let imgHeight = imgWidth / imgAspectRatio
+
+        // Si la imagen es muy alta, ajustar por altura
+        if (imgHeight > availableHeight) {
+          imgHeight = availableHeight
+          imgWidth = imgHeight * imgAspectRatio
+        }
+
+        // Centrar la imagen
+        const x = (pdfWidth - imgWidth) / 2
+        const y = headerHeight + margin
+
+        // Agregar imagen al PDF
+        pdf.addImage(dataUrl, "PNG", x, y, imgWidth, imgHeight)
+
+        // Agregar footer
+        addFooter(pdf, weekIndex + 1, totalWeeks)
+
+        // Restaurar pseudo-elementos después de procesar cada semana
+        enablePseudoElements()
+      }
+
+      pdf.save(filename)
+
+      toast({
+        title: "PDF exportado",
+        description: `Se generó correctamente con ${totalWeeks} ${totalWeeks === 1 ? 'página' : 'páginas'}.`,
+      })
+    } catch (e) {
+      console.error(e)
+      enablePseudoElements()
+      toast({
+        title: "Error",
+        description: "No se pudo exportar el PDF mensual.",
+        variant: "destructive",
+      })
+    } finally {
+      enablePseudoElements() // Asegurar que siempre se restaure
+      setExporting(false)
+    }
+  }, [toast, disablePseudoElements, enablePseudoElements, cleanFlexDivs, restoreFlexDivs, addBottomSeparator])
+
+  return { exporting, exportImage, exportPDF, exportExcel, exportMonthPDF }
 }

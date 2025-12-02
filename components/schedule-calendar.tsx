@@ -44,7 +44,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   const { employees, shifts, loading: dataLoading } = useData()
   const { config } = useConfig(user)
   const { toast } = useToast()
-  const { exporting, exportImage, exportPDF, exportExcel } = useExportSchedule()
+  const { exporting, exportImage, exportPDF, exportExcel, exportMonthPDF } = useExportSchedule()
 
   const monthStartDay = config?.mesInicioDia || 1
   const weekStartsOn = (config?.semanaInicioDia || 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
@@ -109,30 +109,6 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   const goToNextMonth = useCallback(() => {
     setCurrentMonth((prev) => addMonths(prev, 1))
   }, [])
-
-
-
-  const handleExportMonthImage = useCallback(async () => {
-    await exportImage(
-      "schedule-month-container",
-      `horario-${format(monthRange.startDate, "yyyy-MM-dd")}.png`,
-      {
-        nombreEmpresa: config?.nombreEmpresa,
-        colorEmpresa: config?.colorEmpresa,
-      }
-    )
-  }, [exportImage, monthRange.startDate, config])
-
-  const handleExportMonthPDF = useCallback(async () => {
-    await exportPDF(
-      "schedule-month-container",
-      `horario-${format(monthRange.startDate, "yyyy-MM-dd")}.pdf`,
-      {
-        nombreEmpresa: config?.nombreEmpresa,
-        colorEmpresa: config?.colorEmpresa,
-      }
-    )
-  }, [exportPDF, monthRange.startDate, config])
 
   const handleExportWeekImage = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
     const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
@@ -320,6 +296,23 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     config?.horasMinimasParaDescanso,
   ])
 
+  const handleExportMonthPDF = useCallback(async () => {
+    await exportMonthPDF(
+      monthWeeks,
+      getWeekSchedule,
+      employees,
+      shiftsToUse,
+      `horario-mes-${format(monthRange.startDate, "yyyy-MM-dd")}.pdf`,
+      {
+        nombreEmpresa: config?.nombreEmpresa,
+        colorEmpresa: config?.colorEmpresa,
+        monthRange,
+        mediosTurnos: config?.mediosTurnos,
+        employeeMonthlyStats,
+      }
+    )
+  }, [exportMonthPDF, monthWeeks, getWeekSchedule, employees, shiftsToUse, monthRange, config, employeeMonthlyStats])
+
   return (
     <>
       <ExportOverlay isExporting={exporting} message="Exportando horario..." />
@@ -351,7 +344,6 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         employeeMonthlyStats={employeeMonthlyStats}
         getWeekSchedule={getWeekSchedule}
         onAssignmentUpdate={handleAssignmentUpdate}
-        onExportMonthImage={handleExportMonthImage}
         onExportMonthPDF={handleExportMonthPDF}
         onExportWeekImage={handleExportWeekImage}
         onExportWeekPDF={handleExportWeekPDF}

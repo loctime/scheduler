@@ -11,7 +11,6 @@ interface MonthHeaderProps {
   currentMonth: Date
   onPreviousMonth: () => void
   onNextMonth: () => void
-  onExportImage: () => void
   onExportPDF: () => void
   exporting: boolean
 }
@@ -67,7 +66,6 @@ export function MonthHeader({
   currentMonth,
   onPreviousMonth,
   onNextMonth,
-  onExportImage,
   onExportPDF,
   exporting,
 }: MonthHeaderProps) {
@@ -96,19 +94,6 @@ export function MonthHeader({
       </div>
 
       <div className="flex gap-2">
-        <Button variant="outline" onClick={onExportImage} disabled={exporting} aria-label="Exportar mes completo como imagen">
-          {exporting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Exportando...
-            </>
-          ) : (
-            <>
-              <Download className="mr-2 h-4 w-4" />
-              Imagen (Mes completo)
-            </>
-          )}
-        </Button>
         <Button variant="outline" onClick={onExportPDF} disabled={exporting} aria-label="Exportar mes completo como PDF">
           {exporting ? (
             <>
