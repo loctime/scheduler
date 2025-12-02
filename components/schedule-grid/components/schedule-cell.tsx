@@ -115,10 +115,10 @@ export function ScheduleCell({
               aria-label="Horario modificado"
             />
           )}
-          {/* Indicador de horario fijo */}
+          {/* Indicador de horario fijo - oculto en exportaciones */}
           {hasFixedSchedule && (
             <div
-              className="absolute top-1 right-1 z-10 flex items-center gap-1 bg-primary/10 border border-primary/20 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="schedule-fixed-indicator absolute top-1 right-1 z-10 flex items-center gap-1 bg-primary/10 border border-primary/20 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
               title={`Horario fijo detectado (${suggestionWeeks || 0} semanas consecutivas)`}
               aria-label="Horario fijo"
             >
@@ -172,7 +172,7 @@ export function ScheduleCell({
           <CellAssignments assignments={assignments} getShiftInfo={getShiftInfo} />
         )}
       </div>
-      {/* Botón de candado para marcar como fijo (abajo al centro) */}
+      {/* Botón de candado para marcar como fijo (abajo al centro) - oculto en exportaciones */}
       {!readonly && isClickable && onToggleFixed && (
         <button
           type="button"
@@ -181,7 +181,7 @@ export function ScheduleCell({
             const dayOfWeek = getDay(parseISO(date))
             onToggleFixed(date, employeeId, dayOfWeek)
           }}
-          className={`absolute bottom-1 left-1/2 -translate-x-1/2 z-10 flex h-5 w-5 items-center justify-center rounded transition-all ${
+          className={`schedule-lock-button absolute bottom-1 left-1/2 -translate-x-1/2 z-10 flex h-5 w-5 items-center justify-center rounded transition-all ${
             isManuallyFixed
               ? "bg-primary text-primary-foreground opacity-100"
               : "bg-muted/50 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-primary hover:text-primary-foreground"

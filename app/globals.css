@@ -183,6 +183,12 @@
   display: none !important;
 }
 
+/* Ocultar el botón de candado y el indicador de horario fijo durante la exportación */
+.exporting-image .schedule-lock-button,
+.exporting-image .schedule-fixed-indicator {
+  display: none !important;
+}
+
 /* Eliminar espacios en blanco del Card y contenedores durante la exportación */
 .exporting-image [class*="Card"],
 .exporting-image [class*="card"] {
