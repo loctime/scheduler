@@ -1,18 +1,22 @@
 "use client"
 
-import React, { useMemo } from "react"
+import React, { useMemo, useContext } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { useConfig } from "@/hooks/use-config"
-import { useData } from "@/contexts/data-context"
+import { DataContext } from "@/contexts/data-context"
 import { hexToRgba } from "../utils/schedule-grid-utils"
 
 interface GridHeaderProps {
   weekDays: Date[]
+  user?: any // Usuario opcional (para páginas públicas sin DataProvider)
 }
 
-export function GridHeader({ weekDays }: GridHeaderProps) {
-  const { user } = useData()
+export function GridHeader({ weekDays, user: userProp }: GridHeaderProps) {
+  // Usar useContext directamente para evitar el error si no hay DataProvider
+  const dataContext = useContext(DataContext)
+  const contextUser = dataContext?.user || null
+  const user = userProp || contextUser
   const { config } = useConfig(user)
   const nombreEmpresa = config?.nombreEmpresa || "Empleado"
   const colorEmpresa = config?.colorEmpresa

@@ -1,10 +1,10 @@
 "use client"
 
-import { useCallback } from "react"
+import { useCallback, useContext } from "react"
 import { doc, setDoc, serverTimestamp, getDoc, Timestamp } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
-import { useData } from "@/contexts/data-context"
+import { DataContext } from "@/contexts/data-context"
 import { Separador } from "@/lib/types"
 
 // Helper para eliminar campos undefined de un objeto (Firebase no acepta undefined)
@@ -19,7 +19,9 @@ function removeUndefinedFields<T extends Record<string, any>>(obj: T): T {
 }
 
 export function useEmployeeOrder() {
-  const { user } = useData()
+  // Usar useContext directamente para evitar el error si no hay DataProvider
+  const dataContext = useContext(DataContext)
+  const user = dataContext?.user || null
   const { toast } = useToast()
 
   const updateEmployeeOrder = useCallback(

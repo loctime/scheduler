@@ -125,8 +125,8 @@ service cloud.firestore {
     
     // Colección: apps/horarios/employees
     match /apps/horarios/employees/{empleadoId} {
-      // Solo el dueño puede leer
-      allow read: if isAuth() && resource.data.userId == uid();
+      // Permitir lectura pública (para página compartible)
+      allow read: if true;
       // Crear: verificar que userId sea correcto
       allow create: if isAuth() && request.resource.data.userId == uid();
       // Actualizar: verificar propiedad y proteger userId
@@ -138,8 +138,8 @@ service cloud.firestore {
     
     // Colección: apps/horarios/shifts
     match /apps/horarios/shifts/{turnoId} {
-      // Solo el dueño puede leer
-      allow read: if isAuth() && resource.data.userId == uid();
+      // Permitir lectura pública (para página compartible)
+      allow read: if true;
       // Crear: verificar que userId sea correcto
       allow create: if isAuth() && request.resource.data.userId == uid();
       // Actualizar: verificar propiedad y proteger userId
@@ -151,8 +151,8 @@ service cloud.firestore {
     
     // Colección: apps/horarios/schedules
     match /apps/horarios/schedules/{horarioId} {
-      // Solo el dueño puede leer
-      allow read: if isAuth() && resource.data.createdBy == uid();
+      // Permitir lectura pública (para página compartible)
+      allow read: if true;
       // Crear: verificar que createdBy sea correcto
       allow create: if isAuth() && request.resource.data.createdBy == uid();
       // Actualizar: verificar propiedad y proteger createdBy

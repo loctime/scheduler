@@ -10,7 +10,8 @@ import { adjustTime } from "@/lib/utils"
 import { useConfig } from "@/hooks/use-config"
 import { useEmployeeOrder } from "@/hooks/use-employee-order"
 import { useToast } from "@/hooks/use-toast"
-import { useData } from "@/contexts/data-context"
+import { useContext } from "react"
+import { DataContext } from "@/contexts/data-context"
 import { useScheduleGridData } from "./hooks/use-schedule-grid-data"
 import { useCellBackgroundStyles } from "./hooks/use-cell-background-styles"
 import { useDragAndDrop } from "./hooks/use-drag-and-drop"
@@ -54,6 +55,7 @@ interface ScheduleGridProps {
   lastCompletedWeekStart?: string | null // Fecha de inicio de la última semana completada (formato yyyy-MM-dd)
   onClearEmployeeRow?: (employeeId: string) => Promise<boolean> // Función optimizada para limpiar fila del empleado
   allSchedules?: Horario[] // Todos los horarios para análisis de patrones
+  user?: any // Usuario opcional (para páginas públicas sin DataProvider)
 }
 
 export const ScheduleGrid = memo(function ScheduleGrid({
@@ -73,12 +75,18 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   lastCompletedWeekStart,
   onClearEmployeeRow: externalOnClearEmployeeRow,
   allSchedules = [],
+  user: userProp,
 }: ScheduleGridProps) {
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
   const [extraMenuOpenKey, setExtraMenuOpenKey] = useState<string | null>(null)
   const [cellUndoHistory, setCellUndoHistory] = useState<Map<string, ShiftAssignment[]>>(new Map())
 
-  const { user } = useData()
+  // Intentar obtener user del contexto si no se proporciona como prop
+  // Usar useContext directamente para evitar el error si no hay DataProvider
+  const dataContext = useContext(DataContext)
+  const contextUser = dataContext?.user || null
+  const user = userProp || contextUser
+  
   const { config } = useConfig(user)
   const { toast } = useToast()
   const isMobile = useIsMobile()
@@ -575,7 +583,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
       <Card className="overflow-hidden border border-border bg-card">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
-            <GridHeader weekDays={weekDays} />
+            <GridHeader weekDays={weekDays} user={user} />
             <tbody>
               {orderedItems.map((item, itemIndex) => {
                 const showAddButton = !readonly && item.type === "employee"

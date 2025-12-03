@@ -16,7 +16,7 @@ interface DataContextType {
   refreshShifts: () => Promise<void>
 }
 
-const DataContext = createContext<DataContextType | undefined>(undefined)
+export const DataContext = createContext<DataContextType | undefined>(undefined)
 
 export function DataProvider({ children, user }: { children: React.ReactNode; user: any }) {
   const [employees, setEmployees] = useState<Empleado[]>([])

@@ -221,6 +221,7 @@ export function WeekSchedule({
             isScheduleCompleted={isCompleted}
             lastCompletedWeekStart={lastCompletedWeekStart}
             onClearEmployeeRow={!readonly && user ? handleClearEmployeeRow : undefined}
+            user={user}
           />
         </div>
       </CollapsibleContent>
