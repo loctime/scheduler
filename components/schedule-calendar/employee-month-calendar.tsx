@@ -168,11 +168,11 @@ export function EmployeeMonthCalendar({
                       key={day.toISOString()}
                       onClick={() => setSelectedDate(day)}
                       className={cn(
-                        "relative min-h-[80px] p-2 rounded-md border transition-colors text-left",
-                        "hover:bg-accent/50 hover:border-accent-foreground/20",
+                        "relative min-h-[80px] p-2 rounded-md border-2 border-gray-300 dark:border-gray-600 transition-colors text-left",
+                        "hover:bg-accent/50 hover:border-gray-400 dark:hover:border-gray-500",
                         !isCurrentMonth && "opacity-40 text-muted-foreground bg-muted/30",
-                        isToday && !isSelected && "border-primary/30",
-                        isSelected && "bg-primary/10 border-primary"
+                        isToday && !isSelected && "border-primary border-2",
+                        isSelected && "bg-primary/10 border-primary border-2"
                       )}
                     >
                       {/* Número del día */}

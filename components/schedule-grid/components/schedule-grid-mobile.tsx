@@ -74,9 +74,9 @@ export function ScheduleGridMobile({
         const employeeCardId = `employee-card-${employee.id}-${format(weekStartDate, "yyyy-MM-dd")}`
         
         return (
-          <Card key={employee.id} id={employeeCardId} className="overflow-hidden border border-border bg-card">
+          <Card key={employee.id} id={employeeCardId} className="overflow-hidden border-2 border-gray-300 dark:border-gray-600 bg-card">
             {/* Employee Header */}
-            <div className="border-b border-border bg-muted/30 px-4 py-3">
+            <div className="border-b-2 border-gray-300 dark:border-gray-600 bg-muted/30 px-4 py-3">
               <div className="flex items-start gap-2">
                 {!readonly && (
                   <GripVertical className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
@@ -120,7 +120,7 @@ export function ScheduleGridMobile({
             </div>
 
             {/* Week Days */}
-            <div className="divide-y divide-border">
+            <div>
               {weekDaysData.map((dayData, dayIndex) => {
                 const { date, dateStr, dayName, dayNumber } = dayData
                 const assignments = getEmployeeAssignments(employee.id, dateStr)
@@ -137,11 +137,7 @@ export function ScheduleGridMobile({
                 return (
                   <div
                     key={dateStr}
-                    className={`px-4 py-3 transition-colors border-l border-r border-border ${
-                      dayIndex === 0 ? "border-t" : ""
-                    } ${
-                      dayIndex === weekDaysData.length - 1 ? "border-b" : ""
-                    } ${
+                    className={`px-4 py-3 transition-colors border-2 border-gray-300 dark:border-gray-600 ${
                       isClickable ? "cursor-pointer hover:bg-muted/50 active:bg-muted" : ""
                     } ${isCellSelected ? "bg-primary/10" : ""}`}
                     style={backgroundStyle}
