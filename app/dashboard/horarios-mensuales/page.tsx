@@ -20,6 +20,8 @@ import { ExportOverlay } from "@/components/export-overlay"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { calculateDailyHours, calculateExtraHours } from "@/lib/validations"
 import { ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
+import { Button } from "@/components/ui/button"
+import { Share2 } from "lucide-react"
 
 const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAssignment[] => {
   if (!value || !Array.isArray(value) || value.length === 0) return []
@@ -271,16 +273,42 @@ export default function HorariosMensualesPage() {
     )
   }, [exportExcel, employees, shifts])
 
+  const handleShareLink = useCallback(async () => {
+    if (!user) return
+    
+    const shareUrl = `${window.location.origin}/horarios-mensuales?userId=${user.uid}`
+    
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      toast({
+        title: "Enlace copiado",
+        description: "El enlace se ha copiado al portapapeles. Compártelo con tu equipo.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo copiar el enlace. Cópialo manualmente.",
+        variant: "destructive",
+      })
+    }
+  }, [user, toast])
+
   return (
     <>
       <ExportOverlay isExporting={exporting} message="Exportando horario..." />
       <DashboardLayout user={user}>
         <div className="space-y-4 sm:space-y-6">
-        <div>
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">Horarios Mensuales</h2>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Vista jerárquica de todos los horarios organizados por mes y semana
-          </p>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+          <div>
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">Horarios Mensuales</h2>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Vista jerárquica de todos los horarios organizados por mes y semana
+            </p>
+          </div>
+          <Button onClick={handleShareLink} variant="outline" size="sm" className="shrink-0">
+            <Share2 className="mr-2 h-4 w-4" />
+            Compartir enlace
+          </Button>
         </div>
 
         {dataLoading ? (

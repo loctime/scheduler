@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState, useMemo, useCallback } from "react"
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore"
+import { useSearchParams } from "next/navigation"
+import { collection, query, orderBy, onSnapshot, where } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { Card, CardContent } from "@/components/ui/card"
 import { Loader2 } from "lucide-react"
@@ -59,6 +60,9 @@ const defaultConfig: Configuracion = {
 }
 
 export default function HorariosMensualesPage() {
+  const searchParams = useSearchParams()
+  const userId = searchParams.get("userId")
+  
   const [schedules, setSchedules] = useState<Horario[]>([])
   const [employees, setEmployees] = useState<Empleado[]>([])
   const [shifts, setShifts] = useState<Turno[]>([])
@@ -70,15 +74,18 @@ export default function HorariosMensualesPage() {
   const weekStartsOn = (config?.semanaInicioDia || 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
   const monthStartDay = config?.mesInicioDia || 1
 
-  // Cargar empleados (sin filtrar por usuario)
+  // Cargar empleados filtrados por userId
   useEffect(() => {
-    if (!db) {
-      setLoading(false)
+    if (!db || !userId) {
+      if (!userId) {
+        setLoading(false)
+      }
       return
     }
 
     const employeesQuery = query(
       collection(db, COLLECTIONS.EMPLOYEES),
+      where("userId", "==", userId),
       orderBy("name")
     )
     const unsubscribeEmployees = onSnapshot(
@@ -101,14 +108,15 @@ export default function HorariosMensualesPage() {
     )
 
     return () => unsubscribeEmployees()
-  }, [toast])
+  }, [userId, toast])
 
-  // Cargar turnos (sin filtrar por usuario)
+  // Cargar turnos filtrados por userId
   useEffect(() => {
-    if (!db) return
+    if (!db || !userId) return
 
     const shiftsQuery = query(
       collection(db, COLLECTIONS.SHIFTS),
+      where("userId", "==", userId),
       orderBy("name")
     )
     const unsubscribeShifts = onSnapshot(
@@ -131,14 +139,15 @@ export default function HorariosMensualesPage() {
     )
 
     return () => unsubscribeShifts()
-  }, [toast])
+  }, [userId, toast])
 
-  // Cargar horarios (sin filtrar por usuario)
+  // Cargar horarios filtrados por userId
   useEffect(() => {
-    if (!db) return
+    if (!db || !userId) return
 
     const schedulesQuery = query(
       collection(db, COLLECTIONS.SCHEDULES),
+      where("createdBy", "==", userId),
       orderBy("weekStart", "desc")
     )
     const unsubscribeSchedules = onSnapshot(
@@ -163,7 +172,22 @@ export default function HorariosMensualesPage() {
     )
 
     return () => unsubscribeSchedules()
-  }, [toast])
+  }, [userId, toast])
+
+  // Mostrar mensaje si no hay userId
+  if (!userId) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto py-8 px-4">
+          <Card className="p-6 sm:p-8 md:p-12 text-center">
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Enlace inválido. Por favor, solicita un enlace válido al administrador.
+            </p>
+          </Card>
+        </div>
+      </div>
+    )
+  }
 
   // Agrupar horarios por mes y semana
   const monthGroups = useMemo<MonthGroup[]>(() => {
