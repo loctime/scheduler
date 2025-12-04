@@ -300,6 +300,11 @@ export default function HorariosMensualesPage() {
         <div className="space-y-4 sm:space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
           <div>
+            {config?.nombreEmpresa && (
+              <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground mb-1">
+                {config.nombreEmpresa}
+              </h1>
+            )}
             <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">Horarios Mensuales</h2>
             <p className="text-sm sm:text-base text-muted-foreground">
               Vista jerárquica de todos los horarios organizados por mes y semana
@@ -351,80 +356,65 @@ export default function HorariosMensualesPage() {
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>
-                    <Accordion type="multiple" className="space-y-2 sm:space-y-3 mt-2">
-                      {month.weeks.map((week) => (
-                        <AccordionItem
-                          key={week.weekStartStr}
-                          value={week.weekStartStr}
-                          className="border rounded-md px-2 sm:px-3 bg-background"
-                        >
-                          <AccordionTrigger className="text-sm sm:text-base md:text-lg font-medium hover:no-underline py-2 sm:py-3">
-                            <span className="text-left">
-                              Semana del {format(week.weekStartDate, "d", { locale: es })} -{" "}
-                              {format(week.weekEndDate, "d 'de' MMMM", { locale: es })}
-                            </span>
-                          </AccordionTrigger>
-                          <AccordionContent>
-                            {(() => {
-                              // Calcular horas extras para esta semana específica
-                              const weekStats: Record<string, EmployeeMonthlyStats> = {}
-                              employees.forEach((employee) => {
-                                weekStats[employee.id] = {
-                                  ...employeeStats[employee.id],
+                    <div className="space-y-2 sm:space-y-3 mt-2">
+                      {month.weeks.map((week) => {
+                        // Calcular horas extras para esta semana específica
+                        const weekStats: Record<string, EmployeeMonthlyStats> = {}
+                        employees.forEach((employee) => {
+                          weekStats[employee.id] = {
+                            ...employeeStats[employee.id],
+                            horasExtrasSemana: 0,
+                          }
+                        })
+
+                        if (week.schedule?.assignments) {
+                          week.weekDays.forEach((day) => {
+                            const dateStr = format(day, "yyyy-MM-dd")
+                            const dateAssignments = week.schedule?.assignments[dateStr]
+                            if (!dateAssignments) return
+
+                            Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
+                              if (!weekStats[employeeId]) {
+                                weekStats[employeeId] = {
+                                  ...employeeStats[employeeId],
                                   horasExtrasSemana: 0,
                                 }
-                              })
-
-                              if (week.schedule?.assignments) {
-                                week.weekDays.forEach((day) => {
-                                  const dateStr = format(day, "yyyy-MM-dd")
-                                  const dateAssignments = week.schedule?.assignments[dateStr]
-                                  if (!dateAssignments) return
-
-                                  Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
-                                    if (!weekStats[employeeId]) {
-                                      weekStats[employeeId] = {
-                                        ...employeeStats[employeeId],
-                                        horasExtrasSemana: 0,
-                                      }
-                                    }
-
-                                    const normalizedAssignments = normalizeAssignments(assignmentValue)
-                                    if (normalizedAssignments.length === 0) {
-                                      return
-                                    }
-
-                                    // Calcular horas extras para este día
-                                    const extraHours = calculateExtraHours(normalizedAssignments, shifts)
-                                    if (extraHours > 0) {
-                                      weekStats[employeeId].horasExtrasSemana += extraHours
-                                    }
-                                  })
-                                })
                               }
 
-                              return (
-                                <WeekSchedule
-                                  weekDays={week.weekDays}
-                                  weekIndex={0}
-                                  weekSchedule={week.schedule}
-                                  employees={employees}
-                                  shifts={shifts}
-                                  monthRange={monthRange}
-                                  onExportImage={handleExportWeekImage}
-                                  onExportPDF={handleExportWeekPDF}
-                                  onExportExcel={() => handleExportWeekExcel(week.weekStartDate, week.weekDays, week.schedule)}
-                                  exporting={exporting}
-                                  mediosTurnos={config?.mediosTurnos}
-                                  employeeStats={weekStats}
-                                  readonly={true}
-                                />
-                              )
-                            })()}
-                          </AccordionContent>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
+                              const normalizedAssignments = normalizeAssignments(assignmentValue)
+                              if (normalizedAssignments.length === 0) {
+                                return
+                              }
+
+                              // Calcular horas extras para este día
+                              const extraHours = calculateExtraHours(normalizedAssignments, shifts)
+                              if (extraHours > 0) {
+                                weekStats[employeeId].horasExtrasSemana += extraHours
+                              }
+                            })
+                          })
+                        }
+
+                        return (
+                          <WeekSchedule
+                            key={week.weekStartStr}
+                            weekDays={week.weekDays}
+                            weekIndex={0}
+                            weekSchedule={week.schedule}
+                            employees={employees}
+                            shifts={shifts}
+                            monthRange={monthRange}
+                            onExportImage={handleExportWeekImage}
+                            onExportPDF={handleExportWeekPDF}
+                            onExportExcel={() => handleExportWeekExcel(week.weekStartDate, week.weekDays, week.schedule)}
+                            exporting={exporting}
+                            mediosTurnos={config?.mediosTurnos}
+                            employeeStats={weekStats}
+                            readonly={true}
+                          />
+                        )
+                      })}
+                    </div>
                   </AccordionContent>
                 </AccordionItem>
               )
