@@ -63,8 +63,10 @@ match /apps/horarios/historial/{historialId} {
 
 // Colección: apps/horarios/config
 match /apps/horarios/config/{configId} {
-  // Cada usuario solo puede leer/editar su propia configuración (configId debe ser su uid)
-  allow read, write: if isAuth() && configId == uid();
+  // Permitir lectura pública (para página compartible)
+  allow read: if true;
+  // Solo el usuario puede editar su propia configuración (configId debe ser su uid)
+  allow write: if isAuth() && configId == uid();
   // No permitir eliminar configuración
   allow delete: if false;
 }
