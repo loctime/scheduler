@@ -37,18 +37,18 @@ export function GridHeader({ weekDays, user: userProp, onCloseSelector }: GridHe
     // Tamaños responsive: móvil primero, luego desktop
     // Límites aproximados de caracteres por tamaño de fuente (máximo 3 líneas)
     if (length <= 18) {
-      return { fontSize: "text-lg sm:text-xl md:text-2xl lg:text-3xl", displayText: nombreEmpresa }
-    } else if (length <= 24) {
-      return { fontSize: "text-base sm:text-lg md:text-xl lg:text-2xl", displayText: nombreEmpresa }
-    } else if (length <= 30) {
       return { fontSize: "text-sm sm:text-base md:text-lg lg:text-xl", displayText: nombreEmpresa }
-    } else if (length <= 36) {
+    } else if (length <= 24) {
       return { fontSize: "text-xs sm:text-sm md:text-base lg:text-lg", displayText: nombreEmpresa }
+    } else if (length <= 30) {
+      return { fontSize: "text-xs sm:text-sm md:text-base lg:text-base", displayText: nombreEmpresa }
+    } else if (length <= 36) {
+      return { fontSize: "text-[10px] sm:text-xs md:text-sm lg:text-base", displayText: nombreEmpresa }
     } else if (length <= 42) {
-      return { fontSize: "text-xs sm:text-sm md:text-base", displayText: nombreEmpresa }
+      return { fontSize: "text-[10px] sm:text-xs md:text-sm", displayText: nombreEmpresa }
     } else {
-      // Si es muy largo, truncar a 42 caracteres y usar text-base
-      return { fontSize: "text-xs sm:text-sm md:text-base", displayText: nombreEmpresa.substring(0, 42) + "..." }
+      // Si es muy largo, truncar a 42 caracteres y usar text-sm
+      return { fontSize: "text-[10px] sm:text-xs md:text-sm", displayText: nombreEmpresa.substring(0, 42) + "..." }
     }
   }, [nombreEmpresa])
 
@@ -66,7 +66,7 @@ export function GridHeader({ weekDays, user: userProp, onCloseSelector }: GridHe
     <thead>
       <tr className="border-b-2 border-black bg-muted/50" style={rowStyle}>
         <th 
-          className="min-w-[140px] sm:min-w-[180px] md:min-w-[200px] lg:min-w-[220px] lg:max-w-[220px] border-r-2 border-black px-2 sm:px-4 md:px-6 py-2 sm:py-3 md:py-4 text-left font-bold text-foreground"
+          className="min-w-[140px] sm:min-w-[180px] md:min-w-[200px] lg:min-w-[220px] lg:max-w-[220px] border-r-2 border-black px-1.5 sm:px-2 md:px-3 py-1.5 sm:py-2 md:py-3 text-left font-bold text-foreground"
           onClick={(e) => {
             if (onCloseSelector) {
               e.stopPropagation()
@@ -81,7 +81,7 @@ export function GridHeader({ weekDays, user: userProp, onCloseSelector }: GridHe
         {weekDays.map((day) => (
           <th
             key={day.toISOString()}
-            className="min-w-[100px] sm:min-w-[140px] md:min-w-[160px] lg:min-w-[180px] border-r-2 border-black px-2 sm:px-4 md:px-6 py-2 sm:py-3 md:py-4 text-center font-bold text-foreground last:border-r-0"
+            className="min-w-[100px] sm:min-w-[140px] md:min-w-[160px] lg:min-w-[180px] border-r-2 border-black px-1.5 sm:px-2 md:px-3 py-1.5 sm:py-2 md:py-3 text-center font-bold text-foreground last:border-r-0"
             onClick={(e) => {
               if (onCloseSelector) {
                 e.stopPropagation()
@@ -90,8 +90,8 @@ export function GridHeader({ weekDays, user: userProp, onCloseSelector }: GridHe
             }}
           >
             <div className="flex flex-col">
-              <span className="capitalize text-sm sm:text-base md:text-xl lg:text-2xl xl:text-3xl font-bold">{format(day, "EEEE", { locale: es })}</span>
-              <span className="text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl font-semibold text-muted-foreground">{format(day, "d MMM", { locale: es })}</span>
+              <span className="capitalize text-xs sm:text-sm md:text-base lg:text-lg font-bold">{format(day, "EEEE", { locale: es })}</span>
+              <span className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-muted-foreground">{format(day, "d MMM", { locale: es })}</span>
             </div>
           </th>
         ))}

@@ -86,10 +86,10 @@ export function ScheduleCell({
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <td
-          className={`border-r-2 border-black px-2 sm:px-3 md:px-4 py-2 sm:py-3 md:py-4 last:border-r-0 relative group ${
+          className={`border-r-2 border-black px-1.5 sm:px-2 md:px-3 py-1.5 sm:py-2 md:py-3 last:border-r-0 relative group ${
             isClickable ? `cursor-pointer transition-all ${hoverClass} active:brightness-90 touch-manipulation` : ""
           } ${selectedClass} ${
-            isSelected && isClickable && onQuickAssignments ? "min-h-[200px] py-4 sm:py-6 md:py-8" : ""
+            isSelected && isClickable && onQuickAssignments ? "min-h-[150px] py-2 sm:py-3 md:py-4" : ""
           }`}
           style={backgroundStyle}
           onClick={() => onCellClick(date, employeeId)}
@@ -163,7 +163,7 @@ export function ScheduleCell({
           </DropdownMenu>
         </div>
       )}
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
         {isSelected && isClickable && onQuickAssignments ? (
           <QuickShiftSelector
             shifts={quickShifts}

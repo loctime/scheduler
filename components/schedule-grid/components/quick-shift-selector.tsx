@@ -98,7 +98,7 @@ export function QuickShiftSelector({
           <Button
             type="button"
             variant={selectionMode === "franco" ? "default" : "outline"}
-            className="h-full w-1/2 text-2xl sm:text-3xl font-bold rounded-none border-r-0"
+            className="h-full w-1/2 text-lg sm:text-xl font-bold rounded-none border-r-0"
             style={{
               backgroundColor: "#10b981",
               color: "#ffffff",
@@ -114,7 +114,7 @@ export function QuickShiftSelector({
           <Button
             type="button"
             variant={selectionMode === "turno" ? "default" : "outline"}
-            className="h-full w-1/2 text-2xl sm:text-3xl font-bold rounded-none"
+            className="h-full w-1/2 text-lg sm:text-xl font-bold rounded-none"
             disabled={shifts.length === 0}
             onClick={(e) => {
               e.stopPropagation()
@@ -129,7 +129,7 @@ export function QuickShiftSelector({
         <Button
           type="button"
           variant={selectionMode === "medio_franco" ? "default" : "outline"}
-          className="h-[25%] w-full text-base font-semibold rounded-none"
+          className="h-[25%] w-full text-sm font-semibold rounded-none"
           onClick={(e) => {
             e.stopPropagation()
             handleMedioFranco()
@@ -147,7 +147,7 @@ export function QuickShiftSelector({
               key={shift.id}
               type="button"
               variant="outline"
-              className="h-1/2 flex-[0_0_calc(33.333%-0.5rem)] text-base font-semibold flex items-center justify-center rounded-md border-2 shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md active:scale-95 px-1"
+              className="h-1/2 flex-[0_0_calc(33.333%-0.5rem)] text-sm font-semibold flex items-center justify-center rounded-md border-2 shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md active:scale-95 px-1"
               style={{ 
                 backgroundColor: shift.color,
                 color: '#ffffff',
@@ -177,7 +177,7 @@ export function QuickShiftSelector({
                   key={medio.id}
                   type="button"
                   variant="outline"
-                  className="flex-1 min-w-[calc(50%-0.5rem)] text-base font-semibold rounded-md border-2 shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md active:scale-95"
+                  className="flex-1 min-w-[calc(50%-0.5rem)] text-sm font-semibold rounded-md border-2 shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md active:scale-95"
                   style={{ 
                     backgroundColor: medio.color || '#10b981',
                     color: '#ffffff',
@@ -201,7 +201,7 @@ export function QuickShiftSelector({
           <div className="flex gap-2 flex-1">
             <Input
               type="time"
-              className="h-full flex-1 rounded-md text-base"
+              className="h-full flex-1 rounded-md text-sm"
               placeholder="Inicio"
               value={medioFrancoTime.startTime}
               onClick={(e) => e.stopPropagation()}
@@ -209,7 +209,7 @@ export function QuickShiftSelector({
             />
             <Input
               type="time"
-              className="h-full flex-1 rounded-md text-base"
+              className="h-full flex-1 rounded-md text-sm"
               placeholder="Fin"
               value={medioFrancoTime.endTime}
               onClick={(e) => e.stopPropagation()}

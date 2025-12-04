@@ -116,7 +116,7 @@ export function EmployeeRow({
       onDrop={(e) => onDrop(e, employee.id)}
     >
       <td
-        className="border-r-2 border-black px-2 sm:px-4 md:px-6 py-2 sm:py-3 md:py-4 text-sm sm:text-base md:text-lg font-medium text-foreground align-top"
+        className="border-r-2 border-black px-1.5 sm:px-2 md:px-3 py-1.5 sm:py-2 md:py-3 text-xs sm:text-sm md:text-base font-medium text-foreground align-top"
         style={
           separatorColor
             ? { backgroundColor: hexToRgba(separatorColor, 0.1) }
@@ -159,12 +159,12 @@ export function EmployeeRow({
                 <GripVertical className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
             )}
-            <div className="space-y-1 flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold truncate">{employee.name}</p>
+            <div className="space-y-0.5 flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm sm:text-base md:text-lg font-bold truncate">{employee.name}</p>
               </div>
               {employeeStats && employeeStats[employee.id] && (
-                <div className="employee-stats text-xs sm:text-sm md:text-base text-muted-foreground space-y-0.5">
+                <div className="employee-stats text-[10px] sm:text-xs md:text-sm text-muted-foreground space-y-0.5">
                   <div className="flex items-center gap-1">
                     <span className="font-bold text-foreground">Francos:</span>
                     <span className="font-semibold">{formatStatValue(employeeStats[employee.id].francos)}</span>
