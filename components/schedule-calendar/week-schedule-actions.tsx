@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Loader2, Copy, Trash2, CheckCircle2, Circle, Download, Sparkles } from "lucide-react"
+import { Loader2, Copy, Trash2, CheckCircle2, Circle, Download, Sparkles, ChevronDown } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,6 +13,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import type { WeekActionsReturn } from "@/hooks/use-week-actions"
 
 interface WeekScheduleActionsProps {
@@ -194,13 +200,14 @@ export function WeekScheduleActions({
           </Button>
         )}
         {canShowExportActions && (
-          <>
+          <div className="flex items-center border rounded-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <Button
               variant="outline"
               size="sm"
               onClick={onExportImage}
               disabled={exporting}
               aria-label="Exportar semana como imagen"
+              className="rounded-none border-0 border-r"
             >
               {exporting ? (
                 <>
@@ -214,47 +221,38 @@ export function WeekScheduleActions({
                 </>
               )}
             </Button>
-            {onExportExcel && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onExportExcel}
-                disabled={exporting}
-                aria-label="Exportar semana como Excel"
-              >
-                {exporting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Exportando...
-                  </>
-                ) : (
-                  <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={exporting}
+                  className="rounded-none border-0 px-2"
+                  aria-label="Más opciones de exportación"
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {onExportExcel && (
+                  <DropdownMenuItem
+                    onClick={onExportExcel}
+                    disabled={exporting}
+                  >
                     <Download className="mr-2 h-4 w-4" />
                     Excel
-                  </>
+                  </DropdownMenuItem>
                 )}
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onExportPDF}
-              disabled={exporting}
-              aria-label="Exportar semana como PDF"
-            >
-              {exporting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Exportando...
-                </>
-              ) : (
-                <>
+                <DropdownMenuItem
+                  onClick={onExportPDF}
+                  disabled={exporting}
+                >
                   <Download className="mr-2 h-4 w-4" />
                   PDF
-                </>
-              )}
-            </Button>
-          </>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         )}
       </div>
 
