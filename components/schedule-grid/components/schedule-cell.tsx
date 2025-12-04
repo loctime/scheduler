@@ -88,7 +88,9 @@ export function ScheduleCell({
         <td
           className={`border-r-2 border-black px-2 sm:px-3 md:px-4 py-2 sm:py-3 md:py-4 last:border-r-0 relative group ${
             isClickable ? `cursor-pointer transition-all ${hoverClass} active:brightness-90 touch-manipulation` : ""
-          } ${selectedClass}`}
+          } ${selectedClass} ${
+            isSelected && isClickable && onQuickAssignments ? "min-h-[200px] py-4 sm:py-6 md:py-8" : ""
+          }`}
           style={backgroundStyle}
           onClick={() => onCellClick(date, employeeId)}
         >

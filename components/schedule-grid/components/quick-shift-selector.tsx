@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Lock, RotateCcw } from "lucide-react"
 import type { Turno, ShiftAssignment, MedioTurno } from "@/lib/types"
 
 type SelectionMode = "none" | "franco" | "turno" | "medio_franco"
@@ -82,11 +81,9 @@ export function QuickShiftSelector({
   }
 
   // Calcular altura disponible para turnos
-  const hasHeader = !readonly && (hasCellHistory || onToggleFixed)
-  const headerHeight = hasHeader ? 10 : 0
   const turnosHeight = selectionMode === "turno" && shifts.length > 0 ? 50 : 0
   const medioFrancoHeight = selectionMode === "medio_franco" ? 50 : 0
-  const mainContentHeight = 100 - headerHeight - turnosHeight - medioFrancoHeight
+  const mainContentHeight = 100 - turnosHeight - medioFrancoHeight
 
   return (
     <div
@@ -94,45 +91,6 @@ export function QuickShiftSelector({
       onClick={(e) => e.stopPropagation()}
       data-quick-selector="true"
     >
-      {/* HEADER - 10% */}
-      {hasHeader && (
-        <div className="h-[10%] flex items-center justify-center gap-1 p-0 m-0">
-          {hasCellHistory && onUndo && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-full aspect-square p-0 rounded-none"
-              onClick={(e) => {
-                e.stopPropagation()
-                onUndo()
-              }}
-              title="Deshacer"
-              aria-label="Deshacer cambio"
-            >
-              <RotateCcw className="h-3 w-3" />
-            </Button>
-          )}
-
-          {onToggleFixed && (
-            <Button
-              type="button"
-              variant={isManuallyFixed ? "default" : "outline"}
-              size="sm"
-              className="h-full aspect-square p-0 rounded-none"
-              onClick={(e) => {
-                e.stopPropagation()
-                onToggleFixed()
-              }}
-              title={isManuallyFixed ? "Desbloquear horario" : "Bloquear horario"}
-              aria-label={isManuallyFixed ? "Desbloquear horario" : "Bloquear horario"}
-            >
-              <Lock className="h-3 w-3" />
-            </Button>
-          )}
-        </div>
-      )}
-
       {/* CONTENIDO PRINCIPAL - 40% (30% franco/turno + 10% 1/2 franco) */}
       <div className="flex flex-col p-0 m-0" style={{ height: `${mainContentHeight}%` }}>
         {/* FRANCO / TURNO - 30% (50%-50% cada uno) */}
@@ -140,7 +98,7 @@ export function QuickShiftSelector({
           <Button
             type="button"
             variant={selectionMode === "franco" ? "default" : "outline"}
-            className="h-full w-1/2 text-base font-bold rounded-none border-r-0"
+            className="h-full w-1/2 text-2xl sm:text-3xl font-bold rounded-none border-r-0"
             onClick={(e) => {
               e.stopPropagation()
               handleFranco()
@@ -152,7 +110,7 @@ export function QuickShiftSelector({
           <Button
             type="button"
             variant={selectionMode === "turno" ? "default" : "outline"}
-            className="h-full w-1/2 text-base font-bold rounded-none"
+            className="h-full w-1/2 text-2xl sm:text-3xl font-bold rounded-none"
             disabled={shifts.length === 0}
             onClick={(e) => {
               e.stopPropagation()
@@ -177,25 +135,28 @@ export function QuickShiftSelector({
         </Button>
       </div>
 
-      {/* TURNOS - 50% (si hay dos turnos, 50%-50% cada uno) */}
+      {/* TURNOS - 50% (máximo 3 por fila) */}
       {selectionMode === "turno" && shifts.length > 0 && (
-        <div className="h-[50%] flex gap-0 p-0 m-0">
+        <div className="h-[50%] flex flex-wrap gap-0 p-0 m-0 overflow-y-auto">
           {shifts.map((shift, index) => (
             <Button
               key={shift.id}
               type="button"
               variant="outline"
-              className="h-full flex-1 text-xl font-semibold flex items-center gap-2 justify-center rounded-none border-r-0 last:border-r"
+              className="h-1/2 w-1/3 text-sm font-semibold flex items-center justify-center rounded-none border-r-0 border-b-0 [&:nth-child(3n)]:border-r [&:nth-child(n+4)]:border-t px-1"
+              style={{ 
+                backgroundColor: shift.color,
+                color: '#ffffff',
+                borderColor: shift.color
+              }}
               onClick={(e) => {
                 e.stopPropagation()
                 handleTurno(shift)
               }}
             >
-              <span
-                className="inline-block h-4 w-4 rounded-full flex-shrink-0"
-                style={{ backgroundColor: shift.color }}
-              />
-              <span className="truncate">{shift.name}</span>
+              <span className="text-center truncate">
+                {shift.name.length > 6 ? shift.name.substring(0, 6) : shift.name}
+              </span>
             </Button>
           ))}
         </div>
