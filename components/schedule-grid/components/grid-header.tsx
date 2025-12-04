@@ -66,7 +66,7 @@ export function GridHeader({ weekDays, user: userProp, onCloseSelector }: GridHe
     <thead>
       <tr className="border-b-2 border-black bg-muted/50" style={rowStyle}>
         <th 
-          className="min-w-[140px] sm:min-w-[180px] md:min-w-[200px] lg:min-w-[220px] lg:max-w-[220px] border-r-2 border-black px-1.5 sm:px-2 md:px-3 py-1.5 sm:py-2 md:py-3 text-left font-bold text-foreground"
+          className="min-w-[120px] sm:min-w-[150px] md:min-w-[170px] lg:min-w-[180px] lg:max-w-[180px] border-r-2 border-black px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 md:py-2 text-left font-bold text-foreground"
           onClick={(e) => {
             if (onCloseSelector) {
               e.stopPropagation()
@@ -81,7 +81,7 @@ export function GridHeader({ weekDays, user: userProp, onCloseSelector }: GridHe
         {weekDays.map((day) => (
           <th
             key={day.toISOString()}
-            className="min-w-[100px] sm:min-w-[140px] md:min-w-[160px] lg:min-w-[180px] border-r-2 border-black px-1.5 sm:px-2 md:px-3 py-1.5 sm:py-2 md:py-3 text-center font-bold text-foreground last:border-r-0"
+            className="min-w-[90px] sm:min-w-[110px] md:min-w-[130px] lg:min-w-[140px] border-r-2 border-black px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 md:py-2 text-center font-bold text-foreground last:border-r-0"
             onClick={(e) => {
               if (onCloseSelector) {
                 e.stopPropagation()
@@ -90,8 +90,8 @@ export function GridHeader({ weekDays, user: userProp, onCloseSelector }: GridHe
             }}
           >
             <div className="flex flex-col">
-              <span className="capitalize text-xs sm:text-sm md:text-base lg:text-lg font-bold">{format(day, "EEEE", { locale: es })}</span>
-              <span className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-muted-foreground">{format(day, "d MMM", { locale: es })}</span>
+              <span className="capitalize text-[10px] sm:text-xs md:text-sm lg:text-base font-bold">{format(day, "EEEE", { locale: es })}</span>
+              <span className="text-[9px] sm:text-[10px] md:text-xs lg:text-sm font-semibold text-muted-foreground">{format(day, "d MMM", { locale: es })}</span>
             </div>
           </th>
         ))}

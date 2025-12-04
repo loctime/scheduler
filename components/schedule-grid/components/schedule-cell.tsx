@@ -86,10 +86,10 @@ export function ScheduleCell({
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <td
-          className={`border-r-2 border-black px-1.5 sm:px-2 md:px-3 py-1.5 sm:py-2 md:py-3 last:border-r-0 relative group ${
+          className={`border-r-2 border-black px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 md:py-2 last:border-r-0 relative group ${
             isClickable ? `cursor-pointer transition-all ${hoverClass} active:brightness-90 touch-manipulation` : ""
           } ${selectedClass} ${
-            isSelected && isClickable && onQuickAssignments ? "min-h-[150px] py-2 sm:py-3 md:py-4" : ""
+            isSelected && isClickable && onQuickAssignments ? "min-h-[140px] py-2 sm:py-2.5 md:py-3" : ""
           }`}
           style={backgroundStyle}
           onClick={() => onCellClick(date, employeeId)}

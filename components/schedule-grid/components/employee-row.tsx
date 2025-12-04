@@ -116,7 +116,7 @@ export function EmployeeRow({
       onDrop={(e) => onDrop(e, employee.id)}
     >
       <td
-        className="border-r-2 border-black px-1.5 sm:px-2 md:px-3 py-1.5 sm:py-2 md:py-3 text-xs sm:text-sm md:text-base font-medium text-foreground align-top"
+        className="border-r-2 border-black px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 md:py-2 text-xs sm:text-sm md:text-base font-medium text-foreground align-top"
         style={
           separatorColor
             ? { backgroundColor: hexToRgba(separatorColor, 0.1) }
