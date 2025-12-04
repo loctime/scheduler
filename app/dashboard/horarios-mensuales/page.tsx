@@ -305,10 +305,12 @@ export default function HorariosMensualesPage() {
               Vista jerárquica de todos los horarios organizados por mes y semana
             </p>
           </div>
-          <Button onClick={handleShareLink} variant="outline" size="sm" className="shrink-0">
-            <Share2 className="mr-2 h-4 w-4" />
-            Compartir enlace
-          </Button>
+          {user && (
+            <Button onClick={handleShareLink} variant="outline" size="default" className="shrink-0">
+              <Share2 className="mr-2 h-4 w-4" />
+              Compartir enlace
+            </Button>
+          )}
         </div>
 
         {dataLoading ? (

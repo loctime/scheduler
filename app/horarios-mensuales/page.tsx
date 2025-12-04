@@ -179,9 +179,16 @@ function HorariosMensualesContent() {
     return (
       <div className="min-h-screen bg-background">
         <div className="container mx-auto py-8 px-4">
-          <Card className="p-6 sm:p-8 md:p-12 text-center">
+          <Card className="p-6 sm:p-8 md:p-12 text-center space-y-4">
+            <h2 className="text-xl sm:text-2xl font-bold text-foreground">Enlace de Horarios</h2>
             <p className="text-sm sm:text-base text-muted-foreground">
-              Enlace inválido. Por favor, solicita un enlace válido al administrador.
+              Para ver los horarios, necesitas un enlace compartido válido.
+            </p>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Si eres administrador, ve a <strong>Dashboard → Horarios Mensuales</strong> y haz clic en <strong>"Compartir enlace"</strong> para obtener tu enlace personalizado.
+            </p>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-4">
+              El enlace debe tener el formato: <code className="bg-muted px-2 py-1 rounded">/horarios-mensuales?userId=...</code>
             </p>
           </Card>
         </div>
