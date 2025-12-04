@@ -98,8 +98,8 @@ export function ScheduleGridMobile({
             </div>
 
             {/* Week Days */}
-            <div>
-              {weekDaysData.map((dayData) => {
+            <div className="divide-y divide-border">
+              {weekDaysData.map((dayData, dayIndex) => {
                 const { date, dateStr, dayName, dayNumber } = dayData
                 const assignments = getEmployeeAssignments(employee.id, dateStr)
                 const backgroundStyle = getCellBackgroundStyle(employee.id, dateStr)
@@ -115,7 +115,11 @@ export function ScheduleGridMobile({
                 return (
                   <div
                     key={dateStr}
-                    className={`px-4 py-3 transition-colors border border-border ${
+                    className={`px-4 py-3 transition-colors border-l border-r border-border ${
+                      dayIndex === 0 ? "border-t" : ""
+                    } ${
+                      dayIndex === weekDaysData.length - 1 ? "border-b" : ""
+                    } ${
                       isClickable ? "cursor-pointer hover:bg-muted/50 active:bg-muted" : ""
                     } ${isCellSelected ? "bg-primary/10" : ""}`}
                     style={backgroundStyle}

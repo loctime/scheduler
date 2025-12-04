@@ -483,8 +483,8 @@ function HorariosMensualesContent() {
                                 shifts={shifts}
                                 monthRange={monthRange}
                                 onExportImage={handleExportWeekImage}
-                                onExportPDF={handleExportWeekPDF}
-                                onExportExcel={() => handleExportWeekExcel(week.weekStartDate, week.weekDays, week.schedule)}
+                                onExportPDF={undefined}
+                                onExportExcel={undefined}
                                 exporting={exporting}
                                 mediosTurnos={config?.mediosTurnos}
                                 employeeStats={weekStats}
