@@ -137,13 +137,13 @@ export function QuickShiftSelector({
 
       {/* TURNOS - 50% (máximo 3 por fila) */}
       {selectionMode === "turno" && shifts.length > 0 && (
-        <div className="h-[50%] flex flex-wrap gap-0 p-0 m-0 overflow-y-auto">
+        <div className="h-[50%] flex flex-wrap gap-2 p-2 m-0 overflow-y-auto">
           {shifts.map((shift, index) => (
             <Button
               key={shift.id}
               type="button"
               variant="outline"
-              className="h-1/2 w-1/3 text-sm font-semibold flex items-center justify-center rounded-none border-r-0 border-b-0 [&:nth-child(3n)]:border-r [&:nth-child(n+4)]:border-t px-1"
+              className="h-1/2 flex-[0_0_calc(33.333%-0.5rem)] text-base font-semibold flex items-center justify-center rounded-md border-2 shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md active:scale-95 px-1"
               style={{ 
                 backgroundColor: shift.color,
                 color: '#ffffff',
