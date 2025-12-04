@@ -35,6 +35,7 @@ interface WeekScheduleProps {
   onExportImage?: (weekStartDate: Date, weekEndDate: Date) => void
   onExportPDF?: (weekStartDate: Date, weekEndDate: Date) => void
   onExportExcel?: () => void
+  onExportEmployeeImage?: (employeeId: string, employeeName: string, weekStartDate: Date) => void
   exporting: boolean
   mediosTurnos?: MedioTurno[]
   employeeStats?: Record<string, EmployeeMonthlyStats>
@@ -62,6 +63,7 @@ export function WeekSchedule({
   onExportImage,
   onExportPDF,
   onExportExcel,
+  onExportEmployeeImage,
   exporting,
   mediosTurnos = [],
   employeeStats,
@@ -222,6 +224,7 @@ export function WeekSchedule({
             lastCompletedWeekStart={lastCompletedWeekStart}
             onClearEmployeeRow={!readonly && user ? handleClearEmployeeRow : undefined}
             user={user}
+            onExportEmployeeImage={onExportEmployeeImage}
           />
         </div>
       </CollapsibleContent>

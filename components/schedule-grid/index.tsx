@@ -56,6 +56,7 @@ interface ScheduleGridProps {
   onClearEmployeeRow?: (employeeId: string) => Promise<boolean> // Función optimizada para limpiar fila del empleado
   allSchedules?: Horario[] // Todos los horarios para análisis de patrones
   user?: any // Usuario opcional (para páginas públicas sin DataProvider)
+  onExportEmployeeImage?: (employeeId: string, employeeName: string, weekStartDate: Date) => void // Función para exportar imagen de un empleado
 }
 
 export const ScheduleGrid = memo(function ScheduleGrid({
@@ -76,6 +77,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   onClearEmployeeRow: externalOnClearEmployeeRow,
   allSchedules = [],
   user: userProp,
+  onExportEmployeeImage,
 }: ScheduleGridProps) {
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
   const [extraMenuOpenKey, setExtraMenuOpenKey] = useState<string | null>(null)
@@ -550,6 +552,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
 
   // Vista móvil
   if (isMobile) {
+    const weekStartDate = weekDays[0]
     return (
       <>
         <ScheduleGridMobile
@@ -572,6 +575,8 @@ export const ScheduleGrid = memo(function ScheduleGrid({
           getSuggestion={getSuggestion}
           isManuallyFixed={isManuallyFixed}
           onToggleFixed={handleToggleFixed}
+          onExportEmployeeImage={onExportEmployeeImage}
+          weekStartDate={weekStartDate}
         />
       </>
     )

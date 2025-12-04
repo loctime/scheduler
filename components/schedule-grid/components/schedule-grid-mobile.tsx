@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Empleado, Turno, ShiftAssignment, MedioTurno } from "@/lib/types"
 import { CellAssignments } from "./cell-assignments"
 import { InlineShiftSelector } from "./inline-shift-selector"
-import { GripVertical, Plus, RotateCcw, Lock } from "lucide-react"
+import { GripVertical, Plus, RotateCcw, Lock, Download } from "lucide-react"
 import { getDay, parseISO } from "date-fns"
 import type { EmployeeMonthlyStats } from "../index"
 import { formatStatValue } from "../utils/schedule-grid-utils"
@@ -38,6 +38,8 @@ interface ScheduleGridMobileProps {
   getSuggestion?: (employeeId: string, dayOfWeek: number) => any
   isManuallyFixed?: (employeeId: string, dayOfWeek: number) => boolean
   onToggleFixed?: (date: string, employeeId: string, dayOfWeek: number) => void
+  onExportEmployeeImage?: (employeeId: string, employeeName: string, weekStartDate: Date) => void
+  weekStartDate: Date
 }
 
 export function ScheduleGridMobile({
@@ -60,6 +62,8 @@ export function ScheduleGridMobile({
   getSuggestion,
   isManuallyFixed,
   onToggleFixed,
+  onExportEmployeeImage,
+  weekStartDate,
 }: ScheduleGridMobileProps) {
   return (
     <div className="space-y-4">
@@ -67,8 +71,10 @@ export function ScheduleGridMobile({
         const stats = employeeStats?.[employee.id]
         const isSelected = selectedCell?.employeeId === employee.id
 
+        const employeeCardId = `employee-card-${employee.id}-${format(weekStartDate, "yyyy-MM-dd")}`
+        
         return (
-          <Card key={employee.id} className="overflow-hidden border border-border bg-card">
+          <Card key={employee.id} id={employeeCardId} className="overflow-hidden border border-border bg-card">
             {/* Employee Header */}
             <div className="border-b border-border bg-muted/30 px-4 py-3">
               <div className="flex items-start gap-2">
@@ -76,7 +82,23 @@ export function ScheduleGridMobile({
                   <GripVertical className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-bold truncate">{employee.name}</h3>
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-lg font-bold truncate">{employee.name}</h3>
+                    {onExportEmployeeImage && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onExportEmployeeImage(employee.id, employee.name, weekStartDate)
+                        }}
+                        title="Exportar imagen"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                   {stats && (
                     <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
                       <div className="flex items-center gap-2">

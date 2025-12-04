@@ -362,6 +362,15 @@ function HorariosMensualesContent() {
     })
   }, [exportImage, config])
 
+  const handleExportEmployeeImage = useCallback(async (employeeId: string, employeeName: string, weekStartDate: Date) => {
+    const employeeCardId = `employee-card-${employeeId}-${format(weekStartDate, "yyyy-MM-dd")}`
+    const sanitizedName = employeeName.replace(/[^a-zA-Z0-9]/g, "_")
+    await exportImage(employeeCardId, `horario-${sanitizedName}-${format(weekStartDate, "yyyy-MM-dd")}.png`, {
+      nombreEmpresa: config?.nombreEmpresa,
+      colorEmpresa: config?.colorEmpresa,
+    })
+  }, [exportImage, config])
+
   const handleExportWeekPDF = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
     const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
     await exportPDF(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.pdf`, {
@@ -485,6 +494,7 @@ function HorariosMensualesContent() {
                                 onExportImage={handleExportWeekImage}
                                 onExportPDF={undefined}
                                 onExportExcel={undefined}
+                                onExportEmployeeImage={handleExportEmployeeImage}
                                 exporting={exporting}
                                 mediosTurnos={config?.mediosTurnos}
                                 employeeStats={weekStats}
