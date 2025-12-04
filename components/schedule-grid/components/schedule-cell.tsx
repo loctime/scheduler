@@ -14,7 +14,7 @@ import {
 import { Check, RotateCcw, Undo2, Lock } from "lucide-react"
 import { ShiftAssignment, Turno, MedioTurno } from "@/lib/types"
 import { CellAssignments } from "./cell-assignments"
-import { InlineShiftSelector } from "./inline-shift-selector"
+import { QuickShiftSelector } from "./quick-shift-selector"
 import { getDay, parseISO } from "date-fns"
 
 interface ScheduleCellProps {
@@ -163,10 +163,22 @@ export function ScheduleCell({
       )}
       <div className="flex flex-col gap-2">
         {isSelected && isClickable && onQuickAssignments ? (
-          <InlineShiftSelector
+          <QuickShiftSelector
             shifts={quickShifts}
             mediosTurnos={mediosTurnos}
             onSelectAssignments={onQuickAssignments}
+            onUndo={hasCellHistory ? onCellUndo : undefined}
+            onToggleFixed={
+              onToggleFixed
+                ? () => {
+                    const dayOfWeek = getDay(parseISO(date))
+                    onToggleFixed(date, employeeId, dayOfWeek)
+                  }
+                : undefined
+            }
+            isManuallyFixed={isManuallyFixed}
+            hasCellHistory={hasCellHistory}
+            readonly={readonly}
           />
         ) : (
           <CellAssignments assignments={assignments} getShiftInfo={getShiftInfo} />
