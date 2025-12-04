@@ -99,6 +99,10 @@ export function QuickShiftSelector({
             type="button"
             variant={selectionMode === "franco" ? "default" : "outline"}
             className="h-full w-1/2 text-2xl sm:text-3xl font-bold rounded-none border-r-0"
+            style={{
+              backgroundColor: "#10b981",
+              color: "#ffffff",
+            }}
             onClick={(e) => {
               e.stopPropagation()
               handleFranco()
@@ -164,16 +168,21 @@ export function QuickShiftSelector({
 
       {/* MEDIO FRANCO - 50% */}
       {selectionMode === "medio_franco" && (
-        <div className="h-[50%] flex flex-col gap-0 p-0 m-0">
+        <div className="h-[50%] flex flex-col gap-2 p-2 m-0">
           {/* Opciones predefinidas */}
           {mediosTurnos.length > 0 && (
-            <div className="flex gap-0 flex-1">
+            <div className="flex flex-wrap gap-2 flex-1">
               {mediosTurnos.map((medio, index) => (
                 <Button
                   key={medio.id}
                   type="button"
                   variant="outline"
-                  className="h-full flex-1 text-base font-medium rounded-none border-r-0 last:border-r"
+                  className="flex-1 min-w-[calc(50%-0.5rem)] text-base font-semibold rounded-md border-2 shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md active:scale-95"
+                  style={{ 
+                    backgroundColor: medio.color || '#10b981',
+                    color: '#ffffff',
+                    borderColor: medio.color || '#10b981'
+                  }}
                   onClick={(e) => {
                     e.stopPropagation()
                     handleMedioFranco({
@@ -189,10 +198,10 @@ export function QuickShiftSelector({
           )}
 
           {/* Inputs personalizados */}
-          <div className="flex gap-0 flex-1">
+          <div className="flex gap-2 flex-1">
             <Input
               type="time"
-              className="h-full flex-1 rounded-none border-r-0 text-base"
+              className="h-full flex-1 rounded-md text-base"
               placeholder="Inicio"
               value={medioFrancoTime.startTime}
               onClick={(e) => e.stopPropagation()}
@@ -200,7 +209,7 @@ export function QuickShiftSelector({
             />
             <Input
               type="time"
-              className="h-full flex-1 rounded-none text-base"
+              className="h-full flex-1 rounded-md text-base"
               placeholder="Fin"
               value={medioFrancoTime.endTime}
               onClick={(e) => e.stopPropagation()}
