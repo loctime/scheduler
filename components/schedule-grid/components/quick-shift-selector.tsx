@@ -29,7 +29,7 @@ export function QuickShiftSelector({
   hasCellHistory = false,
   readonly = false,
 }: QuickShiftSelectorProps) {
-  const [selectionMode, setSelectionMode] = useState<SelectionMode>("none")
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>("turno")
   const [medioFrancoTime, setMedioFrancoTime] = useState({ startTime: "", endTime: "" })
 
   const resetMode = () => {
