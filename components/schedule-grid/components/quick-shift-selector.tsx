@@ -81,21 +81,28 @@ export function QuickShiftSelector({
     if (next.startTime && next.endTime) handleMedioFranco(next)
   }
 
+  // Calcular altura disponible para turnos
+  const hasHeader = !readonly && (hasCellHistory || onToggleFixed)
+  const headerHeight = hasHeader ? 10 : 0
+  const turnosHeight = selectionMode === "turno" && shifts.length > 0 ? 50 : 0
+  const medioFrancoHeight = selectionMode === "medio_franco" ? 50 : 0
+  const mainContentHeight = 100 - headerHeight - turnosHeight - medioFrancoHeight
+
   return (
     <div
-      className="flex flex-col gap-2 px-2 pb-2 pt-0 min-w-[220px]"
+      className="flex flex-col h-full w-full p-0 m-0"
       onClick={(e) => e.stopPropagation()}
       data-quick-selector="true"
     >
-      {/* HEADER --------------------------------------------------- */}
-      {!readonly && (hasCellHistory || onToggleFixed) && (
-        <div className="flex items-center justify-center gap-1 border-b pb-0.5 -mx-2 px-2">
+      {/* HEADER - 10% */}
+      {hasHeader && (
+        <div className="h-[10%] flex items-center justify-center gap-1 p-0 m-0">
           {hasCellHistory && onUndo && (
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="h-5 w-5 p-0"
+              className="h-full aspect-square p-0 rounded-none"
               onClick={(e) => {
                 e.stopPropagation()
                 onUndo()
@@ -112,7 +119,7 @@ export function QuickShiftSelector({
               type="button"
               variant={isManuallyFixed ? "default" : "outline"}
               size="sm"
-              className="h-5 w-5 p-0"
+              className="h-full aspect-square p-0 rounded-none"
               onClick={(e) => {
                 e.stopPropagation()
                 onToggleFixed()
@@ -126,14 +133,14 @@ export function QuickShiftSelector({
         </div>
       )}
 
-      {/* BLOQUES PRINCIPALES -------------------------------------- */}
-      <div className="flex flex-col gap-2 border-b pb-3">
-        {/* FRANCO / TURNO */}
-        <div className="grid grid-cols-2 gap-1">
+      {/* CONTENIDO PRINCIPAL - 40% (30% franco/turno + 10% 1/2 franco) */}
+      <div className="flex flex-col p-0 m-0" style={{ height: `${mainContentHeight}%` }}>
+        {/* FRANCO / TURNO - 30% (50%-50% cada uno) */}
+        <div className="h-[75%] flex gap-0 p-0 m-0">
           <Button
             type="button"
             variant={selectionMode === "franco" ? "default" : "outline"}
-            className="h-12 text-base font-bold px-6"
+            className="h-full w-1/2 text-base font-bold rounded-none border-r-0"
             onClick={(e) => {
               e.stopPropagation()
               handleFranco()
@@ -145,7 +152,7 @@ export function QuickShiftSelector({
           <Button
             type="button"
             variant={selectionMode === "turno" ? "default" : "outline"}
-            className="h-12 text-base font-bold px-6"
+            className="h-full w-1/2 text-base font-bold rounded-none"
             disabled={shifts.length === 0}
             onClick={(e) => {
               e.stopPropagation()
@@ -156,11 +163,11 @@ export function QuickShiftSelector({
           </Button>
         </div>
 
-        {/* 1/2 FRANCO */}
+        {/* 1/2 FRANCO - 10% */}
         <Button
           type="button"
           variant={selectionMode === "medio_franco" ? "default" : "outline"}
-          className="h-10 text-base font-semibold w-full"
+          className="h-[25%] w-full text-base font-semibold rounded-none"
           onClick={(e) => {
             e.stopPropagation()
             handleMedioFranco()
@@ -170,46 +177,42 @@ export function QuickShiftSelector({
         </Button>
       </div>
 
-      {/* SUBSELECCIONES ------------------------------------------- */}
-
-      {/* TURNOS */}
+      {/* TURNOS - 50% (si hay dos turnos, 50%-50% cada uno) */}
       {selectionMode === "turno" && shifts.length > 0 && (
-        <div className="flex flex-col gap-3 border-b pb-4">
-          <div className="grid grid-cols-2 gap-3">
-            {shifts.map((shift) => (
-              <Button
-                key={shift.id}
-                type="button"
-                variant="outline"
-                className="h-16 text-base font-medium flex items-center gap-2 justify-start"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleTurno(shift)
-                }}
-              >
-                <span
-                  className="inline-block h-3.5 w-3.5 rounded-full"
-                  style={{ backgroundColor: shift.color }}
-                />
-                <span className="truncate">{shift.name}</span>
-              </Button>
-            ))}
-          </div>
+        <div className="h-[50%] flex gap-0 p-0 m-0">
+          {shifts.map((shift, index) => (
+            <Button
+              key={shift.id}
+              type="button"
+              variant="outline"
+              className="h-full flex-1 text-xl font-semibold flex items-center gap-2 justify-center rounded-none border-r-0 last:border-r"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleTurno(shift)
+              }}
+            >
+              <span
+                className="inline-block h-4 w-4 rounded-full flex-shrink-0"
+                style={{ backgroundColor: shift.color }}
+              />
+              <span className="truncate">{shift.name}</span>
+            </Button>
+          ))}
         </div>
       )}
 
-      {/* MEDIO FRANCO */}
+      {/* MEDIO FRANCO - 50% */}
       {selectionMode === "medio_franco" && (
-        <div className="flex flex-col gap-3">
+        <div className="h-[50%] flex flex-col gap-0 p-0 m-0">
           {/* Opciones predefinidas */}
           {mediosTurnos.length > 0 && (
-            <div className="grid grid-cols-2 gap-3">
-              {mediosTurnos.map((medio) => (
+            <div className="flex gap-0 flex-1">
+              {mediosTurnos.map((medio, index) => (
                 <Button
                   key={medio.id}
                   type="button"
                   variant="outline"
-                  className="h-16 text-base font-medium"
+                  className="h-full flex-1 text-base font-medium rounded-none border-r-0 last:border-r"
                   onClick={(e) => {
                     e.stopPropagation()
                     handleMedioFranco({
@@ -225,10 +228,10 @@ export function QuickShiftSelector({
           )}
 
           {/* Inputs personalizados */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex gap-0 flex-1">
             <Input
               type="time"
-              className="h-16 text-base"
+              className="h-full flex-1 rounded-none border-r-0 text-base"
               placeholder="Inicio"
               value={medioFrancoTime.startTime}
               onClick={(e) => e.stopPropagation()}
@@ -236,7 +239,7 @@ export function QuickShiftSelector({
             />
             <Input
               type="time"
-              className="h-16 text-base"
+              className="h-full flex-1 rounded-none text-base"
               placeholder="Fin"
               value={medioFrancoTime.endTime}
               onClick={(e) => e.stopPropagation()}
