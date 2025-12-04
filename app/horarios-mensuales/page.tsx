@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo, useCallback } from "react"
+import { useEffect, useState, useMemo, useCallback, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { collection, query, orderBy, onSnapshot, where } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
@@ -59,7 +59,7 @@ const defaultConfig: Configuracion = {
   mediosTurnos: [],
 }
 
-export default function HorariosMensualesPage() {
+function HorariosMensualesContent() {
   const searchParams = useSearchParams()
   const userId = searchParams.get("userId")
   
@@ -483,6 +483,25 @@ export default function HorariosMensualesPage() {
         </div>
       </div>
     </>
+  )
+}
+
+export default function HorariosMensualesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background">
+          <div className="container mx-auto py-8 px-4">
+            <Card className="p-6 sm:p-8 md:p-12 text-center">
+              <Loader2 className="mx-auto h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary" />
+              <p className="mt-4 text-sm sm:text-base text-muted-foreground">Cargando...</p>
+            </Card>
+          </div>
+        </div>
+      }
+    >
+      <HorariosMensualesContent />
+    </Suspense>
   )
 }
 
