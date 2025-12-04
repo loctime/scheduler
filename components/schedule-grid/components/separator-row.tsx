@@ -23,6 +23,7 @@ interface SeparatorRowProps {
   onEdit: (separator: Separador) => void
   onDelete: (separatorId: string) => void
   isFirstSeparator?: boolean
+  onCloseSelector?: () => void
 }
 
 export function SeparatorRow({
@@ -39,6 +40,7 @@ export function SeparatorRow({
   onEdit,
   onDelete,
   isFirstSeparator = false,
+  onCloseSelector,
 }: SeparatorRowProps) {
   const isEditing = editingSeparatorId === separator.id
   const separatorColor = separator.color
@@ -62,7 +64,19 @@ export function SeparatorRow({
               }
         })()}
       >
-        <td colSpan={weekDays.length + 1} className="px-4 py-0.5">
+        <td 
+          colSpan={weekDays.length + 1} 
+          className="px-4 py-0.5"
+          onClick={(e) => {
+            // No cerrar si se está editando o si se hace click en botones/inputs
+            const target = e.target as HTMLElement
+            const isInteractive = target.closest('button') || target.closest('input')
+            if (onCloseSelector && !isEditing && !isInteractive) {
+              e.stopPropagation()
+              onCloseSelector()
+            }
+          }}
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 flex-1">
               <div
@@ -176,6 +190,12 @@ export function SeparatorRow({
                 ? { backgroundColor: hexToRgba(separatorColor, 0.1) }
                 : { backgroundColor: "rgb(var(--muted) / 0.3)" }
             }
+            onClick={(e) => {
+              if (onCloseSelector) {
+                e.stopPropagation()
+                onCloseSelector()
+              }
+            }}
           ></td>
           {weekDays.map((day) => (
             <td
@@ -186,6 +206,12 @@ export function SeparatorRow({
                   ? { backgroundColor: hexToRgba(separatorColor, 0.1) }
                   : { backgroundColor: "rgb(var(--muted) / 0.3)" }
               }
+              onClick={(e) => {
+                if (onCloseSelector) {
+                  e.stopPropagation()
+                  onCloseSelector()
+                }
+              }}
             >
               <span className="text-xs font-semibold text-muted-foreground capitalize">
                 {format(day, "EEEE", { locale: es })}

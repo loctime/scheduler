@@ -10,9 +10,10 @@ import { hexToRgba } from "../utils/schedule-grid-utils"
 interface GridHeaderProps {
   weekDays: Date[]
   user?: any // Usuario opcional (para páginas públicas sin DataProvider)
+  onCloseSelector?: () => void
 }
 
-export function GridHeader({ weekDays, user: userProp }: GridHeaderProps) {
+export function GridHeader({ weekDays, user: userProp, onCloseSelector }: GridHeaderProps) {
   // Usar useContext directamente para evitar el error si no hay DataProvider
   const dataContext = useContext(DataContext)
   const contextUser = dataContext?.user || null
@@ -66,6 +67,12 @@ export function GridHeader({ weekDays, user: userProp }: GridHeaderProps) {
       <tr className="border-b-2 border-black bg-muted/50" style={rowStyle}>
         <th 
           className="min-w-[140px] sm:min-w-[180px] md:min-w-[200px] lg:min-w-[220px] lg:max-w-[220px] border-r-2 border-black px-2 sm:px-4 md:px-6 py-2 sm:py-3 md:py-4 text-left font-bold text-foreground"
+          onClick={(e) => {
+            if (onCloseSelector) {
+              e.stopPropagation()
+              onCloseSelector()
+            }
+          }}
         >
           <div className={`${fontSize} break-words leading-tight line-clamp-3`}>
             {displayText}
@@ -75,6 +82,12 @@ export function GridHeader({ weekDays, user: userProp }: GridHeaderProps) {
           <th
             key={day.toISOString()}
             className="min-w-[100px] sm:min-w-[140px] md:min-w-[160px] lg:min-w-[180px] border-r-2 border-black px-2 sm:px-4 md:px-6 py-2 sm:py-3 md:py-4 text-center font-bold text-foreground last:border-r-0"
+            onClick={(e) => {
+              if (onCloseSelector) {
+                e.stopPropagation()
+                onCloseSelector()
+              }
+            }}
           >
             <div className="flex flex-col">
               <span className="capitalize text-sm sm:text-base md:text-xl lg:text-2xl xl:text-3xl font-bold">{format(day, "EEEE", { locale: es })}</span>

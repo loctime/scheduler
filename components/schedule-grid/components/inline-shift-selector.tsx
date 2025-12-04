@@ -48,7 +48,7 @@ export function InlineShiftSelector({ shifts, mediosTurnos, onSelectAssignments 
   // Por ahora mostramos todos los turnos configurados como opciones rápidas
   // El usuario puede nombrarlos "Mañana", "Tarde", "Noche", etc.
   return (
-    <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+    <div className="space-y-2" onClick={(e) => e.stopPropagation()} data-inline-selector="true">
       <div className="grid grid-cols-3 gap-1.5">
         <Button
           type="button"

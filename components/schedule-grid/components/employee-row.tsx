@@ -58,6 +58,8 @@ interface EmployeeRowProps {
   // Manual fixed schedules
   isManuallyFixed?: (employeeId: string, dayOfWeek: number) => boolean
   onToggleFixed?: (date: string, employeeId: string, dayOfWeek: number) => void
+  // Close selector
+  onCloseSelector?: () => void
 }
 
 export function EmployeeRow({
@@ -98,6 +100,7 @@ export function EmployeeRow({
   getSuggestion,
   isManuallyFixed,
   onToggleFixed,
+  onCloseSelector,
 }: EmployeeRowProps) {
   return (
     <tr
@@ -119,6 +122,13 @@ export function EmployeeRow({
             ? { backgroundColor: hexToRgba(separatorColor, 0.1) }
             : { backgroundColor: "rgb(var(--muted) / 0.3)" }
         }
+        onClick={(e) => {
+          // Cerrar el selector si está abierto al hacer click en la celda de nombres
+          if (selectedCell && onCloseSelector) {
+            e.stopPropagation()
+            onCloseSelector()
+          }
+        }}
       >
         <div className="flex flex-col gap-1">
           {/* Botón de acción: agregar separador */}

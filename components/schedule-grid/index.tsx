@@ -585,10 +585,24 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   // Vista desktop (tabla)
   return (
     <>
-      <Card className="overflow-hidden border border-border bg-card">
+      <Card 
+        className="overflow-hidden border border-border bg-card"
+        onClick={(e) => {
+          // Detectar si el click fue dentro de la tabla
+          const target = e.target as HTMLElement
+          const isInsideTable = target.closest('table')
+          // Detectar si el click fue en el selector inline
+          const isInlineSelector = target.closest('[data-inline-selector]')
+          
+          // Si hay un selector abierto y el click no fue dentro de la tabla ni en el selector
+          if (selectedCell && !isInsideTable && !isInlineSelector) {
+            setSelectedCell(null)
+          }
+        }}
+      >
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
-            <GridHeader weekDays={weekDays} user={user} />
+            <GridHeader weekDays={weekDays} user={user} onCloseSelector={() => setSelectedCell(null)} />
             <tbody>
               {orderedItems.map((item, itemIndex) => {
                 const showAddButton = !readonly && item.type === "employee"
@@ -613,6 +627,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                         onEdit={handleEditSeparator}
                         onDelete={handleDeleteSeparator}
                         isFirstSeparator={isFirstSeparator}
+                        onCloseSelector={() => setSelectedCell(null)}
                       />
                     ) : (
                       <EmployeeRow
@@ -653,6 +668,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                         getSuggestion={getSuggestion}
                         isManuallyFixed={isManuallyFixed}
                         onToggleFixed={handleToggleFixed}
+                        onCloseSelector={() => setSelectedCell(null)}
                       />
                     )}
                   </React.Fragment>
