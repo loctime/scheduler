@@ -21,7 +21,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Calendar, Users, Clock, History, LogOut, Settings, CalendarDays, Menu, ShoppingCart } from "lucide-react"
+import { Calendar, Users, Clock, History, LogOut, Settings, CalendarDays, Menu, ShoppingCart, PackageSearch } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -37,6 +37,7 @@ const navItems = [
   { href: "/dashboard/empleados", label: "Empleados", icon: Users },
   { href: "/dashboard/turnos", label: "Turnos", icon: Clock },
   { href: "/dashboard/pedidos", label: "Pedidos", icon: ShoppingCart },
+  { href: "/dashboard/stock", label: "Stock", icon: PackageSearch },
   { href: "/dashboard/historial", label: "Historial", icon: History },
   { href: "/dashboard/configuracion", label: "Configuración", icon: Settings },
 ]

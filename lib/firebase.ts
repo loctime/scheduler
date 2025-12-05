@@ -50,4 +50,6 @@ export const COLLECTIONS = {
   CONFIG: getCollectionPath("config"),
   PEDIDOS: getCollectionPath("pedidos"),
   PRODUCTS: getCollectionPath("products"),
+  STOCK_MOVIMIENTOS: getCollectionPath("stock_movimientos"),
+  STOCK_ACTUAL: getCollectionPath("stock_actual"),
 } as const

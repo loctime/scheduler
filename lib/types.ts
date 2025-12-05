@@ -154,3 +154,92 @@ export interface Configuracion {
   updatedBy?: string
   updatedByName?: string
 }
+
+// ==================== STOCK ====================
+
+export interface StockMovimiento {
+  id: string
+  productoId: string
+  productoNombre?: string // Nombre del producto (para historial)
+  tipo: "entrada" | "salida"
+  cantidad: number
+  unidad?: string
+  motivo?: string // Motivo o descripción del movimiento
+  userId: string
+  userName?: string
+  pedidoId?: string // ID del pedido al que pertenece el producto
+  createdAt?: any
+}
+
+export interface StockActual {
+  id: string
+  productoId: string
+  pedidoId: string // ID del pedido al que pertenece
+  cantidad: number
+  ultimaActualizacion: any
+  userId: string
+}
+
+// Tipos para el chat de stock
+export interface ChatMessage {
+  id: string
+  tipo: "usuario" | "sistema" | "error" | "confirmacion"
+  contenido: string
+  timestamp: Date
+  accion?: StockAccionParsed // Acción parseada por Ollama (si aplica)
+  requiereConfirmacion?: boolean
+  confirmacionId?: string
+}
+
+export type TipoAccion = 
+  | "entrada"              // Agregar stock
+  | "salida"               // Quitar stock
+  | "consulta_stock"       // Consultar stock de un producto
+  | "consulta_general"     // Preguntas generales sobre inventario
+  | "crear_producto"       // Crear nuevo producto
+  | "editar_producto"      // Editar producto existente
+  | "eliminar_producto"    // Eliminar producto
+  | "listar_productos"     // Listar todos los productos
+  | "listar_pedidos"       // Listar pedidos/proveedores
+  | "ver_pedido"           // Ver productos de un pedido específico
+  | "importar_productos"   // Importar productos de pedidos al stock
+  | "inicializar_stock"    // Inicializar stock con valores
+  | "stock_bajo"           // Ver productos con stock bajo
+  | "generar_pedido"       // Generar lista de pedido
+  | "ayuda"                // Mostrar ayuda
+  | "conversacion"         // Conversación general
+  | "desconocido"
+
+export interface StockAccionParsed {
+  accion: TipoAccion
+  producto?: string
+  productoId?: string
+  cantidad?: number
+  unidad?: string
+  stockMinimo?: number
+  pedidoId?: string
+  mensaje?: string // Respuesta conversacional de Ollama
+  confianza: number // 0-1 nivel de confianza del parsing
+  requiereConfirmacion?: boolean
+}
+
+// Sinónimos de unidades para el parser
+export const SINONIMOS_UNIDADES: Record<string, string> = {
+  "cajon": "caja",
+  "cajón": "caja",
+  "cajones": "cajas",
+  "kilo": "kg",
+  "kilos": "kg",
+  "kilogramo": "kg",
+  "kilogramos": "kg",
+  "paquete": "pack",
+  "paquetes": "packs",
+  "unidad": "u",
+  "unidades": "u",
+  "botella": "bot",
+  "botellas": "bot",
+  "lata": "lata",
+  "latas": "latas",
+  "litro": "l",
+  "litros": "l",
+}

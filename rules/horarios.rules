@@ -96,3 +96,28 @@ match /apps/horarios/products/{productoId} {
   // Eliminar: solo el dueño
   allow delete: if isAuth() && resource.data.userId == uid();
 }
+
+// Colección: apps/horarios/stock_movimientos
+match /apps/horarios/stock_movimientos/{movimientoId} {
+  // Solo el dueño puede leer sus movimientos
+  allow read: if isAuth() && resource.data.userId == uid();
+  // Crear: verificar que userId sea correcto
+  allow create: if isAuth() && request.resource.data.userId == uid();
+  // Movimientos son inmutables (no se editan, solo se crean nuevos)
+  allow update: if false;
+  // Solo el dueño puede eliminar (para limpiar historial si lo desea)
+  allow delete: if isAuth() && resource.data.userId == uid();
+}
+
+// Colección: apps/horarios/stock_actual
+match /apps/horarios/stock_actual/{stockId} {
+  // Solo el dueño puede leer su stock (stockId = {userId}_{productoId})
+  allow read: if isAuth() && resource.data.userId == uid();
+  // Crear: verificar que userId sea correcto
+  allow create: if isAuth() && request.resource.data.userId == uid();
+  // Actualizar: verificar propiedad y proteger userId
+  allow update: if isAuth() && resource.data.userId == uid()
+    && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId);
+  // Eliminar: solo el dueño
+  allow delete: if isAuth() && resource.data.userId == uid();
+}
