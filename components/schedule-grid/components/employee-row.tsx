@@ -2,7 +2,7 @@
 
 import React from "react"
 import { format, getDay, parseISO } from "date-fns"
-import { Empleado, ShiftAssignment, MedioTurno, Turno } from "@/lib/types"
+import { Empleado, ShiftAssignment, MedioTurno, Turno, Configuracion } from "@/lib/types"
 import type { EmployeeMonthlyStats } from "../index"
 import { Button } from "@/components/ui/button"
 import { GripVertical, Plus } from "lucide-react"
@@ -60,6 +60,7 @@ interface EmployeeRowProps {
   onToggleFixed?: (date: string, employeeId: string, dayOfWeek: number) => void
   // Close selector
   onCloseSelector?: () => void
+  config?: Configuracion | null
 }
 
 export function EmployeeRow({
@@ -101,6 +102,7 @@ export function EmployeeRow({
   isManuallyFixed,
   onToggleFixed,
   onCloseSelector,
+  config,
 }: EmployeeRowProps) {
   return (
     <tr
@@ -258,6 +260,8 @@ export function EmployeeRow({
             suggestionWeeks={suggestion?.weeksMatched}
             isManuallyFixed={isManuallyFixedCell}
             onToggleFixed={onToggleFixed}
+            suggestion={suggestion}
+            config={config}
           />
         )
       })}

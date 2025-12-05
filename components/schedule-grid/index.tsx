@@ -669,6 +669,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                         isManuallyFixed={isManuallyFixed}
                         onToggleFixed={handleToggleFixed}
                         onCloseSelector={() => setSelectedCell(null)}
+                        config={config}
                       />
                     )}
                   </React.Fragment>

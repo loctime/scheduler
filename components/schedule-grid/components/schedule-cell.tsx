@@ -12,10 +12,11 @@ import {
   ContextMenuSeparator,
 } from "@/components/ui/context-menu"
 import { Check, RotateCcw, Undo2, Lock } from "lucide-react"
-import { ShiftAssignment, Turno, MedioTurno } from "@/lib/types"
+import { ShiftAssignment, Turno, MedioTurno, Configuracion } from "@/lib/types"
 import { CellAssignments } from "./cell-assignments"
 import { QuickShiftSelector } from "./quick-shift-selector"
 import { getDay, parseISO } from "date-fns"
+import type { PatternSuggestion } from "@/lib/pattern-learning"
 
 interface ScheduleCellProps {
   date: string
@@ -43,6 +44,8 @@ interface ScheduleCellProps {
   suggestionWeeks?: number
   isManuallyFixed?: boolean
   onToggleFixed?: (date: string, employeeId: string, dayOfWeek: number) => void
+  suggestion?: PatternSuggestion | null
+  config?: Configuracion | null
 }
 
 export function ScheduleCell({
@@ -71,8 +74,11 @@ export function ScheduleCell({
   suggestionWeeks,
   isManuallyFixed = false,
   onToggleFixed,
+  suggestion,
+  config,
 }: ScheduleCellProps) {
   const hasBackgroundStyle = !!backgroundStyle
+  const dayOfWeek = getDay(parseISO(date))
   const hoverClass = hasBackgroundStyle
     ? isClickable
       ? "hover:brightness-95"
@@ -181,6 +187,9 @@ export function ScheduleCell({
             isManuallyFixed={isManuallyFixed}
             hasCellHistory={hasCellHistory}
             readonly={readonly}
+            config={config}
+            employeeId={employeeId}
+            dayOfWeek={dayOfWeek}
           />
         ) : (
           <CellAssignments assignments={assignments} getShiftInfo={getShiftInfo} />
