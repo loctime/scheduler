@@ -108,13 +108,22 @@ export interface Separador {
   updatedAt?: any
 }
 
+export interface Pedido {
+  id: string
+  nombre: string // Nombre del pedido (ej: "Proveedor Bebidas")
+  stockMinimoDefault: number // Stock mínimo por defecto para nuevos productos
+  formatoSalida: string // Formato personalizable con placeholders: {nombre}, {cantidad}, {unidad}
+  userId: string
+  createdAt?: any
+  updatedAt?: any
+}
+
 export interface Producto {
   id: string
+  pedidoId: string // ID del pedido al que pertenece
   nombre: string
   stockMinimo: number // Stock mínimo configurado por el usuario
-  stockActual?: number // Stock actual (se actualiza cada vez que se cuenta)
   unidad?: string // Unidad de medida (ej: "kg", "unidades", "cajas")
-  categoria?: string // Categoría opcional para organizar productos
   userId: string
   createdAt?: any
   updatedAt?: any
