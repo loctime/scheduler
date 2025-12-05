@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Trash2, Upload, Package, ShoppingCart, Settings2 } from "lucide-react"
+import { Trash2, Upload, Package, ShoppingCart, Settings2, Minus, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Producto } from "@/lib/types"
 
@@ -183,14 +183,42 @@ export function ProductosTable({
                           />
                         </TableCell>
                         
-                        {/* Pedido Calculado - solo en modo pedido */}
+                        {/* Pedido Calculado con botones +/- */}
                         <TableCell className="text-center">
-                          <span className={cn(
-                            "font-bold text-lg",
-                            pedidoCalculado > 0 ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"
-                          )}>
-                            {pedidoCalculado}
-                          </span>
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => {
+                                const currentStock = stockActual[product.id] ?? 0
+                                onStockChange(product.id, currentStock + 1)
+                              }}
+                              disabled={pedidoCalculado <= 0}
+                            >
+                              <Minus className="h-3.5 w-3.5" />
+                            </Button>
+                            <span className={cn(
+                              "font-bold text-lg w-8 text-center",
+                              pedidoCalculado > 0 ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"
+                            )}>
+                              {pedidoCalculado}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => {
+                                const currentStock = stockActual[product.id] ?? 0
+                                if (currentStock > 0) {
+                                  onStockChange(product.id, currentStock - 1)
+                                }
+                              }}
+                              disabled={(stockActual[product.id] ?? 0) <= 0}
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </>
                     ) : (
