@@ -381,3 +381,13 @@
 .animate-impact-sparks {
   animation: impact-sparks 1.5s ease-in-out infinite;
 }
+
+/* Utility class to hide scrollbar while keeping scroll functionality */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
