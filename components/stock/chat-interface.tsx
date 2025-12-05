@@ -3,11 +3,10 @@
 import { useState, useRef, useEffect } from "react"
 import { 
   Send, Loader2, RefreshCw, Trash2, AlertCircle, CheckCircle2, 
-  XCircle, HelpCircle, Bot, User, AlertTriangle
+  XCircle, HelpCircle, Bot, User, AlertTriangle, StopCircle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import type { ChatMessage } from "@/lib/types"
 
@@ -23,8 +22,10 @@ interface ChatInterfaceProps {
   ollamaStatus: OllamaStatus
   onSendMessage: (message: string) => void
   onClearChat: () => void
+  onCancelMessage?: () => void
   onRefreshConnection: () => void
   accionPendiente?: any
+  nombreAsistente?: string
 }
 
 export function ChatInterface({
@@ -33,27 +34,38 @@ export function ChatInterface({
   ollamaStatus,
   onSendMessage,
   onClearChat,
+  onCancelMessage,
   onRefreshConnection,
   accionPendiente,
+  nombreAsistente = "Stock Assistant",
 }: ChatInterfaceProps) {
   const [inputValue, setInputValue] = useState("")
   const scrollRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Auto-scroll al final cuando hay nuevos mensajes
   useEffect(() => {
     if (scrollRef.current) {
-      const scrollArea = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]')
-      if (scrollArea) {
-        scrollArea.scrollTop = scrollArea.scrollHeight
-      }
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages])
 
-  // Focus en input al montar
+  // Focus en textarea al montar
   useEffect(() => {
-    inputRef.current?.focus()
+    textareaRef.current?.focus()
   }, [])
+
+  // Auto-resize del textarea
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (textarea) {
+      textarea.style.height = "auto"
+      const scrollHeight = textarea.scrollHeight
+      const maxHeight = 200 // Máximo 200px (aproximadamente 8-9 líneas)
+      textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`
+      textarea.style.overflowY = scrollHeight > maxHeight ? "auto" : "hidden"
+    }
+  }, [inputValue])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -63,11 +75,12 @@ export function ChatInterface({
     setInputValue("")
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSubmit(e as any)
     }
+    // Shift + Enter permite nueva línea (comportamiento por defecto del textarea)
   }
 
   const handleQuickAction = (texto: string) => {
@@ -88,7 +101,7 @@ export function ChatInterface({
       <div className="flex items-center justify-between p-3 border-b border-border bg-muted/30">
         <div className="flex items-center gap-2">
           <Bot className="h-5 w-5 text-primary" />
-          <span className="font-medium text-sm">Stock Assistant</span>
+          <span className="font-medium text-sm">{nombreAsistente}</span>
           <div className="flex items-center gap-1.5 ml-2">
             {ollamaStatus.status === "checking" && (
               <>
@@ -134,7 +147,7 @@ export function ChatInterface({
       </div>
 
       {/* Área de mensajes */}
-      <ScrollArea className="flex-1" ref={scrollRef}>
+      <div className="flex-1 overflow-y-auto min-h-0" ref={scrollRef}>
         <div className="p-4 space-y-4">
           {messages.length === 0 && ollamaStatus.status !== "ok" ? (
             <div className="flex flex-col items-center justify-center h-full text-center py-8">
@@ -175,13 +188,24 @@ export function ChatInterface({
                   <div className="flex items-center gap-2 bg-muted rounded-2xl rounded-tl-md px-4 py-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span className="text-sm text-muted-foreground">Pensando...</span>
+                    {onCancelMessage && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 -mr-1"
+                        onClick={onCancelMessage}
+                        title="Cancelar"
+                      >
+                        <StopCircle className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
             </>
           )}
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Sugerencias rápidas */}
       {messages.length > 0 && !isProcessing && !accionPendiente && ollamaStatus.status === "ok" && (
@@ -233,25 +257,33 @@ export function ChatInterface({
             <span>{ollamaStatus.message || "Asegurate de que Ollama esté corriendo"}</span>
           </div>
         )}
-        <div className="flex gap-2">
-          <Input
-            ref={inputRef}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              accionPendiente 
-                ? "Escribí 'sí' para confirmar o 'no' para cancelar..."
-                : ollamaStatus.status === "ok" 
-                  ? "Escribí lo que necesitás..." 
-                  : "Esperando conexión..."
-            }
-            disabled={isProcessing || ollamaStatus.status !== "ok"}
-            className="flex-1"
-          />
+        <div className="flex gap-2 items-end">
+          <div className="flex-1 relative">
+            <Textarea
+              ref={textareaRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                accionPendiente 
+                  ? "Escribí 'sí' para confirmar o 'no' para cancelar..."
+                  : ollamaStatus.status === "ok" 
+                    ? "Escribí lo que necesitás... (Shift + Enter para nueva línea)" 
+                    : "Esperando conexión..."
+              }
+              disabled={isProcessing || ollamaStatus.status !== "ok"}
+              className={cn(
+                "resize-none min-h-[44px] max-h-[200px] py-3 px-4",
+                "focus-visible:ring-2 focus-visible:ring-primary/20",
+                "leading-relaxed"
+              )}
+              rows={1}
+            />
+          </div>
           <Button 
             type="submit" 
             size="icon"
+            className="h-[44px] w-[44px] shrink-0"
             disabled={!inputValue.trim() || isProcessing || ollamaStatus.status !== "ok"}
           >
             {isProcessing ? (

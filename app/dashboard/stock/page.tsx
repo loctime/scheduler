@@ -1,16 +1,20 @@
 "use client"
 
+import { useState } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { useData } from "@/contexts/data-context"
 import { useStockChat } from "@/hooks/use-stock-chat"
 import { ChatInterface } from "@/components/stock/chat-interface"
 import { StockSidebar } from "@/components/stock/stock-sidebar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { MessageCircle, Package, BarChart3 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { MessageCircle, Package, PanelRightClose, PanelRightOpen } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 
 export default function StockPage() {
   const { user } = useData()
+  const [showInventario, setShowInventario] = useState(false)
   
   const {
     // Chat
@@ -18,9 +22,11 @@ export default function StockPage() {
     isProcessing,
     enviarMensaje,
     limpiarChat,
+    cancelarMensaje,
     ollamaStatus,
     checkOllamaConnection,
     accionPendiente,
+    nombreAsistente,
     
     // Stock
     productos,
@@ -31,6 +37,7 @@ export default function StockPage() {
   } = useStockChat({
     userId: user?.uid,
     userName: user?.displayName || user?.email,
+    user,
   })
 
   return (
@@ -82,8 +89,10 @@ export default function StockPage() {
                 ollamaStatus={ollamaStatus}
                 onSendMessage={enviarMensaje}
                 onClearChat={limpiarChat}
+                onCancelMessage={cancelarMensaje}
                 onRefreshConnection={checkOllamaConnection}
                 accionPendiente={accionPendiente}
+                nombreAsistente={nombreAsistente}
               />
             </div>
           </TabsContent>
@@ -103,29 +112,64 @@ export default function StockPage() {
       </div>
 
       {/* Vista desktop: Side by side */}
-      <div className="hidden lg:flex gap-6 h-[calc(100vh-220px)] min-h-[500px]">
-        {/* Chat - 2/3 del espacio */}
-        <div className="flex-[2]">
+      <div className="hidden lg:flex gap-4 h-[calc(100vh-220px)] min-h-[500px]">
+        {/* Chat */}
+        <div className="flex-1 min-w-0">
           <ChatInterface
             messages={messages}
             isProcessing={isProcessing}
             ollamaStatus={ollamaStatus}
             onSendMessage={enviarMensaje}
             onClearChat={limpiarChat}
+            onCancelMessage={cancelarMensaje}
             onRefreshConnection={checkOllamaConnection}
             accionPendiente={accionPendiente}
+            nombreAsistente={nombreAsistente}
           />
         </div>
         
-        {/* Sidebar de inventario - 1/3 del espacio */}
-        <div className="flex-1 min-w-[300px] max-w-[400px]">
-          <StockSidebar
-            productos={productos}
-            stockActual={stockActual}
-            movimientos={movimientos}
-            productosStockBajo={productosStockBajo}
-            loading={loadingStock}
-          />
+        {/* Sidebar de inventario - colapsable */}
+        <div className={cn(
+          "transition-all duration-300 ease-in-out flex flex-col",
+          showInventario ? "w-[320px]" : "w-10"
+        )}>
+          {/* Botón toggle */}
+          <Button
+            variant="outline"
+            size="icon"
+            className={cn(
+              "h-10 w-10 shrink-0 mb-2",
+              productosStockBajo.length > 0 && !showInventario && "border-amber-500 text-amber-500"
+            )}
+            onClick={() => setShowInventario(!showInventario)}
+            title={showInventario ? "Ocultar inventario" : "Mostrar inventario"}
+          >
+            {showInventario ? (
+              <PanelRightClose className="h-4 w-4" />
+            ) : (
+              <>
+                <PanelRightOpen className="h-4 w-4" />
+                {productosStockBajo.length > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-amber-500 text-[10px] text-white flex items-center justify-center">
+                    {productosStockBajo.length}
+                  </span>
+                )}
+              </>
+            )}
+          </Button>
+          
+          {/* Sidebar content */}
+          {showInventario && (
+            <div className="flex-1 min-h-0">
+              <StockSidebar
+                productos={productos}
+                stockActual={stockActual}
+                movimientos={movimientos}
+                productosStockBajo={productosStockBajo}
+                loading={loadingStock}
+              />
+            </div>
+          )}
         </div>
       </div>
     </DashboardLayout>

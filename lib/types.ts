@@ -221,6 +221,15 @@ export interface StockAccionParsed {
   mensaje?: string // Respuesta conversacional de Ollama
   confianza: number // 0-1 nivel de confianza del parsing
   requiereConfirmacion?: boolean
+  comandoSugerido?: { // Comando que Ollama sugiere ejecutar (se ejecuta con fallback)
+    accion: TipoAccion
+    producto?: string
+    productoId?: string
+    cantidad?: number
+    unidad?: string
+    stockMinimo?: number
+    pedidoId?: string
+  }
 }
 
 // Sinónimos de unidades para el parser
