@@ -18,9 +18,10 @@ import {
   Sheet,
   SheetContent,
   SheetHeader,
+  SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Calendar, Users, Clock, History, LogOut, Settings, CalendarDays, Menu } from "lucide-react"
+import { Calendar, Users, Clock, History, LogOut, Settings, CalendarDays, Menu, ShoppingCart } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -35,6 +36,7 @@ const navItems = [
   { href: "/dashboard/horarios-mensuales", label: "Vista Mensual", icon: CalendarDays },
   { href: "/dashboard/empleados", label: "Empleados", icon: Users },
   { href: "/dashboard/turnos", label: "Turnos", icon: Clock },
+  { href: "/dashboard/pedidos", label: "Pedidos", icon: ShoppingCart },
   { href: "/dashboard/historial", label: "Historial", icon: History },
   { href: "/dashboard/configuracion", label: "Configuración", icon: Settings },
 ]
@@ -91,7 +93,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
                       <Calendar className="h-6 w-6 text-accent-foreground" />
                     </div>
-                    <h2 className="text-lg font-bold">Menú</h2>
+                    <SheetTitle className="text-lg font-bold">Menú</SheetTitle>
                   </div>
                 </SheetHeader>
                 <NavContent onItemClick={() => setMobileMenuOpen(false)} />

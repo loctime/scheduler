@@ -184,6 +184,18 @@ service cloud.firestore {
       allow delete: if false;
     }
     
+    // Colección: apps/horarios/products
+    match /apps/horarios/products/{productoId} {
+      // Solo el dueño puede leer sus productos
+      allow read: if isAuth() && resource.data.userId == uid();
+      // Crear: verificar que userId sea correcto
+      allow create: if isAuth() && request.resource.data.userId == uid();
+      // Actualizar: verificar propiedad y proteger userId
+      allow update: if isAuth() && resource.data.userId == uid()
+        && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId);
+      // Eliminar: solo el dueño
+      allow delete: if isAuth() && resource.data.userId == uid();
+    }
     
 
     /* ========= DENY POR DEFECTO ========= */
