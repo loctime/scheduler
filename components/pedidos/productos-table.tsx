@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Trash2, Upload, Package, ShoppingCart, Settings2, Minus, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -54,66 +53,63 @@ export function ProductosTable({
   // Empty state
   if (products.length === 0) {
     return (
-      <Card className="border-border bg-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Productos</CardTitle>
-          <CardDescription>Importa productos para comenzar</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="py-8 text-center">
-            <Package className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-            <p className="text-muted-foreground text-sm mb-4">No hay productos en este pedido</p>
-            <Button onClick={onImport} size="sm">
-              <Upload className="mr-2 h-4 w-4" />
-              Importar Productos
-            </Button>
+      <div className="rounded-lg border border-border bg-card p-1.5">
+        <div className="flex items-center justify-between mb-1">
+          <div>
+            <h3 className="text-sm font-semibold">Productos</h3>
+            <p className="text-[10px] text-muted-foreground">Importa productos</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        <div className="py-4 text-center">
+          <Package className="h-6 w-6 mx-auto text-muted-foreground mb-1.5" />
+          <p className="text-muted-foreground text-[11px] mb-2">No hay productos</p>
+          <Button onClick={onImport} size="sm" className="h-6 text-[11px] px-2">
+            <Upload className="mr-1 h-3 w-3" />
+            Importar
+          </Button>
+        </div>
+      </div>
     )
   }
 
   return (
-    <Card className="border-border bg-card">
+    <div className="rounded-lg border border-border bg-card">
       {/* Header con tabs de modo */}
-      <CardHeader className="pb-3 px-4">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <CardTitle className="text-lg">Productos</CardTitle>
-            <CardDescription className="text-xs">{products.length} productos</CardDescription>
-          </div>
-          <div className="flex rounded-lg border border-border p-0.5 bg-muted/50 shrink-0">
+      <div className="flex items-center justify-between gap-1 p-1.5 pb-1">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold">Productos</h3>
+          <p className="text-[10px] text-muted-foreground">{products.length} productos</p>
+        </div>
+          <div className="flex rounded-md border border-border p-0.5 bg-muted/50 shrink-0">
             <button
               onClick={() => setMode("pedido")}
               className={cn(
-                "flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors",
+                "flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors",
                 mode === "pedido"
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <ShoppingCart className="h-3.5 w-3.5" />
+              <ShoppingCart className="h-3 w-3" />
               <span className="hidden xs:inline">Pedido</span>
             </button>
             <button
               onClick={() => setMode("config")}
               className={cn(
-                "flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors",
+                "flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors",
                 mode === "config"
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Settings2 className="h-3.5 w-3.5" />
+              <Settings2 className="h-3 w-3" />
               <span className="hidden xs:inline">Config</span>
             </button>
           </div>
         </div>
-      </CardHeader>
 
-      <CardContent className="px-0 pb-2">
-        {/* Lista de productos - mobile first */}
-        <div className="divide-y divide-border">
+      {/* Lista de productos - mobile first */}
+      <div className="divide-y divide-border">
           {products.map((product) => {
             const isEditing = editingField?.id === product.id
             const editingThisField = isEditing ? editingField?.field : null
@@ -123,24 +119,24 @@ export function ProductosTable({
               <div 
                 key={product.id} 
                 className={cn(
-                  "px-4 py-3",
+                  "px-2 py-2",
                   mode === "pedido" && pedidoCalculado > 0 && "bg-amber-500/10"
                 )}
               >
                 {mode === "pedido" ? (
-                  // MODO PEDIDO - Layout móvil optimizado
-                  <div className="flex items-center gap-3">
+                  // MODO PEDIDO - Layout compacto
+                  <div className="flex items-center gap-2">
                     {/* Nombre del producto */}
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{product.nombre}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Stock mín: {product.stockMinimo}
+                      <p className="font-medium text-xs truncate">{product.nombre}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        mín: {product.stockMinimo}
                       </p>
                     </div>
                     
                     {/* Stock actual input */}
-                    <div className="flex flex-col items-center gap-0.5 shrink-0">
-                      <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Actual</span>
+                    <div className="flex flex-col items-center shrink-0">
+                      <span className="text-[9px] text-muted-foreground uppercase">Actual</span>
                       <Input
                         type="number"
                         min="0"
@@ -150,28 +146,28 @@ export function ProductosTable({
                           onStockChange(product.id, val === "" ? 0 : parseInt(val, 10) || 0)
                         }}
                         placeholder="0"
-                        className="h-9 w-14 text-center text-sm"
+                        className="h-7 w-12 text-center text-xs"
                       />
                     </div>
                     
                     {/* Pedido con botones +/- */}
-                    <div className="flex flex-col items-center gap-0.5 shrink-0">
-                      <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Pedir</span>
-                      <div className="flex items-center gap-0.5">
+                    <div className="flex flex-col items-center shrink-0">
+                      <span className="text-[9px] text-muted-foreground uppercase">Pedir</span>
+                      <div className="flex items-center">
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-9 w-9"
+                          className="h-7 w-7"
                           onClick={() => {
                             const currentStock = stockActual[product.id] ?? 0
                             onStockChange(product.id, currentStock + 1)
                           }}
                           disabled={pedidoCalculado <= 0}
                         >
-                          <Minus className="h-4 w-4" />
+                          <Minus className="h-3 w-3" />
                         </Button>
                         <span className={cn(
-                          "font-bold text-xl w-8 text-center tabular-nums",
+                          "font-bold text-base w-6 text-center tabular-nums",
                           pedidoCalculado > 0 ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"
                         )}>
                           {pedidoCalculado}
@@ -179,7 +175,7 @@ export function ProductosTable({
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-9 w-9"
+                          className="h-7 w-7"
                           onClick={() => {
                             const currentStock = stockActual[product.id] ?? 0
                             if (currentStock > 0) {
@@ -188,14 +184,14 @@ export function ProductosTable({
                           }}
                           disabled={(stockActual[product.id] ?? 0) <= 0}
                         >
-                          <Plus className="h-4 w-4" />
+                          <Plus className="h-3 w-3" />
                         </Button>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  // MODO CONFIG - Layout móvil optimizado
-                  <div className="flex items-center gap-3">
+                  // MODO CONFIG - Layout compacto
+                  <div className="flex items-center gap-2">
                     {/* Nombre editable */}
                     <div className="flex-1 min-w-0">
                       {editingThisField === "nombre" ? (
@@ -208,12 +204,12 @@ export function ProductosTable({
                             if (e.key === "Escape") cancelEditing()
                           }}
                           autoFocus
-                          className="h-8 text-sm"
+                          className="h-7 text-xs"
                         />
                       ) : (
                         <p 
                           onClick={() => startEditing(product.id, "nombre", product.nombre)}
-                          className="font-medium text-sm truncate cursor-pointer hover:bg-muted rounded px-2 py-1 -mx-2"
+                          className="font-medium text-xs truncate cursor-pointer hover:bg-muted rounded px-1.5 py-0.5 -mx-1.5"
                         >
                           {product.nombre}
                         </p>
@@ -221,8 +217,8 @@ export function ProductosTable({
                     </div>
                     
                     {/* Stock mínimo */}
-                    <div className="flex flex-col items-center gap-0.5 shrink-0">
-                      <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Mín</span>
+                    <div className="flex flex-col items-center shrink-0">
+                      <span className="text-[9px] text-muted-foreground uppercase">Mín</span>
                       {editingThisField === "stockMinimo" ? (
                         <Input
                           type="number"
@@ -235,12 +231,12 @@ export function ProductosTable({
                             if (e.key === "Escape") cancelEditing()
                           }}
                           autoFocus
-                          className="h-9 w-14 text-center text-sm"
+                          className="h-7 w-10 text-center text-xs"
                         />
                       ) : (
                         <button
                           onClick={() => startEditing(product.id, "stockMinimo", product.stockMinimo.toString())}
-                          className="h-9 w-14 text-center text-sm font-medium hover:bg-muted rounded border border-transparent hover:border-border"
+                          className="h-7 w-10 text-center text-xs font-medium hover:bg-muted rounded"
                         >
                           {product.stockMinimo}
                         </button>
@@ -248,8 +244,8 @@ export function ProductosTable({
                     </div>
                     
                     {/* Unidad */}
-                    <div className="flex flex-col items-center gap-0.5 shrink-0">
-                      <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Unid</span>
+                    <div className="flex flex-col items-center shrink-0">
+                      <span className="text-[9px] text-muted-foreground uppercase">Unid</span>
                       {editingThisField === "unidad" ? (
                         <Input
                           value={inlineValue}
@@ -261,12 +257,12 @@ export function ProductosTable({
                           }}
                           autoFocus
                           placeholder="-"
-                          className="h-9 w-14 text-center text-sm"
+                          className="h-7 w-10 text-center text-xs"
                         />
                       ) : (
                         <button
                           onClick={() => startEditing(product.id, "unidad", product.unidad || "")}
-                          className="h-9 w-14 text-center text-sm text-muted-foreground hover:bg-muted rounded border border-transparent hover:border-border"
+                          className="h-7 w-10 text-center text-xs text-muted-foreground hover:bg-muted rounded"
                         >
                           {product.unidad || "-"}
                         </button>
@@ -278,17 +274,16 @@ export function ProductosTable({
                       variant="ghost"
                       size="icon"
                       onClick={() => onDeleteProduct(product.id)}
-                      className="h-9 w-9 shrink-0"
+                      className="h-7 w-7 shrink-0"
                     >
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
                     </Button>
                   </div>
                 )}
               </div>
             )
           })}
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

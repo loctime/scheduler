@@ -3,11 +3,10 @@
 import { useState, useRef, useEffect } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { 
   Plus, Trash2, Copy, MessageCircle, RotateCcw, Upload, Package, 
-  Construction, Pencil, Check, X
+  Construction, Pencil, Check, X, Settings2
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
@@ -70,6 +69,7 @@ export default function PedidosPage() {
   // Inline edit states
   const [isEditingName, setIsEditingName] = useState(false)
   const [isEditingMensaje, setIsEditingMensaje] = useState(false)
+  const [showConfig, setShowConfig] = useState(false)
   const [editingName, setEditingName] = useState("")
   const [editingMensaje, setEditingMensaje] = useState("")
   const nameInputRef = useRef<HTMLInputElement>(null)
@@ -267,59 +267,64 @@ export default function PedidosPage() {
         {/* Contenido principal */}
         <div className="flex-1 space-y-4 lg:space-y-6 min-w-0">
           {!selectedPedido ? (
-            <Card className="border-border bg-card">
-              <CardContent className="py-16 text-center">
-                <Package className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-xl font-semibold mb-2">Selecciona o crea un pedido</h3>
-                <p className="text-muted-foreground mb-4">
-                  Crea pedidos para organizar tus listas de productos
-                </p>
-                <Button onClick={handleOpenCreate}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Crear Pedido
-                </Button>
-              </CardContent>
-            </Card>
+            <div className="rounded-lg border border-border bg-card p-6 text-center">
+              <Package className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+              <h3 className="text-base font-semibold mb-1">Selecciona o crea un pedido</h3>
+              <p className="text-muted-foreground text-sm mb-3">
+                Crea pedidos para organizar productos
+              </p>
+              <Button onClick={handleOpenCreate} size="sm">
+                <Plus className="h-4 w-4 mr-1" />
+                Crear Pedido
+              </Button>
+            </div>
           ) : (
             <>
               {/* Header del pedido - Mobile first */}
-              <Card className="border-border bg-card">
-                <CardContent className="p-4 space-y-3">
+              <div className="rounded-lg border border-border bg-card p-1.5 space-y-1.5">
                   {/* Fila 1: Nombre + acciones */}
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center justify-between gap-1.5">
                     {isEditingName ? (
-                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-1 flex-1 min-w-0">
                         <Input
                           ref={nameInputRef}
                           value={editingName}
                           onChange={(e) => setEditingName(e.target.value)}
                           onKeyDown={handleNameKeyDown}
-                          className="text-lg font-bold h-9"
+                          className="text-base font-bold h-8"
                           placeholder="Nombre del pedido"
                         />
-                        <Button variant="ghost" size="icon" onClick={handleSaveName} className="h-9 w-9 shrink-0 text-green-600">
+                        <Button variant="ghost" size="icon" onClick={handleSaveName} className="h-8 w-8 shrink-0 text-green-600">
                           <Check className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={handleCancelEditName} className="h-9 w-9 shrink-0">
+                        <Button variant="ghost" size="icon" onClick={handleCancelEditName} className="h-8 w-8 shrink-0">
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <h2 className="text-lg font-bold text-foreground truncate">{selectedPedido.nombre}</h2>
-                        <Button variant="ghost" size="icon" onClick={handleStartEditName} className="h-7 w-7 shrink-0 text-muted-foreground">
-                          <Pencil className="h-3.5 w-3.5" />
+                      <div className="flex items-center gap-1 min-w-0">
+                        <h2 className="text-base font-bold text-foreground truncate">{selectedPedido.nombre}</h2>
+                        <Button variant="ghost" size="icon" onClick={handleStartEditName} className="h-6 w-6 shrink-0 text-muted-foreground">
+                          <Pencil className="h-3 w-3" />
                         </Button>
                       </div>
                     )}
-                    <div className="flex gap-1.5 shrink-0">
-                      <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setImportDialogOpen(true)}>
+                    <div className="flex gap-1 shrink-0">
+                      <Button 
+                        variant={showConfig ? "default" : "outline"} 
+                        size="icon" 
+                        className="h-8 w-8" 
+                        onClick={() => setShowConfig(!showConfig)}
+                      >
+                        <Settings2 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setImportDialogOpen(true)}>
                         <Upload className="h-4 w-4" />
                       </Button>
                       <Button 
                         variant="outline" 
                         size="icon"
-                        className="h-9 w-9 text-destructive hover:text-destructive"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
                         onClick={() => setDeletePedidoDialogOpen(true)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -327,102 +332,113 @@ export default function PedidosPage() {
                     </div>
                   </div>
 
-                  {/* Fila 2: Encabezado del mensaje */}
-                  <div className="flex items-center gap-1.5">
-                    {isEditingMensaje ? (
-                      <>
-                        <Input
-                          ref={mensajeInputRef}
-                          value={editingMensaje}
-                          onChange={(e) => setEditingMensaje(e.target.value)}
-                          onKeyDown={handleMensajeKeyDown}
-                          className="text-sm h-8 flex-1"
-                          placeholder="Ej: Pedido de insumos:"
-                        />
-                        <Button variant="ghost" size="icon" onClick={handleSaveMensaje} className="h-8 w-8 shrink-0 text-green-600">
-                          <Check className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={handleCancelEditMensaje} className="h-8 w-8 shrink-0">
-                          <X className="h-3.5 w-3.5" />
-                        </Button>
-                      </>
-                    ) : (
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-xs text-muted-foreground truncate">
-                          {selectedPedido.mensajePrevio || `📦 ${selectedPedido.nombre}`}
-                        </span>
-                        <Button variant="ghost" size="icon" onClick={handleStartEditMensaje} className="h-6 w-6 shrink-0 text-muted-foreground">
-                          <Pencil className="h-3 w-3" />
-                        </Button>
+                  {/* Sección colapsable: Encabezado + Formato */}
+                  {showConfig && (
+                    <div className="space-y-2 pt-1.5 border-t border-border">
+                      {/* Encabezado del mensaje */}
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+                          Encabezado
+                        </label>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          {isEditingMensaje ? (
+                            <>
+                              <Input
+                                ref={mensajeInputRef}
+                                value={editingMensaje}
+                                onChange={(e) => setEditingMensaje(e.target.value)}
+                                onKeyDown={handleMensajeKeyDown}
+                                className="text-sm h-7 flex-1"
+                                placeholder="Ej: Pedido de insumos:"
+                              />
+                              <Button variant="ghost" size="icon" onClick={handleSaveMensaje} className="h-7 w-7 shrink-0 text-green-600">
+                                <Check className="h-3 w-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={handleCancelEditMensaje} className="h-7 w-7 shrink-0">
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </>
+                          ) : (
+                            <div 
+                              onClick={handleStartEditMensaje}
+                              className="flex-1 text-xs px-2 py-1 rounded border border-border bg-muted/50 cursor-pointer hover:bg-muted truncate"
+                            >
+                              {selectedPedido.mensajePrevio || `📦 ${selectedPedido.nombre}`}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
 
-                  {/* Fila 3: Formato de salida - scroll horizontal en móvil */}
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
-                    {FORMAT_EXAMPLES.map((ex, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => handleFormatChange(ex.format)}
-                        className={cn(
-                          "text-xs px-2.5 py-1.5 rounded-md border transition-colors whitespace-nowrap shrink-0",
-                          selectedPedido.formatoSalida === ex.format 
-                            ? "bg-primary text-primary-foreground border-primary" 
-                            : "bg-muted hover:bg-accent border-border"
-                        )}
-                      >
-                        {ex.example}
-                      </button>
-                    ))}
-                  </div>
+                      {/* Formato de salida */}
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+                          Formato
+                        </label>
+                        <div className="flex gap-1 overflow-x-auto mt-0.5 scrollbar-none">
+                          {FORMAT_EXAMPLES.map((ex, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => handleFormatChange(ex.format)}
+                              className={cn(
+                                "text-[11px] px-2 py-1 rounded border transition-colors whitespace-nowrap shrink-0",
+                                selectedPedido.formatoSalida === ex.format 
+                                  ? "bg-primary text-primary-foreground border-primary" 
+                                  : "bg-muted hover:bg-accent border-border"
+                              )}
+                            >
+                              {ex.example}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-                  {/* Fila 4: Acciones de pedido */}
+                  {/* Acciones de pedido */}
                   {products.length > 0 && (
-                    <div className="flex items-center gap-2 pt-2 border-t border-border">
+                    <div className="flex items-center gap-1.5 pt-1.5 border-t border-border">
                       <span className={cn(
-                        "text-xs font-medium px-2 py-1 rounded-full",
+                        "text-[11px] font-medium px-1.5 py-0.5 rounded-full",
                         productosAPedir.length > 0 
                           ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                           : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                       )}>
                         {productosAPedir.length > 0 
                           ? `${productosAPedir.length} a pedir`
-                          : "✓ Completo"
+                          : "✓ OK"
                         }
                       </span>
                       <div className="flex-1" />
                       <Button 
                         size="sm" 
-                        className="h-9"
+                        className="h-7 px-2"
                         onClick={handleCopyPedido} 
                         disabled={productosAPedir.length === 0}
                       >
-                        <Copy className="h-4 w-4 sm:mr-1.5" />
-                        <span className="hidden sm:inline">Copiar</span>
+                        <Copy className="h-3.5 w-3.5 sm:mr-1" />
+                        <span className="hidden sm:inline text-xs">Copiar</span>
                       </Button>
                       <Button 
                         size="sm"
-                        className="h-9 bg-green-600 hover:bg-green-700 text-white"
+                        className="h-7 px-2 bg-green-600 hover:bg-green-700 text-white"
                         onClick={handleWhatsApp} 
                         disabled={productosAPedir.length === 0}
                       >
-                        <MessageCircle className="h-4 w-4 sm:mr-1.5" />
-                        <span className="hidden sm:inline">WhatsApp</span>
+                        <MessageCircle className="h-3.5 w-3.5 sm:mr-1" />
+                        <span className="hidden sm:inline text-xs">WA</span>
                       </Button>
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className="h-9"
+                        className="h-7 px-2"
                         onClick={() => setClearDialogOpen(true)}
                       >
-                        <RotateCcw className="h-4 w-4 sm:mr-1.5" />
-                        <span className="hidden sm:inline">Limpiar</span>
+                        <RotateCcw className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   )}
-                </CardContent>
-              </Card>
+              </div>
 
               {/* Tabla de productos */}
               <ProductosTable
