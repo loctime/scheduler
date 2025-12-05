@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { 
   Plus, Trash2, Copy, MessageCircle, RotateCcw, Upload, Package, 
-  Settings, Construction
+  Construction, Pencil, Check, X
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
@@ -20,6 +21,15 @@ import {
   ClearStockDialog,
   DEFAULT_FORMAT 
 } from "@/components/pedidos/pedido-dialogs"
+import { cn } from "@/lib/utils"
+
+const FORMAT_EXAMPLES = [
+  { format: "{nombre} ({cantidad})", example: "Leche (8)" },
+  { format: "{cantidad} - {nombre}", example: "8 - Leche" },
+  { format: "({cantidad}) {nombre}", example: "(8) Leche" },
+  { format: "• {nombre}: {cantidad} {unidad}", example: "• Leche: 8 litros" },
+  { format: "{nombre} x{cantidad}", example: "Leche x8" },
+]
 
 export default function PedidosPage() {
   const { user } = useData()
@@ -47,7 +57,6 @@ export default function PedidosPage() {
   
   // Dialog states
   const [createPedidoOpen, setCreatePedidoOpen] = useState(false)
-  const [editPedidoOpen, setEditPedidoOpen] = useState(false)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [deletePedidoDialogOpen, setDeletePedidoDialogOpen] = useState(false)
   const [clearDialogOpen, setClearDialogOpen] = useState(false)
@@ -58,6 +67,29 @@ export default function PedidosPage() {
   const [formFormat, setFormFormat] = useState(DEFAULT_FORMAT)
   const [importText, setImportText] = useState("")
 
+  // Inline edit states
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [isEditingFormat, setIsEditingFormat] = useState(false)
+  const [editingName, setEditingName] = useState("")
+  const nameInputRef = useRef<HTMLInputElement>(null)
+
+  // Focus input when entering edit mode
+  useEffect(() => {
+    if (isEditingName && nameInputRef.current) {
+      nameInputRef.current.focus()
+      nameInputRef.current.select()
+    }
+  }, [isEditingName])
+
+  // Reset edit states when selectedPedido changes
+  useEffect(() => {
+    setIsEditingName(false)
+    setIsEditingFormat(false)
+    if (selectedPedido) {
+      setEditingName(selectedPedido.nombre)
+    }
+  }, [selectedPedido])
+
   // Handlers
   const handleOpenCreate = () => {
     setFormName("")
@@ -66,25 +98,10 @@ export default function PedidosPage() {
     setCreatePedidoOpen(true)
   }
 
-  const handleOpenEdit = () => {
-    if (!selectedPedido) return
-    setFormName(selectedPedido.nombre)
-    setFormStockMin(selectedPedido.stockMinimoDefault.toString())
-    setFormFormat(selectedPedido.formatoSalida)
-    setEditPedidoOpen(true)
-  }
-
   const handleCreatePedido = async () => {
     const result = await createPedido(formName, parseInt(formStockMin, 10) || 1, formFormat)
     if (result) {
       setCreatePedidoOpen(false)
-    }
-  }
-
-  const handleUpdatePedido = async () => {
-    const success = await updatePedido(formName, parseInt(formStockMin, 10) || 1, formFormat)
-    if (success) {
-      setEditPedidoOpen(false)
     }
   }
 
@@ -132,6 +149,46 @@ export default function PedidosPage() {
 
   const handleStockChange = (productId: string, value: number) => {
     setStockActual(prev => ({ ...prev, [productId]: value }))
+  }
+
+  // Inline edit handlers
+  const handleStartEditName = () => {
+    if (selectedPedido) {
+      setEditingName(selectedPedido.nombre)
+      setIsEditingName(true)
+    }
+  }
+
+  const handleSaveName = async () => {
+    if (!selectedPedido) return
+    if (!editingName.trim()) {
+      setEditingName(selectedPedido.nombre)
+      setIsEditingName(false)
+      return
+    }
+    if (editingName !== selectedPedido.nombre) {
+      await updatePedido(editingName, selectedPedido.stockMinimoDefault, selectedPedido.formatoSalida)
+    }
+    setIsEditingName(false)
+  }
+
+  const handleCancelEditName = () => {
+    setEditingName(selectedPedido?.nombre || "")
+    setIsEditingName(false)
+  }
+
+  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSaveName()
+    } else if (e.key === "Escape") {
+      handleCancelEditName()
+    }
+  }
+
+  const handleFormatChange = async (newFormat: string) => {
+    if (!selectedPedido || newFormat === selectedPedido.formatoSalida) return
+    await updatePedido(selectedPedido.nombre, selectedPedido.stockMinimoDefault, newFormat)
+    setIsEditingFormat(false)
   }
 
   // Loading state
@@ -189,71 +246,124 @@ export default function PedidosPage() {
             </Card>
           ) : (
             <>
-              {/* Header del pedido */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground">{selectedPedido.nombre}</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Formato: <code className="bg-muted px-1 rounded">{selectedPedido.formatoSalida}</code>
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={handleOpenEdit}>
-                    <Settings className="h-4 w-4 mr-1" />
-                    Configurar
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(true)}>
-                    <Upload className="h-4 w-4 mr-1" />
-                    Importar
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => setDeletePedidoDialogOpen(true)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Acciones de pedido */}
-              {products.length > 0 && (
-                <Card className="border-border bg-card">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Package className="h-5 w-5" />
-                      Generar Pedido
-                    </CardTitle>
-                    <CardDescription>
-                      {productosAPedir.length > 0 
-                        ? `${productosAPedir.length} producto${productosAPedir.length !== 1 ? "s" : ""} para pedir`
-                        : "Stock completo - no hay productos que pedir"
-                      }
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap gap-2">
-                      <Button onClick={handleCopyPedido} disabled={productosAPedir.length === 0}>
-                        <Copy className="mr-2 h-4 w-4" />
-                        Copiar Pedido
+              {/* Header del pedido con edición inline */}
+              <Card className="border-border bg-card">
+                <CardContent className="pt-6 space-y-4">
+                  {/* Nombre editable y acciones */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    {isEditingName ? (
+                      <div className="flex items-center gap-2 max-w-md w-full">
+                        <Input
+                          ref={nameInputRef}
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          onKeyDown={handleNameKeyDown}
+                          className="text-2xl font-bold h-auto py-1 px-2"
+                          placeholder="Nombre del pedido"
+                        />
+                        <Button variant="ghost" size="icon" onClick={handleSaveName} className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-100">
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={handleCancelEditName} className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-2xl font-bold text-foreground">{selectedPedido.nombre}</h2>
+                        <Button variant="ghost" size="icon" onClick={handleStartEditName} className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(true)}>
+                        <Upload className="h-4 w-4 mr-1" />
+                        Importar
                       </Button>
                       <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setDeletePedidoDialogOpen(true)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Formato de salida */}
+                  <div className="space-y-2">
+                    {isEditingFormat ? (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-muted-foreground">
+                            Formato: <code className="bg-muted px-1.5 py-0.5 rounded text-xs">{"{nombre}"}</code> <code className="bg-muted px-1.5 py-0.5 rounded text-xs">{"{cantidad}"}</code> <code className="bg-muted px-1.5 py-0.5 rounded text-xs">{"{unidad}"}</code>
+                          </p>
+                          <Button variant="ghost" size="icon" onClick={() => setIsEditingFormat(false)} className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {FORMAT_EXAMPLES.map((ex, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => handleFormatChange(ex.format)}
+                              className={cn(
+                                "text-sm px-3 py-1.5 rounded-md border transition-colors",
+                                selectedPedido.formatoSalida === ex.format 
+                                  ? "bg-primary text-primary-foreground border-primary" 
+                                  : "bg-muted hover:bg-accent border-border"
+                              )}
+                            >
+                              {ex.example}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-muted-foreground">
+                          Formato: <code className="bg-muted px-1.5 py-0.5 rounded text-xs">{selectedPedido.formatoSalida}</code>
+                        </p>
+                        <Button variant="ghost" size="icon" onClick={() => setIsEditingFormat(true)} className="h-6 w-6 text-muted-foreground hover:text-foreground">
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Acciones de pedido */}
+                  {products.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border">
+                      <span className="text-sm text-muted-foreground mr-2">
+                        {productosAPedir.length > 0 
+                          ? `${productosAPedir.length} producto${productosAPedir.length !== 1 ? "s" : ""} para pedir`
+                          : "Stock completo"
+                        }
+                      </span>
+                      <Button size="sm" onClick={handleCopyPedido} disabled={productosAPedir.length === 0}>
+                        <Copy className="mr-1.5 h-3.5 w-3.5" />
+                        Copiar
+                      </Button>
+                      <Button 
+                        size="sm"
                         onClick={handleWhatsApp} 
                         disabled={productosAPedir.length === 0}
                         className="bg-green-600 hover:bg-green-700 text-white"
                       >
-                        <MessageCircle className="mr-2 h-4 w-4" />
+                        <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
                         WhatsApp
                       </Button>
-                      <Button variant="outline" onClick={() => setClearDialogOpen(true)}>
-                        <RotateCcw className="mr-2 h-4 w-4" />
-                        Limpiar Stock
+                      <Button variant="outline" size="sm" onClick={() => setClearDialogOpen(true)}>
+                        <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                        Limpiar
                       </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              )}
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Tabla de productos */}
               <ProductosTable
@@ -284,21 +394,6 @@ export default function PedidosPage() {
         onFormatChange={setFormFormat}
         onSubmit={handleCreatePedido}
         submitLabel="Crear Pedido"
-      />
-
-      <PedidoFormDialog
-        open={editPedidoOpen}
-        onOpenChange={setEditPedidoOpen}
-        title="Configurar Pedido"
-        description={`Modifica la configuración de "${selectedPedido?.nombre}"`}
-        name={formName}
-        onNameChange={setFormName}
-        stockMin={formStockMin}
-        onStockMinChange={setFormStockMin}
-        format={formFormat}
-        onFormatChange={setFormFormat}
-        onSubmit={handleUpdatePedido}
-        submitLabel="Guardar Cambios"
       />
 
       <ImportDialog
