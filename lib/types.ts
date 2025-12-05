@@ -113,6 +113,7 @@ export interface Pedido {
   nombre: string // Nombre del pedido (ej: "Proveedor Bebidas")
   stockMinimoDefault: number // Stock mínimo por defecto para nuevos productos
   formatoSalida: string // Formato personalizable con placeholders: {nombre}, {cantidad}, {unidad}
+  mensajePrevio?: string // Mensaje que aparece al inicio del pedido (ej: "Pedido de insumos para fábrica:")
   userId: string
   createdAt?: any
   updatedAt?: any

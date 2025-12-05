@@ -159,7 +159,7 @@ export function usePedidos(user: any) {
   }, [user, toast])
 
   // Actualizar pedido
-  const updatePedido = useCallback(async (nombre: string, stockMinimoDefault: number, formatoSalida: string) => {
+  const updatePedido = useCallback(async (nombre: string, stockMinimoDefault: number, formatoSalida: string, mensajePrevio?: string) => {
     if (!db || !selectedPedido) return false
 
     try {
@@ -167,10 +167,17 @@ export function usePedidos(user: any) {
         nombre: nombre.trim(),
         stockMinimoDefault,
         formatoSalida: formatoSalida || DEFAULT_FORMAT,
+        mensajePrevio: mensajePrevio ?? selectedPedido.mensajePrevio ?? null,
         updatedAt: serverTimestamp(),
       })
       
-      const updatedPedido = { ...selectedPedido, nombre: nombre.trim(), stockMinimoDefault, formatoSalida }
+      const updatedPedido = { 
+        ...selectedPedido, 
+        nombre: nombre.trim(), 
+        stockMinimoDefault, 
+        formatoSalida,
+        mensajePrevio: mensajePrevio ?? selectedPedido.mensajePrevio 
+      }
       setPedidos(prev => prev.map(p => p.id === selectedPedido.id ? updatedPedido : p))
       setSelectedPedido(updatedPedido)
       
@@ -340,7 +347,10 @@ export function usePedidos(user: any) {
       return texto.trim()
     })
     
-    return `📦 ${selectedPedido.nombre}\n\n${lineas.join("\n")}\n\nTotal: ${productosAPedir.length} productos`
+    // Usar mensaje previo personalizado o el default con emoji
+    const encabezado = selectedPedido.mensajePrevio?.trim() || `📦 ${selectedPedido.nombre}`
+    
+    return `${encabezado}\n\n${lineas.join("\n")}\n\nTotal: ${productosAPedir.length} productos`
   }, [selectedPedido, productosAPedir, stockActual, calcularPedido])
 
   return {

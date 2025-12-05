@@ -69,9 +69,11 @@ export default function PedidosPage() {
 
   // Inline edit states
   const [isEditingName, setIsEditingName] = useState(false)
-  const [isEditingFormat, setIsEditingFormat] = useState(false)
+  const [isEditingMensaje, setIsEditingMensaje] = useState(false)
   const [editingName, setEditingName] = useState("")
+  const [editingMensaje, setEditingMensaje] = useState("")
   const nameInputRef = useRef<HTMLInputElement>(null)
+  const mensajeInputRef = useRef<HTMLInputElement>(null)
 
   // Focus input when entering edit mode
   useEffect(() => {
@@ -81,12 +83,20 @@ export default function PedidosPage() {
     }
   }, [isEditingName])
 
+  useEffect(() => {
+    if (isEditingMensaje && mensajeInputRef.current) {
+      mensajeInputRef.current.focus()
+      mensajeInputRef.current.select()
+    }
+  }, [isEditingMensaje])
+
   // Reset edit states when selectedPedido changes
   useEffect(() => {
     setIsEditingName(false)
-    setIsEditingFormat(false)
+    setIsEditingMensaje(false)
     if (selectedPedido) {
       setEditingName(selectedPedido.nombre)
+      setEditingMensaje(selectedPedido.mensajePrevio || "")
     }
   }, [selectedPedido])
 
@@ -188,7 +198,38 @@ export default function PedidosPage() {
   const handleFormatChange = async (newFormat: string) => {
     if (!selectedPedido || newFormat === selectedPedido.formatoSalida) return
     await updatePedido(selectedPedido.nombre, selectedPedido.stockMinimoDefault, newFormat)
-    setIsEditingFormat(false)
+  }
+
+  // Mensaje previo handlers
+  const handleStartEditMensaje = () => {
+    if (selectedPedido) {
+      setEditingMensaje(selectedPedido.mensajePrevio || "")
+      setIsEditingMensaje(true)
+    }
+  }
+
+  const handleSaveMensaje = async () => {
+    if (!selectedPedido) return
+    await updatePedido(
+      selectedPedido.nombre, 
+      selectedPedido.stockMinimoDefault, 
+      selectedPedido.formatoSalida,
+      editingMensaje.trim() || undefined
+    )
+    setIsEditingMensaje(false)
+  }
+
+  const handleCancelEditMensaje = () => {
+    setEditingMensaje(selectedPedido?.mensajePrevio || "")
+    setIsEditingMensaje(false)
+  }
+
+  const handleMensajeKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSaveMensaje()
+    } else if (e.key === "Escape") {
+      handleCancelEditMensaje()
+    }
   }
 
   // Loading state
@@ -292,46 +333,54 @@ export default function PedidosPage() {
                     </div>
                   </div>
 
-                  {/* Formato de salida */}
-                  <div className="space-y-2">
-                    {isEditingFormat ? (
-                      <>
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm text-muted-foreground">
-                            Formato: <code className="bg-muted px-1.5 py-0.5 rounded text-xs">{"{nombre}"}</code> <code className="bg-muted px-1.5 py-0.5 rounded text-xs">{"{cantidad}"}</code> <code className="bg-muted px-1.5 py-0.5 rounded text-xs">{"{unidad}"}</code>
-                          </p>
-                          <Button variant="ghost" size="icon" onClick={() => setIsEditingFormat(false)} className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {FORMAT_EXAMPLES.map((ex, i) => (
-                            <button
-                              key={i}
-                              type="button"
-                              onClick={() => handleFormatChange(ex.format)}
-                              className={cn(
-                                "text-sm px-3 py-1.5 rounded-md border transition-colors",
-                                selectedPedido.formatoSalida === ex.format 
-                                  ? "bg-primary text-primary-foreground border-primary" 
-                                  : "bg-muted hover:bg-accent border-border"
-                              )}
-                            >
-                              {ex.example}
-                            </button>
-                          ))}
-                        </div>
-                      </>
+                  {/* Mensaje previo editable */}
+                  <div className="flex items-center gap-2">
+                    {isEditingMensaje ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <Input
+                          ref={mensajeInputRef}
+                          value={editingMensaje}
+                          onChange={(e) => setEditingMensaje(e.target.value)}
+                          onKeyDown={handleMensajeKeyDown}
+                          className="text-sm h-8 flex-1"
+                          placeholder="Ej: Pedido de insumos para fábrica:"
+                        />
+                        <Button variant="ghost" size="icon" onClick={handleSaveMensaje} className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-100">
+                          <Check className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={handleCancelEditMensaje} className="h-7 w-7 text-muted-foreground hover:text-foreground">
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <p className="text-sm text-muted-foreground">
-                          Formato: <code className="bg-muted px-1.5 py-0.5 rounded text-xs">{selectedPedido.formatoSalida}</code>
-                        </p>
-                        <Button variant="ghost" size="icon" onClick={() => setIsEditingFormat(true)} className="h-6 w-6 text-muted-foreground hover:text-foreground">
+                        <span className="text-sm text-muted-foreground">
+                          Encabezado: <span className="text-foreground">{selectedPedido.mensajePrevio || `📦 ${selectedPedido.nombre}`}</span>
+                        </span>
+                        <Button variant="ghost" size="icon" onClick={handleStartEditMensaje} className="h-6 w-6 text-muted-foreground hover:text-foreground">
                           <Pencil className="h-3 w-3" />
                         </Button>
                       </div>
                     )}
+                  </div>
+
+                  {/* Formato de salida - solo botones */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {FORMAT_EXAMPLES.map((ex, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => handleFormatChange(ex.format)}
+                        className={cn(
+                          "text-sm px-3 py-1.5 rounded-md border transition-colors",
+                          selectedPedido.formatoSalida === ex.format 
+                            ? "bg-primary text-primary-foreground border-primary" 
+                            : "bg-muted hover:bg-accent border-border"
+                        )}
+                      >
+                        {ex.example}
+                      </button>
+                    ))}
                   </div>
 
                   {/* Acciones de pedido */}
