@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { onAuthStateChanged } from "firebase/auth"
 import { auth, isFirebaseConfigured } from "@/lib/firebase"
 import { DataProvider } from "@/contexts/data-context"
@@ -11,8 +11,12 @@ import { Loader2 } from "lucide-react"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
+  
+  // Ocultar el chat flotante en la página de stock (donde está integrado como sidebar)
+  const isStockPage = pathname === "/dashboard/stock"
 
   useEffect(() => {
     if (!isFirebaseConfigured() || !auth) {

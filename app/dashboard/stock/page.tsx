@@ -5,15 +5,15 @@ import { DashboardLayout } from "@/components/dashboard-layout"
 import { useData } from "@/contexts/data-context"
 import { useStockChatContext } from "@/contexts/stock-chat-context"
 import { StockSidebar } from "@/components/stock/stock-sidebar"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { StockChatSidebar } from "@/components/stock/stock-chat-sidebar"
 import { Button } from "@/components/ui/button"
-import { Package, PanelRightClose, PanelRightOpen } from "lucide-react"
+import { MessageCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 
 export default function StockPage() {
   const { user } = useData()
-  const [showInventario, setShowInventario] = useState(false)
+  const [chatIsOpen, setChatIsOpen] = useState(true)
   
   const {
     // Stock
@@ -37,23 +37,52 @@ export default function StockPage() {
               Gestioná tu inventario con comandos de voz natural
             </p>
           </div>
-          {productosStockBajo.length > 0 && (
-            <Badge variant="destructive" className="self-start">
-              {productosStockBajo.length} con stock bajo
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {productosStockBajo.length > 0 && (
+              <Badge variant="destructive" className="self-start">
+                {productosStockBajo.length} con stock bajo
+              </Badge>
+            )}
+            {!chatIsOpen && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setChatIsOpen(true)}
+                className="gap-2"
+              >
+                <MessageCircle className="h-4 w-4" />
+                Abrir Chat
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Contenido principal - Solo inventario (el chat está flotante) */}
-      <div className="h-[calc(100vh-220px)] min-h-[500px]">
-        <StockSidebar
-          productos={productos}
-          stockActual={stockActual}
-          movimientos={movimientos}
-          productosStockBajo={productosStockBajo}
-          loading={loadingStock}
-        />
+      {/* Contenido principal - Layout de dos columnas */}
+      <div className="h-[calc(100vh-220px)] min-h-[500px] flex flex-col lg:flex-row gap-4">
+        {/* Inventario - Columna izquierda */}
+        <div className={cn(
+          "transition-all duration-300",
+          chatIsOpen ? "hidden lg:flex lg:flex-1" : "flex-1 w-full"
+        )}>
+          <StockSidebar
+            productos={productos}
+            stockActual={stockActual}
+            movimientos={movimientos}
+            productosStockBajo={productosStockBajo}
+            loading={loadingStock}
+          />
+        </div>
+
+        {/* Chat - Sidebar derecho */}
+        {chatIsOpen && (
+          <div className="w-full lg:w-full lg:max-w-md flex-shrink-0">
+            <StockChatSidebar
+              isOpen={chatIsOpen}
+              onClose={() => setChatIsOpen(false)}
+            />
+          </div>
+        )}
       </div>
     </DashboardLayout>
   )

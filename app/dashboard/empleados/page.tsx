@@ -14,6 +14,7 @@ import {
   where,
   getDocs,
   writeBatch,
+  deleteField,
 } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { DashboardLayout } from "@/components/dashboard-layout"
@@ -31,14 +32,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Trash2, AlertTriangle } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Plus, Trash2, AlertTriangle, Pencil, Users, Clock } from "lucide-react"
 import { format, parseISO, addDays } from "date-fns"
 import { es } from "date-fns/locale"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
 import { Skeleton } from "@/components/ui/skeleton"
 import { logger } from "@/lib/logger"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,28 +52,51 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Horario } from "@/lib/types"
+import { Horario, Turno } from "@/lib/types"
+
+const PRESET_COLORS = [
+  "#3b82f6", // blue
+  "#10b981", // green
+  "#f59e0b", // amber
+  "#ef4444", // red
+  "#8b5cf6", // violet
+  "#ec4899", // pink
+  "#14b8a6", // teal
+  "#f97316", // orange
+]
 
 export default function EmpleadosPage() {
-  const { employees, loading: dataLoading, refreshEmployees, user } = useData()
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [bulkNames, setBulkNames] = useState("")
+  const { employees, shifts, loading: dataLoading, refreshEmployees, refreshShifts, user } = useData()
   const { toast } = useToast()
+  
+  // Estados para empleados
+  const [employeeDialogOpen, setEmployeeDialogOpen] = useState(false)
+  const [bulkNames, setBulkNames] = useState("")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [employeeToDelete, setEmployeeToDelete] = useState<{ id: string; name: string } | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [lastCompletedWeekInfo, setLastCompletedWeekInfo] = useState<{ start: string; end: string } | null>(null)
-  
-  // Estados para edición inline
   const [editingField, setEditingField] = useState<{id: string, field: string} | null>(null)
   const [inlineValue, setInlineValue] = useState("")
 
-  const handleOpenDialog = () => {
+  // Estados para turnos
+  const [shiftDialogOpen, setShiftDialogOpen] = useState(false)
+  const [editingShift, setEditingShift] = useState<Turno | null>(null)
+  const [shiftFormData, setShiftFormData] = useState({
+    name: "",
+    startTime: "",
+    endTime: "",
+    startTime2: "",
+    endTime2: "",
+    color: PRESET_COLORS[0],
+  })
+  const [hasSecondShift, setHasSecondShift] = useState(false)
+
+  const handleOpenEmployeeDialog = () => {
     setBulkNames("")
-    setDialogOpen(true)
+    setEmployeeDialogOpen(true)
   }
 
-  // Función para guardar cambios inline
   const handleInlineSave = async (employeeId: string, field: string, value: string | null) => {
     if (!db) {
       toast({
@@ -86,7 +112,6 @@ export default function EmpleadosPage() {
         updatedAt: serverTimestamp(),
       }
 
-      // Solo actualizar el campo que cambió
       if (field === 'name') {
         if (!value || !value.trim()) {
           toast({
@@ -127,7 +152,7 @@ export default function EmpleadosPage() {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleEmployeeSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!db) {
@@ -140,7 +165,6 @@ export default function EmpleadosPage() {
     }
 
     try {
-      // Solo creación: agregar uno o múltiples empleados
       const namesToAdd = bulkNames.trim()
         ? bulkNames
             .split("\n")
@@ -157,7 +181,6 @@ export default function EmpleadosPage() {
         return
       }
 
-      // Crear todos los empleados
       const promises = namesToAdd.map((name: string) =>
         addDoc(collection(db!, COLLECTIONS.EMPLOYEES), {
           name,
@@ -174,9 +197,8 @@ export default function EmpleadosPage() {
         description: `Se ${namesToAdd.length === 1 ? "ha creado" : "han creado"} ${namesToAdd.length} empleado${namesToAdd.length === 1 ? "" : "s"} correctamente`,
       })
       
-      // Refrescar datos del contexto
       await refreshEmployees()
-      setDialogOpen(false)
+      setEmployeeDialogOpen(false)
       setBulkNames("")
     } catch (error: any) {
       logger.error("[DEBUG] Error general al crear empleado:", error)
@@ -192,13 +214,8 @@ export default function EmpleadosPage() {
   const handleDeleteClick = async (id: string, name: string) => {
     setEmployeeToDelete({ id, name })
     
-    // Obtener información de la última semana completada antes de abrir el modal
-    // Optimizado: obtener solo semanas completadas con límite
     if (db) {
       try {
-        // Query optimizada: obtener semanas completadas del usuario
-        // Nota: Para usar múltiples where + orderBy necesitaríamos un índice compuesto
-        // Por ahora obtenemos todas las completadas del usuario y ordenamos en cliente
         const completedQuery = query(
           collection(db, COLLECTIONS.SCHEDULES),
           where("createdBy", "==", user.uid),
@@ -239,14 +256,13 @@ export default function EmpleadosPage() {
     setDeleteDialogOpen(true)
   }
 
-  const handleDelete = async () => {
+  const handleEmployeeDelete = async () => {
     if (!employeeToDelete || !db) {
       return
     }
 
     setIsDeleting(true)
     try {
-      // Optimizar: obtener solo semanas completadas del usuario para encontrar la última
       const completedQuery = query(
         collection(db, COLLECTIONS.SCHEDULES),
         where("createdBy", "==", user.uid),
@@ -254,7 +270,6 @@ export default function EmpleadosPage() {
       )
       const completedSnapshot = await getDocs(completedQuery)
       
-      // Encontrar la última semana completada (marcada como "listo")
       const allCompletedSchedules = completedSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -272,8 +287,6 @@ export default function EmpleadosPage() {
         lastCompletedWeekStart = completedSchedules[0].weekStart || null
       }
       
-      // Obtener todos los horarios del usuario para filtrar en cliente
-      // Nota: Para optimizar más necesitaríamos índices compuestos en Firestore
       if (!db) {
         throw new Error("Firebase no está configurado")
       }
@@ -284,24 +297,20 @@ export default function EmpleadosPage() {
       )
       const schedulesSnapshot = await getDocs(schedulesQuery)
       
-      // Filtrar solo los horarios que son futuros a la última semana completada
       const allSchedules = schedulesSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as Horario[]
       
       const schedulesToUpdate = allSchedules.filter((schedule) => {
-        // No tocar semanas completadas
         if (schedule.completada === true) {
           return false
         }
         
-        // Si no hay última semana completada, eliminar de todos los no completados
         if (!lastCompletedWeekStart) {
           return true
         }
         
-        // Solo eliminar de semanas futuras a la última completada
         if (schedule.weekStart && schedule.weekStart > lastCompletedWeekStart!) {
           return true
         }
@@ -309,8 +318,7 @@ export default function EmpleadosPage() {
         return false
       })
       
-      // Eliminar asignaciones del empleado solo en horarios seleccionados usando batch writes
-      const BATCH_LIMIT = 500 // Límite de Firestore
+      const BATCH_LIMIT = 500
       const updates: Array<{ scheduleId: string; updateData: any }> = []
       
       for (const schedule of schedulesToUpdate) {
@@ -320,7 +328,6 @@ export default function EmpleadosPage() {
         const updatedAssignments = { ...schedule.assignments }
         let hasChanges = false
         
-        // Eliminar el empleado de todas las fechas de este horario
         Object.keys(updatedAssignments).forEach((date) => {
           if (updatedAssignments[date][employeeToDelete.id]) {
             delete updatedAssignments[date][employeeToDelete.id]
@@ -328,7 +335,6 @@ export default function EmpleadosPage() {
           }
         })
         
-        // Agregar a la lista de actualizaciones si hay cambios
         if (hasChanges) {
           updates.push({
             scheduleId: schedule.id,
@@ -340,7 +346,6 @@ export default function EmpleadosPage() {
         }
       }
       
-      // Ejecutar actualizaciones en batches
       if (updates.length > 0 && db) {
         for (let i = 0; i < updates.length; i += BATCH_LIMIT) {
           const batch = writeBatch(db)
@@ -355,12 +360,10 @@ export default function EmpleadosPage() {
         }
       }
       
-      // Eliminar el empleado del sistema
       if (db) {
         await deleteDoc(doc(db, COLLECTIONS.EMPLOYEES, employeeToDelete.id))
       }
       
-      // Refrescar datos del contexto
       await refreshEmployees()
       
       setDeleteDialogOpen(false)
@@ -383,169 +386,423 @@ export default function EmpleadosPage() {
     }
   }
 
+  // Funciones para turnos
+  const handleOpenShiftDialog = (shift?: any) => {
+    if (shift) {
+      setEditingShift(shift)
+      const hasSecond = !!(shift.startTime2 || shift.endTime2)
+      setHasSecondShift(hasSecond)
+      setShiftFormData({
+        name: shift.name,
+        startTime: shift.startTime || "",
+        endTime: shift.endTime || "",
+        startTime2: shift.startTime2 || "",
+        endTime2: shift.endTime2 || "",
+        color: shift.color,
+      })
+    } else {
+      setEditingShift(null)
+      setHasSecondShift(false)
+      setShiftFormData({
+        name: "",
+        startTime: "",
+        endTime: "",
+        startTime2: "",
+        endTime2: "",
+        color: PRESET_COLORS[0],
+      })
+    }
+    setShiftDialogOpen(true)
+  }
+
+  const handleShiftSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!db) {
+      toast({
+        title: "Error",
+        description: "Firebase no está configurado",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      if (editingShift) {
+        const updateData: any = {
+          name: shiftFormData.name,
+          color: shiftFormData.color,
+          updatedAt: serverTimestamp(),
+        }
+        
+        if (shiftFormData.startTime) updateData.startTime = shiftFormData.startTime
+        if (shiftFormData.endTime) updateData.endTime = shiftFormData.endTime
+        
+        if (hasSecondShift) {
+          if (shiftFormData.startTime2) updateData.startTime2 = shiftFormData.startTime2
+          if (shiftFormData.endTime2) updateData.endTime2 = shiftFormData.endTime2
+        } else {
+          updateData.startTime2 = deleteField()
+          updateData.endTime2 = deleteField()
+        }
+        
+        const shiftRef = doc(db, COLLECTIONS.SHIFTS, editingShift.id)
+        await updateDoc(shiftRef, updateData)
+        
+        toast({
+          title: "Turno actualizado",
+          description: "El turno se ha actualizado correctamente",
+        })
+      } else {
+        const newShiftData: any = {
+          name: shiftFormData.name,
+          color: shiftFormData.color,
+          userId: user.uid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }
+        
+        if (shiftFormData.startTime) newShiftData.startTime = shiftFormData.startTime
+        if (shiftFormData.endTime) newShiftData.endTime = shiftFormData.endTime
+        
+        if (hasSecondShift) {
+          if (shiftFormData.startTime2) newShiftData.startTime2 = shiftFormData.startTime2
+          if (shiftFormData.endTime2) newShiftData.endTime2 = shiftFormData.endTime2
+        }
+        
+        await addDoc(collection(db, COLLECTIONS.SHIFTS), newShiftData)
+        toast({
+          title: "Turno creado",
+          description: "El turno se ha creado correctamente",
+        })
+      }
+      await refreshShifts()
+      setShiftDialogOpen(false)
+    } catch (error: any) {
+      logger.error("[TURNOS] Error al guardar turno:", error)
+      
+      if (error.code === "permission-denied") {
+        logger.error("[TURNOS] Error de permisos:", {
+          userId: user?.uid,
+          editingShift: editingShift ? {
+            id: editingShift.id,
+            userId: editingShift.userId,
+            name: editingShift.name,
+          } : null,
+          isAuth: !!user,
+        })
+      }
+      
+      toast({
+        title: "Error",
+        description: error.message || "Ocurrió un error al guardar el turno",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleShiftDelete = async (id: string) => {
+    if (!confirm("¿Estás seguro de que quieres eliminar este turno?")) return
+
+    if (!db) {
+      toast({
+        title: "Error",
+        description: "Firebase no está configurado",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      await deleteDoc(doc(db, COLLECTIONS.SHIFTS, id))
+      await refreshShifts()
+      toast({
+        title: "Turno eliminado",
+        description: "El turno se ha eliminado correctamente",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Ocurrió un error al eliminar el turno",
+        variant: "destructive",
+      })
+    }
+  }
+
   return (
     <DashboardLayout user={user}>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">Empleados</h2>
-            <p className="text-sm sm:text-base text-muted-foreground">Gestiona los empleados de tu equipo</p>
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">Empleados y Turnos</h2>
+            <p className="text-sm sm:text-base text-muted-foreground">Gestiona los empleados y turnos de trabajo</p>
           </div>
-          <Button onClick={() => handleOpenDialog()}>
-            <Plus className="mr-2 h-4 w-4" />
-            Agregar Empleados
-          </Button>
         </div>
 
-        <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle className="text-card-foreground">Lista de Empleados</CardTitle>
-            <CardDescription className="text-muted-foreground">Total: {employees.length} empleados</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {dataLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-4">
-                    <Skeleton className="h-12 flex-1" />
-                    <Skeleton className="h-12 w-32" />
-                    <Skeleton className="h-12 w-32" />
-                    <Skeleton className="h-12 w-24" />
-                  </div>
-                ))}
-              </div>
-            ) : employees.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground">
-                No hay empleados registrados. Agrega tu primer empleado.
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border">
-                    <TableHead className="text-foreground">Nombre</TableHead>
-                    <TableHead className="text-foreground">Email</TableHead>
-                    <TableHead className="text-foreground">Teléfono</TableHead>
-                    <TableHead className="text-right text-foreground">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {employees.map((employee) => {
-                    const isEditing = editingField?.id === employee.id
-                    const editingThisField = isEditing && editingField?.field
-                    
-                    return (
-                      <TableRow key={employee.id} className="border-border">
-                        <TableCell className="font-medium text-foreground">
-                          {editingThisField === 'name' ? (
-                            <Input
-                              value={inlineValue}
-                              onChange={(e) => setInlineValue(e.target.value)}
-                              onBlur={() => handleInlineSave(employee.id, 'name', inlineValue)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  handleInlineSave(employee.id, 'name', inlineValue)
-                                } else if (e.key === 'Escape') {
-                                  setEditingField(null)
-                                  setInlineValue("")
-                                }
-                              }}
-                              autoFocus
-                              className="h-8"
-                            />
-                          ) : (
-                            <div
-                              onClick={() => {
-                                setEditingField({ id: employee.id, field: 'name' })
-                                setInlineValue(employee.name)
-                              }}
-                              className="cursor-pointer hover:bg-muted rounded px-2 py-1 -mx-2 transition-colors"
-                            >
-                              {employee.name}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {editingThisField === 'email' ? (
-                            <Input
-                              type="email"
-                              value={inlineValue}
-                              onChange={(e) => setInlineValue(e.target.value)}
-                              onBlur={() => handleInlineSave(employee.id, 'email', inlineValue)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  handleInlineSave(employee.id, 'email', inlineValue)
-                                } else if (e.key === 'Escape') {
-                                  setEditingField(null)
-                                  setInlineValue("")
-                                }
-                              }}
-                              autoFocus
-                              className="h-8"
-                              placeholder="email@ejemplo.com"
-                            />
-                          ) : (
-                            <div
-                              onClick={() => {
-                                setEditingField({ id: employee.id, field: 'email' })
-                                setInlineValue(employee.email || "")
-                              }}
-                              className="cursor-pointer hover:bg-muted rounded px-2 py-1 -mx-2 transition-colors"
-                            >
-                              {employee.email || "-"}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {editingThisField === 'phone' ? (
-                            <Input
-                              value={inlineValue}
-                              onChange={(e) => setInlineValue(e.target.value)}
-                              onBlur={() => handleInlineSave(employee.id, 'phone', inlineValue)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  handleInlineSave(employee.id, 'phone', inlineValue)
-                                } else if (e.key === 'Escape') {
-                                  setEditingField(null)
-                                  setInlineValue("")
-                                }
-                              }}
-                              autoFocus
-                              className="h-8"
-                              placeholder="+1234567890"
-                            />
-                          ) : (
-                            <div
-                              onClick={() => {
-                                setEditingField({ id: employee.id, field: 'phone' })
-                                setInlineValue(employee.phone || "")
-                              }}
-                              className="cursor-pointer hover:bg-muted rounded px-2 py-1 -mx-2 transition-colors"
-                            >
-                              {employee.phone || "-"}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => handleDeleteClick(employee.id, employee.name)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="empleados" className="w-full">
+          <TabsList>
+            <TabsTrigger value="empleados">
+              <Users className="mr-2 h-4 w-4" />
+              Empleados
+            </TabsTrigger>
+            <TabsTrigger value="turnos">
+              <Clock className="mr-2 h-4 w-4" />
+              Turnos
+            </TabsTrigger>
+          </TabsList>
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <TabsContent value="empleados" className="space-y-6 mt-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Lista de Empleados</h3>
+                <p className="text-sm text-muted-foreground">Total: {employees.length} empleados</p>
+              </div>
+              <Button onClick={() => handleOpenEmployeeDialog()}>
+                <Plus className="mr-2 h-4 w-4" />
+                Agregar Empleados
+              </Button>
+            </div>
+
+            <Card className="border-border bg-card">
+              <CardContent className="pt-6">
+                {dataLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="flex items-center gap-4">
+                        <Skeleton className="h-12 flex-1" />
+                        <Skeleton className="h-12 w-32" />
+                        <Skeleton className="h-12 w-32" />
+                        <Skeleton className="h-12 w-24" />
+                      </div>
+                    ))}
+                  </div>
+                ) : employees.length === 0 ? (
+                  <div className="py-12 text-center text-muted-foreground">
+                    No hay empleados registrados. Agrega tu primer empleado.
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-border">
+                        <TableHead className="text-foreground">Nombre</TableHead>
+                        <TableHead className="text-foreground">Email</TableHead>
+                        <TableHead className="text-foreground">Teléfono</TableHead>
+                        <TableHead className="text-right text-foreground">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {employees.map((employee) => {
+                        const isEditing = editingField?.id === employee.id
+                        const editingThisField = isEditing && editingField?.field
+                        
+                        return (
+                          <TableRow key={employee.id} className="border-border">
+                            <TableCell className="font-medium text-foreground">
+                              {editingThisField === 'name' ? (
+                                <Input
+                                  value={inlineValue}
+                                  onChange={(e) => setInlineValue(e.target.value)}
+                                  onBlur={() => handleInlineSave(employee.id, 'name', inlineValue)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleInlineSave(employee.id, 'name', inlineValue)
+                                    } else if (e.key === 'Escape') {
+                                      setEditingField(null)
+                                      setInlineValue("")
+                                    }
+                                  }}
+                                  autoFocus
+                                  className="h-8"
+                                />
+                              ) : (
+                                <div
+                                  onClick={() => {
+                                    setEditingField({ id: employee.id, field: 'name' })
+                                    setInlineValue(employee.name)
+                                  }}
+                                  className="cursor-pointer hover:bg-muted rounded px-2 py-1 -mx-2 transition-colors"
+                                >
+                                  {employee.name}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {editingThisField === 'email' ? (
+                                <Input
+                                  type="email"
+                                  value={inlineValue}
+                                  onChange={(e) => setInlineValue(e.target.value)}
+                                  onBlur={() => handleInlineSave(employee.id, 'email', inlineValue)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleInlineSave(employee.id, 'email', inlineValue)
+                                    } else if (e.key === 'Escape') {
+                                      setEditingField(null)
+                                      setInlineValue("")
+                                    }
+                                  }}
+                                  autoFocus
+                                  className="h-8"
+                                  placeholder="email@ejemplo.com"
+                                />
+                              ) : (
+                                <div
+                                  onClick={() => {
+                                    setEditingField({ id: employee.id, field: 'email' })
+                                    setInlineValue(employee.email || "")
+                                  }}
+                                  className="cursor-pointer hover:bg-muted rounded px-2 py-1 -mx-2 transition-colors"
+                                >
+                                  {employee.email || "-"}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {editingThisField === 'phone' ? (
+                                <Input
+                                  value={inlineValue}
+                                  onChange={(e) => setInlineValue(e.target.value)}
+                                  onBlur={() => handleInlineSave(employee.id, 'phone', inlineValue)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleInlineSave(employee.id, 'phone', inlineValue)
+                                    } else if (e.key === 'Escape') {
+                                      setEditingField(null)
+                                      setInlineValue("")
+                                    }
+                                  }}
+                                  autoFocus
+                                  className="h-8"
+                                  placeholder="+1234567890"
+                                />
+                              ) : (
+                                <div
+                                  onClick={() => {
+                                    setEditingField({ id: employee.id, field: 'phone' })
+                                    setInlineValue(employee.phone || "")
+                                  }}
+                                  className="cursor-pointer hover:bg-muted rounded px-2 py-1 -mx-2 transition-colors"
+                                >
+                                  {employee.phone || "-"}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={() => handleDeleteClick(employee.id, employee.name)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="turnos" className="space-y-6 mt-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Turnos de Trabajo</h3>
+                <p className="text-sm text-muted-foreground">Configura los turnos disponibles</p>
+              </div>
+              <Button onClick={() => handleOpenShiftDialog()}>
+                <Plus className="mr-2 h-4 w-4" />
+                Agregar Turno
+              </Button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {dataLoading ? (
+                <>
+                  {[1, 2, 3].map((i) => (
+                    <Card key={i} className="border-border bg-card">
+                      <CardHeader>
+                        <Skeleton className="h-6 w-32" />
+                        <Skeleton className="h-4 w-24 mt-2" />
+                      </CardHeader>
+                      <CardContent>
+                        <Skeleton className="h-10 w-full" />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </>
+              ) : shifts.length === 0 ? (
+                <Card className="col-span-full border-border bg-card">
+                  <CardContent className="py-12 text-center text-muted-foreground">
+                    No hay turnos configurados. Agrega tu primer turno.
+                  </CardContent>
+                </Card>
+              ) : (
+                shifts.map((shift) => (
+                  <Card key={shift.id} className="border-border bg-card">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <CardTitle className="text-card-foreground">{shift.name}</CardTitle>
+                          <CardDescription className="text-muted-foreground">
+                            {(() => {
+                              const formatTime = (time: string) => {
+                                if (!time) return time
+                                return time.endsWith(":00") ? time.slice(0, -3) : time
+                              }
+                              const formatRange = (start: string, end: string) => {
+                                return `${formatTime(start)} a ${formatTime(end)}`
+                              }
+                              
+                              const firstShift = shift.startTime && shift.endTime
+                                ? formatRange(shift.startTime, shift.endTime)
+                                : null
+                              const secondShift = shift.startTime2 && shift.endTime2
+                                ? formatRange(shift.startTime2, shift.endTime2)
+                                : null
+                              
+                              if (firstShift && secondShift) {
+                                return `${firstShift} / ${secondShift}`
+                              } else if (firstShift) {
+                                return firstShift
+                              } else {
+                                return "Sin horario definido"
+                              }
+                            })()}
+                          </CardDescription>
+                        </div>
+                        <Badge className="h-8 w-8 rounded-full" style={{ backgroundColor: shift.color }} />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 bg-transparent"
+                          onClick={() => handleOpenShiftDialog(shift)}
+                        >
+                          <Pencil className="mr-2 h-3 w-3" />
+                          Editar
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleShiftDelete(shift.id)}>
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Dialog para agregar empleados */}
+        <Dialog open={employeeDialogOpen} onOpenChange={setEmployeeDialogOpen}>
           <DialogContent className="bg-card">
             <DialogHeader>
               <DialogTitle className="text-card-foreground">
@@ -555,7 +812,7 @@ export default function EmpleadosPage() {
                 Ingresa el nombre del empleado o múltiples nombres (uno por línea) para agregar varios a la vez
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleEmployeeSubmit}>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
                   <Label htmlFor="bulkNames" className="text-foreground">
@@ -575,7 +832,7 @@ export default function EmpleadosPage() {
                 </div>
               </div>
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                <Button type="button" variant="outline" onClick={() => setEmployeeDialogOpen(false)}>
                   Cancelar
                 </Button>
                 <Button type="submit">Agregar</Button>
@@ -584,6 +841,143 @@ export default function EmpleadosPage() {
           </DialogContent>
         </Dialog>
 
+        {/* Dialog para agregar/editar turnos */}
+        <Dialog open={shiftDialogOpen} onOpenChange={setShiftDialogOpen}>
+          <DialogContent className="bg-card">
+            <DialogHeader>
+              <DialogTitle className="text-card-foreground">
+                {editingShift ? "Editar Turno" : "Agregar Turno"}
+              </DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                {editingShift ? "Actualiza los datos del turno" : "Ingresa los datos del nuevo turno"}
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleShiftSubmit}>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-foreground">
+                    Nombre *
+                  </Label>
+                  <Input
+                    id="name"
+                    value={shiftFormData.name}
+                    onChange={(e) => setShiftFormData({ ...shiftFormData, name: e.target.value })}
+                    placeholder="Ej: Mañana, Tarde, Noche"
+                    required
+                    className="border-input bg-background text-foreground"
+                  />
+                </div>
+                <div className="space-y-3">
+                  <Label className="text-base font-medium text-foreground">Primera Franja Horaria</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="startTime" className="text-foreground">
+                        Hora Inicio
+                      </Label>
+                      <Input
+                        id="startTime"
+                        type="time"
+                        value={shiftFormData.startTime}
+                        onChange={(e) => setShiftFormData({ ...shiftFormData, startTime: e.target.value })}
+                        className="border-input bg-background text-foreground"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="endTime" className="text-foreground">
+                        Hora Fin
+                      </Label>
+                      <Input
+                        id="endTime"
+                        type="time"
+                        value={shiftFormData.endTime}
+                        onChange={(e) => setShiftFormData({ ...shiftFormData, endTime: e.target.value })}
+                        className="border-input bg-background text-foreground"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between rounded-lg border border-border p-4">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="second-shift" className="text-foreground cursor-pointer">
+                      Turno cortado (Segunda franja horaria)
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Activa esta opción para agregar una segunda franja horaria
+                    </p>
+                  </div>
+                  <Switch
+                    id="second-shift"
+                    checked={hasSecondShift}
+                    onCheckedChange={(checked) => {
+                      setHasSecondShift(checked)
+                      if (!checked) {
+                        setShiftFormData({ ...shiftFormData, startTime2: "", endTime2: "" })
+                      }
+                    }}
+                  />
+                </div>
+                
+                {hasSecondShift && (
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium text-foreground">Segunda Franja Horaria</Label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="startTime2" className="text-foreground">
+                          Hora Inicio
+                        </Label>
+                        <Input
+                          id="startTime2"
+                          type="time"
+                          value={shiftFormData.startTime2}
+                          onChange={(e) => setShiftFormData({ ...shiftFormData, startTime2: e.target.value })}
+                          className="border-input bg-background text-foreground"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="endTime2" className="text-foreground">
+                          Hora Fin
+                        </Label>
+                        <Input
+                          id="endTime2"
+                          type="time"
+                          value={shiftFormData.endTime2}
+                          onChange={(e) => setShiftFormData({ ...shiftFormData, endTime2: e.target.value })}
+                          className="border-input bg-background text-foreground"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                  <Label className="text-foreground">Color *</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {PRESET_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        className={`h-10 w-10 rounded-full border-2 transition-all ${
+                          shiftFormData.color === color ? "border-foreground scale-110" : "border-transparent"
+                        }`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => setShiftFormData({ ...shiftFormData, color })}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShiftDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit">{editingShift ? "Actualizar" : "Crear"}</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* AlertDialog para eliminar empleado */}
         <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <AlertDialogContent className="border-2 border-destructive">
             <AlertDialogHeader>
@@ -642,7 +1036,7 @@ export default function EmpleadosPage() {
                 Cancelar
               </AlertDialogCancel>
               <AlertDialogAction
-                onClick={handleDelete}
+                onClick={handleEmployeeDelete}
                 disabled={isDeleting}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90 w-full sm:w-auto font-bold text-lg py-3"
               >

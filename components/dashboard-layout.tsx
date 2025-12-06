@@ -21,7 +21,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Calendar, Users, Clock, History, LogOut, Settings, CalendarDays, Menu, ShoppingCart, PackageSearch } from "lucide-react"
+import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, PackageSearch } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -36,10 +36,8 @@ const navItems = [
   { href: "/dashboard", label: "Horarios", icon: Calendar },
   { href: "/dashboard/horarios-mensuales", label: "Vista Mensual", icon: CalendarDays },
   { href: "/dashboard/empleados", label: "Empleados", icon: Users },
-  { href: "/dashboard/turnos", label: "Turnos", icon: Clock },
   { href: "/dashboard/pedidos", label: "Pedidos", icon: ShoppingCart },
   { href: "/dashboard/stock", label: "Stock", icon: PackageSearch },
-  { href: "/dashboard/historial", label: "Historial", icon: History },
   { href: "/dashboard/configuracion", label: "Configuración", icon: Settings },
 ]
 
@@ -49,11 +47,9 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
   
   // Obtener estado del chat para ajustar el padding del contenido
   let chatIsOpen = false
-  let chatIsMinimized = false
   try {
     const chatContext = useStockChatContext()
     chatIsOpen = chatContext.chatIsOpen
-    chatIsMinimized = chatContext.chatIsMinimized
   } catch {
     // Si no hay contexto (página fuera del dashboard), no hacer nada
   }
@@ -155,8 +151,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
       {/* Main Content */}
       <main className={cn(
         "flex-1 p-3 sm:p-4 md:p-6 transition-all duration-300",
-        chatIsOpen && !chatIsMinimized && "pr-[calc(1rem+28rem+1rem)]", // padding-right cuando chat está abierto (max-w-md = 28rem + right-4 = 1rem + extra)
-        chatIsOpen && chatIsMinimized && "pr-[calc(1rem+20rem+1rem)]" // padding-right cuando chat está minimizado (w-80 = 20rem + right-4 = 1rem + extra)
+        chatIsOpen && "lg:pr-[25%]" // padding-right cuando chat está abierto (25% del ancho) solo en desktop
       )}>
         {children}
       </main>
