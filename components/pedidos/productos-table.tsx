@@ -3,11 +3,9 @@
 import { useState, useCallback, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Trash2, Upload, Package, ShoppingCart, Settings2, Minus, Plus, GripVertical } from "lucide-react"
+import { Trash2, Upload, Package, Minus, Plus, GripVertical } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Producto } from "@/lib/types"
-
-type TableMode = "pedido" | "config"
 
 interface ProductosTableProps {
   products: Producto[]
@@ -18,6 +16,7 @@ interface ProductosTableProps {
   onImport: () => void
   onProductsOrderUpdate?: (newOrder: string[]) => Promise<boolean>
   calcularPedido: (stockMinimo: number, stockActualValue: number | undefined) => number
+  configMode?: boolean
 }
 
 export function ProductosTable({
@@ -29,8 +28,10 @@ export function ProductosTable({
   onImport,
   onProductsOrderUpdate,
   calcularPedido,
+  configMode = false,
 }: ProductosTableProps) {
-  const [mode, setMode] = useState<TableMode>("pedido")
+  // Sincronizar el modo con configMode del padre
+  const mode: TableMode = configMode ? "config" : "pedido"
   const [editingField, setEditingField] = useState<{id: string, field: string} | null>(null)
   const [inlineValue, setInlineValue] = useState("")
   const [draggedProductId, setDraggedProductId] = useState<string | null>(null)
@@ -196,39 +197,13 @@ export function ProductosTable({
 
   return (
     <div className="rounded-lg border border-border bg-card">
-      {/* Header con tabs de modo */}
+      {/* Header */}
       <div className="flex items-center justify-between gap-1 p-1.5 pb-1">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold">Productos</h3>
           <p className="text-[10px] text-muted-foreground">{products.length} productos</p>
         </div>
-          <div className="flex rounded-md border border-border p-0.5 bg-muted/50 shrink-0">
-            <button
-              onClick={() => setMode("pedido")}
-              className={cn(
-                "flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors",
-                mode === "pedido"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <ShoppingCart className="h-3 w-3" />
-              <span className="hidden xs:inline">Pedido</span>
-            </button>
-            <button
-              onClick={() => setMode("config")}
-              className={cn(
-                "flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors",
-                mode === "config"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Settings2 className="h-3 w-3" />
-              <span className="hidden xs:inline">Config</span>
-            </button>
-          </div>
-        </div>
+      </div>
 
       {/* Lista de productos - mobile first */}
       <div className="divide-y divide-border">

@@ -23,17 +23,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Upload, AlertTriangle } from "lucide-react"
-import { cn } from "@/lib/utils"
 import { Pedido } from "@/lib/types"
 
 const DEFAULT_FORMAT = "{nombre} ({cantidad})"
-const FORMAT_EXAMPLES = [
-  { format: "{nombre} ({cantidad})", example: "Leche (8)" },
-  { format: "{cantidad} - {nombre}", example: "8 - Leche" },
-  { format: "({cantidad}) {nombre}", example: "(8) Leche" },
-  { format: "• {nombre}: {cantidad} {unidad}", example: "• Leche: 8 litros" },
-  { format: "{nombre} x{cantidad}", example: "Leche x8" },
-]
 
 interface PedidoFormDialogProps {
   open: boolean
@@ -42,10 +34,6 @@ interface PedidoFormDialogProps {
   description: string
   name: string
   onNameChange: (value: string) => void
-  stockMin: string
-  onStockMinChange: (value: string) => void
-  format: string
-  onFormatChange: (value: string) => void
   onSubmit: () => void
   submitLabel: string
 }
@@ -57,10 +45,6 @@ export function PedidoFormDialog({
   description,
   name,
   onNameChange,
-  stockMin,
-  onStockMinChange,
-  format,
-  onFormatChange,
   onSubmit,
   submitLabel,
 }: PedidoFormDialogProps) {
@@ -79,58 +63,21 @@ export function PedidoFormDialog({
               value={name}
               onChange={(e) => onNameChange(e.target.value)}
               placeholder="Ej: Proveedor Bebidas, Almacén, etc."
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && name.trim()) {
+                  onSubmit()
+                }
+              }}
             />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="stockMin">Stock mínimo por defecto</Label>
-            <Input
-              id="stockMin"
-              type="number"
-              min="0"
-              value={stockMin}
-              onChange={(e) => onStockMinChange(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Se aplicará a los nuevos productos importados
-            </p>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="formato">Formato de salida</Label>
-            <Input
-              id="formato"
-              value={format}
-              onChange={(e) => onFormatChange(e.target.value)}
-              placeholder="{nombre} ({cantidad})"
-            />
-            <p className="text-xs text-muted-foreground">
-              Usa: <code>{"{nombre}"}</code>, <code>{"{cantidad}"}</code>, <code>{"{unidad}"}</code>
-            </p>
-            <div className="flex flex-wrap gap-1 mt-2">
-              {FORMAT_EXAMPLES.map((ex, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => onFormatChange(ex.format)}
-                  className={cn(
-                    "text-xs px-2 py-1 rounded border transition-colors",
-                    format === ex.format 
-                      ? "bg-primary text-primary-foreground border-primary" 
-                      : "bg-muted hover:bg-accent border-border"
-                  )}
-                >
-                  {ex.example}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={onSubmit}>{submitLabel}</Button>
+          <Button onClick={onSubmit} disabled={!name.trim()}>
+            {submitLabel}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

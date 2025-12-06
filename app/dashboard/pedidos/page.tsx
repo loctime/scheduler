@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { 
   Plus, Trash2, Copy, MessageCircle, RotateCcw, Upload, Package, 
-  Construction, Pencil, Check, X, Settings2
+  Construction, Pencil, Check, X, Cog
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
@@ -78,8 +78,6 @@ export default function PedidosPage() {
   
   // Form states
   const [formName, setFormName] = useState("")
-  const [formStockMin, setFormStockMin] = useState("1")
-  const [formFormat, setFormFormat] = useState(DEFAULT_FORMAT)
   const [importText, setImportText] = useState("")
 
   // Inline edit states
@@ -119,15 +117,15 @@ export default function PedidosPage() {
   // Handlers
   const handleOpenCreate = () => {
     setFormName("")
-    setFormStockMin("1")
-    setFormFormat(DEFAULT_FORMAT)
     setCreatePedidoOpen(true)
   }
 
   const handleCreatePedido = async () => {
-    const result = await createPedido(formName, parseInt(formStockMin, 10) || 1, formFormat)
+    // Usar valores por defecto: stockMin = 1, format = DEFAULT_FORMAT
+    const result = await createPedido(formName, 1, DEFAULT_FORMAT)
     if (result) {
       setCreatePedidoOpen(false)
+      setFormName("")
     }
   }
 
@@ -351,8 +349,9 @@ export default function PedidosPage() {
                         size="icon" 
                         className="h-8 w-8" 
                         onClick={() => setShowConfig(!showConfig)}
+                        title="Configuración"
                       >
-                        <Settings2 className="h-4 w-4" />
+                        <Cog className="h-5 w-5" />
                       </Button>
                       <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setImportDialogOpen(true)}>
                         <Upload className="h-4 w-4" />
@@ -486,6 +485,7 @@ export default function PedidosPage() {
                 onImport={() => setImportDialogOpen(true)}
                 onProductsOrderUpdate={updateProductsOrder}
                 calcularPedido={calcularPedido}
+                configMode={showConfig}
               />
             </>
           )}
@@ -497,13 +497,9 @@ export default function PedidosPage() {
         open={createPedidoOpen}
         onOpenChange={setCreatePedidoOpen}
         title="Crear Nuevo Pedido"
-        description="Configura un nuevo pedido para organizar tus productos"
+        description="Ingresa un nombre para el nuevo pedido"
         name={formName}
         onNameChange={setFormName}
-        stockMin={formStockMin}
-        onStockMinChange={setFormStockMin}
-        format={formFormat}
-        onFormatChange={setFormFormat}
         onSubmit={handleCreatePedido}
         submitLabel="Crear Pedido"
       />
