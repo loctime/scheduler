@@ -14,7 +14,7 @@ interface ProductoInfo {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { mensaje, modo, productos = [], stockActual = {} } = body
+    const { mensaje, modo, productos = [], stockActual = {}, pedidos = [] } = body
 
     if (!mensaje) {
       return NextResponse.json(
@@ -54,6 +54,105 @@ export async function POST(request: NextRequest) {
           stockActual: stock,
         }
       })
+      
+      // Si el mensaje es para generar un pedido
+      if (/^(pedido|generar pedido|qué me falta pedir|qué falta pedir|hacer pedido|crear pedido|armar pedido)/.test(msgLower)) {
+        if (productos.length === 0) {
+          return NextResponse.json({
+            accion: {
+              accion: "conversacion",
+              mensaje: "No tenés productos en tu inventario todavía. Agregalos desde la sección Pedidos.",
+              confianza: 0.9,
+            }
+          })
+        }
+        
+        // Calcular qué productos necesitan pedirse (stock actual < stock mínimo)
+        const calcularPedido = (stockMinimo: number, stockActualValue: number | undefined): number => {
+          const actual = stockActualValue ?? 0
+          return Math.max(0, stockMinimo - actual)
+        }
+        
+        // Agrupar productos por pedido - SOLO productos que existen en el array productos
+        const productosPorPedido = new Map<string, Array<{ producto: ProductoInfo; cantidad: number; stockMinimo: number }>>()
+        
+        // Iterar sobre productos existentes (no sobre productosConStock que puede tener eliminados)
+        productos.forEach((productoCompleto: any) => {
+          // Verificar que el producto tenga stockMinimo configurado
+          const stockMinimo = productoCompleto.stockMinimo || 0
+          if (stockMinimo <= 0) return // Si no tiene stock mínimo, no se puede calcular pedido
+          
+          const stockActualValue = stockActual[productoCompleto.id] ?? 0
+          const cantidadAPedir = calcularPedido(stockMinimo, stockActualValue)
+          
+          if (cantidadAPedir > 0) {
+            const pedidoId = productoCompleto.pedidoId
+            if (!pedidoId) return // Si no tiene pedidoId, saltar
+            
+            // Verificar que el pedido exista
+            const pedidoExiste = pedidos.some((p: any) => p.id === pedidoId)
+            if (!pedidoExiste) return // Si el pedido no existe, saltar
+            
+            if (!productosPorPedido.has(pedidoId)) {
+              productosPorPedido.set(pedidoId, [])
+            }
+            
+            productosPorPedido.get(pedidoId)!.push({
+              producto: {
+                id: productoCompleto.id,
+                nombre: productoCompleto.nombre,
+                unidad: productoCompleto.unidad,
+                stockActual: stockActualValue,
+              },
+              cantidad: cantidadAPedir,
+              stockMinimo,
+            })
+          }
+        })
+        
+        if (productosPorPedido.size === 0) {
+          return NextResponse.json({
+            accion: {
+              accion: "conversacion",
+              mensaje: "✅ ¡Excelente! Todos tus productos tienen stock suficiente. No necesitás hacer ningún pedido.",
+              confianza: 0.9,
+            }
+          })
+        }
+        
+        // Generar texto del pedido para cada grupo
+        const pedidosTexto: string[] = []
+        
+        productosPorPedido.forEach((productosList, pedidoId) => {
+          // Buscar el pedido para obtener formato y mensaje previo
+          const pedido = pedidos.find((p: any) => p.id === pedidoId)
+          const formatoSalida = pedido?.formatoSalida || "{nombre} ({cantidad})"
+          const mensajePrevio = pedido?.mensajePrevio || (pedido ? `📦 ${pedido.nombre}` : "📦 Pedido")
+          
+          const lineas = productosList.map(({ producto, cantidad }) => {
+            let texto = formatoSalida
+            texto = texto.replace(/{nombre}/g, producto.nombre)
+            texto = texto.replace(/{cantidad}/g, cantidad.toString())
+            texto = texto.replace(/{unidad}/g, producto.unidad || "")
+            return texto.trim()
+          })
+          
+          const pedidoTexto = `${mensajePrevio}\n\n${lineas.join("\n")}\n\nTotal: ${productosList.length} productos`
+          pedidosTexto.push(pedidoTexto)
+        })
+        
+        const respuestaCompleta = pedidosTexto.length === 1
+          ? pedidosTexto[0]
+          : `📋 **Pedidos a realizar:**\n\n${pedidosTexto.join("\n\n---\n\n")}`
+        
+        return NextResponse.json({
+          accion: {
+            accion: "conversacion",
+            mensaje: respuestaCompleta,
+            confianza: 0.9,
+          }
+        })
+      }
       
       // Si el mensaje es "todos", "todos los productos", "mostrar todos", etc.
       if (/^(todos|todos los|mostrar todos|listar todos|ver todos|stock completo)/.test(msgLower)) {
