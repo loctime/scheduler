@@ -24,8 +24,8 @@ interface ChatInterfaceProps {
   onCancelMessage?: () => void
   accionPendiente?: any
   nombreAsistente?: string
-  modo?: "ingreso" | "egreso" | "pregunta" | null
-  setModo?: (modo: "ingreso" | "egreso" | "pregunta" | null) => void
+  modo?: "ingreso" | "egreso" | "pregunta" | "stock" | null
+  setModo?: (modo: "ingreso" | "egreso" | "pregunta" | "stock" | null) => void
   productosAcumulados?: Array<{
     productoId: string
     producto: string
@@ -311,16 +311,16 @@ export function ChatInterface({
             </Button>
             <Button
               type="button"
-              variant={modo === "pregunta" ? "default" : "outline"}
+              variant={modo === "stock" ? "default" : "outline"}
               onClick={() => {
-                const nuevoModo = modo === "pregunta" ? null : "pregunta"
+                const nuevoModo = modo === "stock" ? null : "stock"
                 setModo(nuevoModo)
                 setTimeout(() => textareaRef.current?.focus(), 100)
               }}
-              className={modo === "pregunta" ? "bg-blue-600 hover:bg-blue-700 text-white" : ""}
+              className={modo === "stock" ? "bg-purple-600 hover:bg-purple-700 text-white" : ""}
               size="sm"
             >
-              ❓ Pregunta
+              📊 Stock
             </Button>
           </div>
         </div>

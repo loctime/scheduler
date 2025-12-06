@@ -68,8 +68,8 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
   // Acción pendiente de confirmación
   const [accionPendiente, setAccionPendiente] = useState<AccionPendiente | null>(null)
   
-  // Modo del chat (ingreso/egreso/pregunta)
-  const [modo, setModo] = useState<"ingreso" | "egreso" | "pregunta" | null>("pregunta")
+  // Modo del chat (ingreso/egreso/stock). null = modo pregunta (por defecto)
+  const [modo, setModo] = useState<"ingreso" | "egreso" | "pregunta" | "stock" | null>(null)
   
   // Lista acumulada de productos para ingreso/egreso
   const [productosAcumulados, setProductosAcumulados] = useState<Array<{
@@ -361,6 +361,62 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     return { stockAnterior, nuevoStock, producto }
   }, [db, userId, userName, productos, stockActual])
 
+  // Actualizar stock directamente (reemplazar valor)
+  const actualizarStockDirecto = useCallback(async (
+    productoId: string,
+    cantidad: number,
+    motivo?: string
+  ) => {
+    if (!db || !userId) throw new Error("No hay conexión")
+
+    const producto = productos.find(p => p.id === productoId)
+    if (!producto) throw new Error("Producto no encontrado")
+
+    if (cantidad < 0) {
+      throw new Error(`❌ El stock no puede ser negativo. Intentaste establecer ${cantidad} ${producto.unidad || "unidades"} para ${producto.nombre}.`)
+    }
+
+    const stockAnterior = stockActual[productoId] || 0
+    const diferencia = cantidad - stockAnterior
+
+    // Crear movimiento para registrar el cambio
+    // Si la diferencia es positiva, es una entrada; si es negativa, es una salida
+    const tipoMovimiento: "entrada" | "salida" = diferencia >= 0 ? "entrada" : "salida"
+    const cantidadMovimiento = Math.abs(diferencia)
+
+    if (cantidadMovimiento > 0) {
+      const movimiento: Omit<StockMovimiento, "id"> = {
+        productoId,
+        productoNombre: producto.nombre,
+        tipo: tipoMovimiento,
+        cantidad: cantidadMovimiento,
+        unidad: producto.unidad || "u",
+        userId,
+        userName,
+        createdAt: serverTimestamp(),
+        motivo: motivo || `Actualización directa: ${stockAnterior} → ${cantidad}`,
+        ...(producto.pedidoId && { pedidoId: producto.pedidoId }),
+      }
+
+      await addDoc(collection(db, COLLECTIONS.STOCK_MOVIMIENTOS), movimiento)
+    }
+
+    // Actualizar stock actual
+    const stockDocId = `${userId}_${productoId}`
+    const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
+    
+    await setDoc(stockDocRef, {
+      productoId,
+      cantidad: cantidad,
+      ultimaActualizacion: serverTimestamp(),
+      userId,
+      // Solo incluir pedidoId si tiene valor
+      ...(producto.pedidoId && { pedidoId: producto.pedidoId }),
+    })
+
+    return { stockAnterior, nuevoStock: cantidad, producto }
+  }, [db, userId, userName, productos, stockActual])
+
   // Inicializar stock de productos
   const inicializarStockProductos = useCallback(async (cantidadInicial: number = 0) => {
     if (!db || !userId) throw new Error("No hay conexión")
@@ -442,6 +498,40 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
           return `${emoji} ${verbo}: ${accion.cantidad} ${accion.unidad || resultado.producto.unidad || "u"} de ${resultado.producto.nombre}.\nStock: ${resultado.stockAnterior} → ${resultado.nuevoStock}`
         } catch (error) {
           // El error ya tiene un mensaje amigable
+          throw error
+        }
+      }
+
+      case "actualizar_stock": {
+        console.log(`[EJECUTAR] Acción: actualizar_stock`, accion)
+        
+        if (!accion.productoId && !accion.producto) {
+          console.error(`[EJECUTAR] Error: No hay producto ni productoId`, accion)
+          return "No pude identificar el producto. ¿Podés ser más específico?"
+        }
+        
+        if (!accion.productoId) {
+          if (accion.producto) {
+            return `❌ No encontré "${accion.producto}" en tu inventario. Decime "creá un producto ${accion.producto} en ${accion.unidad || "unidades"}" para crearlo primero.`
+          }
+          console.error(`[EJECUTAR] Error: Producto no identificado`, accion)
+          throw new Error("Producto no identificado")
+        }
+        
+        if (accion.cantidad === undefined || accion.cantidad === null || accion.cantidad < 0) {
+          console.error(`[EJECUTAR] Error: Cantidad inválida o faltante`, accion)
+          return `Para actualizar el stock necesito saber la cantidad. Por ejemplo: "${accion.producto || "producto"} 20"`
+        }
+        
+        try {
+          const resultado = await actualizarStockDirecto(
+            accion.productoId,
+            accion.cantidad,
+            accion.mensaje
+          )
+          
+          return `📊 Stock actualizado: ${resultado.producto.nombre}\nStock: ${resultado.stockAnterior} → ${resultado.nuevoStock} ${resultado.producto.unidad || "unidades"}`
+        } catch (error) {
           throw error
         }
       }
@@ -622,7 +712,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       default:
         return accion.mensaje || "No entendí. ¿Podés reformular?"
     }
-  }, [productos, pedidos, stockActual, actualizarStock, crearProducto, editarProducto, eliminarProducto, inicializarStockProductos])
+  }, [productos, pedidos, stockActual, actualizarStock, actualizarStockDirecto, crearProducto, editarProducto, eliminarProducto, inicializarStockProductos])
 
   // ==================== ENVIAR MENSAJE ====================
 
@@ -667,18 +757,9 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       }
     }
 
-    // Validar que haya modo activo
-    console.log(`[CHAT] Enviando mensaje: "${texto}", modo actual:`, modo)
-    if (!modo) {
-      console.log(`[CHAT] No hay modo activo, solicitando selección`)
-      addMessage({ tipo: "usuario", contenido: texto })
-      addMessage({
-        tipo: "sistema",
-        contenido: "Seleccioná un modo primero: 'Ingreso' para agregar stock, 'Egreso' para quitar stock, o 'Pregunta' para consultar stock."
-      })
-      return
-    }
-    console.log(`[CHAT] Modo activo confirmado:`, modo)
+    // null = modo pregunta (por defecto)
+    const modoActual = modo || "pregunta"
+    console.log(`[CHAT] Enviando mensaje: "${texto}", modo actual:`, modoActual)
 
     // Agregar mensaje del usuario
     addMessage({ tipo: "usuario", contenido: texto })
@@ -694,7 +775,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mensaje: texto,
-          modo, // Incluir el modo activo
+          modo: modoActual, // Incluir el modo activo (null se convierte en "pregunta")
           productos: productos.map(p => ({
             id: p.id,
             nombre: p.nombre,
@@ -726,6 +807,28 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       console.log(`[CHAT] Mensaje original: "${texto}"`)
       console.log(`[CHAT] Tiene comando sugerido:`, !!accion.comandoSugerido)
       console.log(`[CHAT] Tiene producto acumulado:`, !!(accion as any).productoAcumulado)
+
+      // Si la acción es "actualizar_stock" (modo stock), ejecutarla directamente
+      if (accion.accion === "actualizar_stock") {
+        setIsProcessing(true)
+        try {
+          const resultado = await ejecutarAccion(accion)
+          addMessage({
+            tipo: "sistema",
+            contenido: resultado,
+            accion,
+          })
+        } catch (error) {
+          addMessage({
+            tipo: "error",
+            contenido: error instanceof Error ? error.message : "Error actualizando stock",
+            accion,
+          })
+        } finally {
+          setIsProcessing(false)
+        }
+        return
+      }
 
       // Si hay un producto acumulado (modo ingreso/egreso), agregarlo a la lista
       if ((accion as any).productoAcumulado && (modo === "ingreso" || modo === "egreso")) {
@@ -964,7 +1067,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
   
   // Limpiar productos acumulados cuando cambia el modo
   useEffect(() => {
-    if (modo === "pregunta") {
+    if (!modo || modo === "pregunta" || modo === "stock") {
       setProductosAcumulados([])
     }
   }, [modo])
@@ -974,13 +1077,6 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     const actual = stockActual[p.id] || 0
     return actual < p.stockMinimo
   })
-
-  // Limpiar productos acumulados cuando cambia el modo
-  useEffect(() => {
-    if (modo === "pregunta") {
-      setProductosAcumulados([])
-    }
-  }, [modo])
 
   return {
     // Chat

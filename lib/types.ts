@@ -195,6 +195,7 @@ export interface ChatMessage {
 export type TipoAccion = 
   | "entrada"              // Agregar stock
   | "salida"               // Quitar stock
+  | "actualizar_stock"     // Actualizar stock directamente (reemplazar valor)
   | "consulta_stock"       // Consultar stock de un producto
   | "consulta_general"     // Preguntas generales sobre inventario
   | "crear_producto"       // Crear nuevo producto
