@@ -26,8 +26,8 @@ interface ChatInterfaceProps {
   onRefreshConnection: () => void
   accionPendiente?: any
   nombreAsistente?: string
-  modo?: "ingreso" | "egreso" | null
-  setModo?: (modo: "ingreso" | "egreso" | null) => void
+  modo?: "ingreso" | "egreso" | "pregunta" | null
+  setModo?: (modo: "ingreso" | "egreso" | "pregunta" | null) => void
 }
 
 export function ChatInterface({
@@ -317,10 +317,28 @@ export function ChatInterface({
             >
               📤 Modo Egreso
             </Button>
+            <Button
+              type="button"
+              variant={modo === "pregunta" ? "default" : "outline"}
+              onClick={() => {
+                console.log("[CHAT-UI] Click en Modo Pregunta, modo actual:", modo)
+                const nuevoModo = modo === "pregunta" ? null : "pregunta"
+                console.log("[CHAT-UI] Nuevo modo:", nuevoModo)
+                setModo(nuevoModo)
+              }}
+              className={modo === "pregunta" ? "bg-blue-600 hover:bg-blue-700 text-white" : ""}
+              size="sm"
+            >
+              ❓ Modo Pregunta
+            </Button>
           </div>
           {modo && (
             <div className="text-xs text-muted-foreground mb-2 px-1">
-              Modo activo: <strong>{modo === "ingreso" ? "Ingreso" : "Egreso"}</strong> - Escribí: "producto cantidad" (ej: "leche 20")
+              {modo === "pregunta" ? (
+                <>Modo activo: <strong>Pregunta</strong> - Escribí: nombre del producto o "todos" para ver todo el inventario</>
+              ) : (
+                <>Modo activo: <strong>{modo === "ingreso" ? "Ingreso" : "Egreso"}</strong> - Escribí: "producto cantidad" (ej: "leche 20")</>
+              )}
             </div>
           )}
         </div>

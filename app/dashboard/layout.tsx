@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 import { onAuthStateChanged } from "firebase/auth"
 import { auth, isFirebaseConfigured } from "@/lib/firebase"
 import { DataProvider } from "@/contexts/data-context"
+import { StockChatProvider } from "@/contexts/stock-chat-context"
+import { StockChatFloating } from "@/components/stock/stock-chat-floating"
 import { Loader2 } from "lucide-react"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -42,6 +44,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return null
   }
 
-  return <DataProvider user={user}>{children}</DataProvider>
+  return (
+    <DataProvider user={user}>
+      <StockChatProvider user={user}>
+        {children}
+        <StockChatFloating />
+      </StockChatProvider>
+    </DataProvider>
+  )
 }
 

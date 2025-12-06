@@ -68,8 +68,8 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
   // Acción pendiente de confirmación
   const [accionPendiente, setAccionPendiente] = useState<AccionPendiente | null>(null)
   
-  // Modo del chat (ingreso/egreso)
-  const [modo, setModo] = useState<"ingreso" | "egreso" | null>(null)
+  // Modo del chat (ingreso/egreso/pregunta)
+  const [modo, setModo] = useState<"ingreso" | "egreso" | "pregunta" | null>(null)
 
   // Verificar conexión con Ollama
   const checkOllamaConnection = useCallback(async () => {
@@ -642,7 +642,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       addMessage({ tipo: "usuario", contenido: texto })
       addMessage({
         tipo: "sistema",
-        contenido: "Seleccioná un modo primero: 'Ingreso' para agregar stock o 'Egreso' para quitar stock."
+        contenido: "Seleccioná un modo primero: 'Ingreso' para agregar stock, 'Egreso' para quitar stock, o 'Pregunta' para consultar stock."
       })
       return
     }
