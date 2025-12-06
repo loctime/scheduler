@@ -744,9 +744,12 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
           ).join("\n")
           
           const verbo = modo === "ingreso" ? "agregar" : "quitar"
+          const verboPasado = modo === "ingreso" ? "agregar" : "quitar"
+          const totalProductos = nuevaLista.length
+          
           addMessage({
             tipo: "sistema",
-            contenido: `✅ Agregado. Lista actual:\n\n${resumen}\n\nEscribí "confirmar" para ${verbo} todo o seguí agregando productos.`,
+            contenido: `✅ Agregado: ${productoAcum.cantidad} ${productoAcum.unidad || "unidades"} de ${productoAcum.producto}\n\n📋 **Lista completa (${totalProductos} productos):**\n\n${resumen}\n\nEscribí "confirmar" para ${verboPasado} todo o seguí agregando productos.`,
             accion,
           })
           
@@ -759,6 +762,18 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       const textoLower = texto.toLowerCase().trim()
       if ((textoLower === "confirmar" || textoLower === "confirmo" || textoLower === "sí" || textoLower === "si" || textoLower === "ok") && productosAcumulados.length > 0) {
         addMessage({ tipo: "usuario", contenido: texto })
+        
+        // Mostrar resumen antes de confirmar
+        const resumenPreConfirmacion = productosAcumulados.map(p => 
+          `• ${p.cantidad} ${p.unidad || "unidades"} de ${p.producto}`
+        ).join("\n")
+        const verbo = modo === "ingreso" ? "agregar" : "quitar"
+        
+        addMessage({
+          tipo: "sistema",
+          contenido: `📋 **Confirmando ${productosAcumulados.length} productos:**\n\n${resumenPreConfirmacion}\n\nAplicando cambios...`,
+        })
+        
         setIsProcessing(true)
         
         try {

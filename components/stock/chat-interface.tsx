@@ -269,44 +269,6 @@ export function ChatInterface({
         </div>
       )}
 
-      {/* Lista de productos acumulados */}
-      {productosAcumulados.length > 0 && (
-        <div className="px-3 pb-2">
-          <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                Lista de productos ({productosAcumulados.length})
-              </h4>
-            </div>
-            <div className="space-y-1 mb-3">
-              {productosAcumulados.map((p, idx) => (
-                <div key={idx} className="text-xs text-muted-foreground">
-                  • {p.cantidad} {p.unidad || "unidades"} de {p.producto} ({p.accion === "entrada" ? "agregar" : "quitar"})
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={() => handleQuickAction("confirmar")}
-                className="bg-green-600 hover:bg-green-700 flex-1"
-              >
-                <CheckCircle2 className="h-4 w-4 mr-1" />
-                Confirmar todo
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleQuickAction("limpiar")}
-              >
-                <XCircle className="h-4 w-4 mr-1" />
-                Limpiar
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Botones de confirmación */}
       {accionPendiente && (
         <div className="px-3 pb-2">
