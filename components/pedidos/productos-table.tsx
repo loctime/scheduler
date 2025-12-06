@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Trash2, Upload, Package, ShoppingCart, Settings2, Minus, Plus, GripVertical } from "lucide-react"
@@ -35,13 +35,29 @@ export function ProductosTable({
   const [inlineValue, setInlineValue] = useState("")
   const [draggedProductId, setDraggedProductId] = useState<string | null>(null)
   const [dragOverProductId, setDragOverProductId] = useState<string | null>(null)
+  const isNavigatingRef = useRef(false)
+  const inputRef = useRef<HTMLInputElement | null>(null)
 
-  const handleInlineSave = async (productId: string, field: string, value: string) => {
+  // Seleccionar texto cuando cambia el campo editado o al navegar
+  useEffect(() => {
+    if (editingField && inputRef.current) {
+      // Pequeño delay para asegurar que el input esté montado
+      const timer = setTimeout(() => {
+        inputRef.current?.select()
+      }, 0)
+      return () => clearTimeout(timer)
+    }
+  }, [editingField])
+
+  const handleInlineSave = async (productId: string, field: string, value: string, keepEditing = false) => {
     const success = await onUpdateProduct(productId, field, value)
     if (success) {
-      setEditingField(null)
-      setInlineValue("")
+      if (!keepEditing) {
+        setEditingField(null)
+        setInlineValue("")
+      }
     }
+    return success
   }
 
   const startEditing = (productId: string, field: string, currentValue: string) => {
@@ -52,6 +68,57 @@ export function ProductosTable({
   const cancelEditing = () => {
     setEditingField(null)
     setInlineValue("")
+  }
+
+  const navigateToNextRow = (currentProductId: string, field: string, currentValue: string, direction: "up" | "down") => {
+    const currentIndex = products.findIndex(p => p.id === currentProductId)
+    if (currentIndex === -1) return
+
+    // Marcar que estamos navegando para prevenir el onBlur
+    isNavigatingRef.current = true
+
+    // Guardar el valor actual (sin esperar, de forma asíncrona en segundo plano)
+    if (field === "stockActual") {
+      // Para stock actual, usar onStockChange directamente (sincrónico)
+      const numValue = parseInt(currentValue, 10) || 0
+      onStockChange(currentProductId, numValue)
+    } else {
+      // Para otros campos, guardar en segundo plano sin esperar
+      handleInlineSave(currentProductId, field, currentValue, true).catch(() => {
+        // Ignorar errores silenciosamente, el usuario ya navegó
+      })
+    }
+
+    // Calcular el siguiente índice
+    const nextIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1
+    
+    if (nextIndex < 0 || nextIndex >= products.length) {
+      // Si estamos en el límite, solo guardar y cerrar
+      setEditingField(null)
+      setInlineValue("")
+      isNavigatingRef.current = false
+      return
+    }
+
+    // Navegar al siguiente producto inmediatamente
+    const nextProduct = products[nextIndex]
+    let nextValue: string
+    if (field === "stockMinimo") {
+      nextValue = nextProduct.stockMinimo.toString()
+    } else if (field === "stockActual") {
+      nextValue = (stockActual[nextProduct.id] ?? 0).toString()
+    } else {
+      nextValue = nextProduct.unidad || "U"
+    }
+    
+    // Cambiar inmediatamente para navegación instantánea
+    setEditingField({ id: nextProduct.id, field })
+    setInlineValue(nextValue)
+    
+    // Resetear la flag inmediatamente (sin setTimeout)
+    requestAnimationFrame(() => {
+      isNavigatingRef.current = false
+    })
   }
 
   // Drag and drop handlers
@@ -208,17 +275,61 @@ export function ProductosTable({
                     {/* Stock actual input */}
                     <div className="flex flex-col items-center shrink-0">
                       <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Actual</span>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={stockActual[product.id] !== undefined ? stockActual[product.id] : ""}
-                        onChange={(e) => {
-                          const val = e.target.value
-                          onStockChange(product.id, val === "" ? 0 : parseInt(val, 10) || 0)
-                        }}
-                        placeholder="0"
-                        className="h-10 w-16 text-center text-sm font-medium px-1"
-                      />
+                      {editingThisField === "stockActual" ? (
+                        <Input
+                          ref={inputRef}
+                          type="number"
+                          min="0"
+                          value={inlineValue}
+                          onChange={(e) => setInlineValue(e.target.value)}
+                          onFocus={(e) => e.target.select()}
+                          onBlur={() => {
+                            if (!isNavigatingRef.current) {
+                              const numValue = parseInt(inlineValue, 10) || 0
+                              onStockChange(product.id, numValue)
+                              setEditingField(null)
+                              setInlineValue("")
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              const numValue = parseInt(inlineValue, 10) || 0
+                              onStockChange(product.id, numValue)
+                              setEditingField(null)
+                              setInlineValue("")
+                            } else if (e.key === "Escape") {
+                              setEditingField(null)
+                              setInlineValue("")
+                            } else if (e.key === "ArrowDown") {
+                              e.preventDefault()
+                              navigateToNextRow(product.id, "stockActual", inlineValue, "down")
+                            } else if (e.key === "ArrowUp") {
+                              e.preventDefault()
+                              navigateToNextRow(product.id, "stockActual", inlineValue, "up")
+                            }
+                          }}
+                          autoFocus
+                          placeholder="0"
+                          className="h-10 w-16 text-center text-sm font-medium px-1"
+                        />
+                      ) : (
+                        <Input
+                          type="number"
+                          min="0"
+                          value={stockActual[product.id] !== undefined ? stockActual[product.id] : ""}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            onStockChange(product.id, val === "" ? 0 : parseInt(val, 10) || 0)
+                          }}
+                          onFocus={(e) => {
+                            startEditing(product.id, "stockActual", (stockActual[product.id] ?? 0).toString())
+                            // Seleccionar texto cuando se hace focus
+                            setTimeout(() => e.target.select(), 0)
+                          }}
+                          placeholder="0"
+                          className="h-10 w-16 text-center text-sm font-medium px-1"
+                        />
+                      )}
                     </div>
                     
                     {/* Pedido con botones +/- */}
@@ -290,14 +401,29 @@ export function ProductosTable({
                       <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Mín</span>
                       {editingThisField === "stockMinimo" ? (
                         <Input
+                          ref={inputRef}
                           type="number"
                           min="0"
                           value={inlineValue}
                           onChange={(e) => setInlineValue(e.target.value)}
-                          onBlur={() => handleInlineSave(product.id, "stockMinimo", inlineValue)}
+                          onFocus={(e) => e.target.select()}
+                          onBlur={() => {
+                            if (!isNavigatingRef.current) {
+                              handleInlineSave(product.id, "stockMinimo", inlineValue)
+                            }
+                          }}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") handleInlineSave(product.id, "stockMinimo", inlineValue)
-                            if (e.key === "Escape") cancelEditing()
+                            if (e.key === "Enter") {
+                              handleInlineSave(product.id, "stockMinimo", inlineValue)
+                            } else if (e.key === "Escape") {
+                              cancelEditing()
+                            } else if (e.key === "ArrowDown") {
+                              e.preventDefault()
+                              navigateToNextRow(product.id, "stockMinimo", inlineValue, "down")
+                            } else if (e.key === "ArrowUp") {
+                              e.preventDefault()
+                              navigateToNextRow(product.id, "stockMinimo", inlineValue, "up")
+                            }
                           }}
                           autoFocus
                           className="h-10 w-16 text-center text-sm font-medium"
@@ -317,12 +443,27 @@ export function ProductosTable({
                       <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Unid</span>
                       {editingThisField === "unidad" ? (
                         <Input
+                          ref={inputRef}
                           value={inlineValue}
                           onChange={(e) => setInlineValue(e.target.value)}
-                          onBlur={() => handleInlineSave(product.id, "unidad", inlineValue)}
+                          onFocus={(e) => e.target.select()}
+                          onBlur={() => {
+                            if (!isNavigatingRef.current) {
+                              handleInlineSave(product.id, "unidad", inlineValue)
+                            }
+                          }}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") handleInlineSave(product.id, "unidad", inlineValue)
-                            if (e.key === "Escape") cancelEditing()
+                            if (e.key === "Enter") {
+                              handleInlineSave(product.id, "unidad", inlineValue)
+                            } else if (e.key === "Escape") {
+                              cancelEditing()
+                            } else if (e.key === "ArrowDown") {
+                              e.preventDefault()
+                              navigateToNextRow(product.id, "unidad", inlineValue, "down")
+                            } else if (e.key === "ArrowUp") {
+                              e.preventDefault()
+                              navigateToNextRow(product.id, "unidad", inlineValue, "up")
+                            }
                           }}
                           autoFocus
                           placeholder="U"

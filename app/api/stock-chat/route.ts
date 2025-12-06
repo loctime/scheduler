@@ -84,13 +84,16 @@ export async function POST(request: NextRequest) {
         
         // Filtrar productos de ese pedido que necesitan pedirse
         const productosDelPedido = productosCompletos.filter(p => p.pedidoId === pedidoEncontrado.id)
-        const productosAPedir = productosDelPedido.filter(p => {
+        
+        // Calcular cantidad a pedir y filtrar solo los que tienen cantidad > 0
+        const productosConCantidad = productosDelPedido.map(p => {
           const stock = stockActual[p.id] ?? 0
           const minimo = p.stockMinimo || 0
-          return stock < minimo
-        })
+          const cantidadAPedir = minimo - stock
+          return { producto: p, cantidadAPedir }
+        }).filter(item => item.cantidadAPedir > 0)
         
-        if (productosAPedir.length === 0) {
+        if (productosConCantidad.length === 0) {
           return NextResponse.json({
             accion: {
               accion: "conversacion",
@@ -104,11 +107,7 @@ export async function POST(request: NextRequest) {
         const formatoSalida = pedidoEncontrado.formatoSalida || "{nombre} ({cantidad})"
         const mensajePrevio = pedidoEncontrado.mensajePrevio || `📦 ${pedidoEncontrado.nombre}`
         
-        const lineas = productosAPedir.map(p => {
-          const stock = stockActual[p.id] ?? 0
-          const minimo = p.stockMinimo || 0
-          const cantidadAPedir = minimo - stock
-          
+        const lineas = productosConCantidad.map(({ producto: p, cantidadAPedir }) => {
           let texto = formatoSalida
           texto = texto.replace(/{nombre}/g, p.nombre)
           texto = texto.replace(/{cantidad}/g, cantidadAPedir.toString())
@@ -116,7 +115,9 @@ export async function POST(request: NextRequest) {
           return texto.trim()
         })
         
-        const respuesta = `${mensajePrevio}\n\n${lineas.join("\n")}\n\nTotal: ${productosAPedir.length} productos`
+        const productosAPedir = productosConCantidad
+        
+        const respuesta = `${mensajePrevio}\n\n${lineas.join("\n")}\n\nTotal: ${productosConCantidad.length} productos`
         
         return NextResponse.json({
           accion: {
