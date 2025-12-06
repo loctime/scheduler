@@ -184,7 +184,7 @@ export default function PedidosPage() {
       const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
       
       await setDoc(stockDocRef, {
-        productoId,
+        productId,
         cantidad: value,
         ultimaActualizacion: serverTimestamp(),
         userId: user.uid,
