@@ -698,13 +698,6 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
             formatoSalida: p.formatoSalida,
             mensajePrevio: p.mensajePrevio,
           })),
-          productos: productos.map(p => ({
-            id: p.id,
-            nombre: p.nombre,
-            unidad: p.unidad,
-            stockMinimo: p.stockMinimo,
-            pedidoId: p.pedidoId,
-          })),
           nombreEmpresa,
         }),
         signal: abortControllerRef.current.signal,
@@ -797,6 +790,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
                 productoId: productoAcum.productoId,
                 cantidad: productoAcum.cantidad,
                 unidad: productoAcum.unidad,
+                confianza: 1.0, // Confianza máxima porque el usuario confirmó explícitamente
               })
               resultados.push(resultado)
             } catch (error) {
