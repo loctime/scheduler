@@ -67,6 +67,9 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
 
   // Acción pendiente de confirmación
   const [accionPendiente, setAccionPendiente] = useState<AccionPendiente | null>(null)
+  
+  // Modo del chat (ingreso/egreso)
+  const [modo, setModo] = useState<"ingreso" | "egreso" | null>(null)
 
   // Verificar conexión con Ollama
   const checkOllamaConnection = useCallback(async () => {
@@ -293,18 +296,19 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       throw new Error(mensajeError)
     }
 
-    // Crear movimiento
+    // Crear movimiento (solo incluir campos que no sean undefined)
     const movimiento: Omit<StockMovimiento, "id"> = {
       productoId,
       productoNombre: producto.nombre,
       tipo,
       cantidad,
       unidad: producto.unidad || "u", // Valor por defecto si no tiene unidad
-      motivo,
       userId,
       userName,
-      pedidoId: producto.pedidoId,
       createdAt: serverTimestamp(),
+      // Solo incluir campos opcionales si tienen valor
+      ...(motivo && { motivo }),
+      ...(producto.pedidoId && { pedidoId: producto.pedidoId }),
     }
 
     await addDoc(collection(db, COLLECTIONS.STOCK_MOVIMIENTOS), movimiento)
@@ -315,10 +319,11 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     
     await setDoc(stockDocRef, {
       productoId,
-      pedidoId: producto.pedidoId,
       cantidad: nuevoStock,
       ultimaActualizacion: serverTimestamp(),
       userId,
+      // Solo incluir pedidoId si tiene valor
+      ...(producto.pedidoId && { pedidoId: producto.pedidoId }),
     })
 
     return { stockAnterior, nuevoStock, producto }
@@ -338,10 +343,11 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       if (stockActual[producto.id] === undefined || stockActual[producto.id] === 0) {
         await setDoc(stockDocRef, {
           productoId: producto.id,
-          pedidoId: producto.pedidoId,
           cantidad: cantidadInicial,
           ultimaActualizacion: serverTimestamp(),
           userId,
+          // Solo incluir pedidoId si tiene valor
+          ...(producto.pedidoId && { pedidoId: producto.pedidoId }),
         })
         inicializados++
       }
@@ -417,6 +423,19 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
           accion.stockMinimo,
           accion.pedidoId
         )
+        
+        // Si se especificó stock inicial (stockMinimo), inicializar el stock actual
+        if (accion.stockMinimo && accion.stockMinimo > 0) {
+          try {
+            await actualizarStock(nuevo.id, "entrada", accion.stockMinimo, "Stock inicial al crear producto")
+            return `✅ Producto "${accion.producto}" creado correctamente con stock inicial de ${accion.stockMinimo} ${accion.unidad || "unidades"} (unidad: ${accion.unidad || "u"}, stock mínimo: ${accion.stockMinimo})`
+          } catch (error) {
+            // Si falla la inicialización del stock, al menos el producto se creó
+            console.error("Error inicializando stock:", error)
+            return `✅ Producto "${accion.producto}" creado correctamente (unidad: ${accion.unidad || "u"}, stock mínimo: ${accion.stockMinimo || 1}). Nota: Hubo un problema al inicializar el stock.`
+          }
+        }
+        
         return `✅ Producto "${accion.producto}" creado correctamente (unidad: ${accion.unidad || "u"}, stock mínimo: ${accion.stockMinimo || 1})`
       }
 
@@ -616,6 +635,19 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       }
     }
 
+    // Validar que haya modo activo
+    console.log(`[CHAT] Enviando mensaje: "${texto}", modo actual:`, modo)
+    if (!modo) {
+      console.log(`[CHAT] No hay modo activo, solicitando selección`)
+      addMessage({ tipo: "usuario", contenido: texto })
+      addMessage({
+        tipo: "sistema",
+        contenido: "Seleccioná un modo primero: 'Ingreso' para agregar stock o 'Egreso' para quitar stock."
+      })
+      return
+    }
+    console.log(`[CHAT] Modo activo confirmado:`, modo)
+
     // Agregar mensaje del usuario
     addMessage({ tipo: "usuario", contenido: texto })
     setIsProcessing(true)
@@ -630,6 +662,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mensaje: texto,
+          modo, // Incluir el modo activo
           productos: productos.map(p => ({
             id: p.id,
             nombre: p.nombre,
@@ -660,17 +693,35 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       if (accion.comandoSugerido) {
         console.log(`[CHAT] Comando sugerido detectado:`, accion.comandoSugerido)
         
+        // Validar que el comando tenga los datos necesarios para ejecutarse
+        const comando = accion.comandoSugerido as StockAccionParsed
+        const necesitaProducto = ["crear_producto", "entrada", "salida", "consulta_stock"].includes(comando.accion)
+        const tieneDatosCompletos = !necesitaProducto || 
+          (comando.accion === "crear_producto" && comando.producto) ||
+          (comando.accion !== "crear_producto" && comando.productoId)
+        
+        // Si no tiene datos completos, solo mostrar mensaje conversacional
+        if (!tieneDatosCompletos) {
+          console.log(`[CHAT] Comando sugerido sin datos completos, solo mostrando mensaje`)
+          addMessage({
+            tipo: "sistema",
+            contenido: accion.mensaje || "¿En qué te puedo ayudar?",
+            accion,
+          })
+          return
+        }
+        
         // Si requiere confirmación, mostrar mensaje y pedir confirmación
         if (accion.requiereConfirmacion) {
           setAccionPendiente({
             id: crypto.randomUUID(),
-            accion: accion.comandoSugerido as StockAccionParsed, // Guardar el comando sugerido para ejecutar
+            accion: comando, // Guardar el comando sugerido para ejecutar
             timestamp: new Date(),
           })
           addMessage({
             tipo: "confirmacion",
             contenido: accion.mensaje || "¿Confirmás esta acción?",
-            accion: accion.comandoSugerido as StockAccionParsed,
+            accion: comando,
             requiereConfirmacion: true,
           })
           return
@@ -678,8 +729,8 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
         
         // Si NO requiere confirmación (consultas), ejecutar directamente
         try {
-          console.log(`[CHAT] Ejecutando comando sugerido directamente:`, accion.comandoSugerido)
-          const resultado = await ejecutarAccion(accion.comandoSugerido as StockAccionParsed)
+          console.log(`[CHAT] Ejecutando comando sugerido directamente:`, comando)
+          const resultado = await ejecutarAccion(comando)
           console.log(`[CHAT] Resultado:`, resultado)
           
           // Mostrar mensaje de Ollama + resultado de la ejecución
@@ -690,14 +741,14 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
           addMessage({ 
             tipo: "sistema", 
             contenido: mensajeCompleto, 
-            accion: accion.comandoSugerido as StockAccionParsed 
+            accion: comando 
           })
         } catch (error) {
           console.error(`[CHAT] Error ejecutando comando sugerido:`, error)
           addMessage({
             tipo: "error",
             contenido: error instanceof Error ? error.message : "Error ejecutando comando",
-            accion: accion.comandoSugerido as StockAccionParsed,
+            accion: comando,
           })
         }
         return
@@ -727,7 +778,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       setIsProcessing(false)
       abortControllerRef.current = null
     }
-  }, [isProcessing, productos, stockActual, pedidos, accionPendiente, addMessage, ejecutarAccion])
+  }, [isProcessing, productos, stockActual, pedidos, accionPendiente, addMessage, ejecutarAccion, modo])
 
   // Cancelar mensaje en proceso
   const cancelarMensaje = useCallback(() => {
@@ -735,12 +786,21 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       abortControllerRef.current.abort()
       abortControllerRef.current = null
       setIsProcessing(false)
-      addMessage({
-        tipo: "sistema",
-        contenido: "⏹️ Mensaje cancelado",
+      
+      // Eliminar el último mensaje del usuario de la lista (para que pueda editarlo)
+      setMessages(prev => {
+        const nuevosMensajes = [...prev]
+        // Buscar y eliminar el último mensaje del usuario
+        for (let i = nuevosMensajes.length - 1; i >= 0; i--) {
+          if (nuevosMensajes[i].tipo === "usuario") {
+            nuevosMensajes.splice(i, 1)
+            break
+          }
+        }
+        return nuevosMensajes
       })
     }
-  }, [addMessage])
+  }, [])
 
   // Limpiar chat
   const limpiarChat = useCallback(() => {
@@ -765,6 +825,8 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     checkOllamaConnection,
     accionPendiente,
     nombreAsistente,
+    modo,
+    setModo,
     
     // Stock
     productos,

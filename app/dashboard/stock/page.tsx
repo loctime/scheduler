@@ -27,6 +27,8 @@ export default function StockPage() {
     checkOllamaConnection,
     accionPendiente,
     nombreAsistente,
+    modo,
+    setModo,
     
     // Stock
     productos,
@@ -93,6 +95,8 @@ export default function StockPage() {
                 onRefreshConnection={checkOllamaConnection}
                 accionPendiente={accionPendiente}
                 nombreAsistente={nombreAsistente}
+                modo={modo}
+                setModo={setModo}
               />
             </div>
           </TabsContent>
@@ -125,6 +129,8 @@ export default function StockPage() {
             onRefreshConnection={checkOllamaConnection}
             accionPendiente={accionPendiente}
             nombreAsistente={nombreAsistente}
+            modo={modo}
+            setModo={setModo}
           />
         </div>
         

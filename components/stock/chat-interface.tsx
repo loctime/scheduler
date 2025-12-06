@@ -26,6 +26,8 @@ interface ChatInterfaceProps {
   onRefreshConnection: () => void
   accionPendiente?: any
   nombreAsistente?: string
+  modo?: "ingreso" | "egreso" | null
+  setModo?: (modo: "ingreso" | "egreso" | null) => void
 }
 
 export function ChatInterface({
@@ -38,8 +40,11 @@ export function ChatInterface({
   onRefreshConnection,
   accionPendiente,
   nombreAsistente = "Stock Assistant",
+  modo,
+  setModo,
 }: ChatInterfaceProps) {
   const [inputValue, setInputValue] = useState("")
+  const [lastSentMessage, setLastSentMessage] = useState<string>("")
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -71,8 +76,39 @@ export function ChatInterface({
     e.preventDefault()
     if (!inputValue.trim() || isProcessing || ollamaStatus.status !== "ok") return
     
+    // Guardar el mensaje antes de enviarlo
+    setLastSentMessage(inputValue)
     onSendMessage(inputValue)
     setInputValue("")
+  }
+
+  const handleCancel = () => {
+    if (onCancelMessage) {
+      // Buscar el último mensaje del usuario en los mensajes
+      const ultimoMensajeUsuario = [...messages]
+        .reverse()
+        .find(msg => msg.tipo === "usuario")
+      
+      // Restaurar el mensaje al textarea
+      const mensajeARestaurar = ultimoMensajeUsuario?.contenido || lastSentMessage
+      
+      if (mensajeARestaurar) {
+        setInputValue(mensajeARestaurar)
+      }
+      
+      // Cancelar el mensaje
+      onCancelMessage()
+      
+      // Enfocar el textarea después de cancelar
+      setTimeout(() => {
+        textareaRef.current?.focus()
+        // Mover el cursor al final
+        if (textareaRef.current && mensajeARestaurar) {
+          const length = mensajeARestaurar.length
+          textareaRef.current.setSelectionRange(length, length)
+        }
+      }, 100)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -249,6 +285,47 @@ export function ChatInterface({
         </div>
       )}
 
+      {/* Botones de modo */}
+      {setModo && (
+        <div className="px-3 pt-3 pb-2 border-t border-border bg-muted/30">
+          <div className="flex gap-2 mb-2">
+            <Button
+              type="button"
+              variant={modo === "ingreso" ? "default" : "outline"}
+              onClick={() => {
+                console.log("[CHAT-UI] Click en Modo Ingreso, modo actual:", modo)
+                const nuevoModo = modo === "ingreso" ? null : "ingreso"
+                console.log("[CHAT-UI] Nuevo modo:", nuevoModo)
+                setModo(nuevoModo)
+              }}
+              className={modo === "ingreso" ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+              size="sm"
+            >
+              📥 Modo Ingreso
+            </Button>
+            <Button
+              type="button"
+              variant={modo === "egreso" ? "default" : "outline"}
+              onClick={() => {
+                console.log("[CHAT-UI] Click en Modo Egreso, modo actual:", modo)
+                const nuevoModo = modo === "egreso" ? null : "egreso"
+                console.log("[CHAT-UI] Nuevo modo:", nuevoModo)
+                setModo(nuevoModo)
+              }}
+              className={modo === "egreso" ? "bg-red-600 hover:bg-red-700 text-white" : ""}
+              size="sm"
+            >
+              📤 Modo Egreso
+            </Button>
+          </div>
+          {modo && (
+            <div className="text-xs text-muted-foreground mb-2 px-1">
+              Modo activo: <strong>{modo === "ingreso" ? "Ingreso" : "Egreso"}</strong> - Escribí: "producto cantidad" (ej: "leche 20")
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Input de mensaje */}
       <form onSubmit={handleSubmit} className="p-3 border-t border-border bg-muted/30">
         {ollamaStatus.status === "error" && (
@@ -280,18 +357,32 @@ export function ChatInterface({
               rows={1}
             />
           </div>
-          <Button 
-            type="submit" 
-            size="icon"
-            className="h-[44px] w-[44px] shrink-0"
-            disabled={!inputValue.trim() || isProcessing || ollamaStatus.status !== "ok"}
-          >
-            {isProcessing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
+          <div className="flex gap-1.5 shrink-0">
+            {isProcessing && onCancelMessage && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-[44px] w-[44px] border-destructive/20 hover:bg-destructive/10 hover:border-destructive/40"
+                onClick={handleCancel}
+                title="Cancelar mensaje"
+              >
+                <StopCircle className="h-4 w-4 text-destructive" />
+              </Button>
             )}
-          </Button>
+            <Button 
+              type="submit" 
+              size="icon"
+              className="h-[44px] w-[44px]"
+              disabled={!inputValue.trim() || isProcessing || ollamaStatus.status !== "ok"}
+            >
+              {isProcessing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
       </form>
     </div>
