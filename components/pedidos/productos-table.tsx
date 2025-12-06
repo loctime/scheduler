@@ -7,6 +7,8 @@ import { Trash2, Upload, Package, Minus, Plus, GripVertical } from "lucide-react
 import { cn } from "@/lib/utils"
 import { Producto } from "@/lib/types"
 
+type TableMode = "config" | "pedido"
+
 interface ProductosTableProps {
   products: Producto[]
   stockActual: Record<string, number>

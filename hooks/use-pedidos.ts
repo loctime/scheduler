@@ -84,7 +84,8 @@ export function usePedidos(user: any) {
       const productosSinUnidad = productsData.filter(p => !p.unidad || p.unidad.trim() === "")
       
       // Si hay productos sin orden, asignarles uno basado en orden alfabético
-      if (productosSinOrden.length > 0) {
+      if (productosSinOrden.length > 0 && db) {
+        const dbInstance = db // TypeScript ahora sabe que db no es undefined
         // Ordenar alfabéticamente primero
         const productosConOrden = productsData.filter(p => p.orden !== undefined)
         productosSinOrden.sort((a, b) => a.nombre.localeCompare(b.nombre))
@@ -100,9 +101,9 @@ export function usePedidos(user: any) {
         })
         
         // Guardar el orden en la base de datos
-        const batch = writeBatch(db)
+        const batch = writeBatch(dbInstance)
         productosSinOrden.forEach((product) => {
-          const productRef = doc(db, COLLECTIONS.PRODUCTS, product.id)
+          const productRef = doc(dbInstance, COLLECTIONS.PRODUCTS, product.id)
           batch.update(productRef, {
             orden: product.orden,
             updatedAt: serverTimestamp(),
@@ -112,10 +113,11 @@ export function usePedidos(user: any) {
       }
       
       // Si hay productos sin unidad, asignarles "U" como valor por defecto
-      if (productosSinUnidad.length > 0) {
-        const batch = writeBatch(db)
+      if (productosSinUnidad.length > 0 && db) {
+        const dbInstance = db // TypeScript ahora sabe que db no es undefined
+        const batch = writeBatch(dbInstance)
         productosSinUnidad.forEach((product) => {
-          const productRef = doc(db, COLLECTIONS.PRODUCTS, product.id)
+          const productRef = doc(dbInstance, COLLECTIONS.PRODUCTS, product.id)
           batch.update(productRef, {
             unidad: "U",
             updatedAt: serverTimestamp(),
@@ -410,10 +412,11 @@ export function usePedidos(user: any) {
     if (!db) return false
 
     try {
-      const batch = writeBatch(db)
+      const dbInstance = db // TypeScript ahora sabe que db no es undefined
+      const batch = writeBatch(dbInstance)
       
       newOrder.forEach((productId, index) => {
-        const productRef = doc(db, COLLECTIONS.PRODUCTS, productId)
+        const productRef = doc(dbInstance, COLLECTIONS.PRODUCTS, productId)
         batch.update(productRef, {
           orden: index,
           updatedAt: serverTimestamp(),
