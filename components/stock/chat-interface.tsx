@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { 
   Send, Loader2, AlertCircle, CheckCircle2, 
-  XCircle, HelpCircle, Bot, User, AlertTriangle, StopCircle
+  XCircle, HelpCircle, Bot, User, AlertTriangle, StopCircle, Copy, Check
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -64,6 +64,25 @@ export function ChatInterface({
     textareaRef.current?.focus()
   }, [])
 
+  // Mantener focus en textarea después de acciones
+  useEffect(() => {
+    // Cuando termina de procesar, volver a enfocar
+    if (!isProcessing) {
+      setTimeout(() => {
+        textareaRef.current?.focus()
+      }, 100)
+    }
+  }, [isProcessing])
+
+  // Mantener focus cuando hay nuevos mensajes (respuestas del sistema)
+  useEffect(() => {
+    if (messages.length > 0 && !isProcessing) {
+      setTimeout(() => {
+        textareaRef.current?.focus()
+      }, 200)
+    }
+  }, [messages.length, isProcessing])
+
   // Auto-resize del textarea
   useEffect(() => {
     const textarea = textareaRef.current
@@ -85,6 +104,10 @@ export function ChatInterface({
     setLastSentMessage(inputValue)
     onSendMessage(inputValue)
     setInputValue("")
+    // Enfocar textarea después de enviar
+    setTimeout(() => {
+      textareaRef.current?.focus()
+    }, 100)
   }
 
   const handleCancel = () => {
@@ -128,6 +151,10 @@ export function ChatInterface({
     // Ollama es opcional - solo bloqueamos si está procesando
     if (isProcessing) return
     onSendMessage(texto)
+    // Enfocar textarea después de acción rápida
+    setTimeout(() => {
+      textareaRef.current?.focus()
+    }, 100)
   }
 
   // Sugerencias rápidas
@@ -226,6 +253,32 @@ export function ChatInterface({
         </div>
       )}
 
+      {/* Botones de confirmación para productos acumulados */}
+      {productosAcumulados.length > 0 && !accionPendiente && (
+        <div className="px-3 pb-2">
+          <div className="flex gap-2 justify-center p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
+            <Button
+              size="sm"
+              onClick={() => handleQuickAction("confirmar")}
+              className="bg-green-600 hover:bg-green-700"
+              disabled={isProcessing}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              Confirmar ({productosAcumulados.length} productos)
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleQuickAction("cancelar")}
+              disabled={isProcessing}
+            >
+              <XCircle className="h-4 w-4 mr-1" />
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Botones de modo */}
       {setModo && (
         <div className="px-3 border-t border-border bg-muted/30">
@@ -236,6 +289,7 @@ export function ChatInterface({
               onClick={() => {
                 const nuevoModo = modo === "ingreso" ? null : "ingreso"
                 setModo(nuevoModo)
+                setTimeout(() => textareaRef.current?.focus(), 100)
               }}
               className={modo === "ingreso" ? "bg-green-600 hover:bg-green-700 text-white" : ""}
               size="sm"
@@ -248,6 +302,7 @@ export function ChatInterface({
               onClick={() => {
                 const nuevoModo = modo === "egreso" ? null : "egreso"
                 setModo(nuevoModo)
+                setTimeout(() => textareaRef.current?.focus(), 100)
               }}
               className={modo === "egreso" ? "bg-red-600 hover:bg-red-700 text-white" : ""}
               size="sm"
@@ -260,6 +315,7 @@ export function ChatInterface({
               onClick={() => {
                 const nuevoModo = modo === "pregunta" ? null : "pregunta"
                 setModo(nuevoModo)
+                setTimeout(() => textareaRef.current?.focus(), 100)
               }}
               className={modo === "pregunta" ? "bg-blue-600 hover:bg-blue-700 text-white" : ""}
               size="sm"
@@ -329,9 +385,37 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.tipo === "usuario"
   const isError = message.tipo === "error"
   const isConfirmacion = message.tipo === "confirmacion"
+  const isSistema = message.tipo === "sistema"
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(message.contenido)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error("Error al copiar:", err)
+    }
+  }
+
+  const CopyButton = () => (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-6 w-6 opacity-60 hover:opacity-100 active:opacity-100 transition-opacity"
+      onClick={handleCopy}
+      title={copied ? "Copiado" : "Copiar"}
+    >
+      {copied ? (
+        <Check className="h-3 w-3 text-green-600" />
+      ) : (
+        <Copy className="h-3 w-3" />
+      )}
+    </Button>
+  )
 
   return (
-    <div className={cn("flex gap-2", isUser ? "justify-end" : "justify-start")}>
+    <div className={cn("flex gap-2 group", isUser ? "justify-end" : "justify-start")}>
       {!isUser && (
         <div className={cn(
           "h-8 w-8 rounded-full flex items-center justify-center shrink-0",
@@ -349,14 +433,29 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       
       <div
         className={cn(
-          "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm",
+          "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm relative",
           isUser && "bg-primary text-primary-foreground rounded-br-md",
           message.tipo === "sistema" && "bg-muted rounded-tl-md",
           isConfirmacion && "bg-amber-500/10 border border-amber-500/20 rounded-tl-md",
           isError && "bg-destructive/10 text-destructive border border-destructive/20 rounded-tl-md"
         )}
       >
+        {/* Botón copiar superior - solo para mensajes del sistema */}
+        {isSistema && (
+          <div className="absolute top-1 right-1">
+            <CopyButton />
+          </div>
+        )}
+        
         <p className="whitespace-pre-wrap">{message.contenido}</p>
+        
+        {/* Botón copiar inferior - solo para mensajes del sistema */}
+        {isSistema && (
+          <div className="absolute bottom-1 right-1">
+            <CopyButton />
+          </div>
+        )}
+        
         <span className={cn(
           "text-[10px] opacity-50 mt-1.5 block",
           isUser ? "text-right" : "text-left"
