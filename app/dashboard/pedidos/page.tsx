@@ -56,6 +56,7 @@ export default function PedidosPage() {
     updateProduct,
     deleteProduct,
     clearStock,
+    updateProductsOrder,
     calcularPedido,
     generarTextoPedido,
   } = usePedidos(user)
@@ -483,6 +484,7 @@ export default function PedidosPage() {
                 onUpdateProduct={updateProduct}
                 onDeleteProduct={deleteProduct}
                 onImport={() => setImportDialogOpen(true)}
+                onProductsOrderUpdate={updateProductsOrder}
                 calcularPedido={calcularPedido}
               />
             </>

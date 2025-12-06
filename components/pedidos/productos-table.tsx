@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Trash2, Upload, Package, ShoppingCart, Settings2, Minus, Plus } from "lucide-react"
+import { Trash2, Upload, Package, ShoppingCart, Settings2, Minus, Plus, GripVertical } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Producto } from "@/lib/types"
 
@@ -16,6 +16,7 @@ interface ProductosTableProps {
   onUpdateProduct: (productId: string, field: string, value: string) => Promise<boolean>
   onDeleteProduct: (productId: string) => void
   onImport: () => void
+  onProductsOrderUpdate?: (newOrder: string[]) => Promise<boolean>
   calcularPedido: (stockMinimo: number, stockActualValue: number | undefined) => number
 }
 
@@ -26,11 +27,14 @@ export function ProductosTable({
   onUpdateProduct,
   onDeleteProduct,
   onImport,
+  onProductsOrderUpdate,
   calcularPedido,
 }: ProductosTableProps) {
   const [mode, setMode] = useState<TableMode>("pedido")
   const [editingField, setEditingField] = useState<{id: string, field: string} | null>(null)
   const [inlineValue, setInlineValue] = useState("")
+  const [draggedProductId, setDraggedProductId] = useState<string | null>(null)
+  const [dragOverProductId, setDragOverProductId] = useState<string | null>(null)
 
   const handleInlineSave = async (productId: string, field: string, value: string) => {
     const success = await onUpdateProduct(productId, field, value)
@@ -49,6 +53,57 @@ export function ProductosTable({
     setEditingField(null)
     setInlineValue("")
   }
+
+  // Drag and drop handlers
+  const orderedProductIds = products.map(p => p.id)
+
+  const handleDragStart = useCallback((e: React.DragEvent, productId: string) => {
+    if (!onProductsOrderUpdate) return
+    setDraggedProductId(productId)
+    e.dataTransfer.effectAllowed = "move"
+    e.dataTransfer.setData("text/plain", productId)
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = "0.5"
+    }
+  }, [onProductsOrderUpdate])
+
+  const handleDragEnd = useCallback((e: React.DragEvent) => {
+    setDraggedProductId(null)
+    setDragOverProductId(null)
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = "1"
+    }
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent, productId: string) => {
+    if (!onProductsOrderUpdate || !draggedProductId || draggedProductId === productId) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = "move"
+    setDragOverProductId(productId)
+  }, [onProductsOrderUpdate, draggedProductId])
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverProductId(null)
+  }, [])
+
+  const handleDrop = useCallback(async (e: React.DragEvent, targetId: string) => {
+    if (!onProductsOrderUpdate || !draggedProductId || draggedProductId === targetId) return
+    e.preventDefault()
+
+    const draggedIndex = orderedProductIds.indexOf(draggedProductId)
+    const targetIndex = orderedProductIds.indexOf(targetId)
+
+    if (draggedIndex === -1 || targetIndex === -1) return
+
+    const newOrder = [...orderedProductIds]
+    const [removed] = newOrder.splice(draggedIndex, 1)
+    newOrder.splice(targetIndex, 0, removed)
+
+    setDraggedProductId(null)
+    setDragOverProductId(null)
+
+    await onProductsOrderUpdate(newOrder)
+  }, [onProductsOrderUpdate, draggedProductId, orderedProductIds])
 
   // Empty state
   if (products.length === 0) {
@@ -118,15 +173,30 @@ export function ProductosTable({
             
             return (
               <div 
-                key={product.id} 
+                key={product.id}
+                draggable={!!onProductsOrderUpdate}
+                onDragStart={(e) => handleDragStart(e, product.id)}
+                onDragEnd={handleDragEnd}
+                onDragOver={(e) => handleDragOver(e, product.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, product.id)}
                 className={cn(
-                  "px-2 py-2",
-                  mode === "pedido" && pedidoCalculado > 0 && "bg-amber-500/10"
+                  "px-2 py-2 flex items-center gap-2",
+                  mode === "pedido" && pedidoCalculado > 0 && "bg-amber-500/10",
+                  dragOverProductId === product.id && "bg-primary/5",
+                  draggedProductId === product.id && "opacity-50"
                 )}
               >
+                {/* Icono de reordenar */}
+                {onProductsOrderUpdate && (
+                  <div className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors">
+                    <GripVertical className="h-4 w-4" />
+                  </div>
+                )}
+                
                 {mode === "pedido" ? (
                   // MODO PEDIDO - Layout compacto
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1">
                     {/* Nombre del producto */}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-xs truncate">{product.nombre}</p>
@@ -137,7 +207,7 @@ export function ProductosTable({
                     
                     {/* Stock actual input */}
                     <div className="flex flex-col items-center shrink-0">
-                      <span className="text-[9px] text-muted-foreground uppercase">Actual</span>
+                      <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Actual</span>
                       <Input
                         type="number"
                         min="0"
@@ -147,27 +217,27 @@ export function ProductosTable({
                           onStockChange(product.id, val === "" ? 0 : parseInt(val, 10) || 0)
                         }}
                         placeholder="0"
-                        className="h-7 w-16 text-center text-xs px-1"
+                        className="h-10 w-16 text-center text-sm font-medium px-1"
                       />
                     </div>
                     
                     {/* Pedido con botones +/- */}
                     <div className="flex flex-col items-center shrink-0">
-                      <span className="text-[9px] text-muted-foreground uppercase">Pedir</span>
-                      <div className="flex items-center">
+                      <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Pedir</span>
+                      <div className="flex items-center gap-1">
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-7 w-7"
+                          className="h-9 w-9"
                           onClick={() => {
                             onStockChange(product.id, stockActualValue + 1)
                           }}
                           disabled={pedidoCalculado <= 0}
                         >
-                          <Minus className="h-3 w-3" />
+                          <Minus className="h-4 w-4" />
                         </Button>
                         <span className={cn(
-                          "font-bold text-base w-6 text-center tabular-nums",
+                          "font-bold text-lg w-8 text-center tabular-nums",
                           pedidoCalculado > 0 ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"
                         )}>
                           {pedidoCalculado}
@@ -175,7 +245,7 @@ export function ProductosTable({
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-7 w-7"
+                          className="h-9 w-9"
                           onClick={() => {
                             if (stockActualValue > 0) {
                               onStockChange(product.id, stockActualValue - 1)
@@ -183,14 +253,14 @@ export function ProductosTable({
                           }}
                           disabled={stockActualValue <= 0}
                         >
-                          <Plus className="h-3 w-3" />
+                          <Plus className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
                   </div>
                 ) : (
                   // MODO CONFIG - Layout compacto
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1">
                     {/* Nombre editable */}
                     <div className="flex-1 min-w-0">
                       {editingThisField === "nombre" ? (
@@ -217,7 +287,7 @@ export function ProductosTable({
                     
                     {/* Stock mínimo */}
                     <div className="flex flex-col items-center shrink-0">
-                      <span className="text-[9px] text-muted-foreground uppercase">Mín</span>
+                      <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Mín</span>
                       {editingThisField === "stockMinimo" ? (
                         <Input
                           type="number"
@@ -230,12 +300,12 @@ export function ProductosTable({
                             if (e.key === "Escape") cancelEditing()
                           }}
                           autoFocus
-                          className="h-7 w-10 text-center text-xs"
+                          className="h-10 w-16 text-center text-sm font-medium"
                         />
                       ) : (
                         <button
                           onClick={() => startEditing(product.id, "stockMinimo", product.stockMinimo.toString())}
-                          className="h-7 w-10 text-center text-xs font-medium hover:bg-muted rounded"
+                          className="h-10 w-16 text-center text-sm font-medium hover:bg-muted active:bg-muted/80 rounded-md transition-colors px-2 py-1.5"
                         >
                           {product.stockMinimo}
                         </button>
@@ -244,7 +314,7 @@ export function ProductosTable({
                     
                     {/* Unidad */}
                     <div className="flex flex-col items-center shrink-0">
-                      <span className="text-[9px] text-muted-foreground uppercase">Unid</span>
+                      <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Unid</span>
                       {editingThisField === "unidad" ? (
                         <Input
                           value={inlineValue}
@@ -255,15 +325,15 @@ export function ProductosTable({
                             if (e.key === "Escape") cancelEditing()
                           }}
                           autoFocus
-                          placeholder="-"
-                          className="h-7 w-10 text-center text-xs"
+                          placeholder="U"
+                          className="h-10 w-16 text-center text-sm font-medium"
                         />
                       ) : (
                         <button
-                          onClick={() => startEditing(product.id, "unidad", product.unidad || "")}
-                          className="h-7 w-10 text-center text-xs text-muted-foreground hover:bg-muted rounded"
+                          onClick={() => startEditing(product.id, "unidad", product.unidad || "U")}
+                          className="h-10 w-16 text-center text-sm font-medium text-muted-foreground hover:bg-muted active:bg-muted/80 rounded-md transition-colors px-2 py-1.5"
                         >
-                          {product.unidad || "-"}
+                          {product.unidad || "U"}
                         </button>
                       )}
                     </div>

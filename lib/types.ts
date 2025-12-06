@@ -125,6 +125,7 @@ export interface Producto {
   nombre: string
   stockMinimo: number // Stock mínimo configurado por el usuario
   unidad?: string // Unidad de medida (ej: "kg", "unidades", "cajas")
+  orden?: number // Orden de visualización (para mantener el orden de importación y permitir reordenar)
   userId: string
   createdAt?: any
   updatedAt?: any

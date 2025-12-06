@@ -79,7 +79,62 @@ export function usePedidos(user: any) {
         ...doc.data(),
       })) as Producto[]
       
-      productsData.sort((a, b) => a.nombre.localeCompare(b.nombre))
+      // Identificar productos sin orden o sin unidad (productos antiguos)
+      const productosSinOrden = productsData.filter(p => p.orden === undefined)
+      const productosSinUnidad = productsData.filter(p => !p.unidad || p.unidad.trim() === "")
+      
+      // Si hay productos sin orden, asignarles uno basado en orden alfabético
+      if (productosSinOrden.length > 0) {
+        // Ordenar alfabéticamente primero
+        const productosConOrden = productsData.filter(p => p.orden !== undefined)
+        productosSinOrden.sort((a, b) => a.nombre.localeCompare(b.nombre))
+        
+        // Calcular el orden inicial (máximo orden existente + 1, o 0)
+        const maxOrden = productosConOrden.length > 0
+          ? Math.max(...productosConOrden.map(p => p.orden ?? 0), -1) + 1
+          : 0
+        
+        // Asignar orden a productos sin orden
+        productosSinOrden.forEach((product, index) => {
+          product.orden = maxOrden + index
+        })
+        
+        // Guardar el orden en la base de datos
+        const batch = writeBatch(db)
+        productosSinOrden.forEach((product) => {
+          const productRef = doc(db, COLLECTIONS.PRODUCTS, product.id)
+          batch.update(productRef, {
+            orden: product.orden,
+            updatedAt: serverTimestamp(),
+          })
+        })
+        await batch.commit()
+      }
+      
+      // Si hay productos sin unidad, asignarles "U" como valor por defecto
+      if (productosSinUnidad.length > 0) {
+        const batch = writeBatch(db)
+        productosSinUnidad.forEach((product) => {
+          const productRef = doc(db, COLLECTIONS.PRODUCTS, product.id)
+          batch.update(productRef, {
+            unidad: "U",
+            updatedAt: serverTimestamp(),
+          })
+          product.unidad = "U"
+        })
+        await batch.commit()
+      }
+      
+      // Ordenar por orden, y si tienen el mismo orden, alfabéticamente
+      productsData.sort((a, b) => {
+        const ordenA = a.orden ?? 0
+        const ordenB = b.orden ?? 0
+        if (ordenA !== ordenB) {
+          return ordenA - ordenB
+        }
+        return a.nombre.localeCompare(b.nombre)
+      })
+      
       setProducts(productsData)
     } catch (error: any) {
       logger.error("Error al cargar productos:", error)
@@ -245,13 +300,29 @@ export function usePedidos(user: any) {
     }
 
     try {
+      // Calcular el orden inicial: máximo orden existente + 1, o 0 si no hay productos
+      const maxOrden = products.length > 0 
+        ? Math.max(...products.map(p => p.orden ?? 0), -1) + 1
+        : 0
+
       const batch = writeBatch(db)
+      
+      // Crear un mapa de nombres para mantener el orden de importación
+      const nombresMap = new Map<string, number>()
+      nombres.forEach((nombre, index) => {
+        if (!existingNames.includes(nombre.toLowerCase())) {
+          nombresMap.set(nombre, maxOrden + nombresMap.size)
+        }
+      })
+
       for (const nombre of nuevos) {
         const docRef = doc(collection(db, COLLECTIONS.PRODUCTS))
         batch.set(docRef, {
           pedidoId: selectedPedido.id,
           nombre,
           stockMinimo: selectedPedido.stockMinimoDefault,
+          unidad: "U",
+          orden: nombresMap.get(nombre) ?? maxOrden + nuevos.indexOf(nombre),
           userId: user.uid,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -294,7 +365,7 @@ export function usePedidos(user: any) {
         }
         updateData.stockMinimo = num
       } else if (field === "unidad") {
-        updateData.unidad = value.trim() || null
+        updateData.unidad = value.trim() || "U"
       }
 
       await updateDoc(doc(db, COLLECTIONS.PRODUCTS, productId), updateData)
@@ -333,6 +404,43 @@ export function usePedidos(user: any) {
     setStockActual({})
     toast({ title: "Stock limpiado" })
   }, [toast])
+
+  // Actualizar orden de productos
+  const updateProductsOrder = useCallback(async (newOrder: string[]) => {
+    if (!db) return false
+
+    try {
+      const batch = writeBatch(db)
+      
+      newOrder.forEach((productId, index) => {
+        const productRef = doc(db, COLLECTIONS.PRODUCTS, productId)
+        batch.update(productRef, {
+          orden: index,
+          updatedAt: serverTimestamp(),
+        })
+      })
+      
+      await batch.commit()
+      
+      // Actualizar estado local sin recargar desde Firestore para mejor UX
+      setProducts(prev => {
+        const ordered = newOrder.map(id => prev.find(p => p.id === id)!).filter(Boolean)
+        return ordered.map((p, index) => ({ ...p, orden: index }))
+      })
+      
+      return true
+    } catch (error: any) {
+      logger.error("Error al actualizar orden:", error)
+      toast({ 
+        title: "Error", 
+        description: "No se pudo actualizar el orden", 
+        variant: "destructive" 
+      })
+      // Recargar productos en caso de error
+      await loadProducts()
+      return false
+    }
+  }, [db, loadProducts, toast])
 
   // Generar texto del pedido
   const generarTextoPedido = useCallback((): string => {
@@ -374,6 +482,7 @@ export function usePedidos(user: any) {
     updateProduct,
     deleteProduct,
     clearStock,
+    updateProductsOrder,
     calcularPedido,
     generarTextoPedido,
   }
