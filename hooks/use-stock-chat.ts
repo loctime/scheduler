@@ -224,17 +224,25 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
 
   // Mensaje de bienvenida
   useEffect(() => {
-    if (messages.length === 0 && ollamaStatus.status === "ok") {
-      const welcomeMsg = productos.length === 0
+    if (messages.length === 0 && ollamaStatus.status === "ok" && !loadingStock) {
+      // Contar pedidos que tienen productos
+      // Verificar cuáles pedidos tienen productos asociados
+      const pedidosConProductos = pedidos.filter(pedido => {
+        return productos.some(prod => prod.pedidoId === pedido.id)
+      })
+      
+      const cantidadPedidos = pedidosConProductos.length
+      
+      const welcomeMsg = cantidadPedidos === 0
         ? "¡Hola! Cargá productos desde la sección Pedidos para empezar. ¿En qué te ayudo?"
-        : `¡Hola! Tenés ${productos.length} productos. Preguntame sobre stock, agregar o quitar productos. ¿Qué necesitás?`
+        : `¡Hola! Tenés ${cantidadPedidos} pedido${cantidadPedidos > 1 ? "s" : ""} con productos. ¿En qué te ayudo?\n\n💡 Seleccioná el modo de trabajo en la parte de abajo, y el pedido a trabajar en la parte de arriba.`
       
       addMessage({
         tipo: "sistema",
         contenido: welcomeMsg,
       })
     }
-  }, [ollamaStatus.status, productos.length])
+  }, [ollamaStatus.status, productos, pedidos, loadingStock, addMessage])
 
   // Agregar mensaje al chat
   const addMessage = useCallback((mensaje: Omit<ChatMessage, "id" | "timestamp">) => {
