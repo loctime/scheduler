@@ -113,7 +113,8 @@ export function ProductosTable({
           {products.map((product) => {
             const isEditing = editingField?.id === product.id
             const editingThisField = isEditing ? editingField?.field : null
-            const pedidoCalculado = calcularPedido(product.stockMinimo, stockActual[product.id])
+            const stockActualValue = stockActual[product.id] ?? 0
+            const pedidoCalculado = calcularPedido(product.stockMinimo, stockActualValue)
             
             return (
               <div 
@@ -140,13 +141,13 @@ export function ProductosTable({
                       <Input
                         type="number"
                         min="0"
-                        value={stockActual[product.id] ?? ""}
+                        value={stockActual[product.id] !== undefined ? stockActual[product.id] : ""}
                         onChange={(e) => {
                           const val = e.target.value
                           onStockChange(product.id, val === "" ? 0 : parseInt(val, 10) || 0)
                         }}
                         placeholder="0"
-                        className="h-7 w-12 text-center text-xs"
+                        className="h-7 w-16 text-center text-xs px-1"
                       />
                     </div>
                     
@@ -159,8 +160,7 @@ export function ProductosTable({
                           size="icon"
                           className="h-7 w-7"
                           onClick={() => {
-                            const currentStock = stockActual[product.id] ?? 0
-                            onStockChange(product.id, currentStock + 1)
+                            onStockChange(product.id, stockActualValue + 1)
                           }}
                           disabled={pedidoCalculado <= 0}
                         >
@@ -177,12 +177,11 @@ export function ProductosTable({
                           size="icon"
                           className="h-7 w-7"
                           onClick={() => {
-                            const currentStock = stockActual[product.id] ?? 0
-                            if (currentStock > 0) {
-                              onStockChange(product.id, currentStock - 1)
+                            if (stockActualValue > 0) {
+                              onStockChange(product.id, stockActualValue - 1)
                             }
                           }}
-                          disabled={(stockActual[product.id] ?? 0) <= 0}
+                          disabled={stockActualValue <= 0}
                         >
                           <Plus className="h-3 w-3" />
                         </Button>

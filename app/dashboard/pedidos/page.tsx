@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +10,10 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
+import { useStockChatContext } from "@/contexts/stock-chat-context"
 import { usePedidos } from "@/hooks/use-pedidos"
+import { db, COLLECTIONS } from "@/lib/firebase"
+import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { PedidosSidebar } from "@/components/pedidos/pedidos-sidebar"
 import { ProductosTable } from "@/components/pedidos/productos-table"
 import { 
@@ -34,12 +37,15 @@ export default function PedidosPage() {
   const { user } = useData()
   const { toast } = useToast()
   
+  // Obtener stockActual del contexto global del chat
+  const { stockActual: stockActualGlobal } = useStockChatContext()
+  
   const {
     pedidos,
     products,
     selectedPedido,
     loading,
-    stockActual,
+    stockActual: stockActualLocal,
     productosAPedir,
     setSelectedPedido,
     setStockActual,
@@ -53,6 +59,15 @@ export default function PedidosPage() {
     calcularPedido,
     generarTextoPedido,
   } = usePedidos(user)
+  
+  // Usar el stockActual del contexto global (del chat) en lugar del local
+  // El local solo se usa para cambios manuales desde la tabla
+  const stockActual = stockActualGlobal || stockActualLocal
+  
+  // Recalcular productosAPedir con el stock global
+  const productosAPedirActualizados = useMemo(() => {
+    return products.filter(p => calcularPedido(p.stockMinimo, stockActual[p.id]) > 0)
+  }, [products, stockActual, calcularPedido])
   
   // Dialog states
   const [createPedidoOpen, setCreatePedidoOpen] = useState(false)
@@ -136,7 +151,7 @@ export default function PedidosPage() {
   }
 
   const handleCopyPedido = async () => {
-    if (productosAPedir.length === 0) {
+    if (productosAPedirActualizados.length === 0) {
       toast({ title: "Sin pedidos", description: "No hay productos que pedir" })
       return
     }
@@ -149,7 +164,7 @@ export default function PedidosPage() {
   }
 
   const handleWhatsApp = () => {
-    if (productosAPedir.length === 0) {
+    if (productosAPedirActualizados.length === 0) {
       toast({ title: "Sin pedidos", description: "No hay productos que pedir" })
       return
     }
@@ -157,8 +172,28 @@ export default function PedidosPage() {
     window.open(`https://wa.me/?text=${encoded}`, "_blank")
   }
 
-  const handleStockChange = (productId: string, value: number) => {
+  const handleStockChange = async (productId: string, value: number) => {
+    // Actualizar estado local inmediatamente para feedback visual
     setStockActual(prev => ({ ...prev, [productId]: value }))
+    
+    // Actualizar en Firestore para sincronizar con el contexto global
+    try {
+      if (!db || !user) return
+      
+      const stockDocId = `${user.uid}_${productId}`
+      const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
+      
+      await setDoc(stockDocRef, {
+        productoId,
+        cantidad: value,
+        ultimaActualizacion: serverTimestamp(),
+        userId: user.uid,
+      }, { merge: true })
+    } catch (error) {
+      console.error("Error actualizando stock:", error)
+      // Revertir cambio local si falla
+      setStockActual(prev => ({ ...prev, [productId]: stockActualGlobal[productId] ?? 0 }))
+    }
   }
 
   // Inline edit handlers
@@ -400,12 +435,12 @@ export default function PedidosPage() {
                     <div className="flex items-center gap-1.5 pt-1.5 border-t border-border">
                       <span className={cn(
                         "text-[11px] font-medium px-1.5 py-0.5 rounded-full",
-                        productosAPedir.length > 0 
+                        productosAPedirActualizados.length > 0 
                           ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                           : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                       )}>
                         {productosAPedir.length > 0 
-                          ? `${productosAPedir.length} a pedir`
+                          ? `${productosAPedirActualizados.length} a pedir`
                           : "✓ OK"
                         }
                       </span>
@@ -414,7 +449,7 @@ export default function PedidosPage() {
                         size="sm" 
                         className="h-7 px-2"
                         onClick={handleCopyPedido} 
-                        disabled={productosAPedir.length === 0}
+                        disabled={productosAPedirActualizados.length === 0}
                       >
                         <Copy className="h-3.5 w-3.5 sm:mr-1" />
                         <span className="hidden sm:inline text-xs">Copiar</span>
@@ -423,7 +458,7 @@ export default function PedidosPage() {
                         size="sm"
                         className="h-7 px-2 bg-green-600 hover:bg-green-700 text-white"
                         onClick={handleWhatsApp} 
-                        disabled={productosAPedir.length === 0}
+                        disabled={productosAPedirActualizados.length === 0}
                       >
                         <MessageCircle className="h-3.5 w-3.5 sm:mr-1" />
                         <span className="hidden sm:inline text-xs">WA</span>

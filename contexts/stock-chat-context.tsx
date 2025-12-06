@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, ReactNode } from "react"
+import { createContext, useContext, ReactNode, useState } from "react"
 import { useStockChat } from "@/hooks/use-stock-chat"
 
 interface StockChatContextType {
@@ -24,6 +24,12 @@ interface StockChatContextType {
   movimientos: ReturnType<typeof useStockChat>["movimientos"]
   loadingStock: ReturnType<typeof useStockChat>["loadingStock"]
   productosStockBajo: ReturnType<typeof useStockChat>["productosStockBajo"]
+  
+  // Chat UI State
+  chatIsOpen: boolean
+  setChatIsOpen: (isOpen: boolean) => void
+  chatIsMinimized: boolean
+  setChatIsMinimized: (isMinimized: boolean) => void
 }
 
 const StockChatContext = createContext<StockChatContextType | undefined>(undefined)
@@ -40,9 +46,18 @@ export function StockChatProvider({
     userName: user?.displayName || user?.email,
     user,
   })
+  
+  const [chatIsOpen, setChatIsOpen] = useState(false)
+  const [chatIsMinimized, setChatIsMinimized] = useState(false)
 
   return (
-    <StockChatContext.Provider value={stockChat}>
+    <StockChatContext.Provider value={{
+      ...stockChat,
+      chatIsOpen,
+      setChatIsOpen,
+      chatIsMinimized,
+      setChatIsMinimized,
+    }}>
       {children}
     </StockChatContext.Provider>
   )

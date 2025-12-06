@@ -8,9 +8,6 @@ import { useStockChatContext } from "@/contexts/stock-chat-context"
 import { cn } from "@/lib/utils"
 
 export function StockChatFloating() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [isMinimized, setIsMinimized] = useState(false)
-  
   const {
     messages,
     isProcessing,
@@ -23,13 +20,17 @@ export function StockChatFloating() {
     nombreAsistente,
     modo,
     setModo,
+    chatIsOpen,
+    setChatIsOpen,
+    chatIsMinimized,
+    setChatIsMinimized,
   } = useStockChatContext()
 
-  if (!isOpen) {
+  if (!chatIsOpen) {
     return (
       <div className="fixed bottom-4 right-4 z-50">
         <Button
-          onClick={() => setIsOpen(true)}
+          onClick={() => setChatIsOpen(true)}
           size="lg"
           className="h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90"
         >
@@ -43,7 +44,7 @@ export function StockChatFloating() {
     <div
       className={cn(
         "fixed bottom-4 right-4 z-50 transition-all duration-300",
-        isMinimized ? "w-80" : "w-full max-w-md"
+        chatIsMinimized ? "w-80" : "w-full max-w-md"
       )}
       style={{ 
         // Asegurar que no interfiera con el contenido
@@ -63,9 +64,9 @@ export function StockChatFloating() {
               size="icon"
               className="h-8 w-8"
               onClick={() => {
-                setIsMinimized(!isMinimized)
+                setChatIsMinimized(!chatIsMinimized)
               }}
-              title={isMinimized ? "Expandir" : "Minimizar"}
+              title={chatIsMinimized ? "Expandir" : "Minimizar"}
             >
               <Minimize2 className="h-4 w-4" />
             </Button>
@@ -74,8 +75,8 @@ export function StockChatFloating() {
               size="icon"
               className="h-8 w-8"
               onClick={() => {
-                setIsOpen(false)
-                setIsMinimized(false)
+                setChatIsOpen(false)
+                setChatIsMinimized(false)
               }}
               title="Cerrar"
             >
@@ -85,7 +86,7 @@ export function StockChatFloating() {
         </div>
 
         {/* Chat Content */}
-        {!isMinimized && (
+        {!chatIsMinimized && (
           <div className="flex-1 min-h-0">
             <ChatInterface
               messages={messages}
@@ -104,7 +105,7 @@ export function StockChatFloating() {
         )}
 
         {/* Minimized view */}
-        {isMinimized && (
+        {chatIsMinimized && (
           <div className="flex-1 p-4 flex items-center justify-center text-sm text-muted-foreground">
             Chat minimizado - Click en expandir para continuar
           </div>

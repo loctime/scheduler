@@ -25,6 +25,7 @@ import { Calendar, Users, Clock, History, LogOut, Settings, CalendarDays, Menu, 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { useStockChatContext } from "@/contexts/stock-chat-context"
 
 interface DashboardLayoutProps {
   children: ReactNode
@@ -45,6 +46,17 @@ const navItems = [
 export function DashboardLayout({ children, user }: DashboardLayoutProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  
+  // Obtener estado del chat para ajustar el padding del contenido
+  let chatIsOpen = false
+  let chatIsMinimized = false
+  try {
+    const chatContext = useStockChatContext()
+    chatIsOpen = chatContext.chatIsOpen
+    chatIsMinimized = chatContext.chatIsMinimized
+  } catch {
+    // Si no hay contexto (página fuera del dashboard), no hacer nada
+  }
 
   const handleSignOut = async () => {
     if (!auth) return
@@ -141,7 +153,11 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 p-3 sm:p-4 md:p-6">
+      <main className={cn(
+        "flex-1 p-3 sm:p-4 md:p-6 transition-all duration-300",
+        chatIsOpen && !chatIsMinimized && "pr-[calc(1rem+28rem+1rem)]", // padding-right cuando chat está abierto (max-w-md = 28rem + right-4 = 1rem + extra)
+        chatIsOpen && chatIsMinimized && "pr-[calc(1rem+20rem+1rem)]" // padding-right cuando chat está minimizado (w-80 = 20rem + right-4 = 1rem + extra)
+      )}>
         {children}
       </main>
     </div>
