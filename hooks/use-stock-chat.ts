@@ -80,7 +80,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     accion: "entrada" | "salida"
   }>>([])
 
-  // Verificar conexión con Ollama
+  // Verificar conexión con Ollama (opcional)
   const checkOllamaConnection = useCallback(async () => {
     setOllamaStatus({ status: "checking" })
     try {
@@ -88,23 +88,35 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       const data = await response.json()
       
       if (data.status === "ok") {
+        // Ollama es opcional - siempre devolvemos "ok", solo indicamos si está disponible
+        if (data.ollamaDisponible) {
+          setOllamaStatus({
+            status: "ok",
+            modeloDisponible: data.modelosDisponibles?.length > 0,
+            message: data.message || "Ollama conectado"
+          })
+        } else {
+          // Ollama no disponible pero la app funciona - tratamos como "ok" sin bloquear
+          setOllamaStatus({
+            status: "ok",
+            modeloDisponible: false,
+            message: data.message || "Ollama no disponible (modo sin IA)"
+          })
+        }
+      } else {
+        // Si hay error en el endpoint, aún permitimos usar la app
         setOllamaStatus({
           status: "ok",
-          modeloDisponible: data.modeloDisponible,
-          message: data.modeloDisponible 
-            ? `Conectado (${data.modeloConfigurado})`
-            : `Modelo ${data.modeloConfigurado} no encontrado`
-        })
-      } else {
-        setOllamaStatus({
-          status: "error",
-          message: data.message || "Error conectando con Ollama"
+          modeloDisponible: false,
+          message: "Ollama no disponible (modo sin IA)"
         })
       }
     } catch (error) {
+      // En caso de error, no bloquear - la app funciona sin Ollama
       setOllamaStatus({
-        status: "error",
-        message: "No se puede conectar con el servidor"
+        status: "ok",
+        modeloDisponible: false,
+        message: "Ollama no disponible (modo sin IA)"
       })
     }
   }, [])

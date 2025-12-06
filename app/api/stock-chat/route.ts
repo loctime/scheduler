@@ -420,35 +420,73 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Endpoint GET para verificar Ollama (mantener por compatibilidad)
+// Endpoint GET para verificar Ollama (Opcional - la app funciona sin Ollama)
 export async function GET() {
   try {
-    const OLLAMA_URL = process.env.OLLAMA_URL || "http://localhost:11434"
-    const response = await fetch(`${OLLAMA_URL}/api/tags`)
+    // Determinar URL de Ollama
+    const isDevelopment = process.env.NODE_ENV === "development"
+    const OLLAMA_URL = process.env.OLLAMA_URL || (isDevelopment ? "http://localhost:11434" : null)
     
-    if (!response.ok) {
-      return NextResponse.json(
-        { status: "error", message: "Ollama no está respondiendo", url: OLLAMA_URL },
-        { status: 503 }
-      )
+    // Si no hay URL configurada en producción, devolver estado "ok" sin Ollama
+    if (!OLLAMA_URL) {
+      return NextResponse.json({
+        status: "ok",
+        ollamaDisponible: false,
+        message: "Ollama no configurado (la app funciona sin Ollama)",
+        url: null,
+        modelosDisponibles: [],
+      })
     }
     
-    const data = await response.json()
-    const modelosDisponibles = data.models?.map((m: any) => m.name) || []
+    // Intentar conectar con Ollama (con timeout corto)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 3000) // 3 segundos timeout
     
+    try {
+      const response = await fetch(`${OLLAMA_URL}/api/tags`, {
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+      
+      if (!response.ok) {
+        return NextResponse.json({
+          status: "ok",
+          ollamaDisponible: false,
+          message: "Ollama no está respondiendo (la app funciona sin Ollama)",
+          url: OLLAMA_URL,
+          modelosDisponibles: [],
+        })
+      }
+      
+      const data = await response.json()
+      const modelosDisponibles = data.models?.map((m: any) => m.name) || []
+      
+      return NextResponse.json({
+        status: "ok",
+        ollamaDisponible: true,
+        message: "Ollama conectado",
+        url: OLLAMA_URL,
+        modelosDisponibles,
+      })
+    } catch (fetchError) {
+      clearTimeout(timeoutId)
+      // Si es un abort (timeout) o error de conexión, devolver ok sin Ollama
+      return NextResponse.json({
+        status: "ok",
+        ollamaDisponible: false,
+        message: "Ollama no disponible (la app funciona sin Ollama)",
+        url: OLLAMA_URL,
+        modelosDisponibles: [],
+      })
+    }
+  } catch (error) {
+    // En caso de cualquier error, devolver ok sin Ollama (no bloquear la app)
     return NextResponse.json({
       status: "ok",
-      url: OLLAMA_URL,
-      modelosDisponibles,
+      ollamaDisponible: false,
+      message: "Ollama no disponible (la app funciona sin Ollama)",
+      url: null,
+      modelosDisponibles: [],
     })
-  } catch (error) {
-    return NextResponse.json(
-      { 
-        status: "error",
-        message: "No se puede conectar con Ollama",
-        error: error instanceof Error ? error.message : "Error desconocido"
-      },
-      { status: 503 }
-    )
   }
 }

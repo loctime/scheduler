@@ -82,7 +82,8 @@ export function ChatInterface({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!inputValue.trim() || isProcessing || ollamaStatus.status !== "ok") return
+    // Ollama es opcional - solo bloqueamos si está procesando o sin texto
+    if (!inputValue.trim() || isProcessing) return
     
     // Guardar el mensaje antes de enviarlo
     setLastSentMessage(inputValue)
@@ -128,7 +129,8 @@ export function ChatInterface({
   }
 
   const handleQuickAction = (texto: string) => {
-    if (isProcessing || ollamaStatus.status !== "ok") return
+    // Ollama es opcional - solo bloqueamos si está procesando
+    if (isProcessing) return
     onSendMessage(texto)
   }
 
@@ -153,16 +155,16 @@ export function ChatInterface({
                 <span className="text-xs text-muted-foreground">Conectando...</span>
               </>
             )}
-            {ollamaStatus.status === "ok" && (
+            {ollamaStatus.status === "ok" && ollamaStatus.modeloDisponible && (
               <>
                 <span className="h-2 w-2 rounded-full bg-green-500" />
-                <span className="text-xs text-green-600 dark:text-green-400">Conectado</span>
+                <span className="text-xs text-green-600 dark:text-green-400">IA disponible</span>
               </>
             )}
-            {ollamaStatus.status === "error" && (
+            {ollamaStatus.status === "ok" && !ollamaStatus.modeloDisponible && (
               <>
-                <span className="h-2 w-2 rounded-full bg-destructive" />
-                <span className="text-xs text-destructive">Desconectado</span>
+                <span className="h-2 w-2 rounded-full bg-yellow-500" />
+                <span className="text-xs text-yellow-600 dark:text-yellow-400">Sin IA</span>
               </>
             )}
           </div>
@@ -193,26 +195,10 @@ export function ChatInterface({
       {/* Área de mensajes */}
       <div className="flex-1 overflow-y-auto min-h-0" ref={scrollRef}>
         <div className="p-4 space-y-4">
-          {messages.length === 0 && ollamaStatus.status !== "ok" ? (
+          {messages.length === 0 && ollamaStatus.status === "checking" ? (
             <div className="flex flex-col items-center justify-center h-full text-center py-8">
-              {ollamaStatus.status === "checking" ? (
-                <>
-                  <Loader2 className="h-10 w-10 animate-spin text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Conectando con Ollama...</p>
-                </>
-              ) : (
-                <>
-                  <XCircle className="h-10 w-10 text-destructive mb-4" />
-                  <h3 className="font-semibold mb-2">Sin conexión</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {ollamaStatus.message || "Asegurate de que Ollama esté corriendo"}
-                  </p>
-                  <Button onClick={onRefreshConnection} variant="outline" size="sm">
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Reintentar
-                  </Button>
-                </>
-              )}
+              <Loader2 className="h-10 w-10 animate-spin text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">Iniciando asistente...</p>
             </div>
           ) : messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8">
@@ -354,10 +340,10 @@ export function ChatInterface({
 
       {/* Input de mensaje */}
       <form onSubmit={handleSubmit} className="p-3 border-t border-border bg-muted/30">
-        {ollamaStatus.status === "error" && (
-          <div className="flex items-center gap-2 text-xs text-destructive mb-2 p-2 rounded bg-destructive/10">
+        {ollamaStatus.status === "ok" && !ollamaStatus.modeloDisponible && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2 p-2 rounded bg-muted/50">
             <AlertCircle className="h-3 w-3 shrink-0" />
-            <span>{ollamaStatus.message || "Asegurate de que Ollama esté corriendo"}</span>
+            <span>Modo sin IA: La funcionalidad básica funciona correctamente</span>
           </div>
         )}
         <div className="flex gap-2 items-end">
@@ -370,11 +356,9 @@ export function ChatInterface({
               placeholder={
                 accionPendiente 
                   ? "Escribí 'sí' para confirmar o 'no' para cancelar..."
-                  : ollamaStatus.status === "ok" 
-                    ? "Escribí lo que necesitás... (Shift + Enter para nueva línea)" 
-                    : "Esperando conexión..."
+                  : "Escribí lo que necesitás... (Shift + Enter para nueva línea)"
               }
-              disabled={isProcessing || ollamaStatus.status !== "ok"}
+              disabled={isProcessing}
               className={cn(
                 "resize-none min-h-[44px] max-h-[200px] py-3 px-4",
                 "focus-visible:ring-2 focus-visible:ring-primary/20",
@@ -400,7 +384,7 @@ export function ChatInterface({
               type="submit" 
               size="icon"
               className="h-[44px] w-[44px]"
-              disabled={!inputValue.trim() || isProcessing || ollamaStatus.status !== "ok"}
+              disabled={!inputValue.trim() || isProcessing}
             >
               {isProcessing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
