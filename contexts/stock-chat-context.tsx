@@ -16,6 +16,8 @@ interface StockChatContextType {
   nombreAsistente: ReturnType<typeof useStockChat>["nombreAsistente"]
   modo: ReturnType<typeof useStockChat>["modo"]
   setModo: ReturnType<typeof useStockChat>["setModo"]
+  productosAcumulados: ReturnType<typeof useStockChat>["productosAcumulados"]
+  setProductosAcumulados: ReturnType<typeof useStockChat>["setProductosAcumulados"]
   
   // Stock
   productos: ReturnType<typeof useStockChat>["productos"]

@@ -20,6 +20,7 @@ export function StockChatFloating() {
     nombreAsistente,
     modo,
     setModo,
+    productosAcumulados,
     chatIsOpen,
     setChatIsOpen,
     chatIsMinimized,
@@ -100,6 +101,7 @@ export function StockChatFloating() {
               nombreAsistente={nombreAsistente}
               modo={modo}
               setModo={setModo}
+              productosAcumulados={productosAcumulados}
             />
           </div>
         )}

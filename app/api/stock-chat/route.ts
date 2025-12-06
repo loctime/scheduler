@@ -384,7 +384,7 @@ export async function POST(request: NextRequest) {
       })
     }
     
-    // Todo bien, sugerir comando según el modo
+    // Todo bien, agregar a lista acumulada (no confirmar inmediatamente)
     const accion = modo === "ingreso" ? "entrada" : "salida"
     const verbo = modo === "ingreso" ? "agregar" : "quitar"
     
@@ -392,19 +392,19 @@ export async function POST(request: NextRequest) {
     console.log(`[STOCK-CHAT] Cantidad: ${cantidad}`)
     console.log(`[STOCK-CHAT] Acción: ${accion}`)
     
+    // Retornar información del producto para acumular
     return NextResponse.json({
       accion: {
         accion: "conversacion",
-        mensaje: `¿Confirmás ${verbo} ${cantidad} ${productoEncontrado.unidad || "unidades"} de ${productoEncontrado.nombre}?`,
+        mensaje: `✅ Agregado a la lista: ${cantidad} ${productoEncontrado.unidad || "unidades"} de ${productoEncontrado.nombre}. Podés seguir agregando productos o escribir "confirmar" para aplicar todos los cambios.`,
         confianza: 0.9,
-        comandoSugerido: {
+        productoAcumulado: {
           accion,
           productoId: productoEncontrado.id,
           producto: productoEncontrado.nombre,
           cantidad,
           unidad: productoEncontrado.unidad,
         },
-        requiereConfirmacion: true,
       }
     })
     

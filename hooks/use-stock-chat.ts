@@ -70,6 +70,15 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
   
   // Modo del chat (ingreso/egreso/pregunta)
   const [modo, setModo] = useState<"ingreso" | "egreso" | "pregunta" | null>(null)
+  
+  // Lista acumulada de productos para ingreso/egreso
+  const [productosAcumulados, setProductosAcumulados] = useState<Array<{
+    productoId: string
+    producto: string
+    cantidad: number
+    unidad?: string
+    accion: "entrada" | "salida"
+  }>>([])
 
   // Verificar conexión con Ollama
   const checkOllamaConnection = useCallback(async () => {
@@ -700,6 +709,106 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       console.log(`[CHAT] Acción recibida:`, accion)
       console.log(`[CHAT] Mensaje original: "${texto}"`)
       console.log(`[CHAT] Tiene comando sugerido:`, !!accion.comandoSugerido)
+      console.log(`[CHAT] Tiene producto acumulado:`, !!(accion as any).productoAcumulado)
+
+      // Si hay un producto acumulado (modo ingreso/egreso), agregarlo a la lista
+      if ((accion as any).productoAcumulado && (modo === "ingreso" || modo === "egreso")) {
+        const productoAcum = (accion as any).productoAcumulado
+        
+        setProductosAcumulados(prev => {
+          // Verificar si el producto ya está en la lista
+          const existe = prev.find(p => p.productoId === productoAcum.productoId && p.accion === productoAcum.accion)
+          let nuevaLista: typeof prev
+          
+          if (existe) {
+            // Si existe, sumar la cantidad
+            nuevaLista = prev.map(p => 
+              p.productoId === productoAcum.productoId && p.accion === productoAcum.accion
+                ? { ...p, cantidad: p.cantidad + productoAcum.cantidad }
+                : p
+            )
+          } else {
+            // Si no existe, agregarlo
+            nuevaLista = [...prev, {
+              productoId: productoAcum.productoId,
+              producto: productoAcum.producto,
+              cantidad: productoAcum.cantidad,
+              unidad: productoAcum.unidad,
+              accion: productoAcum.accion,
+            }]
+          }
+          
+          // Generar mensaje con resumen actualizado
+          const resumen = nuevaLista.map(p => 
+            `• ${p.cantidad} ${p.unidad || "unidades"} de ${p.producto}`
+          ).join("\n")
+          
+          const verbo = modo === "ingreso" ? "agregar" : "quitar"
+          addMessage({
+            tipo: "sistema",
+            contenido: `✅ Agregado. Lista actual:\n\n${resumen}\n\nEscribí "confirmar" para ${verbo} todo o seguí agregando productos.`,
+            accion,
+          })
+          
+          return nuevaLista
+        })
+        return
+      }
+
+      // Si el usuario escribe "confirmar" y hay productos acumulados
+      const textoLower = texto.toLowerCase().trim()
+      if ((textoLower === "confirmar" || textoLower === "confirmo" || textoLower === "sí" || textoLower === "si" || textoLower === "ok") && productosAcumulados.length > 0) {
+        addMessage({ tipo: "usuario", contenido: texto })
+        setIsProcessing(true)
+        
+        try {
+          const resultados: string[] = []
+          for (const productoAcum of productosAcumulados) {
+            try {
+              const resultado = await ejecutarAccion({
+                accion: productoAcum.accion,
+                productoId: productoAcum.productoId,
+                cantidad: productoAcum.cantidad,
+                unidad: productoAcum.unidad,
+              })
+              resultados.push(resultado)
+            } catch (error) {
+              resultados.push(`❌ Error con ${productoAcum.producto}: ${error instanceof Error ? error.message : "Error desconocido"}`)
+            }
+          }
+          
+          const mensajeFinal = resultados.length === 1
+            ? resultados[0]
+            : `✅ **Cambios aplicados:**\n\n${resultados.join("\n")}`
+          
+          addMessage({
+            tipo: "sistema",
+            contenido: mensajeFinal,
+          })
+          
+          // Limpiar lista acumulada
+          setProductosAcumulados([])
+        } catch (error) {
+          addMessage({
+            tipo: "error",
+            contenido: error instanceof Error ? error.message : "Error ejecutando acciones",
+          })
+        } finally {
+          setIsProcessing(false)
+        }
+        return
+      }
+
+      // Si el usuario escribe "cancelar" o "limpiar" y hay productos acumulados
+      if ((textoLower === "cancelar" || textoLower === "limpiar" || textoLower === "borrar" || textoLower === "reset") && productosAcumulados.length > 0) {
+        addMessage({ tipo: "usuario", contenido: texto })
+        setProductosAcumulados([])
+        addMessage({
+          tipo: "sistema",
+          contenido: "✅ Lista limpiada. Podés empezar de nuevo.",
+        })
+        return
+      }
 
       // NUEVA ARQUITECTURA: Ollama sugiere comandos, el fallback los ejecuta
       if (accion.comandoSugerido) {
@@ -790,7 +899,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       setIsProcessing(false)
       abortControllerRef.current = null
     }
-  }, [isProcessing, productos, stockActual, pedidos, accionPendiente, addMessage, ejecutarAccion, modo])
+  }, [isProcessing, productos, stockActual, pedidos, accionPendiente, addMessage, ejecutarAccion, modo, productosAcumulados])
 
   // Cancelar mensaje en proceso
   const cancelarMensaje = useCallback(() => {
@@ -818,13 +927,28 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
   const limpiarChat = useCallback(() => {
     setMessages([])
     setAccionPendiente(null)
+    setProductosAcumulados([])
   }, [])
+  
+  // Limpiar productos acumulados cuando cambia el modo
+  useEffect(() => {
+    if (modo === "pregunta") {
+      setProductosAcumulados([])
+    }
+  }, [modo])
 
   // Obtener productos con stock bajo
   const productosStockBajo = productos.filter(p => {
     const actual = stockActual[p.id] || 0
     return actual < p.stockMinimo
   })
+
+  // Limpiar productos acumulados cuando cambia el modo
+  useEffect(() => {
+    if (modo === "pregunta") {
+      setProductosAcumulados([])
+    }
+  }, [modo])
 
   return {
     // Chat
@@ -839,6 +963,8 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     nombreAsistente,
     modo,
     setModo,
+    productosAcumulados,
+    setProductosAcumulados,
     
     // Stock
     productos,
