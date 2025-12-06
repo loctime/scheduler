@@ -217,6 +217,17 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     return () => unsubscribe()
   }, [userId])
 
+  // Agregar mensaje al chat
+  const addMessage = useCallback((mensaje: Omit<ChatMessage, "id" | "timestamp">) => {
+    const newMessage: ChatMessage = {
+      ...mensaje,
+      id: crypto.randomUUID(),
+      timestamp: new Date(),
+    }
+    setMessages(prev => [...prev, newMessage])
+    return newMessage
+  }, [])
+
   // Verificar Ollama al montar
   useEffect(() => {
     checkOllamaConnection()
@@ -242,18 +253,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
         contenido: welcomeMsg,
       })
     }
-  }, [ollamaStatus.status, productos, pedidos, loadingStock, addMessage])
-
-  // Agregar mensaje al chat
-  const addMessage = useCallback((mensaje: Omit<ChatMessage, "id" | "timestamp">) => {
-    const newMessage: ChatMessage = {
-      ...mensaje,
-      id: crypto.randomUUID(),
-      timestamp: new Date(),
-    }
-    setMessages(prev => [...prev, newMessage])
-    return newMessage
-  }, [])
+  }, [ollamaStatus.status, productos, pedidos, loadingStock, addMessage, messages.length])
 
   // ==================== ACCIONES DE BASE DE DATOS ====================
 
