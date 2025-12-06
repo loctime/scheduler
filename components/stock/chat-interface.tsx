@@ -33,6 +33,9 @@ interface ChatInterfaceProps {
     unidad?: string
     accion: "entrada" | "salida"
   }>
+  pedidos?: Array<{ id: string; nombre: string }>
+  pedidoSeleccionado?: string | null
+  setPedidoSeleccionado?: (pedidoId: string | null) => void
 }
 
 export function ChatInterface({
@@ -46,6 +49,9 @@ export function ChatInterface({
   modo,
   setModo,
   productosAcumulados = [],
+  pedidos = [],
+  pedidoSeleccionado,
+  setPedidoSeleccionado,
 }: ChatInterfaceProps) {
   const [inputValue, setInputValue] = useState("")
   const [lastSentMessage, setLastSentMessage] = useState<string>("")
@@ -164,8 +170,46 @@ export function ChatInterface({
     { texto: "¿Qué me falta pedir?", icon: null },
   ]
 
+  // Mostrar botones de pedidos solo en modos ingreso/egreso/stock
+  const mostrarBotonesPedidos = modo === "ingreso" || modo === "egreso" || modo === "stock"
+
   return (
     <div className="flex flex-col h-full rounded-lg border border-border bg-card overflow-hidden">
+      {/* Botones de selección de pedidos */}
+      {mostrarBotonesPedidos && setPedidoSeleccionado && pedidos.length > 0 && (
+        <div className="px-3 py-2 border-b border-border bg-muted/30">
+          <div className="flex gap-2 overflow-x-auto scrollbar-none">
+            <Button
+              type="button"
+              variant={pedidoSeleccionado === null ? "default" : "outline"}
+              onClick={() => {
+                setPedidoSeleccionado(null)
+                setTimeout(() => textareaRef.current?.focus(), 100)
+              }}
+              className={pedidoSeleccionado === null ? "bg-primary text-primary-foreground" : ""}
+              size="sm"
+            >
+              Todos
+            </Button>
+            {pedidos.map((pedido) => (
+              <Button
+                key={pedido.id}
+                type="button"
+                variant={pedidoSeleccionado === pedido.id ? "default" : "outline"}
+                onClick={() => {
+                  setPedidoSeleccionado(pedido.id)
+                  setTimeout(() => textareaRef.current?.focus(), 100)
+                }}
+                className={pedidoSeleccionado === pedido.id ? "bg-primary text-primary-foreground" : ""}
+                size="sm"
+              >
+                {pedido.nombre}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+      
       {/* Área de mensajes */}
       <div className="flex-1 overflow-y-auto min-h-0" ref={scrollRef}>
         <div className="p-4 space-y-4">

@@ -20,6 +20,9 @@ export function StockChatFloating() {
     modo,
     setModo,
     productosAcumulados,
+    pedidos,
+    pedidoSeleccionado,
+    setPedidoSeleccionado,
     chatIsOpen,
     setChatIsOpen,
   } = useStockChatContext()
@@ -121,6 +124,9 @@ export function StockChatFloating() {
                 modo={modo}
                 setModo={setModo}
                 productosAcumulados={productosAcumulados}
+                pedidos={pedidos}
+                pedidoSeleccionado={pedidoSeleccionado}
+                setPedidoSeleccionado={setPedidoSeleccionado}
               />
             </div>
           </div>

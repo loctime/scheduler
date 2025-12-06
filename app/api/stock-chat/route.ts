@@ -14,7 +14,7 @@ interface ProductoInfo {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { mensaje, modo, productos = [], stockActual = {}, pedidos = [] } = body
+    const { mensaje, modo, pedidoSeleccionado, productos = [], stockActual = {}, pedidos = [] } = body
 
     if (!mensaje) {
       return NextResponse.json(
@@ -313,8 +313,14 @@ export async function POST(request: NextRequest) {
     if (modo === "stock") {
       const msgNormalizado = mensaje.replace(/\n+/g, " ").replace(/\s+/g, " ").trim()
       
+      // Filtrar productos según pedido seleccionado (si aplica)
+      let productosFiltrados = productos
+      if (pedidoSeleccionado) {
+        productosFiltrados = productos.filter((p: { pedidoId?: string }) => p.pedidoId === pedidoSeleccionado)
+      }
+      
       // Construir lista de productos
-      const productosConStock: ProductoInfo[] = productos.map((p: { id: string; nombre: string; unidad?: string }) => ({
+      const productosConStock: ProductoInfo[] = productosFiltrados.map((p: { id: string; nombre: string; unidad?: string }) => ({
         id: p.id,
         nombre: p.nombre,
         unidad: p.unidad,

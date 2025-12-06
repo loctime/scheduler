@@ -71,6 +71,9 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
   // Modo del chat (ingreso/egreso/stock). null = modo pregunta (por defecto)
   const [modo, setModo] = useState<"ingreso" | "egreso" | "pregunta" | "stock" | null>(null)
   
+  // Pedido seleccionado para filtrar productos (solo en modos ingreso/egreso/stock)
+  const [pedidoSeleccionado, setPedidoSeleccionado] = useState<string | null>(null)
+  
   // Lista acumulada de productos para ingreso/egreso
   const [productosAcumulados, setProductosAcumulados] = useState<Array<{
     productoId: string
@@ -761,6 +764,11 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     const modoActual = modo || "pregunta"
     console.log(`[CHAT] Enviando mensaje: "${texto}", modo actual:`, modoActual)
 
+    // Filtrar productos según pedido seleccionado (solo en modos ingreso/egreso/stock)
+    const productosFiltrados = (modoActual === "ingreso" || modoActual === "egreso" || modoActual === "stock") && pedidoSeleccionado
+      ? productos.filter(p => p.pedidoId === pedidoSeleccionado)
+      : productos
+
     // Agregar mensaje del usuario
     addMessage({ tipo: "usuario", contenido: texto })
     setIsProcessing(true)
@@ -776,7 +784,8 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
         body: JSON.stringify({
           mensaje: texto,
           modo: modoActual, // Incluir el modo activo (null se convierte en "pregunta")
-          productos: productos.map(p => ({
+          pedidoSeleccionado: (modoActual === "ingreso" || modoActual === "egreso" || modoActual === "stock") ? pedidoSeleccionado : null,
+          productos: productosFiltrados.map(p => ({
             id: p.id,
             nombre: p.nombre,
             unidad: p.unidad,
@@ -1093,6 +1102,8 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     setModo,
     productosAcumulados,
     setProductosAcumulados,
+    pedidoSeleccionado,
+    setPedidoSeleccionado,
     
     // Stock
     productos,

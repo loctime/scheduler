@@ -25,6 +25,9 @@ export function StockChatSidebar({ isOpen, onClose }: StockChatSidebarProps) {
     modo,
     setModo,
     productosAcumulados,
+    pedidos,
+    pedidoSeleccionado,
+    setPedidoSeleccionado,
   } = useStockChatContext()
 
   if (!isOpen) {
@@ -63,6 +66,9 @@ export function StockChatSidebar({ isOpen, onClose }: StockChatSidebarProps) {
           modo={modo}
           setModo={setModo}
           productosAcumulados={productosAcumulados}
+          pedidos={pedidos}
+          pedidoSeleccionado={pedidoSeleccionado}
+          setPedidoSeleccionado={setPedidoSeleccionado}
         />
       </div>
     </div>
