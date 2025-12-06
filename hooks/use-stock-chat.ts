@@ -69,7 +69,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
   const [accionPendiente, setAccionPendiente] = useState<AccionPendiente | null>(null)
   
   // Modo del chat (ingreso/egreso/pregunta)
-  const [modo, setModo] = useState<"ingreso" | "egreso" | "pregunta" | null>(null)
+  const [modo, setModo] = useState<"ingreso" | "egreso" | "pregunta" | null>("pregunta")
   
   // Lista acumulada de productos para ingreso/egreso
   const [productosAcumulados, setProductosAcumulados] = useState<Array<{

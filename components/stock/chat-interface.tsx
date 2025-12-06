@@ -147,8 +147,7 @@ export function ChatInterface({
       <div className="flex items-center justify-between p-3 border-b border-border bg-muted/30">
         <div className="flex items-center gap-2">
           <Bot className="h-5 w-5 text-primary" />
-          <span className="font-medium text-sm">{nombreAsistente}</span>
-          <div className="flex items-center gap-1.5 ml-2">
+          <div className="flex items-center gap-1.5">
             {ollamaStatus.status === "checking" && (
               <>
                 <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
@@ -287,51 +286,45 @@ export function ChatInterface({
               type="button"
               variant={modo === "ingreso" ? "default" : "outline"}
               onClick={() => {
-                console.log("[CHAT-UI] Click en Modo Ingreso, modo actual:", modo)
                 const nuevoModo = modo === "ingreso" ? null : "ingreso"
-                console.log("[CHAT-UI] Nuevo modo:", nuevoModo)
                 setModo(nuevoModo)
               }}
               className={modo === "ingreso" ? "bg-green-600 hover:bg-green-700 text-white" : ""}
               size="sm"
             >
-              📥 Modo Ingreso
+              📥 Ingreso
             </Button>
             <Button
               type="button"
               variant={modo === "egreso" ? "default" : "outline"}
               onClick={() => {
-                console.log("[CHAT-UI] Click en Modo Egreso, modo actual:", modo)
                 const nuevoModo = modo === "egreso" ? null : "egreso"
-                console.log("[CHAT-UI] Nuevo modo:", nuevoModo)
                 setModo(nuevoModo)
               }}
               className={modo === "egreso" ? "bg-red-600 hover:bg-red-700 text-white" : ""}
               size="sm"
             >
-              📤 Modo Egreso
+              📤 Egreso
             </Button>
             <Button
               type="button"
               variant={modo === "pregunta" ? "default" : "outline"}
               onClick={() => {
-                console.log("[CHAT-UI] Click en Modo Pregunta, modo actual:", modo)
                 const nuevoModo = modo === "pregunta" ? null : "pregunta"
-                console.log("[CHAT-UI] Nuevo modo:", nuevoModo)
                 setModo(nuevoModo)
               }}
               className={modo === "pregunta" ? "bg-blue-600 hover:bg-blue-700 text-white" : ""}
               size="sm"
             >
-              ❓ Modo Pregunta
+              ❓ Pregunta
             </Button>
           </div>
           {modo && (
             <div className="text-xs text-muted-foreground mb-2 px-1">
               {modo === "pregunta" ? (
-                <>Modo activo: <strong>Pregunta</strong> - Escribí: nombre del producto o "todos" para ver todo el inventario</>
+                <> Escribí: nombre del producto o "todos" para ver todo el inventario</>
               ) : (
-                <>Modo activo: <strong>{modo === "ingreso" ? "Ingreso" : "Egreso"}</strong> - Escribí: "producto cantidad" (ej: "leche 20")</>
+                <> Escribí: "producto cantidad" (ej: "leche 20")</>
               )}
             </div>
           )}

@@ -54,7 +54,7 @@ export function StockChatFloating() {
             <div className="flex items-center justify-between p-4 border-b border-border bg-muted/30">
               <div className="flex items-center gap-2">
                 <MessageCircle className="h-5 w-5 text-primary" />
-                <h3 className="font-semibold text-sm">Chat de Stock</h3>
+                <h3 className="font-semibold text-sm">{nombreAsistente}</h3>
               </div>
               <Button
                 variant="ghost"
