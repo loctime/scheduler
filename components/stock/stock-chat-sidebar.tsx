@@ -57,9 +57,7 @@ export function StockChatSidebar({ isOpen, onClose }: StockChatSidebarProps) {
           isProcessing={isProcessing}
           ollamaStatus={ollamaStatus}
           onSendMessage={enviarMensaje}
-          onClearChat={limpiarChat}
           onCancelMessage={cancelarMensaje}
-          onRefreshConnection={checkOllamaConnection}
           accionPendiente={accionPendiente}
           nombreAsistente={nombreAsistente}
           modo={modo}

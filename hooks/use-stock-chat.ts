@@ -154,12 +154,23 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
         id: doc.id,
         ...doc.data()
       })) as Producto[]
-      setProductos(productosData)
+      
+      // Filtrar productos que tengan pedidoId válido (solo cuando ya tenemos pedidos cargados)
+      // Si no hay pedidos cargados aún, esperamos a que se carguen
+      const productosFiltrados = pedidos.length > 0
+        ? productosData.filter(p => {
+            // Solo incluir productos que tengan pedidoId y que ese pedido exista
+            if (!p.pedidoId) return false
+            return pedidos.some(ped => ped.id === p.pedidoId)
+          })
+        : productosData
+      
+      setProductos(productosFiltrados)
       setLoadingStock(false)
     })
 
     return () => unsubscribe()
-  }, [userId])
+  }, [userId, pedidos])
 
   // Cargar stock actual
   useEffect(() => {
@@ -212,8 +223,8 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
   useEffect(() => {
     if (messages.length === 0 && ollamaStatus.status === "ok") {
       const welcomeMsg = productos.length === 0
-        ? "¡Hola! Soy tu asistente de inventario. Todavía no tenés productos cargados. Podés decirme algo como \"creá un producto Tomate en cajas\" o ir a la sección Pedidos para cargarlos. ¿En qué te ayudo?"
-        : `¡Hola! Tenés ${productos.length} productos en tu inventario. Podés preguntarme sobre tu stock, agregar o quitar productos, ver qué te falta... ¿Qué necesitás?`
+        ? "¡Hola! Cargá productos desde la sección Pedidos para empezar. ¿En qué te ayudo?"
+        : `¡Hola! Tenés ${productos.length} productos. Preguntame sobre stock, agregar o quitar productos. ¿Qué necesitás?`
       
       addMessage({
         tipo: "sistema",

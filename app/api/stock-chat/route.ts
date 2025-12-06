@@ -39,238 +39,279 @@ export async function POST(request: NextRequest) {
       const msgNormalizado = mensaje.replace(/\n+/g, " ").replace(/\s+/g, " ").trim()
       const msgLower = msgNormalizado.toLowerCase()
       
-      // Construir lista de productos con stock
-      console.log(`[STOCK-CHAT] Modo pregunta - productos recibidos:`, productos.length)
-      console.log(`[STOCK-CHAT] Modo pregunta - stockActual recibido:`, Object.keys(stockActual).length, "productos")
-      console.log(`[STOCK-CHAT] Modo pregunta - muestra de stockActual:`, Object.entries(stockActual).slice(0, 5))
-      
-      const productosConStock: ProductoInfo[] = productos.map((p: { id: string; nombre: string; unidad?: string }) => {
-        const stock = stockActual[p.id] ?? 0
-        console.log(`[STOCK-CHAT] Producto: ${p.nombre} (ID: ${p.id}) -> Stock: ${stock}`)
-        return {
-          id: p.id,
-          nombre: p.nombre,
-          unidad: p.unidad,
-          stockActual: stock,
-        }
+      // Preparar datos - Filtrar productos que tengan pedidoId válido
+      const pedidosIds = new Set(pedidos.map((p: any) => p.id))
+      const productosCompletos = (productos as Array<{
+        id: string
+        nombre: string
+        unidad?: string
+        pedidoId?: string
+        stockMinimo?: number
+      }>).filter(p => {
+        // Solo incluir productos que tengan pedidoId y que ese pedido exista
+        if (!p.pedidoId) return false
+        return pedidosIds.has(p.pedidoId)
       })
       
-      // Si el mensaje es para generar un pedido
-      if (/^(pedido|generar pedido|qué me falta pedir|qué falta pedir|hacer pedido|crear pedido|armar pedido)/.test(msgLower)) {
-        if (productos.length === 0) {
+      // ==================== COMANDO: "pedido nombrepedido" ====================
+      if (msgLower.startsWith("pedido ")) {
+        const nombrePedido = msgNormalizado.substring(7).trim() // Remover "pedido "
+        
+        if (!nombrePedido) {
           return NextResponse.json({
             accion: {
               accion: "conversacion",
-              mensaje: "No tenés productos en tu inventario todavía. Agregalos desde la sección Pedidos.",
-              confianza: 0.9,
+              mensaje: "Escribí el nombre del pedido. Por ejemplo: 'pedido Verdulería'",
+              confianza: 0.5,
             }
           })
         }
         
-        // Calcular qué productos necesitan pedirse (stock actual < stock mínimo)
-        const calcularPedido = (stockMinimo: number, stockActualValue: number | undefined): number => {
-          const actual = stockActualValue ?? 0
-          return Math.max(0, stockMinimo - actual)
-        }
-        
-        // Agrupar productos por pedido - SOLO productos que existen en el array productos
-        const productosPorPedido = new Map<string, Array<{ producto: ProductoInfo; cantidad: number; stockMinimo: number }>>()
-        
-        // Iterar sobre productos existentes (no sobre productosConStock que puede tener eliminados)
-        productos.forEach((productoCompleto: any) => {
-          // Verificar que el producto tenga stockMinimo configurado
-          const stockMinimo = productoCompleto.stockMinimo || 0
-          if (stockMinimo <= 0) return // Si no tiene stock mínimo, no se puede calcular pedido
-          
-          const stockActualValue = stockActual[productoCompleto.id] ?? 0
-          const cantidadAPedir = calcularPedido(stockMinimo, stockActualValue)
-          
-          if (cantidadAPedir > 0) {
-            const pedidoId = productoCompleto.pedidoId
-            if (!pedidoId) return // Si no tiene pedidoId, saltar
-            
-            // Verificar que el pedido exista
-            const pedidoExiste = pedidos.some((p: any) => p.id === pedidoId)
-            if (!pedidoExiste) return // Si el pedido no existe, saltar
-            
-            if (!productosPorPedido.has(pedidoId)) {
-              productosPorPedido.set(pedidoId, [])
-            }
-            
-            productosPorPedido.get(pedidoId)!.push({
-              producto: {
-                id: productoCompleto.id,
-                nombre: productoCompleto.nombre,
-                unidad: productoCompleto.unidad,
-                stockActual: stockActualValue,
-              },
-              cantidad: cantidadAPedir,
-              stockMinimo,
-            })
-          }
-        })
-        
-        if (productosPorPedido.size === 0) {
-          return NextResponse.json({
-            accion: {
-              accion: "conversacion",
-              mensaje: "✅ ¡Excelente! Todos tus productos tienen stock suficiente. No necesitás hacer ningún pedido.",
-              confianza: 0.9,
-            }
-          })
-        }
-        
-        // Generar texto del pedido para cada grupo
-        const pedidosTexto: string[] = []
-        
-        productosPorPedido.forEach((productosList, pedidoId) => {
-          // Buscar el pedido para obtener formato y mensaje previo
-          const pedido = pedidos.find((p: any) => p.id === pedidoId)
-          const formatoSalida = pedido?.formatoSalida || "{nombre} ({cantidad})"
-          const mensajePrevio = pedido?.mensajePrevio || (pedido ? `📦 ${pedido.nombre}` : "📦 Pedido")
-          
-          const lineas = productosList.map(({ producto, cantidad }) => {
-            let texto = formatoSalida
-            texto = texto.replace(/{nombre}/g, producto.nombre)
-            texto = texto.replace(/{cantidad}/g, cantidad.toString())
-            texto = texto.replace(/{unidad}/g, producto.unidad || "")
-            return texto.trim()
-          })
-          
-          const pedidoTexto = `${mensajePrevio}\n\n${lineas.join("\n")}\n\nTotal: ${productosList.length} productos`
-          pedidosTexto.push(pedidoTexto)
-        })
-        
-        const respuestaCompleta = pedidosTexto.length === 1
-          ? pedidosTexto[0]
-          : `📋 **Pedidos a realizar:**\n\n${pedidosTexto.join("\n\n---\n\n")}`
-        
-        return NextResponse.json({
-          accion: {
-            accion: "conversacion",
-            mensaje: respuestaCompleta,
-            confianza: 0.9,
-          }
-        })
-      }
-      
-      // Si el mensaje es "todos", "todos los productos", "mostrar todos", etc.
-      if (/^(todos|todos los|mostrar todos|listar todos|ver todos|stock completo)/.test(msgLower)) {
-        if (productosConStock.length === 0) {
-          return NextResponse.json({
-            accion: {
-              accion: "conversacion",
-              mensaje: "No tenés productos en tu inventario todavía. Agregalos desde la sección Pedidos.",
-              confianza: 0.9,
-            }
-          })
-        }
-        
-        // Ordenar por stock (menor a mayor para destacar los que necesitan atención)
-        const productosOrdenados = [...productosConStock].sort((a, b) => 
-          (a.stockActual || 0) - (b.stockActual || 0)
+        // Buscar pedido por nombre
+        const pedidoEncontrado = pedidos.find((p: any) => 
+          p.nombre.toLowerCase().includes(nombrePedido.toLowerCase())
         )
         
-        const listaStock = productosOrdenados.map(p => {
-          // Obtener stock directamente de stockActual para asegurar que esté actualizado
+        if (!pedidoEncontrado) {
+          return NextResponse.json({
+            accion: {
+              accion: "conversacion",
+              mensaje: `No encontré el pedido "${nombrePedido}". Escribí "pedido" seguido del nombre del pedido.`,
+              confianza: 0.5,
+            }
+          })
+        }
+        
+        // Filtrar productos de ese pedido que necesitan pedirse
+        const productosDelPedido = productosCompletos.filter(p => p.pedidoId === pedidoEncontrado.id)
+        const productosAPedir = productosDelPedido.filter(p => {
           const stock = stockActual[p.id] ?? 0
-          const unidad = p.unidad || "u"
-          console.log(`[STOCK-CHAT] Listando producto: ${p.nombre} (ID: ${p.id}) -> Stock: ${stock} (desde stockActual) vs ${p.stockActual} (desde objeto)`)
-          return `• ${p.nombre}: ${stock} ${unidad}`
-        }).join("\n")
+          const minimo = p.stockMinimo || 0
+          return stock < minimo
+        })
+        
+        if (productosAPedir.length === 0) {
+          return NextResponse.json({
+            accion: {
+              accion: "conversacion",
+              mensaje: `✅ El pedido "${pedidoEncontrado.nombre}" está completo. Todos los productos tienen stock suficiente.`,
+              confianza: 0.9,
+            }
+          })
+        }
+        
+        // Generar lista de pedido
+        const formatoSalida = pedidoEncontrado.formatoSalida || "{nombre} ({cantidad})"
+        const mensajePrevio = pedidoEncontrado.mensajePrevio || `📦 ${pedidoEncontrado.nombre}`
+        
+        const lineas = productosAPedir.map(p => {
+          const stock = stockActual[p.id] ?? 0
+          const minimo = p.stockMinimo || 0
+          const cantidadAPedir = minimo - stock
+          
+          let texto = formatoSalida
+          texto = texto.replace(/{nombre}/g, p.nombre)
+          texto = texto.replace(/{cantidad}/g, cantidadAPedir.toString())
+          texto = texto.replace(/{unidad}/g, p.unidad || "")
+          return texto.trim()
+        })
+        
+        const respuesta = `${mensajePrevio}\n\n${lineas.join("\n")}\n\nTotal: ${productosAPedir.length} productos`
         
         return NextResponse.json({
           accion: {
             accion: "conversacion",
-            mensaje: `📦 **Stock actual de todos los productos:**\n\n${listaStock}\n\nTotal: ${productosConStock.length} productos`,
+            mensaje: respuesta,
             confianza: 0.9,
           }
         })
       }
       
-      // Buscar producto específico
-      const palabras = msgNormalizado.split(/\s+/).filter((p: string) => !/^\d+$/.test(p) && p.length > 1)
-      
-      if (palabras.length === 0) {
+      // ==================== COMANDO: "stock" (todo) ====================
+      if (msgLower === "stock" || msgLower === "stock todo" || msgLower === "stock todos") {
+        if (productosCompletos.length === 0) {
+          return NextResponse.json({
+            accion: {
+              accion: "conversacion",
+              mensaje: "No tenés productos en tu inventario todavía. Agregalos desde la sección Pedidos.",
+              confianza: 0.9,
+            }
+          })
+        }
+        
+        // Agrupar por pedido (solo productos con pedidoId válido)
+        const productosPorPedido = new Map<string, typeof productosCompletos>()
+        productosCompletos.forEach(p => {
+          // Solo agrupar si tiene pedidoId válido
+          if (!p.pedidoId) return
+          const pedidoId = p.pedidoId
+          if (!productosPorPedido.has(pedidoId)) {
+            productosPorPedido.set(pedidoId, [])
+          }
+          productosPorPedido.get(pedidoId)!.push(p)
+        })
+        
+        // Generar lista agrupada
+        const secciones: string[] = []
+        productosPorPedido.forEach((prods, pedidoId) => {
+          const pedido = pedidos.find((p: any) => p.id === pedidoId)
+          // Solo mostrar si el pedido existe (ya filtramos antes, pero por seguridad)
+          if (!pedido) return
+          
+          const nombrePedido = pedido.nombre
+          
+          const lista = prods
+            .sort((a, b) => (stockActual[a.id] ?? 0) - (stockActual[b.id] ?? 0))
+            .map(p => {
+              const stock = stockActual[p.id] ?? 0
+              const unidad = p.unidad || "u"
+              const estado = stock < (p.stockMinimo || 0) ? "⚠️" : "✅"
+              return `${estado} ${p.nombre}: ${stock} ${unidad}`
+            })
+            .join("\n")
+          
+          secciones.push(`**${nombrePedido}** (${prods.length} productos):\n${lista}`)
+        })
+        
+        const totalProductos = productosCompletos.length
+        const respuesta = `📦 **Stock General**\n\n${secciones.join("\n\n")}\n\nTotal: ${totalProductos} productos`
+        
         return NextResponse.json({
           accion: {
             accion: "conversacion",
-            mensaje: "¿De qué producto querés consultar el stock? Escribí el nombre del producto o 'todos' para ver todo el inventario.",
-            confianza: 0.5,
+            mensaje: respuesta,
+            confianza: 0.9,
           }
         })
       }
       
-      // Buscar producto (usar la misma lógica que en ingreso/egreso)
-      const textoBusqueda = palabras.join(" ").toLowerCase()
-      let productoEncontrado: ProductoInfo | null = null
-      
-      // Coincidencia exacta
-      productoEncontrado = productosConStock.find(p => 
-        p.nombre.toLowerCase() === textoBusqueda
-      ) || null
-      
-      if (!productoEncontrado) {
-        // Buscar productos que contengan todas las palabras
-        const productosQueContienen = productosConStock.filter(producto => {
-          const nombreLower = producto.nombre.toLowerCase()
-          return palabras.every((pal: string) => {
-            const palLower = pal.toLowerCase()
-            const regex = new RegExp(`\\b${palLower}\\b`, "i")
-            return regex.test(nombreLower) || nombreLower.includes(palLower)
-          })
-        })
+      // ==================== COMANDO: "stock nombrepedido" ====================
+      if (msgLower.startsWith("stock ")) {
+        const resto = msgNormalizado.substring(6).trim() // Remover "stock "
         
-        if (productosQueContienen.length === 1) {
-          productoEncontrado = productosQueContienen[0]
-        } else if (productosQueContienen.length > 1) {
-          productoEncontrado = productosQueContienen.reduce((prev, curr) => 
-            curr.nombre.length < prev.nombre.length ? curr : prev
-          )
-        } else {
-          // Buscar por inicio
-          const productosQueEmpiezan = productosConStock.filter(producto => {
-            const nombreLower = producto.nombre.toLowerCase()
-            return palabras.some((pal: string) => {
-              const palLower = pal.toLowerCase()
-              return nombreLower.startsWith(palLower) || nombreLower.includes(` ${palLower}`)
+        if (!resto) {
+          return NextResponse.json({
+            accion: {
+              accion: "conversacion",
+              mensaje: "Escribí 'stock' para ver todo, 'stock nombrepedido' para ver un pedido, o 'stock nombreproducto' para ver un producto.",
+              confianza: 0.5,
+            }
+          })
+        }
+        
+        // Buscar si es un pedido
+        const pedidoEncontrado = pedidos.find((p: any) => 
+          p.nombre.toLowerCase().includes(resto.toLowerCase())
+        )
+        
+        if (pedidoEncontrado) {
+          // Es un pedido
+          const productosDelPedido = productosCompletos
+            .filter(p => p.pedidoId === pedidoEncontrado.id)
+            .sort((a, b) => (stockActual[a.id] ?? 0) - (stockActual[b.id] ?? 0))
+          
+          if (productosDelPedido.length === 0) {
+            return NextResponse.json({
+              accion: {
+                accion: "conversacion",
+                mensaje: `El pedido "${pedidoEncontrado.nombre}" no tiene productos cargados.`,
+                confianza: 0.9,
+              }
             })
+          }
+          
+          const lista = productosDelPedido.map(p => {
+            const stock = stockActual[p.id] ?? 0
+            const unidad = p.unidad || "u"
+            const estado = stock < (p.stockMinimo || 0) ? "⚠️" : "✅"
+            return `${estado} ${p.nombre}: ${stock} ${unidad}`
+          }).join("\n")
+          
+          return NextResponse.json({
+            accion: {
+              accion: "conversacion",
+              mensaje: `📦 **Stock de ${pedidoEncontrado.nombre}**\n\n${lista}\n\nTotal: ${productosDelPedido.length} productos`,
+              confianza: 0.9,
+            }
+          })
+        }
+        
+        // Si no es pedido, buscar como producto
+        const palabras = resto.split(/\s+/).filter((p: string) => p.length > 1)
+        if (palabras.length === 0) {
+          return NextResponse.json({
+            accion: {
+              accion: "conversacion",
+              mensaje: "No encontré ese pedido ni producto. Escribí 'stock' para ver todo el inventario.",
+              confianza: 0.5,
+            }
+          })
+        }
+        
+        // Buscar producto
+        const textoBusqueda = palabras.join(" ").toLowerCase()
+        let productoEncontrado = productosCompletos.find(p => 
+          p.nombre.toLowerCase() === textoBusqueda
+        )
+        
+        if (!productoEncontrado) {
+          // Buscar productos que contengan todas las palabras
+          const productosQueContienen = productosCompletos.filter(p => {
+            const nombreLower = p.nombre.toLowerCase()
+            return palabras.every((pal: string) => 
+              nombreLower.includes(pal.toLowerCase())
+            )
           })
           
-          if (productosQueEmpiezan.length === 1) {
-            productoEncontrado = productosQueEmpiezan[0]
-          } else if (productosQueEmpiezan.length > 1) {
-            productoEncontrado = productosQueEmpiezan.reduce((prev, curr) => 
+          if (productosQueContienen.length === 1) {
+            productoEncontrado = productosQueContienen[0]
+          } else if (productosQueContienen.length > 1) {
+            productoEncontrado = productosQueContienen.reduce((prev, curr) => 
               curr.nombre.length < prev.nombre.length ? curr : prev
             )
           }
         }
-      }
-      
-      if (!productoEncontrado) {
-        const nombreMencionado = palabras.join(" ")
+        
+        if (!productoEncontrado) {
+          return NextResponse.json({
+            accion: {
+              accion: "conversacion",
+              mensaje: `No encontré "${resto}" en tu inventario. Escribí "stock" para ver todos los productos.`,
+              confianza: 0.5,
+            }
+          })
+        }
+        
+        // Mostrar stock del producto
+        const stock = stockActual[productoEncontrado.id] ?? 0
+        const unidad = productoEncontrado.unidad || "u"
+        const minimo = productoEncontrado.stockMinimo || 0
+        const estado = stock < minimo ? "⚠️" : "✅"
+        const pedido = pedidos.find((p: any) => p.id === productoEncontrado!.pedidoId)
+        
+        let respuesta = `📦 **${productoEncontrado.nombre}**: ${stock} ${unidad}`
+        if (pedido) {
+          respuesta += `\n📋 Pedido: ${pedido.nombre}`
+        }
+        if (minimo > 0) {
+          respuesta += `\n${estado} Mínimo: ${minimo} ${unidad}`
+        }
+        
         return NextResponse.json({
           accion: {
             accion: "conversacion",
-            mensaje: `No encontré "${nombreMencionado}" en tu inventario. Escribí "todos" para ver todos los productos o el nombre exacto del producto.`,
-            confianza: 0.5,
+            mensaje: respuesta,
+            confianza: 0.9,
           }
         })
       }
       
-      // Mostrar stock del producto encontrado (obtener directamente de stockActual para asegurar que esté actualizado)
-      const stock = stockActual[productoEncontrado.id] ?? 0
-      const unidad = productoEncontrado.unidad || "u"
-      
-      console.log(`[STOCK-CHAT] Producto encontrado: ${productoEncontrado.nombre} (ID: ${productoEncontrado.id})`)
-      console.log(`[STOCK-CHAT] Stock desde stockActual[${productoEncontrado.id}]:`, stock)
-      console.log(`[STOCK-CHAT] Stock desde productoEncontrado.stockActual:`, productoEncontrado.stockActual)
-      
+      // ==================== MENSAJE NO RECONOCIDO ====================
       return NextResponse.json({
         accion: {
           accion: "conversacion",
-          mensaje: `📦 **${productoEncontrado.nombre}**: ${stock} ${unidad}`,
-          confianza: 0.9,
+          mensaje: "Comandos disponibles:\n\n• **stock** - Ver todo el inventario\n• **stock nombrepedido** - Ver stock de un pedido\n• **stock nombreproducto** - Ver stock de un producto\n• **pedido nombrepedido** - Generar pedido de un proveedor",
+          confianza: 0.5,
         }
       })
     }
