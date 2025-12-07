@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { 
   Plus, Trash2, Copy, MessageCircle, RotateCcw, Upload, Package, 
-  Construction, Pencil, Check, X, Cog
+  Construction, Pencil, Check, X, Cog, ExternalLink
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
@@ -344,6 +344,15 @@ export default function PedidosPage() {
                       </div>
                     )}
                     <div className="flex gap-1 shrink-0">
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        className="h-8 w-8" 
+                        onClick={() => window.location.href = `/dashboard/pedidos/${selectedPedido.id}`}
+                        title="Ver detalle y control"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
                       <Button 
                         variant={showConfig ? "default" : "outline"} 
                         size="icon" 

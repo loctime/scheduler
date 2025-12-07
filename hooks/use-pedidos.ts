@@ -190,6 +190,7 @@ export function usePedidos(user: any) {
         nombre: nombre.trim(),
         stockMinimoDefault,
         formatoSalida: formatoSalida || DEFAULT_FORMAT,
+        estado: "creado",
         userId: user.uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -200,6 +201,7 @@ export function usePedidos(user: any) {
         nombre: nombre.trim(),
         stockMinimoDefault,
         formatoSalida: formatoSalida || DEFAULT_FORMAT,
+        estado: "creado",
         userId: user.uid,
       }
       
@@ -464,6 +466,109 @@ export function usePedidos(user: any) {
     return `${encabezado}\n\n${lineas.join("\n")}\n\nTotal: ${productosAPedir.length} productos`
   }, [selectedPedido, productosAPedir, stockActual, calcularPedido])
 
+  // Actualizar estado del pedido
+  const updatePedidoEstado = useCallback(async (
+    pedidoId: string,
+    estado: "creado" | "enviado" | "recibido" | "completado",
+    fechaEnvio?: Date,
+    fechaRecepcion?: Date
+  ) => {
+    if (!db) return false
+
+    try {
+      const updateData: any = {
+        estado,
+        updatedAt: serverTimestamp(),
+      }
+      
+      if (fechaEnvio) {
+        updateData.fechaEnvio = fechaEnvio
+      }
+      if (fechaRecepcion) {
+        updateData.fechaRecepcion = fechaRecepcion
+      }
+
+      await updateDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId), updateData)
+      
+      // Actualizar estado local
+      setPedidos(prev => prev.map(p => 
+        p.id === pedidoId 
+          ? { ...p, estado, fechaEnvio, fechaRecepcion }
+          : p
+      ))
+      
+      if (selectedPedido?.id === pedidoId) {
+        setSelectedPedido(prev => prev ? { ...prev, estado, fechaEnvio, fechaRecepcion } : null)
+      }
+
+      return true
+    } catch (error: any) {
+      logger.error("Error al actualizar estado del pedido:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el estado",
+        variant: "destructive",
+      })
+      return false
+    }
+  }, [selectedPedido, toast])
+
+  // Actualizar remito de envío
+  const updateRemitoEnvio = useCallback(async (
+    pedidoId: string,
+    remitoEnvioId: string
+  ) => {
+    if (!db) return false
+
+    try {
+      await updateDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId), {
+        remitoEnvioId,
+        updatedAt: serverTimestamp(),
+      })
+      
+      setPedidos(prev => prev.map(p => 
+        p.id === pedidoId ? { ...p, remitoEnvioId } : p
+      ))
+      
+      if (selectedPedido?.id === pedidoId) {
+        setSelectedPedido(prev => prev ? { ...prev, remitoEnvioId } : null)
+      }
+
+      return true
+    } catch (error: any) {
+      logger.error("Error al actualizar remito de envío:", error)
+      return false
+    }
+  }, [selectedPedido])
+
+  // Actualizar enlace público
+  const updateEnlacePublico = useCallback(async (
+    pedidoId: string,
+    enlacePublicoId: string
+  ) => {
+    if (!db) return false
+
+    try {
+      await updateDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId), {
+        enlacePublicoId,
+        updatedAt: serverTimestamp(),
+      })
+      
+      setPedidos(prev => prev.map(p => 
+        p.id === pedidoId ? { ...p, enlacePublicoId } : p
+      ))
+      
+      if (selectedPedido?.id === pedidoId) {
+        setSelectedPedido(prev => prev ? { ...prev, enlacePublicoId } : null)
+      }
+
+      return true
+    } catch (error: any) {
+      logger.error("Error al actualizar enlace público:", error)
+      return false
+    }
+  }, [selectedPedido])
+
   return {
     // Estado
     pedidos,
@@ -488,6 +593,9 @@ export function usePedidos(user: any) {
     updateProductsOrder,
     calcularPedido,
     generarTextoPedido,
+    updatePedidoEstado,
+    updateRemitoEnvio,
+    updateEnlacePublico,
   }
 }
 

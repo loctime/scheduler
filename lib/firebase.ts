@@ -52,4 +52,7 @@ export const COLLECTIONS = {
   PRODUCTS: getCollectionPath("products"),
   STOCK_MOVIMIENTOS: getCollectionPath("stock_movimientos"),
   STOCK_ACTUAL: getCollectionPath("stock_actual"),
+  REMITOS: getCollectionPath("remitos"),
+  RECEPCIONES: getCollectionPath("recepciones"),
+  ENLACES_PUBLICOS: getCollectionPath("enlaces_publicos"),
 } as const

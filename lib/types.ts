@@ -114,6 +114,13 @@ export interface Pedido {
   stockMinimoDefault: number // Stock mínimo por defecto para nuevos productos
   formatoSalida: string // Formato personalizable con placeholders: {nombre}, {cantidad}, {unidad}
   mensajePrevio?: string // Mensaje que aparece al inicio del pedido (ej: "Pedido de insumos para fábrica:")
+  estado?: "creado" | "enviado" | "recibido" | "completado" // Estado del pedido
+  remitoEnvioId?: string // ID del remito de envío
+  enlacePublicoId?: string // ID para el enlace público
+  origenDefault?: string // Origen por defecto (ej: "FABRICA")
+  destinoDefault?: string // Destino por defecto (ej: "LOCAL")
+  fechaEnvio?: any // Fecha de envío
+  fechaRecepcion?: any // Fecha de recepción
   userId: string
   createdAt?: any
   updatedAt?: any
@@ -253,4 +260,61 @@ export const SINONIMOS_UNIDADES: Record<string, string> = {
   "latas": "latas",
   "litro": "l",
   "litros": "l",
+}
+
+// ==================== REMITOS Y RECEPCIONES ====================
+
+export interface Remito {
+  id: string
+  pedidoId: string
+  tipo: "envio" | "recepcion" | "devolucion"
+  numero: string // Generado automático
+  fecha: any
+  desde: string // Origen
+  hacia: string // Destino
+  productos: Array<{
+    productoId: string
+    productoNombre: string
+    cantidadPedida: number
+    cantidadEnviada?: number
+    cantidadRecibida?: number
+  }>
+  firmaEnvio?: { nombre: string, firma?: string } // Firma digital
+  firmaRecepcion?: { nombre: string, firma?: string }
+  observaciones?: string
+  userId: string
+  createdAt?: any
+}
+
+export interface Recepcion {
+  id: string
+  pedidoId: string
+  remitoId?: string // ID del remito asociado
+  fecha: any
+  productos: Array<{
+    productoId: string
+    productoNombre: string
+    cantidadEnviada: number // Lo que envió la fábrica
+    cantidadRecibida: number // Lo que realmente llegó
+    estado: "ok" | "danado" | "vencido" | "faltante"
+    observaciones?: string
+    esDevolucion?: boolean // Si se devuelve a la fábrica
+  }>
+  esParcial: boolean
+  completada: boolean
+  userId: string
+  createdAt?: any
+}
+
+export interface EnlacePublico {
+  id: string // ID simple para el enlace
+  pedidoId: string
+  activo: boolean
+  productosDisponibles?: Record<string, {
+    disponible: boolean
+    cantidadEnviada?: number
+    observaciones?: string
+  }>
+  fechaAcceso?: any
+  createdAt?: any
 }
