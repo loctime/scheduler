@@ -167,11 +167,36 @@ export function useEnlacePublico(user: any) {
     }
   }, [])
 
+  // Buscar enlaces públicos activos por pedidoId
+  const buscarEnlacesActivosPorPedido = useCallback(async (
+    pedidoId: string
+  ): Promise<EnlacePublico[]> => {
+    if (!db || !user) return []
+
+    try {
+      const enlacesQuery = query(
+        collection(db, COLLECTIONS.ENLACES_PUBLICOS),
+        where("pedidoId", "==", pedidoId),
+        where("activo", "==", true),
+        where("userId", "==", user.uid)
+      )
+      const snapshot = await getDocs(enlacesQuery)
+      return snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as EnlacePublico[]
+    } catch (error: any) {
+      logger.error("Error al buscar enlaces activos:", error)
+      return []
+    }
+  }, [user])
+
   return {
     loading,
     crearEnlacePublico,
     obtenerEnlacePublico,
     actualizarProductosDisponibles,
     desactivarEnlace,
+    buscarEnlacesActivosPorPedido,
   }
 }
