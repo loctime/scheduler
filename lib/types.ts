@@ -309,7 +309,15 @@ export interface Recepcion {
 export interface EnlacePublico {
   id: string // ID simple para el enlace
   pedidoId: string
+  userId: string // ID del usuario dueño del pedido (para reglas de seguridad)
   activo: boolean
+  productosSnapshot?: Array<{
+    id: string
+    nombre: string
+    stockMinimo: number
+    unidad?: string
+    orden?: number
+  }> // Snapshot de productos al momento de crear el enlace
   productosDisponibles?: Record<string, {
     disponible: boolean
     cantidadEnviada?: number

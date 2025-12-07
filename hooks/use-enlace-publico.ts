@@ -2,17 +2,19 @@
 
 import { useState, useCallback } from "react"
 import {
-  collection,
-  addDoc,
   doc,
   getDoc,
   setDoc,
   serverTimestamp,
+  collection,
+  query,
+  where,
+  getDocs,
 } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
-import { EnlacePublico } from "@/lib/types"
+import { EnlacePublico, Producto } from "@/lib/types"
 
 export function useEnlacePublico(user: any) {
   const { toast } = useToast()
@@ -29,9 +31,50 @@ export function useEnlacePublico(user: any) {
       // Generar ID simple (usar últimos 8 caracteres del pedidoId + timestamp)
       const idSimple = `${pedidoId.slice(-8)}-${Date.now().toString(36)}`
 
+      // Obtener el userId del pedido para validación de seguridad
+      const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId))
+      if (!pedidoDoc.exists()) {
+        throw new Error("El pedido no existe")
+      }
+      const pedidoData = pedidoDoc.data()
+      if (pedidoData.userId !== user.uid) {
+        throw new Error("No tienes permiso para crear enlaces de este pedido")
+      }
+
+      // Verificar si el pedido ya está enviado
+      if (pedidoData.estado === "enviado" || pedidoData.estado === "recibido" || pedidoData.estado === "completado") {
+        throw new Error("No se puede generar un enlace para un pedido que ya fue enviado")
+      }
+
+      // Obtener productos del pedido para guardar snapshot
+      // Filtrar por pedidoId Y userId para que las reglas de seguridad permitan la lectura
+      const productosQuery = query(
+        collection(db, COLLECTIONS.PRODUCTS),
+        where("pedidoId", "==", pedidoId),
+        where("userId", "==", user.uid)
+      )
+      const productosSnapshot = await getDocs(productosQuery)
+      const productosData = productosSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Producto[]
+
+      productosData.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+
+      // Crear snapshot de productos (solo campos necesarios)
+      const productosSnapshotData = productosData.map(p => ({
+        id: p.id,
+        nombre: p.nombre,
+        stockMinimo: p.stockMinimo,
+        unidad: p.unidad,
+        orden: p.orden,
+      }))
+
       const enlaceData: Omit<EnlacePublico, "id"> = {
         pedidoId,
         activo: true,
+        userId: user.uid, // Incluir userId para las reglas de seguridad
+        productosSnapshot: productosSnapshotData, // Guardar snapshot
         createdAt: serverTimestamp(),
       }
 
@@ -52,7 +95,7 @@ export function useEnlacePublico(user: any) {
       logger.error("Error al crear enlace público:", error)
       toast({
         title: "Error",
-        description: "No se pudo crear el enlace público",
+        description: error.message || "No se pudo crear el enlace público",
         variant: "destructive",
       })
       return null
@@ -103,10 +146,32 @@ export function useEnlacePublico(user: any) {
     }
   }, [])
 
+  // Desactivar enlace público
+  const desactivarEnlace = useCallback(async (
+    enlaceId: string
+  ): Promise<boolean> => {
+    if (!db) return false
+
+    try {
+      await setDoc(
+        doc(db, COLLECTIONS.ENLACES_PUBLICOS, enlaceId),
+        {
+          activo: false,
+        },
+        { merge: true }
+      )
+      return true
+    } catch (error: any) {
+      logger.error("Error al desactivar enlace:", error)
+      return false
+    }
+  }, [])
+
   return {
     loading,
     crearEnlacePublico,
     obtenerEnlacePublico,
     actualizarProductosDisponibles,
+    desactivarEnlace,
   }
 }

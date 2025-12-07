@@ -58,13 +58,73 @@ export function crearRemitoEnvio(
 }
 
 /**
+ * Genera un remito de envío desde productosDisponibles (confirmado por la fábrica)
+ */
+export function crearRemitoEnvioDesdeDisponibles(
+  pedido: Pedido,
+  productos: Producto[],
+  productosDisponibles: Record<string, {
+    disponible: boolean
+    cantidadEnviada?: number
+    observaciones?: string
+  }>
+): Omit<Remito, "id" | "numero" | "createdAt"> {
+  // Obtener solo los productos que están disponibles y tienen cantidad a enviar
+  const productosRemito = productos
+    .filter(p => {
+      const disponible = productosDisponibles[p.id]
+      return disponible?.disponible && (disponible.cantidadEnviada ?? 0) > 0
+    })
+    .map(p => {
+      const disponible = productosDisponibles[p.id]
+      return {
+        productoId: p.id,
+        productoNombre: p.nombre,
+        cantidadPedida: p.stockMinimo || 0,
+        cantidadEnviada: disponible?.cantidadEnviada || 0,
+      }
+    })
+
+  // Recolectar observaciones de todos los productos
+  const observaciones = productos
+    .map(p => {
+      const disponible = productosDisponibles[p.id]
+      if (disponible?.observaciones) {
+        return `${p.nombre}: ${disponible.observaciones}`
+      }
+      return null
+    })
+    .filter(Boolean)
+    .join("\n")
+
+  // Construir el objeto del remito
+  const remitoData: any = {
+    pedidoId: pedido.id,
+    tipo: "envio",
+    fecha: new Date(),
+    desde: pedido.origenDefault || "FABRICA",
+    hacia: pedido.destinoDefault || "LOCAL",
+    productos: productosRemito,
+    userId: pedido.userId,
+  }
+
+  // Solo incluir observaciones si hay contenido
+  if (observaciones && observaciones.trim().length > 0) {
+    remitoData.observaciones = observaciones
+  }
+
+  return remitoData
+}
+
+/**
  * Genera un remito de recepción (fábrica → local)
  */
 export function crearRemitoRecepcion(
   pedido: Pedido,
   recepcion: any
 ): Omit<Remito, "id" | "numero" | "createdAt"> {
-  return {
+  // Construir el objeto del remito
+  const remitoData: any = {
     pedidoId: pedido.id,
     tipo: "recepcion",
     fecha: recepcion.fecha || new Date(),
@@ -77,9 +137,15 @@ export function crearRemitoRecepcion(
       cantidadEnviada: p.cantidadEnviada,
       cantidadRecibida: p.cantidadRecibida,
     })),
-    observaciones: recepcion.observaciones,
     userId: pedido.userId,
   }
+
+  // Solo incluir observaciones si hay contenido
+  if (recepcion.observaciones && recepcion.observaciones.trim().length > 0) {
+    remitoData.observaciones = recepcion.observaciones
+  }
+
+  return remitoData
 }
 
 /**

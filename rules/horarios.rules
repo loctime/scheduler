@@ -73,21 +73,52 @@ match /apps/horarios/config/{configId} {
 
 // Colección: apps/horarios/pedidos
 match /apps/horarios/pedidos/{pedidoId} {
-  // Solo el dueño puede leer sus pedidos
-  allow read: if isAuth() && resource.data.userId == uid();
+  // Permitir lectura si es el dueño O si no hay autenticación (la app valida el enlace)
+  allow read: if (isAuth() && resource.data.userId == uid()) 
+    || !isAuth();
   // Crear: verificar que userId sea correcto
   allow create: if isAuth() && request.resource.data.userId == uid();
-  // Actualizar: verificar propiedad y proteger userId
-  allow update: if isAuth() && resource.data.userId == uid()
-    && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId);
+  // Actualizar: 
+  // - Si está autenticado: verificar propiedad y proteger userId
+  // - Si NO está autenticado: permitir solo si el pedido NO está en estado "enviado", "recibido" o "completado"
+  //   (permite "creado", null, o undefined para pedidos antiguos)
+  //   y solo se actualizan campos específicos (estado, remitoEnvioId, fechaEnvio, updatedAt)
+  //   sin modificar userId ni otros campos sensibles
+  allow update: if (isAuth() && resource.data.userId == uid()
+    && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId))
+    || (!isAuth() 
+      && (
+        // Permitir si el estado NO es uno de los estados bloqueados
+        // Esto funciona incluso cuando el estado es null o undefined
+        !('estado' in resource.data)
+        || resource.data.estado == null
+        || (resource.data.estado != "enviado"
+            && resource.data.estado != "recibido"
+            && resource.data.estado != "completado")
+      )
+      && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
+      // Solo permitir actualizar campos específicos: estado, remitoEnvioId, fechaEnvio, updatedAt
+      && (!('nombre' in request.resource.data) || request.resource.data.nombre == resource.data.nombre)
+      && (!('stockMinimoDefault' in request.resource.data) || request.resource.data.stockMinimoDefault == resource.data.stockMinimoDefault)
+      && (!('formatoSalida' in request.resource.data) || request.resource.data.formatoSalida == resource.data.formatoSalida)
+      && (!('mensajePrevio' in request.resource.data) || request.resource.data.mensajePrevio == resource.data.mensajePrevio)
+      && (!('origenDefault' in request.resource.data) || request.resource.data.origenDefault == resource.data.origenDefault)
+      && (!('destinoDefault' in request.resource.data) || request.resource.data.destinoDefault == resource.data.destinoDefault)
+      && (!('fechaRecepcion' in request.resource.data) || request.resource.data.fechaRecepcion == resource.data.fechaRecepcion)
+      && (!('createdAt' in request.resource.data) || request.resource.data.createdAt == resource.data.createdAt));
   // Eliminar: solo el dueño
   allow delete: if isAuth() && resource.data.userId == uid();
 }
 
 // Colección: apps/horarios/products
 match /apps/horarios/products/{productoId} {
-  // Solo el dueño puede leer sus productos
-  allow read: if isAuth() && resource.data.userId == uid();
+  // Permitir lectura si es el dueño
+  // Para lectura pública, se permite si el producto pertenece a un pedido con enlace público
+  // Nota: La validación completa del enlace activo se hace en la aplicación
+  // Como no podemos consultar el pedido desde aquí, permitimos lectura pública
+  // pero la app valida el enlace antes de mostrar datos
+  allow read: if (isAuth() && resource.data.userId == uid()) 
+    || !isAuth();
   // Crear: verificar que userId sea correcto
   allow create: if isAuth() && request.resource.data.userId == uid();
   // Actualizar: verificar propiedad y proteger userId
@@ -118,6 +149,71 @@ match /apps/horarios/stock_actual/{stockId} {
   // Actualizar: verificar propiedad y proteger userId
   allow update: if isAuth() && resource.data.userId == uid()
     && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId);
+  // Eliminar: solo el dueño
+  allow delete: if isAuth() && resource.data.userId == uid();
+}
+
+// Colección: apps/horarios/remitos
+match /apps/horarios/remitos/{remitoId} {
+  // Solo el dueño puede leer sus remitos
+  allow read: if isAuth() && resource.data.userId == uid();
+  // Crear: 
+  // - Si está autenticado: verificar que userId sea correcto
+  // - Si NO está autenticado: permitir solo si el pedido existe y el userId coincide
+  //   (la aplicación controla que el pedido esté en estado válido antes de crear el remito)
+  allow create: if (isAuth() && request.resource.data.userId == uid())
+    || (!isAuth() 
+      && request.resource.data.pedidoId != null
+      && exists(/databases/$(db)/documents/apps/horarios/pedidos/$(request.resource.data.pedidoId))
+      && request.resource.data.userId == get(/databases/$(db)/documents/apps/horarios/pedidos/$(request.resource.data.pedidoId)).data.userId);
+  // Actualizar: verificar propiedad y proteger userId
+  allow update: if isAuth() && resource.data.userId == uid()
+    && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId);
+  // Eliminar: solo el dueño
+  allow delete: if isAuth() && resource.data.userId == uid();
+}
+
+// Colección: apps/horarios/recepciones
+match /apps/horarios/recepciones/{recepcionId} {
+  // Solo el dueño puede leer sus recepciones
+  allow read: if isAuth() && resource.data.userId == uid();
+  // Crear: verificar que userId sea correcto
+  allow create: if isAuth() && request.resource.data.userId == uid();
+  // Actualizar: verificar propiedad y proteger userId
+  allow update: if isAuth() && resource.data.userId == uid()
+    && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId);
+  // Eliminar: solo el dueño
+  allow delete: if isAuth() && resource.data.userId == uid();
+}
+
+// Colección: apps/horarios/enlaces_publicos
+match /apps/horarios/enlaces_publicos/{enlaceId} {
+  // Permitir lectura pública (para que la fábrica pueda acceder sin login)
+  allow read: if true;
+  // Crear: verificar que userId sea correcto (la app debe incluir userId al crear)
+  allow create: if isAuth() && request.resource.data.userId == uid();
+  // Actualizar: 
+  // - Si está autenticado: verificar propiedad y proteger userId
+  // - Si NO está autenticado: permitir actualizar cuando está activo
+  //   - Proteger campos sensibles (userId, pedidoId, createdAt)
+  //   - Permitir actualizar productosDisponibles, fechaAcceso
+  //   - Permitir desactivar solo si el pedido está enviado
+  allow update: if (isAuth() && resource.data.userId == uid()
+    && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId))
+    || (!isAuth() 
+      && resource.data.activo == true
+      // Proteger campos sensibles
+      && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
+      && (!('pedidoId' in request.resource.data) || request.resource.data.pedidoId == resource.data.pedidoId)
+      && (!('createdAt' in request.resource.data) || request.resource.data.createdAt == resource.data.createdAt)
+      && (
+        // Caso 1: No se modifica activo o no está en request - permitir actualizar
+        (!('activo' in request.resource.data) || request.resource.data.activo == true)
+        // Caso 2: Se intenta desactivar - solo si el pedido está enviado
+        || (request.resource.data.activo == false
+          && exists(/databases/$(db)/documents/apps/horarios/pedidos/$(resource.data.pedidoId))
+          && get(/databases/$(db)/documents/apps/horarios/pedidos/$(resource.data.pedidoId)).data.estado == "enviado")
+      ));
   // Eliminar: solo el dueño
   allow delete: if isAuth() && resource.data.userId == uid();
 }

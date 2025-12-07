@@ -6,14 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { 
   Plus, Trash2, Copy, MessageCircle, RotateCcw, Upload, Package, 
-  Construction, Pencil, Check, X, Cog, ExternalLink
+  Construction, Pencil, Check, X, Cog, ExternalLink, Link as LinkIcon
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
 import { useStockChatContext } from "@/contexts/stock-chat-context"
 import { usePedidos } from "@/hooks/use-pedidos"
+import { useEnlacePublico } from "@/hooks/use-enlace-publico"
 import { db, COLLECTIONS } from "@/lib/firebase"
-import { doc, setDoc, serverTimestamp } from "firebase/firestore"
+import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore"
 import { PedidosSidebar } from "@/components/pedidos/pedidos-sidebar"
 import { ProductosTable } from "@/components/pedidos/productos-table"
 import { 
@@ -60,6 +61,8 @@ export default function PedidosPage() {
     calcularPedido,
     generarTextoPedido,
   } = usePedidos(user)
+
+  const { crearEnlacePublico } = useEnlacePublico(user)
   
   // Usar el stockActual del contexto global (del chat) en lugar del local
   // El local solo se usa para cambios manuales desde la tabla
@@ -103,6 +106,8 @@ export default function PedidosPage() {
       mensajeInputRef.current.select()
     }
   }, [isEditingMensaje])
+
+  // Ya no cargamos enlaces existentes - siempre generamos nuevos
 
   // Reset edit states when selectedPedido changes
   useEffect(() => {
@@ -169,6 +174,39 @@ export default function PedidosPage() {
     }
     const encoded = encodeURIComponent(generarTextoPedido())
     window.open(`https://wa.me/?text=${encoded}`, "_blank")
+  }
+
+  const handleGenerarEnlace = async () => {
+    if (!selectedPedido) return
+
+    // Verificar si el pedido ya está enviado
+    if (selectedPedido.estado === "enviado" || selectedPedido.estado === "recibido" || selectedPedido.estado === "completado") {
+      toast({
+        title: "No se puede generar enlace",
+        description: "Este pedido ya fue enviado. No se pueden generar nuevos enlaces.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      // Siempre crear un nuevo enlace (no reutilizar)
+      const nuevoEnlace = await crearEnlacePublico(selectedPedido.id)
+      if (nuevoEnlace) {
+        const url = `${window.location.origin}/pedido-publico/${nuevoEnlace.id}`
+        await navigator.clipboard.writeText(url)
+        toast({
+          title: "Enlace generado y copiado",
+          description: "El nuevo enlace público se ha generado y copiado al portapapeles",
+        })
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo generar el enlace",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleStockChange = async (productId: string, value: number) => {
@@ -462,6 +500,17 @@ export default function PedidosPage() {
                       >
                         <Copy className="h-3.5 w-3.5 sm:mr-1" />
                         <span className="hidden sm:inline text-xs">Copiar</span>
+                      </Button>
+                      <Button 
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2"
+                        onClick={handleGenerarEnlace}
+                        disabled={productosAPedirActualizados.length === 0 || selectedPedido?.estado === "enviado" || selectedPedido?.estado === "recibido" || selectedPedido?.estado === "completado"}
+                        title="Generar nuevo enlace público"
+                      >
+                        <LinkIcon className="h-3.5 w-3.5 sm:mr-1" />
+                        <span className="hidden sm:inline text-xs">Link</span>
                       </Button>
                       <Button 
                         size="sm"
