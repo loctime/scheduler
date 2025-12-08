@@ -66,15 +66,23 @@ export default function PedidoPublicoPage() {
         // Usar snapshot de productos si existe, sino leer dinámicamente (para enlaces antiguos)
         if (enlace.productosSnapshot && enlace.productosSnapshot.length > 0) {
           // Convertir snapshot a formato Producto
-          const productosFromSnapshot = enlace.productosSnapshot.map(p => ({
-            id: p.id,
-            pedidoId: enlace.pedidoId,
-            nombre: p.nombre,
-            stockMinimo: p.stockMinimo,
-            unidad: p.unidad,
-            orden: p.orden,
-            userId: enlace.userId,
-          })) as Producto[]
+          const productosFromSnapshot = enlace.productosSnapshot
+            .filter(p => (p.cantidadPedida ?? 0) > 0) // Solo incluir productos con cantidadPedida > 0
+            .map(p => {
+              const cantidadPedida = p.cantidadPedida ?? 0
+              console.log(`Cargando producto ${p.nombre} del snapshot: stockMinimo=${p.stockMinimo}, cantidadPedida=${cantidadPedida}`)
+              return {
+                id: p.id,
+                pedidoId: enlace.pedidoId,
+                nombre: p.nombre,
+                stockMinimo: p.stockMinimo,
+                cantidadPedida: cantidadPedida, // Usar cantidadPedida del snapshot (ya filtrado)
+                unidad: p.unidad,
+                orden: p.orden,
+                userId: enlace.userId,
+              }
+            }) as Producto[]
+          console.log("Productos cargados del snapshot:", productosFromSnapshot)
           setProductos(productosFromSnapshot)
         } else {
           // Fallback: leer productos dinámicamente (para enlaces antiguos sin snapshot)

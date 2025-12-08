@@ -43,7 +43,7 @@ export default function RecepcionPage() {
 
   useEffect(() => {
     const cargarDatos = async () => {
-      if (!pedidoId) return
+      if (!pedidoId || !db) return
 
       try {
         // Cargar pedido
@@ -140,33 +140,35 @@ export default function RecepcionPage() {
                 const productos: typeof productosEnviados = []
                 
                 // Necesitamos obtener los productos del pedido para tener los nombres
-                const { collection, query, where, getDocs } = await import("firebase/firestore")
-                const productosQuery = query(
-                  collection(db, COLLECTIONS.PRODUCTS),
-                  where("pedidoId", "==", pedidoId)
-                )
-                const productosSnapshot = await getDocs(productosQuery)
-                const productosData = productosSnapshot.docs.map((doc) => ({
-                  id: doc.id,
-                  ...doc.data(),
-                }))
+                if (db) {
+                  const { collection, query, where, getDocs } = await import("firebase/firestore")
+                  const productosQuery = query(
+                    collection(db, COLLECTIONS.PRODUCTS),
+                    where("pedidoId", "==", pedidoId)
+                  )
+                  const productosSnapshot = await getDocs(productosQuery)
+                  const productosData = productosSnapshot.docs.map((doc) => ({
+                    id: doc.id,
+                    ...doc.data(),
+                  }))
 
-                // Construir lista de productos enviados
-                Object.entries(enlace.productosDisponibles).forEach(([productoId, data]: [string, any]) => {
-                  if (data.disponible && data.cantidadEnviada) {
-                    const producto = productosData.find(p => p.id === productoId)
-                    if (producto) {
-                      productos.push({
-                        productoId: producto.id,
-                        productoNombre: producto.nombre,
-                        cantidadPedida: producto.stockMinimo || 0,
-                        cantidadEnviada: data.cantidadEnviada,
-                      })
+                  // Construir lista de productos enviados
+                  Object.entries(enlace.productosDisponibles).forEach(([productoId, data]: [string, any]) => {
+                    if (data.disponible && data.cantidadEnviada) {
+                      const producto = productosData.find(p => p.id === productoId)
+                      if (producto) {
+                        productos.push({
+                          productoId: producto.id,
+                          productoNombre: producto.nombre,
+                          cantidadPedida: producto.stockMinimo || 0,
+                          cantidadEnviada: data.cantidadEnviada,
+                        })
+                      }
                     }
-                  }
-                })
+                  })
 
-                setProductosEnviados(productos)
+                  setProductosEnviados(productos)
+                }
               }
             }
           }
@@ -210,7 +212,7 @@ export default function RecepcionPage() {
       const remitoData = crearRemitoRecepcion(pedido, recepcion, remitoPedido, remitoEnvio)
       const remito = await crearRemito(remitoData, pedido.nombre)
 
-      if (remito) {
+      if (remito && db) {
         // Actualizar recepción con remito ID
         const { updateDoc } = await import("firebase/firestore")
         await updateDoc(doc(db, COLLECTIONS.RECEPCIONES, recepcion.id), {

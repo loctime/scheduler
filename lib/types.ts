@@ -316,6 +316,7 @@ export interface EnlacePublico {
     id: string
     nombre: string
     stockMinimo: number
+    cantidadPedida: number // Cantidad calculada a pedir (resultado de calcularPedido)
     unidad?: string
     orden?: number
   }> // Snapshot de productos al momento de crear el enlace

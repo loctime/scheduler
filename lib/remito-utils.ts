@@ -134,10 +134,12 @@ export function crearRemitoEnvioDesdeDisponibles(
     })
     .map(p => {
       const disponible = productosDisponibles[p.id]
+      // Usar cantidadPedida del snapshot si existe (en productos del enlace público), sino stockMinimo
+      const cantidadPedida = (p as any).cantidadPedida || p.stockMinimo || 0
       return {
         productoId: p.id,
         productoNombre: p.nombre,
-        cantidadPedida: p.stockMinimo || 0,
+        cantidadPedida: cantidadPedida,
         cantidadEnviada: disponible?.cantidadEnviada || 0,
       }
     })

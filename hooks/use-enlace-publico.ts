@@ -22,7 +22,8 @@ export function useEnlacePublico(user: any) {
 
   // Crear enlace público
   const crearEnlacePublico = useCallback(async (
-    pedidoId: string
+    pedidoId: string,
+    cantidadesPedidas?: Record<string, number> // Mapa de productoId -> cantidad a pedir
   ): Promise<EnlacePublico | null> => {
     if (!db || !user) return null
 
@@ -74,14 +75,25 @@ export function useEnlacePublico(user: any) {
 
       productosData.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
 
-      // Crear snapshot de productos (solo campos necesarios)
-      const productosSnapshotData = productosData.map(p => ({
-        id: p.id,
-        nombre: p.nombre,
-        stockMinimo: p.stockMinimo,
-        unidad: p.unidad,
-        orden: p.orden,
-      }))
+      // Crear snapshot solo de productos que necesitan ser pedidos (cantidadPedida > 0)
+      const productosSnapshotData = productosData
+        .filter(p => {
+          const cantidadPedida = cantidadesPedidas?.[p.id] ?? 0
+          return cantidadPedida > 0 // Solo incluir productos que realmente necesitan ser pedidos
+        })
+        .map(p => {
+          const cantidadPedida = cantidadesPedidas?.[p.id] ?? 0
+          console.log(`Snapshot producto ${p.nombre}: stockMinimo=${p.stockMinimo}, cantidadPedida=${cantidadPedida}`)
+          return {
+            id: p.id,
+            nombre: p.nombre,
+            stockMinimo: p.stockMinimo,
+            cantidadPedida: cantidadPedida, // Solo usar cantidad calculada (ya filtramos los que son 0)
+            unidad: p.unidad,
+            orden: p.orden,
+          }
+        })
+      console.log("Snapshot de productos creado (solo con cantidadPedida > 0):", productosSnapshotData)
 
       const enlaceData: Omit<EnlacePublico, "id"> = {
         pedidoId,

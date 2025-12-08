@@ -91,10 +91,15 @@ export function EnlacePublicoForm({
         </p>
         <div className="space-y-3">
           {productos
-            .filter((producto) => (producto.stockMinimo || 0) > 0) // Solo mostrar productos con stock mínimo > 0
+            .filter((producto) => {
+              // Solo mostrar productos con cantidadPedida > 0 (no usar stockMinimo como fallback)
+              const cantidadPedida = (producto as any).cantidadPedida ?? 0
+              return cantidadPedida > 0
+            })
             .map((producto) => {
             const productoData = productosDisponibles[producto.id] || { disponible: false }
-            const cantidadPedida = producto.stockMinimo || 0
+            // Usar cantidadPedida del snapshot (no usar stockMinimo como fallback)
+            const cantidadPedida = (producto as any).cantidadPedida ?? 0
 
             return (
               <div

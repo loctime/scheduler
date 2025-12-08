@@ -343,7 +343,18 @@ export default function PedidosPage() {
     if (!selectedPedido) return
 
     try {
-      const nuevoEnlace = await crearEnlacePublico(selectedPedido.id)
+      // Calcular cantidades a pedir solo para productos que realmente necesitan ser pedidos
+      const cantidadesPedidas: Record<string, number> = {}
+      products.forEach(p => {
+        const cantidad = calcularPedido(p.stockMinimo, stockActual[p.id])
+        if (cantidad > 0) {
+          cantidadesPedidas[p.id] = cantidad // Solo guardar productos que necesitan ser pedidos
+          console.log(`Producto ${p.nombre}: stockMinimo=${p.stockMinimo}, stockActual=${stockActual[p.id]}, cantidadPedida=${cantidad}`)
+        }
+      })
+      console.log("Cantidades a pedir calculadas (solo > 0):", cantidadesPedidas)
+      
+      const nuevoEnlace = await crearEnlacePublico(selectedPedido.id, cantidadesPedidas)
       if (nuevoEnlace) {
         setEnlaceActivo({ id: nuevoEnlace.id })
         const url = `${window.location.origin}/pedido-publico/${nuevoEnlace.id}`
@@ -407,7 +418,16 @@ export default function PedidosPage() {
   const handleGenerarEnlacePublicoDesdeControl = async () => {
     if (!selectedPedido) return
 
-    const enlace = await crearEnlacePublico(selectedPedido.id)
+    // Calcular cantidades a pedir solo para productos que realmente necesitan ser pedidos
+    const cantidadesPedidas: Record<string, number> = {}
+    products.forEach(p => {
+      const cantidad = calcularPedido(p.stockMinimo, stockActual[p.id])
+      if (cantidad > 0) {
+        cantidadesPedidas[p.id] = cantidad // Solo guardar productos que necesitan ser pedidos
+      }
+    })
+    
+    const enlace = await crearEnlacePublico(selectedPedido.id, cantidadesPedidas)
     if (enlace) {
       await updateEnlacePublico(selectedPedido.id, enlace.id)
       setEnlaceActivo({ id: enlace.id })
