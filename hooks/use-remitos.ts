@@ -15,7 +15,7 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
 import { Remito } from "@/lib/types"
-import { generarNumeroRemito, generarPDFRemito } from "@/lib/remito-utils"
+import { generarNumeroRemito, generarPDFRemito, eliminarRemitosAnteriores } from "@/lib/remito-utils"
 
 export function useRemitos(user: any) {
   const { toast } = useToast()
@@ -23,14 +23,24 @@ export function useRemitos(user: any) {
 
   // Crear remito
   const crearRemito = useCallback(async (
-    remitoData: Omit<Remito, "id" | "numero" | "createdAt">
+    remitoData: Omit<Remito, "id" | "numero" | "createdAt">,
+    nombrePedido?: string
   ): Promise<Remito | null> => {
     if (!db || !user) return null
 
     setLoading(true)
     try {
-      // Generar número de remito
-      const numero = await generarNumeroRemito(db, COLLECTIONS)
+      // Obtener nombre del pedido si no se proporciona
+      let nombre = nombrePedido
+      if (!nombre && remitoData.pedidoId) {
+        const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, remitoData.pedidoId))
+        if (pedidoDoc.exists()) {
+          nombre = pedidoDoc.data().nombre
+        }
+      }
+      
+      // Generar número de remito con nombre del pedido
+      const numero = await generarNumeroRemito(db, COLLECTIONS, nombre || "PEDIDO")
 
       // Crear remito en Firestore
       const remitoRef = await addDoc(collection(db, COLLECTIONS.REMITOS), {
@@ -43,6 +53,11 @@ export function useRemitos(user: any) {
         id: remitoRef.id,
         ...remitoData,
         numero,
+      }
+
+      // Si es un remito final (recepcion), eliminar remitos anteriores
+      if (remitoData.final && remitoData.pedidoId) {
+        await eliminarRemitosAnteriores(db, COLLECTIONS, remitoData.pedidoId)
       }
 
       toast({

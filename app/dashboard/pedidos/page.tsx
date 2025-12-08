@@ -74,9 +74,16 @@ export default function PedidosPage() {
   // Estado para enlace público activo
   const [enlaceActivo, setEnlaceActivo] = useState<{ id: string } | null>(null)
   
-  // Usar el stockActual del contexto global (del chat) en lugar del local
-  // El local solo se usa para cambios manuales desde la tabla
-  const stockActual = stockActualGlobal || stockActualLocal
+  // Mejorar la lógica de merge: los cambios locales tienen prioridad sobre los globales
+  // Esto evita que el listener de Firestore sobrescriba los cambios del usuario
+  const stockActual = useMemo(() => {
+    // Si hay cambios locales, combinarlos con los globales (locales tienen prioridad)
+    if (Object.keys(stockActualLocal).length > 0) {
+      return { ...stockActualGlobal, ...stockActualLocal }
+    }
+    // Si no hay cambios locales, usar los globales
+    return stockActualGlobal || stockActualLocal
+  }, [stockActualGlobal, stockActualLocal])
   
   // Recalcular productosAPedir con el stock global
   const productosAPedirActualizados = useMemo(() => {
@@ -272,13 +279,14 @@ export default function PedidosPage() {
     
     // Actualizar en Firestore para sincronizar con el contexto global
     try {
-      if (!db || !user) return
+      if (!db || !user || !selectedPedido) return
       
       const stockDocId = `${user.uid}_${productId}`
       const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
       
       await setDoc(stockDocRef, {
-        productId,
+        productoId: productId, // Corregir: usar productoId en lugar de productId
+        pedidoId: selectedPedido.id, // Agregar pedidoId
         cantidad: value,
         ultimaActualizacion: serverTimestamp(),
         userId: user.uid,
@@ -656,18 +664,31 @@ export default function PedidosPage() {
                         <h3 className="text-sm font-semibold flex items-center gap-2">
                           <FileText className="h-4 w-4" />
                           Remitos ({remitos.length})
+                          {remitos.some(r => r.final) && (
+                            <span className="text-xs text-muted-foreground ml-2">
+                              (Completado)
+                            </span>
+                          )}
                         </h3>
                       </div>
                       <div className="space-y-2">
-                        {remitos.map((remito) => (
+                        {/* Mostrar primero el remito final si existe, luego los demás */}
+                        {[...remitos]
+                          .sort((a, b) => {
+                            if (a.final && !b.final) return -1
+                            if (!a.final && b.final) return 1
+                            return 0
+                          })
+                          .map((remito) => (
                           <div
                             key={remito.id}
                             className="flex items-center justify-between p-2.5 rounded-lg border bg-background hover:bg-accent/50 transition-colors"
                           >
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium truncate">
-                                {remito.tipo === "envio" ? "📤 Remito de Envío" : remito.tipo === "recepcion" ? "📥 Remito de Recepción" : "↩️ Remito de Devolución"} - {remito.numero}
-                              </p>
+                          <p className="text-xs font-medium truncate">
+                            {remito.tipo === "pedido" ? "📋 Remito de Pedido" : remito.tipo === "envio" ? "📤 Remito de Envío" : remito.tipo === "recepcion" ? "📥 Remito de Recepción" : "↩️ Remito de Devolución"} - {remito.numero}
+                            {remito.final && " (Final)"}
+                          </p>
                               <p className="text-[10px] text-muted-foreground mt-0.5">
                                 {remito.fecha?.toDate 
                                   ? remito.fecha.toDate().toLocaleDateString("es-AR", { 

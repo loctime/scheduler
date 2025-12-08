@@ -3,34 +3,91 @@ import { es } from "date-fns/locale"
 import type { Remito, Pedido, Producto } from "./types"
 
 /**
- * Genera un número de remito único en formato REM-001, REM-002, etc.
+ * Normaliza el nombre del pedido para usar en la numeración de remitos
+ */
+function normalizarNombrePedido(nombre: string): string {
+  return nombre
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "") // Solo letras y números
+    .substring(0, 10) // Máximo 10 caracteres
+    || "PEDIDO" // Fallback si está vacío
+}
+
+/**
+ * Genera un número de remito único por tipo de pedido en formato VERDULERIA-001, VERDULERIA-002, etc.
  */
 export async function generarNumeroRemito(
   db: any,
-  COLLECTIONS: any
+  COLLECTIONS: any,
+  nombrePedido: string
 ): Promise<string> {
   try {
-    const { collection, query, orderBy, limit, getDocs } = await import("firebase/firestore")
+    const { collection, query, orderBy, limit, getDocs, where } = await import("firebase/firestore")
+    const prefijo = normalizarNombrePedido(nombrePedido)
     const remitosRef = collection(db, COLLECTIONS.REMITOS)
-    const q = query(remitosRef, orderBy("numero", "desc"), limit(1))
+    
+    // Buscar el último remito de este tipo de pedido
+    const q = query(
+      remitosRef,
+      where("numero", ">=", `${prefijo}-000`),
+      where("numero", "<", `${prefijo}-999`),
+      orderBy("numero", "desc"),
+      limit(1)
+    )
     const snapshot = await getDocs(q)
     
     if (snapshot.empty) {
-      return "REM-001"
+      return `${prefijo}-001`
     }
     
     const ultimoNumero = snapshot.docs[0].data().numero
-    const numero = parseInt(ultimoNumero.split("-")[1]) + 1
-    return `REM-${String(numero).padStart(3, "0")}`
+    const partes = ultimoNumero.split("-")
+    if (partes.length === 2 && partes[0] === prefijo) {
+      const numero = parseInt(partes[1]) + 1
+      return `${prefijo}-${String(numero).padStart(3, "0")}`
+    }
+    
+    // Si no coincide el prefijo, empezar desde 001
+    return `${prefijo}-001`
   } catch (error) {
     // Si hay error, generar número basado en timestamp
+    const prefijo = normalizarNombrePedido(nombrePedido)
     const timestamp = Date.now()
-    return `REM-${String(timestamp).slice(-6)}`
+    return `${prefijo}-${String(timestamp).slice(-6)}`
+  }
+}
+
+/**
+ * Genera un remito de pedido inicial (solo cantidades pedidas)
+ */
+export function crearRemitoPedido(
+  pedido: Pedido,
+  productos: Producto[],
+  stockActual: Record<string, number>,
+  calcularPedido: (stockMinimo: number, stockActual?: number) => number
+): Omit<Remito, "id" | "numero" | "createdAt"> {
+  const productosAPedir = productos
+    .filter(p => calcularPedido(p.stockMinimo, stockActual[p.id]) > 0)
+    .map(p => ({
+      productoId: p.id,
+      productoNombre: p.nombre,
+      cantidadPedida: calcularPedido(p.stockMinimo, stockActual[p.id]),
+    }))
+
+  return {
+    pedidoId: pedido.id,
+    tipo: "pedido",
+    fecha: new Date(),
+    desde: pedido.origenDefault || "FABRICA",
+    hacia: pedido.destinoDefault || "LOCAL",
+    productos: productosAPedir,
+    userId: pedido.userId,
   }
 }
 
 /**
  * Genera un remito de envío (pedido → fábrica)
+ * @deprecated Usar crearRemitoPedido para el inicial y crearRemitoEnvioDesdeDisponibles para el confirmado
  */
 export function crearRemitoEnvio(
   pedido: Pedido,
@@ -117,26 +174,119 @@ export function crearRemitoEnvioDesdeDisponibles(
 }
 
 /**
- * Genera un remito de recepción (fábrica → local)
+ * Consolida datos de remitos anteriores (pedido y envío) con la recepción
+ */
+function consolidarProductosRemito(
+  remitoPedido: Remito | null,
+  remitoEnvio: Remito | null,
+  recepcion: any
+): Array<{
+  productoId: string
+  productoNombre: string
+  cantidadPedida: number
+  cantidadEnviada?: number
+  cantidadRecibida?: number
+}> {
+  // Crear un mapa de productos recibidos
+  const productosRecibidosMap = new Map<string, any>()
+  recepcion.productos.forEach((p: any) => {
+    productosRecibidosMap.set(p.productoId, p)
+  })
+
+  // Crear un mapa de productos del remito de pedido
+  const productosPedidoMap = new Map<string, any>()
+  if (remitoPedido) {
+    remitoPedido.productos.forEach(p => {
+      productosPedidoMap.set(p.productoId, p)
+    })
+  }
+
+  // Crear un mapa de productos del remito de envío
+  const productosEnvioMap = new Map<string, any>()
+  if (remitoEnvio) {
+    remitoEnvio.productos.forEach(p => {
+      productosEnvioMap.set(p.productoId, p)
+    })
+  }
+
+  // Consolidar: usar todos los productos que aparecen en cualquiera de los remitos
+  const productosConsolidados = new Map<string, any>()
+  
+  // Agregar productos del pedido
+  productosPedidoMap.forEach((p, id) => {
+    productosConsolidados.set(id, {
+      productoId: id,
+      productoNombre: p.productoNombre,
+      cantidadPedida: p.cantidadPedida || 0,
+      cantidadEnviada: 0,
+      cantidadRecibida: 0,
+    })
+  })
+
+  // Actualizar con datos de envío
+  productosEnvioMap.forEach((p, id) => {
+    const consolidado = productosConsolidados.get(id) || {
+      productoId: id,
+      productoNombre: p.productoNombre,
+      cantidadPedida: p.cantidadPedida || 0,
+      cantidadEnviada: 0,
+      cantidadRecibida: 0,
+    }
+    consolidado.cantidadEnviada = p.cantidadEnviada || 0
+    if (!consolidado.cantidadPedida && p.cantidadPedida) {
+      consolidado.cantidadPedida = p.cantidadPedida
+    }
+    productosConsolidados.set(id, consolidado)
+  })
+
+  // Actualizar con datos de recepción
+  productosRecibidosMap.forEach((p, id) => {
+    const consolidado = productosConsolidados.get(id) || {
+      productoId: id,
+      productoNombre: p.productoNombre,
+      cantidadPedida: 0,
+      cantidadEnviada: 0,
+      cantidadRecibida: 0,
+    }
+    consolidado.cantidadRecibida = p.cantidadRecibida || 0
+    if (!consolidado.cantidadEnviada && p.cantidadEnviada) {
+      consolidado.cantidadEnviada = p.cantidadEnviada
+    }
+    if (!consolidado.cantidadPedida && p.cantidadEnviada) {
+      consolidado.cantidadPedida = p.cantidadEnviada
+    }
+    productosConsolidados.set(id, consolidado)
+  })
+
+  return Array.from(productosConsolidados.values())
+}
+
+/**
+ * Genera un remito de recepción final consolidado (fábrica → local)
+ * Este remito consolida datos de remitos anteriores (pedido y envío)
  */
 export function crearRemitoRecepcion(
   pedido: Pedido,
-  recepcion: any
+  recepcion: any,
+  remitoPedido: Remito | null = null,
+  remitoEnvio: Remito | null = null
 ): Omit<Remito, "id" | "numero" | "createdAt"> {
-  // Construir el objeto del remito
+  // Consolidar productos de todos los remitos
+  const productosConsolidados = consolidarProductosRemito(
+    remitoPedido,
+    remitoEnvio,
+    recepcion
+  )
+
+  // Construir el objeto del remito final
   const remitoData: any = {
     pedidoId: pedido.id,
     tipo: "recepcion",
     fecha: recepcion.fecha || new Date(),
     desde: pedido.destinoDefault || "FABRICA",
     hacia: pedido.origenDefault || "LOCAL",
-    productos: recepcion.productos.map((p: any) => ({
-      productoId: p.productoId,
-      productoNombre: p.productoNombre,
-      cantidadPedida: p.cantidadEnviada || 0,
-      cantidadEnviada: p.cantidadEnviada,
-      cantidadRecibida: p.cantidadRecibida,
-    })),
+    productos: productosConsolidados,
+    final: true, // Marcar como remito final
     userId: pedido.userId,
   }
 
@@ -146,6 +296,44 @@ export function crearRemitoRecepcion(
   }
 
   return remitoData
+}
+
+/**
+ * Elimina remitos anteriores (pedido y envío) cuando se crea el remito de recepción final
+ */
+export async function eliminarRemitosAnteriores(
+  db: any,
+  COLLECTIONS: any,
+  pedidoId: string
+): Promise<void> {
+  try {
+    const { collection, query, where, getDocs, deleteDoc } = await import("firebase/firestore")
+    const remitosRef = collection(db, COLLECTIONS.REMITOS)
+    
+    // Buscar todos los remitos del pedido (no podemos usar != en Firestore fácilmente)
+    const q = query(
+      remitosRef,
+      where("pedidoId", "==", pedidoId)
+    )
+    const snapshot = await getDocs(q)
+    
+    // Eliminar remitos anteriores (pedido y envío) que no sean finales
+    const promesas = snapshot.docs
+      .filter(doc => {
+        const data = doc.data()
+        // Solo eliminar remitos de tipo "pedido" o "envio" que no sean finales
+        return (data.tipo === "pedido" || data.tipo === "envio") && !data.final
+      })
+      .map(doc => deleteDoc(doc.ref))
+    
+    if (promesas.length > 0) {
+      await Promise.all(promesas)
+      console.log(`✓ Eliminados ${promesas.length} remitos anteriores`)
+    }
+  } catch (error) {
+    console.error("Error al eliminar remitos anteriores:", error)
+    // No lanzar error para no interrumpir el flujo
+  }
 }
 
 /**
@@ -163,7 +351,9 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
   // Título
   pdf.setFontSize(16)
   pdf.setFont(undefined, "bold")
-  const titulo = remito.tipo === "envio" 
+  const titulo = remito.tipo === "pedido"
+    ? "PEDIDO PANIFICADOS Y EMPANADAS SANTA"
+    : remito.tipo === "envio" 
     ? "ENTREGA PANIFICADOS Y EMPANADAS SANTA"
     : remito.tipo === "recepcion"
     ? "RECEPCIÓN PANIFICADOS Y EMPANADAS SANTA"
@@ -209,8 +399,22 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
   // Tabla de productos
   pdf.setFontSize(10)
   pdf.setFont(undefined, "bold")
-  pdf.text("PRODUCTO", margin, yPos)
-  pdf.text("CANTIDAD", pdfWidth - margin - 30, yPos, { align: "right" })
+  
+  // Si es remito final (recepcion con final=true), mostrar 3 columnas
+  const esRemitoFinal = remito.final && remito.tipo === "recepcion"
+  
+  if (esRemitoFinal) {
+    // Encabezado con 3 columnas
+    pdf.text("PRODUCTO", margin, yPos)
+    const colWidth = (pdfWidth - margin * 2) / 3
+    pdf.text("PEDIDA", margin + colWidth, yPos, { align: "center" })
+    pdf.text("ENVIADA", margin + colWidth * 2, yPos, { align: "center" })
+    pdf.text("RECIBIDA", pdfWidth - margin, yPos, { align: "right" })
+  } else {
+    // Encabezado con 1 columna
+    pdf.text("PRODUCTO", margin, yPos)
+    pdf.text("CANTIDAD", pdfWidth - margin - 30, yPos, { align: "right" })
+  }
   yPos += 5
 
   // Línea debajo del encabezado
@@ -225,14 +429,39 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
       yPos = margin + 10
     }
 
-    const cantidad = remito.tipo === "recepcion" && producto.cantidadRecibida !== undefined
-      ? producto.cantidadRecibida.toString()
-      : producto.cantidadEnviada !== undefined
-      ? producto.cantidadEnviada.toString()
-      : producto.cantidadPedida.toString()
+    if (esRemitoFinal) {
+      // Mostrar 3 columnas para remito final
+      const colWidth = (pdfWidth - margin * 2) / 3
+      pdf.text(producto.productoNombre, margin + 2, yPos)
+      pdf.text(
+        (producto.cantidadPedida || 0).toString(),
+        margin + colWidth,
+        yPos,
+        { align: "center" }
+      )
+      pdf.text(
+        (producto.cantidadEnviada || 0).toString(),
+        margin + colWidth * 2,
+        yPos,
+        { align: "center" }
+      )
+      pdf.text(
+        (producto.cantidadRecibida || 0).toString(),
+        pdfWidth - margin,
+        yPos,
+        { align: "right" }
+      )
+    } else {
+      // Mostrar 1 columna para remitos intermedios
+      const cantidad = remito.tipo === "recepcion" && producto.cantidadRecibida !== undefined
+        ? producto.cantidadRecibida.toString()
+        : producto.cantidadEnviada !== undefined
+        ? producto.cantidadEnviada.toString()
+        : producto.cantidadPedida.toString()
 
-    pdf.text(producto.productoNombre, margin + 2, yPos)
-    pdf.text(cantidad, pdfWidth - margin - 30, yPos, { align: "right" })
+      pdf.text(producto.productoNombre, margin + 2, yPos)
+      pdf.text(cantidad, pdfWidth - margin - 30, yPos, { align: "right" })
+    }
     yPos += 6
   })
 

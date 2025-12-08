@@ -267,8 +267,8 @@ export const SINONIMOS_UNIDADES: Record<string, string> = {
 export interface Remito {
   id: string
   pedidoId: string
-  tipo: "envio" | "recepcion" | "devolucion"
-  numero: string // Generado automático
+  tipo: "pedido" | "envio" | "recepcion" | "devolucion"
+  numero: string // Generado automático (ej: "VERDULERIA-001")
   fecha: any
   desde: string // Origen
   hacia: string // Destino
@@ -282,6 +282,7 @@ export interface Remito {
   firmaEnvio?: { nombre: string, firma?: string } // Firma digital
   firmaRecepcion?: { nombre: string, firma?: string }
   observaciones?: string
+  final?: boolean // Indica si es el remito final (de recepción) que consolida todo
   userId: string
   createdAt?: any
 }

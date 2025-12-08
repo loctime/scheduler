@@ -11,7 +11,7 @@ import { useRemitos } from "@/hooks/use-remitos"
 import { useEnlacePublico } from "@/hooks/use-enlace-publico"
 import { useRecepciones } from "@/hooks/use-recepciones"
 import { PedidoTimeline } from "@/components/pedidos/pedido-timeline"
-import { crearRemitoEnvio, crearRemitoRecepcion } from "@/lib/remito-utils"
+import { crearRemitoPedido, crearRemitoRecepcion } from "@/lib/remito-utils"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { doc, getDoc } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
@@ -73,8 +73,8 @@ export default function PedidoDetallePage() {
   const handleGenerarRemitoEnvio = async () => {
     if (!pedido || !products.length) return
 
-    const remitoData = crearRemitoEnvio(pedido, products, stockActual, calcularPedido)
-    const remito = await crearRemito(remitoData)
+    const remitoData = crearRemitoPedido(pedido, products, stockActual, calcularPedido)
+    const remito = await crearRemito(remitoData, pedido.nombre)
     
     if (remito) {
       await updateRemitoEnvio(pedido.id, remito.id)

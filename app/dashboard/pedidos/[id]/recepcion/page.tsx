@@ -11,7 +11,8 @@ import { useRecepciones } from "@/hooks/use-recepciones"
 import { useRemitos } from "@/hooks/use-remitos"
 import { useEnlacePublico } from "@/hooks/use-enlace-publico"
 import { RecepcionForm } from "@/components/pedidos/recepcion-form"
-import { crearRemitoRecepcion } from "@/lib/remito-utils"
+import { crearRemitoRecepcion, eliminarRemitosAnteriores } from "@/lib/remito-utils"
+import type { Remito } from "@/lib/types"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { doc, getDoc } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
@@ -26,7 +27,7 @@ export default function RecepcionPage() {
 
   const { pedidos, stockActual, calcularPedido, updatePedidoEstado } = usePedidos(user)
   const { crearRecepcion } = useRecepciones(user)
-  const { crearRemito, descargarPDFRemito } = useRemitos(user)
+  const { crearRemito, descargarPDFRemito, obtenerRemitosPorPedido } = useRemitos(user)
   const { obtenerEnlacePublico } = useEnlacePublico(user)
 
   const [pedido, setPedido] = useState<any>(null)
@@ -118,9 +119,14 @@ export default function RecepcionPage() {
 
       if (!recepcion) return
 
-      // Generar remito de recepción
-      const remitoData = crearRemitoRecepcion(pedido, recepcion)
-      const remito = await crearRemito(remitoData)
+      // Buscar remitos anteriores (pedido y envío) para consolidar
+      const remitosAnteriores = await obtenerRemitosPorPedido(pedido.id)
+      const remitoPedido = remitosAnteriores.find(r => r.tipo === "pedido") || null
+      const remitoEnvio = remitosAnteriores.find(r => r.tipo === "envio") || null
+
+      // Generar remito de recepción consolidado
+      const remitoData = crearRemitoRecepcion(pedido, recepcion, remitoPedido, remitoEnvio)
+      const remito = await crearRemito(remitoData, pedido.nombre)
 
       if (remito) {
         // Actualizar recepción con remito ID

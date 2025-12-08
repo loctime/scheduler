@@ -124,9 +124,9 @@ export default function PedidoPublicoPage() {
       )
       console.log("Datos del remito:", remitoData)
 
-      // Generar número de remito
+      // Generar número de remito con nombre del pedido
       console.log("Paso 3: Generando número de remito...")
-      const numeroRemito = await generarNumeroRemito(db, COLLECTIONS)
+      const numeroRemito = await generarNumeroRemito(db, COLLECTIONS, pedido.nombre)
       console.log("Número de remito:", numeroRemito)
 
       // Crear remito en Firestore
