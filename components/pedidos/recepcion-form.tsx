@@ -148,8 +148,8 @@ export function RecepcionForm({
                   </span>
                 </div>
 
-                {/* Enviada */}
-                <div className="grid grid-cols-1 sm:grid-cols-[140px] gap-3 sm:gap-4 items-start">
+                {/* Enviada, recibida, comentario y estado: mobile-first sin scroll horizontal */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-[120px_120px_1fr_auto] gap-3 sm:gap-4 items-start">
                   <div className="space-y-1">
                     <Label htmlFor={`enviada-${producto.productoId}`} className="text-xs sm:text-sm">
                       Enviada
@@ -162,10 +162,7 @@ export function RecepcionForm({
                       className="bg-muted text-sm"
                     />
                   </div>
-                </div>
 
-                {/* Recibido, comentario y estado en la misma línea */}
-                <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr_auto] gap-3 sm:gap-4 items-start">
                   <div className="space-y-1">
                     <Label htmlFor={`cantidad-${producto.productoId}`} className="text-xs sm:text-sm">
                       Recibido
@@ -186,7 +183,7 @@ export function RecepcionForm({
                     />
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1 sm:col-span-2 md:col-span-1">
                     <Label htmlFor={`obs-${producto.productoId}`} className="text-xs sm:text-sm">
                       Comentario
                     </Label>
