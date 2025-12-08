@@ -26,12 +26,23 @@ export function useRecepciones(user: any) {
 
     setLoading(true)
     try {
-      const recepcionRef = await addDoc(collection(db, COLLECTIONS.RECEPCIONES), {
-        ...recepcionData,
+      // Filtrar campos undefined antes de enviar a Firestore
+      const recepcionDataLimpio: any = {
+        pedidoId: recepcionData.pedidoId,
         fecha: recepcionData.fecha || serverTimestamp(),
+        productos: recepcionData.productos,
+        esParcial: recepcionData.esParcial || false,
+        completada: recepcionData.completada !== undefined ? recepcionData.completada : true,
         userId: user.uid,
         createdAt: serverTimestamp(),
-      })
+      }
+      
+      // Solo incluir observaciones si tiene valor
+      if (recepcionData.observaciones && recepcionData.observaciones.trim()) {
+        recepcionDataLimpio.observaciones = recepcionData.observaciones
+      }
+      
+      const recepcionRef = await addDoc(collection(db, COLLECTIONS.RECEPCIONES), recepcionDataLimpio)
 
       const nuevaRecepcion: Recepcion = {
         id: recepcionRef.id,

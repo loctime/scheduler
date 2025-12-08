@@ -87,26 +87,34 @@ export function RecepcionForm({
         estado: "ok" as const,
         esDevolucion: false,
       }
-      return {
+      // Construir objeto de producto, eliminando campos undefined
+      const producto: any = {
         productoId: p.productoId,
         productoNombre: p.productoNombre,
         cantidadEnviada: p.cantidadEnviada,
         cantidadRecibida: data.cantidadRecibida,
         estado: data.estado,
-        observaciones: data.observaciones,
         esDevolucion: data.esDevolucion || false,
       }
+      // Solo incluir observaciones si tiene valor
+      if (data.observaciones && data.observaciones.trim()) {
+        producto.observaciones = data.observaciones
+      }
+      return producto
     })
 
     onConfirmar({
       pedidoId: "", // Se completará en el componente padre
       fecha: new Date(),
       productos,
-      esParcial,
+      esParcial: esParcial || false,
       completada: true,
       userId: "", // Se completará en el componente padre
     })
   }
+
+  console.log("RecepcionForm - productosEnviados:", productosEnviados)
+  console.log("RecepcionForm - cantidad de productos:", productosEnviados.length)
 
   return (
     <div className="space-y-6">
@@ -116,10 +124,20 @@ export function RecepcionForm({
           <h3 className="text-lg font-semibold">
             Control de Recepción {esParcial && "(Parcial)"}
           </h3>
+          {productosEnviados.length > 0 && (
+            <span className="text-sm text-muted-foreground">
+              ({productosEnviados.length} {productosEnviados.length === 1 ? "producto" : "productos"})
+            </span>
+          )}
         </div>
 
         <div className="space-y-3">
-          {productosEnviados.map((producto) => {
+          {productosEnviados.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No hay productos para recibir
+            </div>
+          ) : (
+            productosEnviados.map((producto) => {
             const data = productosRecepcion[producto.productoId] || {
               cantidadRecibida: producto.cantidadEnviada,
               estado: "ok" as const,
@@ -227,7 +245,8 @@ export function RecepcionForm({
                 </div>
               </div>
             )
-          })}
+            })
+          )}
         </div>
       </div>
 
