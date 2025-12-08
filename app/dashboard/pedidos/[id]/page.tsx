@@ -38,7 +38,7 @@ export default function PedidoDetallePage() {
 
   useEffect(() => {
     const cargarDatos = async () => {
-      if (!pedidoId) return
+      if (!pedidoId || !db) return
 
       try {
         // Cargar pedido
@@ -86,9 +86,11 @@ export default function PedidoDetallePage() {
       setRemitos(remitosData)
       
       // Recargar pedido
-      const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId))
-      if (pedidoDoc.exists()) {
-        setPedido({ id: pedidoDoc.id, ...pedidoDoc.data() })
+      if (db) {
+        const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId))
+        if (pedidoDoc.exists()) {
+          setPedido({ id: pedidoDoc.id, ...pedidoDoc.data() })
+        }
       }
     }
   }
@@ -111,7 +113,7 @@ export default function PedidoDetallePage() {
   }
 
   const handleMarcarCompletado = async () => {
-    if (!pedido) return
+    if (!pedido || !db) return
     await updatePedidoEstado(pedido.id, "completado")
     
     const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId))

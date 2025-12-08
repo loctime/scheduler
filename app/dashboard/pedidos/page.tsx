@@ -421,18 +421,6 @@ export default function PedidosPage() {
     }
   }
 
-  const handleMarcarCompletado = async () => {
-    if (!selectedPedido) return
-    await updatePedidoEstado(selectedPedido.id, "completado")
-    
-    // Recargar pedido desde Firestore
-    if (db) {
-      const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, selectedPedido.id))
-      if (pedidoDoc.exists()) {
-        setSelectedPedido({ id: pedidoDoc.id, ...pedidoDoc.data() } as any)
-      }
-    }
-  }
 
   const handleStockChange = async (productId: string, value: number) => {
     // Actualizar estado local inmediatamente para feedback visual
@@ -838,79 +826,74 @@ export default function PedidosPage() {
                 />
               ) : (
                 <div className="space-y-4">
-                  {/* Timeline del pedido */}
+                  {/* Timeline y Acciones fusionados */}
                   {selectedPedido && (
-                    <div className="rounded-lg border bg-card p-4">
-                      <h3 className="text-sm font-semibold mb-3">Estado del Pedido</h3>
-                      <PedidoTimeline pedido={selectedPedido} />
-                    </div>
-                  )}
-
-                  {/* Acciones de control según estado */}
-                  {selectedPedido && (
-                    <div className="rounded-lg border bg-card p-4 space-y-3">
-                      <h3 className="text-sm font-semibold">Acciones</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedPedido.estado === "creado" && productosAPedirActualizados.length > 0 && (
-                          <Button onClick={handleGenerarRemitoEnvio} size="sm">
-                            <FileText className="h-4 w-4 mr-2" />
-                            Generar Remito de Envío
-                          </Button>
-                        )}
-                        
-                        {selectedPedido.estado === "enviado" && !enlaceActivo && (
-                          <Button onClick={handleGenerarEnlacePublicoDesdeControl} size="sm" variant="outline">
-                            <LinkIcon className="h-4 w-4 mr-2" />
-                            Generar Enlace Público
-                          </Button>
-                        )}
-
-                        {enlaceActivo && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const url = `${window.location.origin}/pedido-publico/${enlaceActivo.id}`
-                              navigator.clipboard.writeText(url)
-                              toast({ title: "Enlace copiado" })
-                            }}
-                          >
-                            <LinkIcon className="h-4 w-4 mr-2" />
-                            Copiar Enlace Público
-                          </Button>
-                        )}
-
-                        {(selectedPedido.estado === "enviado" || selectedPedido.estado === "recibido") && (
-                          <Link href={`/dashboard/pedidos/${selectedPedido.id}/recepcion`}>
-                            <Button size="sm">
-                              <Package className="h-4 w-4 mr-2" />
-                              Registrar Recepción
+                    <div className="rounded-lg border bg-card">
+                      <div className="p-3 border-b border-border">
+                        <h3 className="text-sm font-semibold">Estado del Pedido</h3>
+                      </div>
+                      <div className="p-3">
+                        <PedidoTimeline pedido={selectedPedido} />
+                      </div>
+                      <div className="p-3 border-t border-border">
+                        <div className="flex flex-wrap gap-2">
+                          {selectedPedido.estado === "creado" && productosAPedirActualizados.length > 0 && (
+                            <Button onClick={handleGenerarRemitoEnvio} size="sm">
+                              <FileText className="h-4 w-4 mr-2" />
+                              Generar Remito de Envío
                             </Button>
-                          </Link>
-                        )}
+                          )}
+                          
+                          {selectedPedido.estado === "enviado" && !enlaceActivo && (
+                            <Button onClick={handleGenerarEnlacePublicoDesdeControl} size="sm" variant="outline">
+                              <LinkIcon className="h-4 w-4 mr-2" />
+                              Generar Enlace Público
+                            </Button>
+                          )}
 
-                        {selectedPedido.estado === "recibido" && (
-                          <Button onClick={handleMarcarCompletado} size="sm">
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Marcar como Completado
-                          </Button>
-                        )}
+                          {enlaceActivo && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const url = `${window.location.origin}/pedido-publico/${enlaceActivo.id}`
+                                navigator.clipboard.writeText(url)
+                                toast({ title: "Enlace copiado" })
+                              }}
+                            >
+                              <LinkIcon className="h-4 w-4 mr-2" />
+                              Copiar Enlace Público
+                            </Button>
+                          )}
+
+                          {(selectedPedido.estado === "enviado" || selectedPedido.estado === "recibido") && (
+                            <Link href={`/dashboard/pedidos/${selectedPedido.id}/recepcion`}>
+                              <Button size="sm">
+                                <Package className="h-4 w-4 mr-2" />
+                                Registrar Recepción
+                              </Button>
+                            </Link>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
 
                   {/* Remitos */}
-                  <div className="rounded-lg border bg-card p-4 space-y-3">
-                    <h3 className="text-sm font-semibold flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Remitos ({remitos.length})
-                      {remitos.some(r => r.final) && (
-                        <span className="text-xs text-muted-foreground ml-2">
-                          (Completado)
-                        </span>
-                      )}
-                    </h3>
-                    {remitos.length === 0 ? (
+                  <div className="rounded-lg border bg-card space-y-3">
+                    <div className="p-3 border-b border-border">
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Remitos ({remitos.length})
+                        {remitos.some(r => r.final) && (
+                          <span className="text-xs text-muted-foreground ml-2">
+                            (Completado)
+                          </span>
+                        )}
+                      </h3>
+                    </div>
+                    <div className="p-3">
+                      {remitos.length === 0 ? (
                       <div className="text-center py-6">
                         <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                         <p className="text-sm text-muted-foreground">
@@ -964,36 +947,41 @@ export default function PedidosPage() {
                           </div>
                         ))}
                       </div>
-                    )}
+                      )}
+                    </div>
                   </div>
 
                   {/* Recepciones */}
                   {recepciones.length > 0 && (
-                    <div className="rounded-lg border bg-card p-4 space-y-3">
-                      <h3 className="text-sm font-semibold">Recepciones</h3>
-                      <div className="space-y-2">
-                        {recepciones.map((recepcion) => (
-                          <div
-                            key={recepcion.id}
-                            className="p-3 rounded-lg border bg-background"
-                          >
-                            <p className="text-xs font-medium">
-                              Recepción {recepcion.esParcial ? "(Parcial)" : "(Completa)"}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">
-                              {recepcion.fecha?.toDate 
-                                ? recepcion.fecha.toDate().toLocaleDateString("es-AR", { 
-                                    day: "2-digit", 
-                                    month: "2-digit", 
-                                    year: "numeric" 
-                                  })
-                                : "Sin fecha"}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">
-                              Productos: {recepcion.productos.length}
-                            </p>
-                          </div>
-                        ))}
+                    <div className="rounded-lg border bg-card space-y-3">
+                      <div className="p-3 border-b border-border">
+                        <h3 className="text-sm font-semibold">Recepciones</h3>
+                      </div>
+                      <div className="p-3">
+                        <div className="space-y-2">
+                          {recepciones.map((recepcion) => (
+                            <div
+                              key={recepcion.id}
+                              className="p-3 rounded-lg border bg-background"
+                            >
+                              <p className="text-xs font-medium">
+                                Recepción {recepcion.esParcial ? "(Parcial)" : "(Completa)"}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                {recepcion.fecha?.toDate 
+                                  ? recepcion.fecha.toDate().toLocaleDateString("es-AR", { 
+                                      day: "2-digit", 
+                                      month: "2-digit", 
+                                      year: "numeric" 
+                                    })
+                                  : "Sin fecha"}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                Productos: {recepcion.productos.length}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )}

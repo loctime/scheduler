@@ -218,7 +218,8 @@ export default function RecepcionPage() {
         })
 
         // Actualizar estado del pedido
-        const nuevoEstado = recepcionData.esParcial ? "recibido" : "recibido"
+        // Si la recepción no es parcial, marcar como completado automáticamente
+        const nuevoEstado = recepcionData.esParcial ? "recibido" : "completado"
         await updatePedidoEstado(pedido.id, nuevoEstado, undefined, new Date())
 
         // Descargar PDF del remito
