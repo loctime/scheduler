@@ -31,6 +31,13 @@ export default function PedidoPublicoPage() {
   useEffect(() => {
     const cargarDatos = async () => {
       try {
+        // Validar que db esté disponible
+        if (!db) {
+          setError("Firebase no está configurado correctamente")
+          setLoadingData(false)
+          return
+        }
+
         // Obtener enlace público
         const enlace = await obtenerEnlacePublico(enlaceId)
         if (!enlace || !enlace.activo) {
@@ -365,7 +372,7 @@ export default function PedidoPublicoPage() {
         <div className="rounded-lg border bg-card p-3 sm:p-4 md:p-6">
           <EnlacePublicoForm
             productos={productos}
-            enlacePublico={enlacePublico}
+            enlacePublico={enlacePublico ?? undefined}
             onConfirmar={handleConfirmar}
             loading={loading}
             pedidoConfirmado={pedidoConfirmado}
