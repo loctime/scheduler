@@ -20,6 +20,7 @@ interface RecepcionFormProps {
   productosEnviados: Array<{
     productoId: string
     productoNombre: string
+    cantidadPedida: number
     cantidadEnviada: number
   }>
   onConfirmar: (recepcion: Omit<Recepcion, "id" | "createdAt">) => void
@@ -131,13 +132,18 @@ export function RecepcionForm({
                 className="rounded-lg border p-4 space-y-3"
               >
                 <div className="flex items-center justify-between">
-                  <div>
+                  <div className="flex-1">
                     <Label className="text-base font-medium">
                       {producto.productoNombre}
                     </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Cantidad enviada: {producto.cantidadEnviada}
-                    </p>
+                    <div className="flex gap-4 mt-1 text-sm text-muted-foreground">
+                      <span>
+                        <span className="font-medium">Pedida:</span> {producto.cantidadPedida}
+                      </span>
+                      <span>
+                        <span className="font-medium">Enviada:</span> {producto.cantidadEnviada}
+                      </span>
+                    </div>
                   </div>
                 </div>
 

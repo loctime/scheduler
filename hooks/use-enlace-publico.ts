@@ -46,6 +46,19 @@ export function useEnlacePublico(user: any) {
         throw new Error("No se puede generar un enlace para un pedido que ya fue enviado")
       }
 
+      // Desactivar todos los enlaces activos anteriores para este pedido
+      const enlacesActivosQuery = query(
+        collection(db, COLLECTIONS.ENLACES_PUBLICOS),
+        where("pedidoId", "==", pedidoId),
+        where("activo", "==", true),
+        where("userId", "==", user.uid)
+      )
+      const enlacesActivosSnapshot = await getDocs(enlacesActivosQuery)
+      const desactivarPromesas = enlacesActivosSnapshot.docs.map((doc) =>
+        setDoc(doc.ref, { activo: false }, { merge: true })
+      )
+      await Promise.all(desactivarPromesas)
+
       // Obtener productos del pedido para guardar snapshot
       // Filtrar por pedidoId Y userId para que las reglas de seguridad permitan la lectura
       const productosQuery = query(

@@ -22,7 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Upload, AlertTriangle } from "lucide-react"
+import { Upload, AlertTriangle, Package } from "lucide-react"
 import { Pedido } from "@/lib/types"
 
 const DEFAULT_FORMAT = "{nombre} ({cantidad})"
@@ -202,6 +202,138 @@ export function ClearStockDialog({
         <AlertDialogFooter>
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction onClick={onClear}>Limpiar</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
+interface ConfirmarNuevoEnlaceDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onConfirm: () => void
+}
+
+export function ConfirmarNuevoEnlaceDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+}: ConfirmarNuevoEnlaceDialogProps) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-600" />
+            Generar nuevo enlace
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Ya existe un enlace activo para este pedido. Si generas un nuevo enlace, el anterior quedará obsoleto y no podrá ser usado.
+            <br />
+            <strong>¿Deseas continuar?</strong>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm}>
+            Generar nuevo enlace
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
+interface ConfirmarEnvioDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onConfirm: () => void
+  productos: Array<{
+    nombre: string
+    cantidadPedida: number
+    cantidadEnviada: number
+    unidad: string
+  }>
+}
+
+export function ConfirmarEnvioDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+  productos,
+}: ConfirmarEnvioDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Confirmar Envío
+          </DialogTitle>
+          <DialogDescription>
+            Revisa los detalles del envío antes de confirmar
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="rounded-lg border p-4 space-y-2">
+            <h4 className="font-semibold text-sm mb-2">Resumen del envío:</h4>
+            <div className="space-y-2">
+              {productos.map((producto, index) => (
+                <div key={index} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
+                  <span className="font-medium">{producto.nombre}</span>
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <span>Pedido: {producto.cantidadPedida} {producto.unidad}</span>
+                    <span>→</span>
+                    <span className="font-semibold text-foreground">Envío: {producto.cantidadEnviada} {producto.unidad}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button onClick={onConfirm}>
+            Confirmar Envío
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+interface ConfirmarEdicionDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onConfirm: () => void
+}
+
+export function ConfirmarEdicionDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+}: ConfirmarEdicionDialogProps) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-600" />
+            Editar pedido confirmado
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Este pedido ya fue confirmado. Si editas las cantidades, se cancelará el pedido confirmado y deberás volver a confirmarlo.
+            <br />
+            <strong>¿Deseas continuar?</strong>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm}>
+            Sí, editar y cancelar pedido
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

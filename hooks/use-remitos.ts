@@ -86,16 +86,38 @@ export function useRemitos(user: any) {
     if (!db || !user) return []
 
     try {
+      // Primero intentar obtener remitos filtrando por pedidoId y userId
       const remitosQuery = query(
         collection(db, COLLECTIONS.REMITOS),
         where("pedidoId", "==", pedidoId),
         where("userId", "==", user.uid)
       )
       const snapshot = await getDocs(remitosQuery)
-      return snapshot.docs.map((doc) => ({
+      const remitos = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as Remito[]
+      
+      // Si no se encontraron remitos, intentar solo por pedidoId (para remitos creados sin autenticación)
+      if (remitos.length === 0) {
+        const remitosQuerySinUser = query(
+          collection(db, COLLECTIONS.REMITOS),
+          where("pedidoId", "==", pedidoId)
+        )
+        const snapshotSinUser = await getDocs(remitosQuerySinUser)
+        const remitosSinUser = snapshotSinUser.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Remito[]
+        
+        // Filtrar manualmente por userId del pedido (verificar que el pedido pertenece al usuario)
+        const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId))
+        if (pedidoDoc.exists() && pedidoDoc.data().userId === user.uid) {
+          return remitosSinUser
+        }
+      }
+      
+      return remitos
     } catch (error: any) {
       logger.error("Error al obtener remitos:", error)
       return []

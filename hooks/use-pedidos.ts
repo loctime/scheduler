@@ -12,6 +12,7 @@ import {
   where,
   getDocs,
   writeBatch,
+  onSnapshot,
 } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
@@ -164,6 +165,37 @@ export function usePedidos(user: any) {
       setStockActual({})
     }
   }, [selectedPedido?.id])
+
+  // Listener en tiempo real para el pedido seleccionado (para actualizar estado automáticamente)
+  useEffect(() => {
+    if (!selectedPedido?.id || !db || !user) return
+
+    const pedidoRef = doc(db, COLLECTIONS.PEDIDOS, selectedPedido.id)
+    const unsubscribe = onSnapshot(
+      pedidoRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const pedidoData = { id: snapshot.id, ...snapshot.data() } as Pedido
+          // Actualizar el pedido seleccionado si es el mismo
+          setSelectedPedido((prev) => {
+            if (prev?.id === pedidoData.id) {
+              return pedidoData
+            }
+            return prev
+          })
+          // También actualizar en la lista de pedidos
+          setPedidos((prev) =>
+            prev.map((p) => (p.id === pedidoData.id ? pedidoData : p))
+          )
+        }
+      },
+      (error) => {
+        logger.error("Error en listener de pedido:", error)
+      }
+    )
+
+    return () => unsubscribe()
+  }, [selectedPedido?.id, user])
 
   // Calcular pedido recomendado
   const calcularPedido = useCallback((stockMinimo: number, stockActualValue: number | undefined): number => {

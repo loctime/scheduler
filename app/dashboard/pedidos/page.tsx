@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { 
   Plus, Trash2, Copy, MessageCircle, RotateCcw, Upload, Package, 
   Construction, Pencil, Check, X, Cog, ExternalLink, Link as LinkIcon,
-  FileText, Download
+  FileText, Download, Bell, Loader2
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
@@ -16,7 +16,7 @@ import { usePedidos } from "@/hooks/use-pedidos"
 import { useEnlacePublico } from "@/hooks/use-enlace-publico"
 import { useRemitos } from "@/hooks/use-remitos"
 import { db, COLLECTIONS } from "@/lib/firebase"
-import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore"
+import { doc, setDoc, serverTimestamp, getDoc, updateDoc, deleteDoc } from "firebase/firestore"
 import type { Remito } from "@/lib/types"
 import { PedidosSidebar } from "@/components/pedidos/pedidos-sidebar"
 import { ProductosTable } from "@/components/pedidos/productos-table"
@@ -25,6 +25,7 @@ import {
   ImportDialog, 
   DeletePedidoDialog, 
   ClearStockDialog,
+  ConfirmarNuevoEnlaceDialog,
   DEFAULT_FORMAT 
 } from "@/components/pedidos/pedido-dialogs"
 import { cn } from "@/lib/utils"
@@ -65,8 +66,62 @@ export default function PedidosPage() {
     generarTextoPedido,
   } = usePedidos(user)
 
-  const { crearEnlacePublico, buscarEnlacesActivosPorPedido } = useEnlacePublico(user)
+  const { crearEnlacePublico, buscarEnlacesActivosPorPedido, loading: loadingEnlace } = useEnlacePublico(user)
   const { obtenerRemitosPorPedido, descargarPDFRemito } = useRemitos(user)
+  
+  // Función para reiniciar pedido (eliminar remito de envío y volver a estado "creado")
+  const reiniciarPedido = async () => {
+    if (!selectedPedido || !db || !user) return
+    
+    if (selectedPedido.estado !== "enviado") {
+      toast({
+        title: "Error",
+        description: "Solo se pueden reiniciar pedidos en estado 'enviado'",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    try {
+      // 1. Intentar eliminar el remito de envío si existe
+      if (selectedPedido.remitoEnvioId) {
+        try {
+          await deleteDoc(doc(db, COLLECTIONS.REMITOS, selectedPedido.remitoEnvioId))
+          console.log("Remito de envío eliminado:", selectedPedido.remitoEnvioId)
+        } catch (deleteError: any) {
+          console.error("Error al eliminar remito (continuando de todas formas):", deleteError)
+          // Si falla la eliminación del remito, continuamos de todas formas
+          // El remito quedará huérfano pero el pedido se reiniciará
+        }
+      }
+      
+      // 2. Actualizar el pedido: cambiar estado a "creado" y eliminar remitoEnvioId y fechaEnvio
+      await updateDoc(doc(db, COLLECTIONS.PEDIDOS, selectedPedido.id), {
+        estado: "creado",
+        remitoEnvioId: null,
+        fechaEnvio: null,
+        updatedAt: serverTimestamp(),
+      })
+      
+      toast({
+        title: "Pedido reiniciado",
+        description: "El pedido ha vuelto a estado 'creado'",
+      })
+      
+      // Recargar remitos
+      const remitosData = await obtenerRemitosPorPedido(selectedPedido.id)
+      setRemitos(remitosData)
+    } catch (error: any) {
+      console.error("Error al reiniciar pedido:", error)
+      toast({
+        title: "Error",
+        description: error?.message?.includes("permissions") 
+          ? "Error de permisos. Asegúrate de que las reglas de Firestore estén desplegadas."
+          : `No se pudo reiniciar el pedido: ${error?.message || "Error desconocido"}`,
+        variant: "destructive",
+      })
+    }
+  }
   
   // Estado para remitos
   const [remitos, setRemitos] = useState<Remito[]>([])
@@ -95,6 +150,7 @@ export default function PedidosPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [deletePedidoDialogOpen, setDeletePedidoDialogOpen] = useState(false)
   const [clearDialogOpen, setClearDialogOpen] = useState(false)
+  const [confirmarNuevoEnlaceOpen, setConfirmarNuevoEnlaceOpen] = useState(false)
   
   // Form states
   const [formName, setFormName] = useState("")
@@ -236,18 +292,41 @@ export default function PedidosPage() {
   const handleGenerarEnlace = async () => {
     if (!selectedPedido) return
 
-    // Verificar si el pedido ya está enviado
-    if (selectedPedido.estado === "enviado" || selectedPedido.estado === "recibido" || selectedPedido.estado === "completado") {
+    // Verificar si el pedido está esperando recepción
+    if (selectedPedido.estado === "enviado") {
       toast({
         title: "No se puede generar enlace",
-        description: "Este pedido ya fue enviado. No se pueden generar nuevos enlaces.",
+        description: "Este pedido está esperando recepción. Completa la recepción antes de generar un nuevo enlace.",
         variant: "destructive",
       })
       return
     }
 
+    // Verificar si el pedido ya está recibido o completado
+    if (selectedPedido.estado === "recibido" || selectedPedido.estado === "completado") {
+      toast({
+        title: "No se puede generar enlace",
+        description: "Este pedido ya fue recibido. No se pueden generar nuevos enlaces.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Si ya existe un enlace activo, pedir confirmación
+    if (enlaceActivo) {
+      setConfirmarNuevoEnlaceOpen(true)
+      return
+    }
+
+    // Si no hay enlace activo, generar directamente
+    await ejecutarGenerarEnlace()
+  }
+
+  // Función para ejecutar la generación del enlace
+  const ejecutarGenerarEnlace = async () => {
+    if (!selectedPedido) return
+
     try {
-      // Siempre crear un nuevo enlace (no reutilizar)
       const nuevoEnlace = await crearEnlacePublico(selectedPedido.id)
       if (nuevoEnlace) {
         setEnlaceActivo({ id: nuevoEnlace.id })
@@ -268,9 +347,19 @@ export default function PedidosPage() {
   }
 
   const handleVerPedido = () => {
-    if (!enlaceActivo) return
-    const url = `${window.location.origin}/pedido-publico/${enlaceActivo.id}`
-    window.open(url, "_blank")
+    if (!selectedPedido) return
+
+    // Si el pedido está en estado "enviado", ir a la página de recepción
+    if (selectedPedido.estado === "enviado") {
+      window.location.href = `/dashboard/pedidos/${selectedPedido.id}/recepcion`
+      return
+    }
+
+    // Si hay enlace activo y no está enviado, ver el pedido público
+    if (enlaceActivo) {
+      const url = `${window.location.origin}/pedido-publico/${enlaceActivo.id}`
+      window.open(url, "_blank")
+    }
   }
 
   const handleStockChange = async (productId: string, value: number) => {
@@ -447,6 +536,17 @@ export default function PedidosPage() {
                       </div>
                     )}
                     <div className="flex gap-1 shrink-0">
+                      {selectedPedido.estado === "enviado" && (
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-8 w-8 text-amber-600 hover:text-amber-700" 
+                          onClick={reiniciarPedido}
+                          title="Reiniciar pedido (volver a estado 'creado' y eliminar remito de envío)"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button 
                         variant="outline" 
                         size="icon" 
@@ -597,22 +697,45 @@ export default function PedidosPage() {
                         variant="outline"
                         className="h-7 px-2"
                         onClick={handleGenerarEnlace}
-                        disabled={productosAPedirActualizados.length === 0 || selectedPedido?.estado === "enviado" || selectedPedido?.estado === "recibido" || selectedPedido?.estado === "completado"}
+                        disabled={productosAPedirActualizados.length === 0 || selectedPedido?.estado === "enviado" || selectedPedido?.estado === "recibido" || selectedPedido?.estado === "completado" || loadingEnlace}
                         title="Generar nuevo enlace público"
                       >
-                        <LinkIcon className="h-3.5 w-3.5 sm:mr-1" />
-                        <span className="hidden sm:inline text-xs">Generar link</span>
+                        {loadingEnlace ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 sm:mr-1 animate-spin" />
+                            <span className="hidden sm:inline text-xs">Generando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <LinkIcon className="h-3.5 w-3.5 sm:mr-1" />
+                            <span className="hidden sm:inline text-xs">Generar link</span>
+                          </>
+                        )}
                       </Button>
-                      {enlaceActivo && (
+                      {(enlaceActivo || selectedPedido?.estado === "enviado") && (
                         <Button 
                           size="sm"
                           variant="outline"
-                          className="h-7 px-2"
+                          className={cn(
+                            "h-7 px-2 relative",
+                            selectedPedido?.estado === "enviado" && "bg-amber-50 border-amber-300 hover:bg-amber-100 dark:bg-amber-950 dark:border-amber-800"
+                          )}
                           onClick={handleVerPedido}
-                          title="Ver pedido público (solo lectura)"
+                          title={
+                            selectedPedido?.estado === "enviado" 
+                              ? "Controlar recepción del pedido enviado"
+                              : "Ver pedido público (solo lectura)"
+                          }
                         >
-                          <ExternalLink className="h-3.5 w-3.5 sm:mr-1" />
-                          <span className="hidden sm:inline text-xs">Ver pedido</span>
+                          {selectedPedido?.estado === "enviado" && (
+                            <Bell className="h-3.5 w-3.5 sm:mr-1 text-amber-600 dark:text-amber-400 animate-pulse" />
+                          )}
+                          {selectedPedido?.estado !== "enviado" && (
+                            <ExternalLink className="h-3.5 w-3.5 sm:mr-1" />
+                          )}
+                          <span className="hidden sm:inline text-xs">
+                            {selectedPedido?.estado === "enviado" ? "Controlar recepción" : "Ver pedido"}
+                          </span>
                         </Button>
                       )}
                       <Button 
@@ -759,6 +882,15 @@ export default function PedidosPage() {
         open={clearDialogOpen}
         onOpenChange={setClearDialogOpen}
         onClear={handleClearStock}
+      />
+
+      <ConfirmarNuevoEnlaceDialog
+        open={confirmarNuevoEnlaceOpen}
+        onOpenChange={setConfirmarNuevoEnlaceOpen}
+        onConfirm={async () => {
+          setConfirmarNuevoEnlaceOpen(false)
+          await ejecutarGenerarEnlace()
+        }}
       />
     </DashboardLayout>
   )

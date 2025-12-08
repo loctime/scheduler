@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { db, COLLECTIONS } from "@/lib/firebase"
-import { doc, getDoc, collection, query, where, getDocs, addDoc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { doc, getDoc, collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore"
 import { useEnlacePublico } from "@/hooks/use-enlace-publico"
 import { EnlacePublicoForm } from "@/components/pedidos/enlace-publico-form"
+import { ConfirmarEnvioDialog, ConfirmarEdicionDialog } from "@/components/pedidos/pedido-dialogs"
 import { Package, Loader2 } from "lucide-react"
 import { logger } from "@/lib/logger"
 import type { Pedido, Producto, EnlacePublico } from "@/lib/types"
@@ -21,6 +22,10 @@ export default function PedidoPublicoPage() {
   const [enlacePublico, setEnlacePublico] = useState<EnlacePublico | null>(null)
   const [loadingData, setLoadingData] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [confirmarEnvioOpen, setConfirmarEnvioOpen] = useState(false)
+  const [confirmarEdicionOpen, setConfirmarEdicionOpen] = useState(false)
+  const [productosDisponiblesPendientes, setProductosDisponiblesPendientes] = useState<EnlacePublico["productosDisponibles"] | null>(null)
+  const [pedidoConfirmado, setPedidoConfirmado] = useState(false)
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -46,9 +51,12 @@ export default function PedidoPublicoPage() {
         const pedidoData = { id: pedidoDoc.id, ...pedidoDoc.data() } as Pedido
         setPedido(pedidoData)
 
-        // Verificar si el pedido ya está enviado
-        if (pedidoData.estado === "enviado" || pedidoData.estado === "recibido" || pedidoData.estado === "completado") {
-          setError("Este pedido ya fue enviado y no puede ser modificado")
+        // Verificar si el pedido ya está enviado (pero permitir editar con confirmación)
+        if (pedidoData.estado === "enviado") {
+          setPedidoConfirmado(true)
+          // No mostrar error, permitir editar pero con confirmación
+        } else if (pedidoData.estado === "recibido" || pedidoData.estado === "completado") {
+          setError("Este pedido ya fue recibido y no puede ser modificado")
           setLoadingData(false)
           return
         }
@@ -94,12 +102,129 @@ export default function PedidoPublicoPage() {
     }
   }, [enlaceId, obtenerEnlacePublico])
 
+  // Función para cancelar el pedido confirmado
+  const cancelarPedidoConfirmado = async () => {
+    if (!pedido || !db) return
+
+    try {
+      // Eliminar el remito de envío si existe
+      if (pedido.remitoEnvioId) {
+        await deleteDoc(doc(db, COLLECTIONS.REMITOS, pedido.remitoEnvioId))
+      }
+
+      // Volver el estado del pedido a "creado"
+      await updateDoc(doc(db, COLLECTIONS.PEDIDOS, pedido.id), {
+        estado: "creado",
+        remitoEnvioId: null,
+        fechaEnvio: null,
+        updatedAt: serverTimestamp(),
+      })
+
+      setPedidoConfirmado(false)
+      setPedido({ ...pedido, estado: "creado", remitoEnvioId: undefined, fechaEnvio: undefined })
+    } catch (error: any) {
+      logger.error("Error al cancelar pedido:", error)
+      alert(`Error al cancelar el pedido: ${error?.message || "Error desconocido"}`)
+    }
+  }
+
   const handleConfirmar = async (
     productosDisponibles: EnlacePublico["productosDisponibles"]
   ) => {
     if (!enlacePublico || !pedido || !db) return
 
+    // Si el pedido ya está confirmado, mostrar modal de confirmación de edición
+    if (pedidoConfirmado) {
+      setProductosDisponiblesPendientes(productosDisponibles)
+      setConfirmarEdicionOpen(true)
+      return
+    }
+
+    // Mostrar modal de confirmación con detalles
+    setProductosDisponiblesPendientes(productosDisponibles)
+    setConfirmarEnvioOpen(true)
+  }
+
+  const ejecutarConfirmacion = async () => {
+    if (!enlacePublico || !pedido || !db || !productosDisponiblesPendientes) return
+
     try {
+      // Si el pedido estaba confirmado, cancelarlo primero
+      if (pedidoConfirmado) {
+        await cancelarPedidoConfirmado()
+      }
+
+      console.log("Iniciando confirmación de envío...")
+      
+      // 1. Actualizar el enlace con productosDisponibles
+      console.log("Paso 1: Actualizando productos disponibles...")
+      const success = await actualizarProductosDisponibles(
+        enlacePublico.id,
+        productosDisponiblesPendientes
+      )
+
+      if (!success) {
+        alert("Error al actualizar el enlace")
+        return
+      }
+      console.log("✓ Productos disponibles actualizados")
+
+      // 2. Generar el remito automáticamente
+      console.log("Paso 2: Generando datos del remito...")
+      console.log("Productos disponibles pendientes:", productosDisponiblesPendientes)
+      console.log("Productos del pedido:", productos)
+      const remitoData = crearRemitoEnvioDesdeDisponibles(
+        pedido,
+        productos,
+        productosDisponiblesPendientes || {}
+      )
+      console.log("Datos del remito:", remitoData)
+      console.log("Productos en remitoData:", remitoData.productos)
+      console.log("Cantidad de productos:", remitoData.productos?.length || 0)
+
+      // Generar número de remito con nombre del pedido
+      console.log("Paso 3: Generando número de remito...")
+      const numeroRemito = await generarNumeroRemito(db, COLLECTIONS, pedido.nombre)
+      console.log("Número de remito:", numeroRemito)
+
+      // Crear remito en Firestore
+      console.log("Paso 4: Creando remito en Firestore...")
+      const remitoRef = await addDoc(collection(db, COLLECTIONS.REMITOS), {
+        ...remitoData,
+        numero: numeroRemito,
+        createdAt: serverTimestamp(),
+      })
+      console.log("✓ Remito creado:", remitoRef.id)
+
+      // 3. Actualizar el pedido: estado "enviado", fechaEnvio, y vincular remito
+      console.log("Paso 5: Actualizando pedido...")
+      await updateDoc(doc(db, COLLECTIONS.PEDIDOS, pedido.id), {
+        estado: "enviado",
+        remitoEnvioId: remitoRef.id,
+        fechaEnvio: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+      console.log("✓ Pedido actualizado")
+
+      // 4. Desactivar el enlace para que no pueda ser editado nuevamente
+      console.log("Paso 6: Desactivando enlace...")
+      try {
+        await desactivarEnlace(enlacePublico.id)
+        console.log("✓ Enlace desactivado")
+      } catch (desactivarError: any) {
+        logger.error("Error al desactivar enlace (no crítico):", desactivarError)
+      }
+
+      console.log("✓ Confirmación completada exitosamente")
+      alert("Pedido confirmado y remito generado exitosamente. Gracias!")
+      
+      // Recargar la página para actualizar el estado
+      window.location.reload()
+    } catch (error: any) {
+      logger.error("Error al confirmar envío:", error)
+      alert(`Error al procesar la confirmación: ${error?.message || "Error desconocido"}. Por favor, intente nuevamente.`)
+    }
+  }
       console.log("Iniciando confirmación de envío...")
       
       // 1. Actualizar el enlace con productosDisponibles
@@ -226,9 +351,38 @@ export default function PedidoPublicoPage() {
             enlacePublico={enlacePublico}
             onConfirmar={handleConfirmar}
             loading={loading}
+            pedidoConfirmado={pedidoConfirmado}
           />
         </div>
       </div>
+
+      {/* Modal de confirmación de envío */}
+      {productosDisponiblesPendientes && (
+        <ConfirmarEnvioDialog
+          open={confirmarEnvioOpen}
+          onOpenChange={setConfirmarEnvioOpen}
+          onConfirm={ejecutarConfirmacion}
+          productos={productos
+            .filter(p => productosDisponiblesPendientes[p.id]?.disponible)
+            .map(p => ({
+              nombre: p.nombre,
+              cantidadPedida: p.stockMinimo || 0,
+              cantidadEnviada: productosDisponiblesPendientes[p.id]?.cantidadEnviada || p.stockMinimo || 0,
+              unidad: p.unidad || "unidades"
+            }))}
+        />
+      )}
+
+      {/* Modal de confirmación de edición */}
+      <ConfirmarEdicionDialog
+        open={confirmarEdicionOpen}
+        onOpenChange={setConfirmarEdicionOpen}
+        onConfirm={async () => {
+          setConfirmarEdicionOpen(false)
+          // Mostrar modal de confirmación de envío después de cancelar
+          setConfirmarEnvioOpen(true)
+        }}
+      />
     </div>
   )
 }

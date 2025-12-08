@@ -156,7 +156,15 @@ match /apps/horarios/stock_actual/{stockId} {
 // Colección: apps/horarios/remitos
 match /apps/horarios/remitos/{remitoId} {
   // Solo el dueño puede leer sus remitos
-  allow read: if isAuth() && resource.data.userId == uid();
+  // Permitir lectura si está autenticado y:
+  // - El remito tiene userId que coincide con el uid del usuario, O
+  // - El remito pertenece a un pedido del usuario (incluso si fue creado sin autenticación)
+  allow read: if isAuth() && (
+    resource.data.userId == uid()
+    || (resource.data.pedidoId != null
+      && exists(/databases/$(db)/documents/apps/horarios/pedidos/$(resource.data.pedidoId))
+      && get(/databases/$(db)/documents/apps/horarios/pedidos/$(resource.data.pedidoId)).data.userId == uid())
+  );
   // Crear: 
   // - Si está autenticado: verificar que userId sea correcto
   // - Si NO está autenticado: permitir solo si el pedido existe y el userId coincide
@@ -169,8 +177,13 @@ match /apps/horarios/remitos/{remitoId} {
   // Actualizar: verificar propiedad y proteger userId
   allow update: if isAuth() && resource.data.userId == uid()
     && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId);
-  // Eliminar: solo el dueño
-  allow delete: if isAuth() && resource.data.userId == uid();
+  // Eliminar: solo el dueño (por userId o por pedido asociado)
+  allow delete: if isAuth() && (
+    resource.data.userId == uid()
+    || (resource.data.pedidoId != null
+      && exists(/databases/$(db)/documents/apps/horarios/pedidos/$(resource.data.pedidoId))
+      && get(/databases/$(db)/documents/apps/horarios/pedidos/$(resource.data.pedidoId)).data.userId == uid())
+  );
 }
 
 // Colección: apps/horarios/recepciones

@@ -27,7 +27,7 @@ export default function RecepcionPage() {
 
   const { pedidos, stockActual, calcularPedido, updatePedidoEstado } = usePedidos(user)
   const { crearRecepcion } = useRecepciones(user)
-  const { crearRemito, descargarPDFRemito, obtenerRemitosPorPedido } = useRemitos(user)
+  const { crearRemito, descargarPDFRemito, obtenerRemitosPorPedido, obtenerRemito } = useRemitos(user)
   const { obtenerEnlacePublico } = useEnlacePublico(user)
 
   const [pedido, setPedido] = useState<any>(null)
@@ -35,6 +35,7 @@ export default function RecepcionPage() {
   const [productosEnviados, setProductosEnviados] = useState<Array<{
     productoId: string
     productoNombre: string
+    cantidadPedida: number
     cantidadEnviada: number
   }>>([])
   const [loading, setLoading] = useState(true)
@@ -50,42 +51,84 @@ export default function RecepcionPage() {
           const pedidoData = { id: pedidoDoc.id, ...pedidoDoc.data() }
           setPedido(pedidoData)
 
-          // Cargar enlace público si existe
-          if (pedidoData.enlacePublicoId) {
-            const enlace = await obtenerEnlacePublico(pedidoData.enlacePublicoId)
-            setEnlacePublico(enlace)
-
-            // Obtener productos enviados desde el enlace público
-            if (enlace?.productosDisponibles) {
-              const productos: typeof productosEnviados = []
-              
-              // Necesitamos obtener los productos del pedido para tener los nombres
-              const { collection, query, where, getDocs } = await import("firebase/firestore")
-              const productosQuery = query(
-                collection(db, COLLECTIONS.PRODUCTS),
-                where("pedidoId", "==", pedidoId)
-              )
-              const productosSnapshot = await getDocs(productosQuery)
-              const productosData = productosSnapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data(),
-              }))
-
-              // Construir lista de productos enviados
-              Object.entries(enlace.productosDisponibles).forEach(([productoId, data]) => {
-                if (data.disponible && data.cantidadEnviada) {
-                  const producto = productosData.find(p => p.id === productoId)
-                  if (producto) {
-                    productos.push({
-                      productoId: producto.id,
-                      productoNombre: producto.nombre,
-                      cantidadEnviada: data.cantidadEnviada,
-                    })
-                  }
-                }
-              })
-
+          // Obtener productos enviados desde el remito de envío (si el pedido está en estado "enviado")
+          if (pedidoData.estado === "enviado") {
+            console.log("Pedido en estado enviado, buscando remito de envío...")
+            console.log("remitoEnvioId:", pedidoData.remitoEnvioId)
+            
+            // Buscar en todos los remitos del pedido (más confiable que obtener por ID directo)
+            const remitos = await obtenerRemitosPorPedido(pedidoId)
+            console.log("Remitos encontrados:", remitos)
+            
+            // Buscar el remito de envío (por ID si existe, o por tipo)
+            let remitoEnvio = null
+            if (pedidoData.remitoEnvioId) {
+              remitoEnvio = remitos.find(r => r.id === pedidoData.remitoEnvioId && r.tipo === "envio")
+            }
+            
+            // Si no se encontró por ID, buscar por tipo
+            if (!remitoEnvio) {
+              remitoEnvio = remitos.find(r => r.tipo === "envio")
+            }
+            
+            if (remitoEnvio && remitoEnvio.productos && remitoEnvio.productos.length > 0) {
+              console.log("Remito de envío encontrado:", remitoEnvio)
+              console.log("Productos en remito:", remitoEnvio.productos)
+              const productos: typeof productosEnviados = remitoEnvio.productos
+                .filter((p: any) => p.cantidadEnviada && p.cantidadEnviada > 0)
+                .map((p: any) => ({
+                  productoId: p.productoId,
+                  productoNombre: p.productoNombre,
+                  cantidadPedida: p.cantidadPedida || 0,
+                  cantidadEnviada: p.cantidadEnviada,
+                }))
               setProductosEnviados(productos)
+              console.log("Productos cargados:", productos)
+            } else {
+              console.log("No se encontró remito de envío o no tiene productos")
+              if (remitoEnvio) {
+                console.log("Remito encontrado pero sin productos:", remitoEnvio)
+              }
+            }
+          } else {
+            // Fallback: buscar en enlace público si existe (para pedidos antiguos)
+            if (pedidoData.enlacePublicoId) {
+              const enlace = await obtenerEnlacePublico(pedidoData.enlacePublicoId)
+              setEnlacePublico(enlace)
+
+              // Obtener productos enviados desde el enlace público
+              if (enlace?.productosDisponibles) {
+                const productos: typeof productosEnviados = []
+                
+                // Necesitamos obtener los productos del pedido para tener los nombres
+                const { collection, query, where, getDocs } = await import("firebase/firestore")
+                const productosQuery = query(
+                  collection(db, COLLECTIONS.PRODUCTS),
+                  where("pedidoId", "==", pedidoId)
+                )
+                const productosSnapshot = await getDocs(productosQuery)
+                const productosData = productosSnapshot.docs.map((doc) => ({
+                  id: doc.id,
+                  ...doc.data(),
+                }))
+
+                // Construir lista de productos enviados
+                Object.entries(enlace.productosDisponibles).forEach(([productoId, data]: [string, any]) => {
+                  if (data.disponible && data.cantidadEnviada) {
+                    const producto = productosData.find(p => p.id === productoId)
+                    if (producto) {
+                      productos.push({
+                        productoId: producto.id,
+                        productoNombre: producto.nombre,
+                        cantidadPedida: producto.stockMinimo || 0,
+                        cantidadEnviada: data.cantidadEnviada,
+                      })
+                    }
+                  }
+                })
+
+                setProductosEnviados(productos)
+              }
             }
           }
         }
@@ -102,7 +145,7 @@ export default function RecepcionPage() {
     }
 
     cargarDatos()
-  }, [pedidoId, obtenerEnlacePublico, toast])
+  }, [pedidoId, obtenerEnlacePublico, obtenerRemitosPorPedido, obtenerRemito, toast])
 
   const handleConfirmarRecepcion = async (
     recepcionData: Omit<Recepcion, "id" | "createdAt">

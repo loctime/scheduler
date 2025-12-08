@@ -14,6 +14,7 @@ interface EnlacePublicoFormProps {
   enlacePublico?: EnlacePublico
   onConfirmar: (productosDisponibles: EnlacePublico["productosDisponibles"]) => void
   loading?: boolean
+  pedidoConfirmado?: boolean
 }
 
 export function EnlacePublicoForm({
@@ -21,18 +22,29 @@ export function EnlacePublicoForm({
   enlacePublico,
   onConfirmar,
   loading = false,
+  pedidoConfirmado = false,
 }: EnlacePublicoFormProps) {
   const [productosDisponibles, setProductosDisponibles] = useState<
+    Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string }>
+  >(enlacePublico?.productosDisponibles || {})
+  const [productosDisponiblesOriginales, setProductosDisponiblesOriginales] = useState<
     Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string }>
   >(enlacePublico?.productosDisponibles || {})
 
   useEffect(() => {
     if (enlacePublico?.productosDisponibles) {
       setProductosDisponibles(enlacePublico.productosDisponibles)
+      setProductosDisponiblesOriginales(enlacePublico.productosDisponibles)
     }
   }, [enlacePublico])
 
+  // Detectar si hay cambios cuando el pedido está confirmado
+  const hayCambios = pedidoConfirmado && JSON.stringify(productosDisponibles) !== JSON.stringify(productosDisponiblesOriginales)
+
   const toggleDisponible = (productoId: string) => {
+    if (pedidoConfirmado && !hayCambios) {
+      // Si es la primera edición después de confirmar, el modal se mostrará al intentar confirmar
+    }
     setProductosDisponibles((prev) => ({
       ...prev,
       [productoId]: {
@@ -65,6 +77,13 @@ export function EnlacePublicoForm({
 
   return (
     <div className="space-y-6">
+      {pedidoConfirmado && (
+        <div className="rounded-lg border-2 border-amber-500/50 bg-amber-50 dark:bg-amber-950/20 p-3">
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            ⚠️ Este pedido ya fue confirmado. Si editas las cantidades y confirmas, se cancelará el pedido anterior.
+          </p>
+        </div>
+      )}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Productos del Pedido</h3>
         <div className="space-y-3">
