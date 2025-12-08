@@ -33,10 +33,10 @@ export function EnlacePublicoForm({
   pedidoConfirmado = false,
 }: EnlacePublicoFormProps) {
   const [productosDisponibles, setProductosDisponibles] = useState<
-    Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string }>
+    Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string; listo?: boolean; cantidadAnterior?: number }>
   >(enlacePublico?.productosDisponibles || {})
   const [productosDisponiblesOriginales, setProductosDisponiblesOriginales] = useState<
-    Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string }>
+    Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string; listo?: boolean; cantidadAnterior?: number }>
   >(enlacePublico?.productosDisponibles || {})
 
   useEffect(() => {
@@ -83,6 +83,16 @@ export function EnlacePublicoForm({
     }))
   }
 
+  const toggleListo = (productoId: string) => {
+    setProductosDisponibles((prev) => ({
+      ...prev,
+      [productoId]: {
+        ...prev[productoId],
+        listo: !prev[productoId]?.listo,
+      },
+    }))
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {pedidoConfirmado && (
@@ -107,46 +117,85 @@ export function EnlacePublicoForm({
               const cantidadPedida = (producto as any).cantidadPedida ?? 0
               return cantidadPedida > 0
             })
+            .sort((a, b) => {
+              const aData = productosDisponibles[a.id] || { listo: false, cantidadEnviada: 0 }
+              const bData = productosDisponibles[b.id] || { listo: false, cantidadEnviada: 0 }
+              const cantidadPedidaA = (a as any).cantidadPedida ?? 0
+              const cantidadPedidaB = (b as any).cantidadPedida ?? 0
+              const aCompleto = (aData.cantidadEnviada ?? 0) === cantidadPedidaA && (aData.cantidadEnviada ?? 0) > 0
+              const bCompleto = (bData.cantidadEnviada ?? 0) === cantidadPedidaB && (bData.cantidadEnviada ?? 0) > 0
+              const aMarcado = aCompleto || aData.listo
+              const bMarcado = bCompleto || bData.listo
+              // Primero los no marcados, luego los marcados (manteniendo orden original dentro de cada grupo)
+              if (aMarcado === bMarcado) return 0
+              return aMarcado ? 1 : -1
+            })
             .map((producto) => {
-              const productoData = productosDisponibles[producto.id] || { disponible: false }
+              const productoData = productosDisponibles[producto.id] || { disponible: false, listo: false }
               const cantidadPedida = (producto as any).cantidadPedida ?? 0
               const cantidadEnviada = productoData.cantidadEnviada ?? 0
               const estaCompleto = cantidadEnviada === cantidadPedida && cantidadEnviada > 0
+              const estaListo = productoData.listo || false
+              const estaMarcado = estaCompleto || estaListo
 
               return (
                 <div
                   key={producto.id}
-                  className="rounded-lg border bg-card p-4 space-y-3"
+                  className={`rounded-lg border-2 p-4 space-y-3 transition-colors ${
+                    estaMarcado 
+                      ? "bg-green-50 dark:bg-green-950/20 border-green-500/50" 
+                      : "bg-card border-border"
+                  }`}
                 >
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      checked={estaCompleto}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          updateCantidadEnviada(producto.id, cantidadPedida)
-                          if (!productoData.disponible) {
-                            toggleDisponible(producto.id)
-                          }
-                        } else {
-                          updateCantidadEnviada(producto.id, 0)
-                          if (productoData.disponible) {
-                            toggleDisponible(producto.id)
-                          }
-                        }
-                      }}
-                      className="mt-1 h-6 w-6"
-                    />
-                    <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        checked={estaListo}
+                        onCheckedChange={() => toggleListo(producto.id)}
+                        className="h-7 w-7 border-2 border-foreground data-[state=checked]:bg-foreground data-[state=checked]:border-foreground"
+                      />
+                      <span className="text-sm font-semibold">Listo</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
                       <Label className="text-sm font-semibold">
                         {producto.nombre}
                       </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        checked={estaCompleto}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            // Guardar la cantidad actual antes de cambiarla
+                            setProductosDisponibles((prev) => ({
+                              ...prev,
+                              [producto.id]: {
+                                ...prev[producto.id],
+                                cantidadAnterior: cantidadEnviada > 0 ? cantidadEnviada : undefined,
+                              },
+                            }))
+                            updateCantidadEnviada(producto.id, cantidadPedida)
+                            if (!productoData.disponible) {
+                              toggleDisponible(producto.id)
+                            }
+                          } else {
+                            // Restaurar la cantidad anterior o dejar 0
+                            const cantidadARestaurar = productoData.cantidadAnterior ?? 0
+                            updateCantidadEnviada(producto.id, cantidadARestaurar)
+                            if (cantidadARestaurar === 0 && productoData.disponible) {
+                              toggleDisponible(producto.id)
+                            }
+                          }
+                        }}
+                        className="h-7 w-7 border-2 border-foreground data-[state=checked]:bg-foreground data-[state=checked]:border-foreground"
+                      />
                       <span className="text-sm font-bold text-primary whitespace-nowrap">
                         Pedido: {cantidadPedida} {producto.unidad || "U"}
                       </span>
                     </div>
                   </div>
                   
-                  <div className="pl-9 space-y-3">
+                  <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1 border rounded-md">
                         <Button
@@ -221,8 +270,9 @@ export function EnlacePublicoForm({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-16">Completo</TableHead>
+                <TableHead className="w-24">Listo</TableHead>
                 <TableHead>Producto</TableHead>
+                <TableHead className="w-48">Completo / Pedido</TableHead>
                 <TableHead className="w-32">Cantidad a Enviar</TableHead>
                 <TableHead>Comentario</TableHead>
               </TableRow>
@@ -233,36 +283,74 @@ export function EnlacePublicoForm({
                   const cantidadPedida = (producto as any).cantidadPedida ?? 0
                   return cantidadPedida > 0
                 })
+                .sort((a, b) => {
+                  const aData = productosDisponibles[a.id] || { listo: false, cantidadEnviada: 0 }
+                  const bData = productosDisponibles[b.id] || { listo: false, cantidadEnviada: 0 }
+                  const cantidadPedidaA = (a as any).cantidadPedida ?? 0
+                  const cantidadPedidaB = (b as any).cantidadPedida ?? 0
+                  const aCompleto = (aData.cantidadEnviada ?? 0) === cantidadPedidaA && (aData.cantidadEnviada ?? 0) > 0
+                  const bCompleto = (bData.cantidadEnviada ?? 0) === cantidadPedidaB && (bData.cantidadEnviada ?? 0) > 0
+                  const aMarcado = aCompleto || aData.listo
+                  const bMarcado = bCompleto || bData.listo
+                  // Primero los no marcados, luego los marcados (manteniendo orden original dentro de cada grupo)
+                  if (aMarcado === bMarcado) return 0
+                  return aMarcado ? 1 : -1
+                })
                 .map((producto) => {
-                  const productoData = productosDisponibles[producto.id] || { disponible: false }
+                  const productoData = productosDisponibles[producto.id] || { disponible: false, listo: false }
                   const cantidadPedida = (producto as any).cantidadPedida ?? 0
                   const cantidadEnviada = productoData.cantidadEnviada ?? 0
                   const estaCompleto = cantidadEnviada === cantidadPedida && cantidadEnviada > 0
+                  const estaListo = productoData.listo || false
+                  const estaMarcado = estaCompleto || estaListo
 
                   return (
-                    <TableRow key={producto.id}>
+                    <TableRow 
+                      key={producto.id}
+                      className={estaMarcado ? "bg-green-50 dark:bg-green-950/20" : ""}
+                    >
                       <TableCell>
-                        <Checkbox
-                          checked={estaCompleto}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              updateCantidadEnviada(producto.id, cantidadPedida)
-                              if (!productoData.disponible) {
-                                toggleDisponible(producto.id)
-                              }
-                            } else {
-                              updateCantidadEnviada(producto.id, 0)
-                              if (productoData.disponible) {
-                                toggleDisponible(producto.id)
-                              }
-                            }
-                          }}
-                          className="h-6 w-6"
-                        />
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            checked={estaListo}
+                            onCheckedChange={() => toggleListo(producto.id)}
+                            className="h-7 w-7 border-2 border-foreground data-[state=checked]:bg-foreground data-[state=checked]:border-foreground"
+                          />
+                          <span className="text-sm font-semibold">Listo</span>
+                        </div>
                       </TableCell>
                       <TableCell className="font-medium">
-                        <div className="flex items-center justify-between gap-2">
-                          <span>{producto.nombre}</span>
+                        <span>{producto.nombre}</span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            checked={estaCompleto}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                // Guardar la cantidad actual antes de cambiarla
+                                setProductosDisponibles((prev) => ({
+                                  ...prev,
+                                  [producto.id]: {
+                                    ...prev[producto.id],
+                                    cantidadAnterior: cantidadEnviada > 0 ? cantidadEnviada : undefined,
+                                  },
+                                }))
+                                updateCantidadEnviada(producto.id, cantidadPedida)
+                                if (!productoData.disponible) {
+                                  toggleDisponible(producto.id)
+                                }
+                              } else {
+                                // Restaurar la cantidad anterior o dejar 0
+                                const cantidadARestaurar = productoData.cantidadAnterior ?? 0
+                                updateCantidadEnviada(producto.id, cantidadARestaurar)
+                                if (cantidadARestaurar === 0 && productoData.disponible) {
+                                  toggleDisponible(producto.id)
+                                }
+                              }
+                            }}
+                            className="h-7 w-7 border-2 border-foreground data-[state=checked]:bg-foreground data-[state=checked]:border-foreground"
+                          />
                           <span className="text-sm font-bold text-primary whitespace-nowrap">
                             Pedido: {cantidadPedida} {producto.unidad || "U"}
                           </span>

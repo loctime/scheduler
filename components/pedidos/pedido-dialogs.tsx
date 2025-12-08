@@ -253,7 +253,11 @@ interface ConfirmarEnvioDialogProps {
     cantidadPedida: number
     cantidadEnviada: number
     unidad: string
+    observaciones?: string
   }>
+  nombrePedido?: string
+  nombreEmpresa?: string
+  fecha?: string
 }
 
 export function ConfirmarEnvioDialog({
@@ -261,34 +265,59 @@ export function ConfirmarEnvioDialog({
   onOpenChange,
   onConfirm,
   productos,
+  nombrePedido,
+  nombreEmpresa,
+  fecha,
 }: ConfirmarEnvioDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] sm:max-h-[80vh] overflow-y-auto p-4 sm:p-6">
+      <DialogContent className="sm:max-w-xl max-h-[85vh] sm:max-h-[80vh] overflow-y-auto p-4 sm:p-5">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
             <Package className="h-5 w-5" />
             Confirmar Envío
           </DialogTitle>
           <DialogDescription className="text-xs sm:text-sm">
-            Revisa los detalles del envío antes de confirmar
+            {(nombreEmpresa || fecha) ? (
+              <span className="flex items-center justify-between gap-2">
+                {nombreEmpresa && <span className="font-semibold text-foreground">{nombreEmpresa}</span>}
+                {fecha && <span className="text-muted-foreground">{fecha}</span>}
+              </span>
+            ) : (
+              <span>Revisa los detalles del envío antes de confirmar</span>
+            )}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="rounded-lg border p-3 sm:p-4 space-y-2">
-            <h4 className="font-semibold text-sm sm:text-base mb-3">Resumen del envío:</h4>
-            <div className="space-y-3">
-              {productos.map((producto, index) => (
-                <div key={index} className="space-y-1.5 py-2 border-b last:border-0">
-                  <div className="font-medium text-sm sm:text-base">{producto.nombre}</div>
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-xs sm:text-sm text-muted-foreground pl-2 sm:pl-0">
-                    <span>Pedido: <strong className="text-foreground">{producto.cantidadPedida} {producto.unidad}</strong></span>
-                    <span className="hidden sm:inline">→</span>
-                    <span className="sm:font-semibold text-foreground">Envío: {producto.cantidadEnviada} {producto.unidad}</span>
+        <div className="space-y-3 py-3">
+          <h4 className="font-semibold text-sm mb-2">
+            {nombrePedido ? `${nombrePedido} • ` : ""}
+            Resumen del envío ({productos.length} {productos.length === 1 ? 'producto' : 'productos'}):
+          </h4>
+          <div className="rounded-lg border divide-y max-h-[50vh] overflow-y-auto">
+            {productos.length === 0 ? (
+              <div className="p-3 text-sm text-muted-foreground text-center">
+                No hay productos para enviar
+              </div>
+            ) : (
+              productos.map((producto, index) => (
+                <div key={index} className="p-2.5 sm:p-3 hover:bg-muted/50 transition-colors">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="font-medium text-sm flex-1 min-w-0">{producto.nombre}</div>
+                    <div className="flex items-center gap-2 text-xs sm:text-sm flex-shrink-0">
+                      <span className="text-muted-foreground">Pedido: <strong className="text-foreground">{producto.cantidadPedida}</strong></span>
+                      <span className="text-muted-foreground">→</span>
+                      <span className="font-semibold text-foreground">Envío: {producto.cantidadEnviada}</span>
+                      <span className="text-muted-foreground">{producto.unidad}</span>
+                    </div>
                   </div>
+                  {producto.observaciones && (
+                    <div className="text-xs text-muted-foreground italic mt-1 pl-1">
+                      💬 {producto.observaciones}
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
+              ))
+            )}
           </div>
         </div>
         <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">

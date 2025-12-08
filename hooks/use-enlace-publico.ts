@@ -156,10 +156,26 @@ export function useEnlacePublico(user: any) {
     if (!db) return false
 
     try {
+      // Limpiar campos undefined antes de guardar (Firestore no acepta undefined)
+      const productosDisponiblesLimpios: Record<string, any> = {}
+      if (productosDisponibles) {
+        Object.entries(productosDisponibles).forEach(([key, value]) => {
+          if (value) {
+            const productoLimpio: any = {}
+            if (value.disponible !== undefined) productoLimpio.disponible = value.disponible
+            if (value.cantidadEnviada !== undefined) productoLimpio.cantidadEnviada = value.cantidadEnviada
+            if (value.observaciones !== undefined) productoLimpio.observaciones = value.observaciones
+            if (value.listo !== undefined) productoLimpio.listo = value.listo
+            // No incluir cantidadAnterior ya que es solo para uso interno del formulario
+            productosDisponiblesLimpios[key] = productoLimpio
+          }
+        })
+      }
+
       await setDoc(
         doc(db, COLLECTIONS.ENLACES_PUBLICOS, enlaceId),
         {
-          productosDisponibles,
+          productosDisponibles: productosDisponiblesLimpios,
           fechaAcceso: serverTimestamp(),
         },
         { merge: true }

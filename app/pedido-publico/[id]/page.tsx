@@ -9,7 +9,7 @@ import { EnlacePublicoForm } from "@/components/pedidos/enlace-publico-form"
 import { ConfirmarEnvioDialog, ConfirmarEdicionDialog } from "@/components/pedidos/pedido-dialogs"
 import { Package, Loader2 } from "lucide-react"
 import { logger } from "@/lib/logger"
-import type { Pedido, Producto, EnlacePublico } from "@/lib/types"
+import type { Pedido, Producto, EnlacePublico, Configuracion } from "@/lib/types"
 import { generarNumeroRemito, crearRemitoEnvioDesdeDisponibles } from "@/lib/remito-utils"
 
 export default function PedidoPublicoPage() {
@@ -26,6 +26,7 @@ export default function PedidoPublicoPage() {
   const [confirmarEdicionOpen, setConfirmarEdicionOpen] = useState(false)
   const [productosDisponiblesPendientes, setProductosDisponiblesPendientes] = useState<EnlacePublico["productosDisponibles"] | null>(null)
   const [pedidoConfirmado, setPedidoConfirmado] = useState(false)
+  const [nombreEmpresa, setNombreEmpresa] = useState<string>("")
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -50,6 +51,22 @@ export default function PedidoPublicoPage() {
 
         const pedidoData = { id: pedidoDoc.id, ...pedidoDoc.data() } as Pedido
         setPedido(pedidoData)
+
+        // Obtener configuración para nombre de empresa
+        if (pedidoData.userId) {
+          try {
+            const configDoc = await getDoc(doc(db, COLLECTIONS.CONFIG, pedidoData.userId))
+            if (configDoc.exists()) {
+              const config = configDoc.data() as Configuracion
+              setNombreEmpresa(config.nombreEmpresa || "Empresa")
+            } else {
+              setNombreEmpresa("Empresa")
+            }
+          } catch (err) {
+            logger.error("Error al cargar configuración:", err)
+            setNombreEmpresa("Empresa")
+          }
+        }
 
         // Verificar si el pedido ya está enviado (pero permitir editar con confirmación)
         if (pedidoData.estado === "enviado") {
@@ -362,14 +379,39 @@ export default function PedidoPublicoPage() {
           open={confirmarEnvioOpen}
           onOpenChange={setConfirmarEnvioOpen}
           onConfirm={ejecutarConfirmacion}
-          productos={productos
-            .filter(p => productosDisponiblesPendientes[p.id]?.disponible)
-            .map(p => ({
-              nombre: p.nombre,
-              cantidadPedida: p.stockMinimo || 0,
-              cantidadEnviada: productosDisponiblesPendientes[p.id]?.cantidadEnviada || p.stockMinimo || 0,
-              unidad: p.unidad || "unidades"
-            }))}
+          nombrePedido={pedido?.nombre}
+          nombreEmpresa={nombreEmpresa}
+          fecha={new Date().toLocaleDateString('es-ES', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          })}
+          productos={(() => {
+            const productosFiltrados = productos
+              .map(p => {
+                const productoData = productosDisponiblesPendientes[p.id]
+                const cantidadEnviada = productoData?.cantidadEnviada ?? 0
+                const cantidadPedida = (p as any).cantidadPedida ?? 0
+                
+                // Incluir si tiene cantidad enviada > 0 o está marcado como disponible
+                if (cantidadEnviada > 0 || productoData?.disponible) {
+                  return {
+                    nombre: p.nombre,
+                    cantidadPedida: cantidadPedida,
+                    cantidadEnviada: cantidadEnviada,
+                    unidad: p.unidad || "U",
+                    observaciones: productoData?.observaciones
+                  }
+                }
+                return null
+              })
+              .filter((p): p is NonNullable<typeof p> => p !== null && p.cantidadEnviada > 0)
+            
+            console.log("Productos para modal:", productosFiltrados)
+            console.log("Productos disponibles pendientes:", productosDisponiblesPendientes)
+            
+            return productosFiltrados
+          })()}
         />
       )}
 
