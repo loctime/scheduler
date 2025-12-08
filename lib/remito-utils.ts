@@ -352,7 +352,7 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
 
   // Título
   pdf.setFontSize(16)
-  pdf.setFont(undefined, "bold")
+  pdf.setFont("helvetica", "bold")
   const titulo = remito.tipo === "pedido"
     ? "PEDIDO PANIFICADOS Y EMPANADAS SANTA"
     : remito.tipo === "envio" 
@@ -365,7 +365,7 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
 
   // Número de remito (esquina superior derecha)
   pdf.setFontSize(12)
-  pdf.setFont(undefined, "normal")
+  pdf.setFont("helvetica", "normal")
   pdf.text(`N°${remito.numero}`, pdfWidth - margin, margin + 5, { align: "right" })
 
   // Fecha (esquina superior izquierda)
@@ -400,7 +400,7 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
 
   // Tabla de productos
   pdf.setFontSize(10)
-  pdf.setFont(undefined, "bold")
+  pdf.setFont("helvetica", "bold")
   
   // Si es remito final (recepcion con final=true), mostrar 3 columnas
   const esRemitoFinal = remito.final && remito.tipo === "recepcion"
@@ -424,7 +424,7 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
   yPos += 3
 
   // Productos
-  pdf.setFont(undefined, "normal")
+  pdf.setFont("helvetica", "normal")
   remito.productos.forEach((producto) => {
     if (yPos > pdfHeight - 60) {
       pdf.addPage()
