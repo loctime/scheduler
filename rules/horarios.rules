@@ -80,21 +80,23 @@ match /apps/horarios/pedidos/{pedidoId} {
   allow create: if isAuth() && request.resource.data.userId == uid();
   // Actualizar: 
   // - Si está autenticado: verificar propiedad y proteger userId
-  // - Si NO está autenticado: permitir solo si el pedido NO está en estado "enviado", "recibido" o "completado"
-  //   (permite "creado", null, o undefined para pedidos antiguos)
+  // - Si NO está autenticado: permitir solo si el pedido NO está en estado "enviado" o "recibido"
+  //   (permite "creado", "completado", null, o undefined)
+  //   "completado" se permite porque puede ser un nuevo ciclo de pedido
   //   y solo se actualizan campos específicos (estado, remitoEnvioId, fechaEnvio, updatedAt)
   //   sin modificar userId ni otros campos sensibles
   allow update: if (isAuth() && resource.data.userId == uid()
     && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId))
     || (!isAuth() 
       && (
-        // Permitir si el estado NO es uno de los estados bloqueados
+        // Permitir si el estado NO es "enviado" o "recibido"
+        // Permitir "completado" para permitir nuevos ciclos de pedido
         // Esto funciona incluso cuando el estado es null o undefined
         !('estado' in resource.data)
         || resource.data.estado == null
+        || resource.data.estado == "completado"
         || (resource.data.estado != "enviado"
-            && resource.data.estado != "recibido"
-            && resource.data.estado != "completado")
+            && resource.data.estado != "recibido")
       )
       && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
       // Solo permitir actualizar campos específicos: estado, remitoEnvioId, fechaEnvio, updatedAt

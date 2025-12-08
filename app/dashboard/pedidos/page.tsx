@@ -302,11 +302,11 @@ export default function PedidosPage() {
       return
     }
 
-    // Verificar si el pedido ya está recibido o completado
-    if (selectedPedido.estado === "recibido" || selectedPedido.estado === "completado") {
+    // Verificar si el pedido está recibido (pero no completado, ya que completado permite nuevo link)
+    if (selectedPedido.estado === "recibido") {
       toast({
         title: "No se puede generar enlace",
-        description: "Este pedido ya fue recibido. No se pueden generar nuevos enlaces.",
+        description: "Este pedido está en proceso de recepción. Completa la recepción antes de generar un nuevo enlace.",
         variant: "destructive",
       })
       return
@@ -508,10 +508,10 @@ export default function PedidosPage() {
             <>
               {/* Header del pedido - Mobile first */}
               <div className="rounded-lg border border-border bg-card p-1.5 space-y-1.5">
-                  {/* Fila 1: Nombre + acciones */}
-                  <div className="flex items-center justify-between gap-1.5">
+                  {/* Fila 1: Nombre + pestañas + acciones */}
+                  <div className="flex items-center gap-2">
                     {isEditingName ? (
-                      <div className="flex items-center gap-1 flex-1 min-w-0">
+                      <div className="flex items-center gap-1 min-w-0 flex-shrink-0">
                         <Input
                           ref={nameInputRef}
                           value={editingName}
@@ -528,14 +528,41 @@ export default function PedidosPage() {
                         </Button>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1 min-w-0">
+                      <div className="flex items-center gap-1 min-w-0 flex-shrink-0">
                         <h2 className="text-base font-bold text-foreground truncate">{selectedPedido.nombre}</h2>
                         <Button variant="ghost" size="icon" onClick={handleStartEditName} className="h-6 w-6 shrink-0 text-muted-foreground">
                           <Pencil className="h-3 w-3" />
                         </Button>
                       </div>
                     )}
-                    <div className="flex gap-1 shrink-0">
+                    
+                    {/* Tabs: Productos / Remitos */}
+                    <div className="flex gap-1 border-l border-r border-border px-2 flex-shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                          "h-8 px-3 rounded-none border-b-2 border-transparent",
+                          activeTab === "productos" && "border-primary text-primary font-medium"
+                        )}
+                        onClick={() => setActiveTab("productos")}
+                      >
+                        Productos
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                          "h-8 px-3 rounded-none border-b-2 border-transparent",
+                          activeTab === "remitos" && "border-primary text-primary font-medium"
+                        )}
+                        onClick={() => setActiveTab("remitos")}
+                      >
+                        Remitos {remitos.length > 0 && `(${remitos.length})`}
+                      </Button>
+                    </div>
+                    
+                    <div className="flex gap-1 shrink-0 ml-auto">
                       {selectedPedido.estado === "enviado" && (
                         <Button 
                           variant="outline" 
@@ -577,32 +604,6 @@ export default function PedidosPage() {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                  </div>
-
-                  {/* Tabs: Productos / Remitos */}
-                  <div className="flex gap-1 border-b border-border">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={cn(
-                        "h-8 px-3 rounded-none border-b-2 border-transparent",
-                        activeTab === "productos" && "border-primary text-primary font-medium"
-                      )}
-                      onClick={() => setActiveTab("productos")}
-                    >
-                      Productos
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={cn(
-                        "h-8 px-3 rounded-none border-b-2 border-transparent",
-                        activeTab === "remitos" && "border-primary text-primary font-medium"
-                      )}
-                      onClick={() => setActiveTab("remitos")}
-                    >
-                      Remitos {remitos.length > 0 && `(${remitos.length})`}
-                    </Button>
                   </div>
 
                   {/* Sección colapsable: Encabezado + Formato */}
@@ -697,7 +698,7 @@ export default function PedidosPage() {
                         variant="outline"
                         className="h-7 px-2"
                         onClick={handleGenerarEnlace}
-                        disabled={productosAPedirActualizados.length === 0 || selectedPedido?.estado === "enviado" || selectedPedido?.estado === "recibido" || selectedPedido?.estado === "completado" || loadingEnlace}
+                        disabled={productosAPedirActualizados.length === 0 || selectedPedido?.estado === "enviado" || selectedPedido?.estado === "recibido" || loadingEnlace}
                         title="Generar nuevo enlace público"
                       >
                         {loadingEnlace ? (

@@ -41,9 +41,9 @@ export function useEnlacePublico(user: any) {
         throw new Error("No tienes permiso para crear enlaces de este pedido")
       }
 
-      // Verificar si el pedido ya está enviado
-      if (pedidoData.estado === "enviado" || pedidoData.estado === "recibido" || pedidoData.estado === "completado") {
-        throw new Error("No se puede generar un enlace para un pedido que ya fue enviado")
+      // Verificar si el pedido está en proceso (enviado o recibido, pero permitir completado para nuevo pedido)
+      if (pedidoData.estado === "enviado" || pedidoData.estado === "recibido") {
+        throw new Error("No se puede generar un enlace para un pedido que está en proceso de envío o recepción")
       }
 
       // Desactivar todos los enlaces activos anteriores para este pedido

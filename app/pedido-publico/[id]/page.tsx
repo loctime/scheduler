@@ -55,8 +55,10 @@ export default function PedidoPublicoPage() {
         if (pedidoData.estado === "enviado") {
           setPedidoConfirmado(true)
           // No mostrar error, permitir editar pero con confirmación
-        } else if (pedidoData.estado === "recibido" || pedidoData.estado === "completado") {
-          setError("Este pedido ya fue recibido y no puede ser modificado")
+        } else if (pedidoData.estado === "recibido") {
+          // Solo bloquear si está "recibido" (en proceso de recepción)
+          // Permitir "completado" porque puede ser un nuevo pedido
+          setError("Este pedido está en proceso de recepción y no puede ser modificado")
           setLoadingData(false)
           return
         }
