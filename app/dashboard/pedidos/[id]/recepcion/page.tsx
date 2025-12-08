@@ -271,15 +271,20 @@ export default function RecepcionPage() {
   if (productosEnviados.length === 0) {
     return (
       <DashboardLayout user={user}>
-        <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => router.push(`/dashboard/pedidos/${pedidoId}`)}>
+        <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => router.push(`/dashboard/pedidos/${pedidoId}`)}
+              className="h-9 w-9 sm:h-10 sm:w-10"
+            >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <h1 className="text-2xl font-bold">Registrar Recepción</h1>
+            <h1 className="text-xl sm:text-2xl font-bold">Registrar Recepción</h1>
           </div>
-          <div className="rounded-lg border bg-card p-6 text-center">
-            <p className="text-muted-foreground">
+          <div className="rounded-lg border bg-card p-4 sm:p-6 text-center">
+            <p className="text-sm sm:text-base text-muted-foreground">
               No hay productos enviados registrados. Primero debe generarse un enlace público y la fábrica debe confirmar el envío.
             </p>
           </div>
@@ -290,21 +295,26 @@ export default function RecepcionPage() {
 
   return (
     <DashboardLayout user={user}>
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push(`/dashboard/pedidos/${pedidoId}`)}>
+      <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
+        <div className="flex items-center gap-2 sm:gap-4">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => router.push(`/dashboard/pedidos/${pedidoId}`)}
+            className="h-9 w-9 sm:h-10 sm:w-10"
+          >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-2xl font-bold">Registrar Recepción</h1>
+          <h1 className="text-xl sm:text-2xl font-bold">Registrar Recepción</h1>
         </div>
 
-        <div className="rounded-lg border bg-card p-6 space-y-6">
+        <div className="rounded-lg border bg-card p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
           {observacionesRemito && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800 p-4">
-              <h4 className="font-semibold text-sm mb-2 text-blue-900 dark:text-blue-100">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800 p-3 sm:p-4">
+              <h4 className="font-semibold text-xs sm:text-sm mb-2 text-blue-900 dark:text-blue-100">
                 Observaciones del envío:
               </h4>
-              <p className="text-sm text-blue-800 dark:text-blue-200 whitespace-pre-wrap">
+              <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 whitespace-pre-wrap">
                 {observacionesRemito}
               </p>
             </div>
