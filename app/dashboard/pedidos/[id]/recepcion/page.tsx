@@ -12,7 +12,7 @@ import { useRemitos } from "@/hooks/use-remitos"
 import { useEnlacePublico } from "@/hooks/use-enlace-publico"
 import { RecepcionForm } from "@/components/pedidos/recepcion-form"
 import { crearRemitoRecepcion, eliminarRemitosAnteriores } from "@/lib/remito-utils"
-import type { Remito } from "@/lib/types"
+import type { Remito, Pedido } from "@/lib/types"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { doc, getDoc } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
@@ -30,7 +30,7 @@ export default function RecepcionPage() {
   const { crearRemito, descargarPDFRemito, obtenerRemitosPorPedido, obtenerRemito } = useRemitos(user)
   const { obtenerEnlacePublico } = useEnlacePublico(user)
 
-  const [pedido, setPedido] = useState<any>(null)
+  const [pedido, setPedido] = useState<Pedido | null>(null)
   const [enlacePublico, setEnlacePublico] = useState<any>(null)
   const [productosEnviados, setProductosEnviados] = useState<Array<{
     productoId: string
@@ -49,7 +49,7 @@ export default function RecepcionPage() {
         // Cargar pedido
         const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId))
         if (pedidoDoc.exists()) {
-          const pedidoData = { id: pedidoDoc.id, ...pedidoDoc.data() }
+          const pedidoData = { id: pedidoDoc.id, ...pedidoDoc.data() } as Pedido
           setPedido(pedidoData)
 
           // Obtener productos enviados desde el remito de envío (si el pedido está en estado "enviado")

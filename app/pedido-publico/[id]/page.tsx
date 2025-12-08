@@ -309,10 +309,10 @@ export default function PedidoPublicoPage() {
 
   if (loadingData) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-          <p className="text-muted-foreground">Cargando pedido...</p>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="text-center space-y-3 sm:space-y-4">
+          <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 animate-spin mx-auto text-primary" />
+          <p className="text-sm sm:text-base text-muted-foreground">Cargando pedido...</p>
         </div>
       </div>
     )
@@ -321,31 +321,31 @@ export default function PedidoPublicoPage() {
   if (error || !pedido) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="text-center space-y-4 max-w-md">
-          <Package className="h-12 w-12 mx-auto text-muted-foreground" />
-          <h1 className="text-2xl font-bold">Error</h1>
-          <p className="text-muted-foreground">{error || "El pedido no existe"}</p>
+        <div className="text-center space-y-3 sm:space-y-4 max-w-md">
+          <Package className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-muted-foreground" />
+          <h1 className="text-xl sm:text-2xl font-bold">Error</h1>
+          <p className="text-sm sm:text-base text-muted-foreground break-words">{error || "El pedido no existe"}</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="rounded-lg border bg-card p-6 space-y-4">
-          <div className="flex items-center gap-3">
-            <Package className="h-6 w-6 text-primary" />
-            <div>
-              <h1 className="text-2xl font-bold">{pedido.nombre}</h1>
-              <p className="text-sm text-muted-foreground">
+    <div className="min-h-screen bg-background p-3 sm:p-4">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
+        <div className="rounded-lg border bg-card p-4 sm:p-6 space-y-3 sm:space-y-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Package className="h-5 w-5 sm:h-6 sm:w-6 text-primary flex-shrink-0" />
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold break-words">{pedido.nombre}</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                 Complete la información de disponibilidad y cantidades a enviar
               </p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-lg border bg-card p-6">
+        <div className="rounded-lg border bg-card p-3 sm:p-4 md:p-6">
           <EnlacePublicoForm
             productos={productos}
             enlacePublico={enlacePublico}

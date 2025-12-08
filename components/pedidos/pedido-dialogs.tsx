@@ -264,38 +264,45 @@ export function ConfirmarEnvioDialog({
 }: ConfirmarEnvioDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] sm:max-h-[80vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
             <Package className="h-5 w-5" />
             Confirmar Envío
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs sm:text-sm">
             Revisa los detalles del envío antes de confirmar
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
-          <div className="rounded-lg border p-4 space-y-2">
-            <h4 className="font-semibold text-sm mb-2">Resumen del envío:</h4>
-            <div className="space-y-2">
+          <div className="rounded-lg border p-3 sm:p-4 space-y-2">
+            <h4 className="font-semibold text-sm sm:text-base mb-3">Resumen del envío:</h4>
+            <div className="space-y-3">
               {productos.map((producto, index) => (
-                <div key={index} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
-                  <span className="font-medium">{producto.nombre}</span>
-                  <div className="flex items-center gap-3 text-muted-foreground">
-                    <span>Pedido: {producto.cantidadPedida} {producto.unidad}</span>
-                    <span>→</span>
-                    <span className="font-semibold text-foreground">Envío: {producto.cantidadEnviada} {producto.unidad}</span>
+                <div key={index} className="space-y-1.5 py-2 border-b last:border-0">
+                  <div className="font-medium text-sm sm:text-base">{producto.nombre}</div>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-xs sm:text-sm text-muted-foreground pl-2 sm:pl-0">
+                    <span>Pedido: <strong className="text-foreground">{producto.cantidadPedida} {producto.unidad}</strong></span>
+                    <span className="hidden sm:inline">→</span>
+                    <span className="sm:font-semibold text-foreground">Envío: {producto.cantidadEnviada} {producto.unidad}</span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+          <Button 
+            variant="outline" 
+            onClick={() => onOpenChange(false)}
+            className="w-full sm:w-auto h-11 sm:h-10"
+          >
             Cancelar
           </Button>
-          <Button onClick={onConfirm}>
+          <Button 
+            onClick={onConfirm}
+            className="w-full sm:w-auto h-11 sm:h-10"
+          >
             Confirmar Envío
           </Button>
         </DialogFooter>
