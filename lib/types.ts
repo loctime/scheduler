@@ -303,6 +303,7 @@ export interface Recepcion {
   }>
   esParcial: boolean
   completada: boolean
+  observaciones?: string
   userId: string
   createdAt?: any
 }
