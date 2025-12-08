@@ -762,7 +762,7 @@ export default function PedidosPage() {
                         disabled={productosAPedirActualizados.length === 0}
                       >
                         <Copy className="h-3.5 w-3.5 sm:mr-1" />
-                        <span className="hidden sm:inline text-xs">Copiar</span>
+                        <span className="hidden sm:inline text-xs">Copiar pedido</span>
                       </Button>
                       <Button 
                         size="sm"

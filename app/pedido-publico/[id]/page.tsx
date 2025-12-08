@@ -226,20 +226,60 @@ export default function PedidoPublicoPage() {
       console.log("✓ Remito creado:", remitoRef.id)
       
       // Verificar que se guardó correctamente leyendo el documento
-      const { getDoc } = await import("firebase/firestore")
-      const remitoGuardado = await getDoc(remitoRef)
-      console.log("Remito guardado en Firestore:", remitoGuardado.data())
-      console.log("Productos en remito guardado:", remitoGuardado.data()?.productos)
+      console.log("Intentando leer remito guardado...")
+      try {
+        const remitoGuardado = await getDoc(remitoRef)
+        console.log("Remito guardado en Firestore:", remitoGuardado.data())
+        console.log("Productos en remito guardado:", remitoGuardado.data()?.productos)
+      } catch (readError: any) {
+        console.warn("⚠️ Error al leer remito (no crítico):", readError)
+        // Continuar de todas formas
+      }
 
       // 3. Actualizar el pedido: estado "enviado", fechaEnvio, y vincular remito
       console.log("Paso 5: Actualizando pedido...")
-      await updateDoc(doc(db, COLLECTIONS.PEDIDOS, pedido.id), {
+      console.log("=== INICIO ACTUALIZACIÓN PEDIDO ===")
+      console.log("Estado actual del pedido (en memoria):", pedido.estado)
+      console.log("Pedido ID:", pedido.id)
+      console.log("Remito ID a vincular:", remitoRef.id)
+      
+      // Leer el pedido nuevamente para obtener el estado más reciente
+      console.log("Leyendo pedido desde Firestore...")
+      const pedidoDocActualizado = await getDoc(doc(db, COLLECTIONS.PEDIDOS, pedido.id))
+      console.log("Pedido leído exitosamente")
+      if (!pedidoDocActualizado.exists()) {
+        throw new Error("El pedido no existe")
+      }
+      const pedidoActualizado = { id: pedidoDocActualizado.id, ...pedidoDocActualizado.data() } as Pedido
+      console.log("Estado actual del pedido (desde Firestore):", pedidoActualizado.estado)
+      
+      // Verificar que el pedido esté en un estado válido para actualizar
+      if (pedidoActualizado.estado === "enviado" || pedidoActualizado.estado === "recibido") {
+        console.warn("⚠️ El pedido ya está en estado", pedidoActualizado.estado, "- no se puede actualizar desde enlace público")
+        alert("Este pedido ya fue procesado. No se puede actualizar nuevamente.")
+        return
+      }
+      
+      const updateData = {
         estado: "enviado",
         remitoEnvioId: remitoRef.id,
         fechaEnvio: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      })
-      console.log("✓ Pedido actualizado")
+      }
+      console.log("Datos a actualizar en pedido:", JSON.stringify(updateData, null, 2))
+      console.log("Verificando reglas: estado actual debe ser 'creado' o 'completado' para permitir actualización")
+      console.log("Estado actual del pedido para validación:", pedidoActualizado.estado)
+      console.log("¿Estado es 'creado' o 'completado'?", pedidoActualizado.estado === "creado" || pedidoActualizado.estado === "completado" || !pedidoActualizado.estado)
+      
+      try {
+        await updateDoc(doc(db, COLLECTIONS.PEDIDOS, pedido.id), updateData)
+        console.log("✓ Pedido actualizado exitosamente")
+      } catch (updateError: any) {
+        console.error("❌ Error específico al actualizar pedido:", updateError)
+        console.error("Código de error:", updateError?.code)
+        console.error("Mensaje de error:", updateError?.message)
+        throw updateError
+      }
 
       // 4. Desactivar el enlace para que no pueda ser editado nuevamente
       console.log("Paso 6: Desactivando enlace...")
@@ -256,6 +296,12 @@ export default function PedidoPublicoPage() {
       // Recargar la página para actualizar el estado
       window.location.reload()
     } catch (error: any) {
+      console.error("=== ERROR CAPTURADO ===")
+      console.error("Tipo de error:", error?.constructor?.name)
+      console.error("Código de error:", error?.code)
+      console.error("Mensaje de error:", error?.message)
+      console.error("Stack trace:", error?.stack)
+      console.error("Error completo:", error)
       logger.error("Error al confirmar envío:", error)
       alert(`Error al procesar la confirmación: ${error?.message || "Error desconocido"}. Por favor, intente nuevamente.`)
     }

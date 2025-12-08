@@ -80,23 +80,21 @@ match /apps/horarios/pedidos/{pedidoId} {
   allow create: if isAuth() && request.resource.data.userId == uid();
   // Actualizar: 
   // - Si está autenticado: verificar propiedad y proteger userId
-  // - Si NO está autenticado: permitir solo si el pedido NO está en estado "enviado" o "recibido"
-  //   (permite "creado", "completado", null, o undefined)
-  //   "completado" se permite porque puede ser un nuevo ciclo de pedido
-  //   y solo se actualizan campos específicos (estado, remitoEnvioId, fechaEnvio, updatedAt)
-  //   sin modificar userId ni otros campos sensibles
+  // - Si NO está autenticado: permitir actualizar desde enlace público
+  //   - Permitir cambiar de "creado" o "completado" a "enviado" (confirmación desde enlace público)
+  //   - NO permitir cambiar si ya está "enviado" o "recibido" (solo el dueño puede hacerlo)
+  //   - Solo se actualizan campos específicos (estado, remitoEnvioId, fechaEnvio, updatedAt)
+  //   - sin modificar userId ni otros campos sensibles
   allow update: if (isAuth() && resource.data.userId == uid()
     && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId))
     || (!isAuth() 
       && (
-        // Permitir si el estado NO es "enviado" o "recibido"
-        // Permitir "completado" para permitir nuevos ciclos de pedido
-        // Esto funciona incluso cuando el estado es null o undefined
-        !('estado' in resource.data)
+        // Permitir si el estado actual es "creado", "completado", null o undefined
+        // (NO permitir si ya está "enviado" o "recibido")
+        (!('estado' in resource.data)
         || resource.data.estado == null
-        || resource.data.estado == "completado"
-        || (resource.data.estado != "enviado"
-            && resource.data.estado != "recibido")
+        || resource.data.estado == "creado"
+        || resource.data.estado == "completado")
       )
       && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
       // Solo permitir actualizar campos específicos: estado, remitoEnvioId, fechaEnvio, updatedAt
