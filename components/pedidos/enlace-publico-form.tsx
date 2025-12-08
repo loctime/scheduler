@@ -86,8 +86,13 @@ export function EnlacePublicoForm({
       )}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Productos del Pedido</h3>
+        <p className="text-sm text-muted-foreground">
+          Marca los productos disponibles y especifica la cantidad a enviar
+        </p>
         <div className="space-y-3">
-          {productos.map((producto) => {
+          {productos
+            .filter((producto) => (producto.stockMinimo || 0) > 0) // Solo mostrar productos con stock mínimo > 0
+            .map((producto) => {
             const productoData = productosDisponibles[producto.id] || { disponible: false }
             const cantidadPedida = producto.stockMinimo || 0
 

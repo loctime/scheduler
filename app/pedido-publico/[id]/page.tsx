@@ -173,16 +173,30 @@ export default function PedidoPublicoPage() {
 
       // 2. Generar el remito automáticamente
       console.log("Paso 2: Generando datos del remito...")
-      console.log("Productos disponibles pendientes:", productosDisponiblesPendientes)
-      console.log("Productos del pedido:", productos)
+      console.log("Productos disponibles pendientes:", JSON.stringify(productosDisponiblesPendientes, null, 2))
+      console.log("Productos del pedido:", productos.map(p => ({ id: p.id, nombre: p.nombre, stockMinimo: p.stockMinimo })))
+      
+      // Verificar qué productos están marcados como disponibles
+      const productosDisponiblesArray = Object.entries(productosDisponiblesPendientes || {})
+      console.log("Productos marcados como disponibles:", productosDisponiblesArray.length)
+      productosDisponiblesArray.forEach(([productoId, data]: [string, any]) => {
+        console.log(`  - Producto ${productoId}: disponible=${data.disponible}, cantidadEnviada=${data.cantidadEnviada}`)
+      })
+      
       const remitoData = crearRemitoEnvioDesdeDisponibles(
         pedido,
         productos,
         productosDisponiblesPendientes || {}
       )
-      console.log("Datos del remito:", remitoData)
+      console.log("Datos del remito:", JSON.stringify(remitoData, null, 2))
       console.log("Productos en remitoData:", remitoData.productos)
       console.log("Cantidad de productos:", remitoData.productos?.length || 0)
+      
+      // Si no hay productos, es un error
+      if (!remitoData.productos || remitoData.productos.length === 0) {
+        alert("Error: No hay productos para enviar. Debes marcar al menos un producto como disponible y especificar la cantidad a enviar.")
+        return
+      }
 
       // Generar número de remito con nombre del pedido
       console.log("Paso 3: Generando número de remito...")
@@ -191,12 +205,23 @@ export default function PedidoPublicoPage() {
 
       // Crear remito en Firestore
       console.log("Paso 4: Creando remito en Firestore...")
-      const remitoRef = await addDoc(collection(db, COLLECTIONS.REMITOS), {
+      const remitoParaGuardar = {
         ...remitoData,
         numero: numeroRemito,
         createdAt: serverTimestamp(),
-      })
+      }
+      console.log("Datos que se van a guardar en Firestore:", JSON.stringify(remitoParaGuardar, null, 2))
+      console.log("Productos en datos a guardar:", remitoParaGuardar.productos)
+      console.log("Cantidad de productos a guardar:", remitoParaGuardar.productos?.length || 0)
+      
+      const remitoRef = await addDoc(collection(db, COLLECTIONS.REMITOS), remitoParaGuardar)
       console.log("✓ Remito creado:", remitoRef.id)
+      
+      // Verificar que se guardó correctamente leyendo el documento
+      const { getDoc } = await import("firebase/firestore")
+      const remitoGuardado = await getDoc(remitoRef)
+      console.log("Remito guardado en Firestore:", remitoGuardado.data())
+      console.log("Productos en remito guardado:", remitoGuardado.data()?.productos)
 
       // 3. Actualizar el pedido: estado "enviado", fechaEnvio, y vincular remito
       console.log("Paso 5: Actualizando pedido...")

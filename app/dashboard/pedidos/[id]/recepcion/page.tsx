@@ -38,6 +38,7 @@ export default function RecepcionPage() {
     cantidadPedida: number
     cantidadEnviada: number
   }>>([])
+  const [observacionesRemito, setObservacionesRemito] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -56,38 +57,76 @@ export default function RecepcionPage() {
             console.log("Pedido en estado enviado, buscando remito de envío...")
             console.log("remitoEnvioId:", pedidoData.remitoEnvioId)
             
-            // Buscar en todos los remitos del pedido (más confiable que obtener por ID directo)
-            const remitos = await obtenerRemitosPorPedido(pedidoId)
-            console.log("Remitos encontrados:", remitos)
-            
-            // Buscar el remito de envío (por ID si existe, o por tipo)
+            // Intentar obtener el remito directamente por ID primero
             let remitoEnvio = null
             if (pedidoData.remitoEnvioId) {
-              remitoEnvio = remitos.find(r => r.id === pedidoData.remitoEnvioId && r.tipo === "envio")
+              console.log("Obteniendo remito directamente por ID:", pedidoData.remitoEnvioId)
+              remitoEnvio = await obtenerRemito(pedidoData.remitoEnvioId)
+              console.log("Remito obtenido por ID:", remitoEnvio)
+              if (remitoEnvio) {
+                console.log("Productos en remito (obtenido por ID):", remitoEnvio.productos)
+                console.log("Tipo de productos:", typeof remitoEnvio.productos)
+                console.log("Es array?", Array.isArray(remitoEnvio.productos))
+              }
             }
             
-            // Si no se encontró por ID, buscar por tipo
-            if (!remitoEnvio) {
-              remitoEnvio = remitos.find(r => r.tipo === "envio")
+            // Si no se encontró por ID, buscar en todos los remitos del pedido
+            if (!remitoEnvio || !remitoEnvio.productos || remitoEnvio.productos.length === 0) {
+              console.log("Buscando en todos los remitos del pedido...")
+              const remitos = await obtenerRemitosPorPedido(pedidoId)
+              console.log("Remitos encontrados:", remitos)
+              
+              // Buscar el remito de envío (por ID si existe, o por tipo)
+              if (pedidoData.remitoEnvioId) {
+                remitoEnvio = remitos.find(r => r.id === pedidoData.remitoEnvioId && r.tipo === "envio")
+              }
+              
+              // Si no se encontró por ID, buscar por tipo
+              if (!remitoEnvio) {
+                remitoEnvio = remitos.find(r => r.tipo === "envio")
+              }
+              
+              // Debug: verificar estructura completa del remito
+              if (remitoEnvio) {
+                console.log("Remito encontrado - estructura completa:", JSON.stringify(remitoEnvio, null, 2))
+                console.log("Remito.productos existe?", "productos" in remitoEnvio)
+                console.log("Remito.productos es array?", Array.isArray(remitoEnvio.productos))
+                console.log("Remito.productos length:", remitoEnvio.productos?.length)
+                console.log("Tipo de remito.productos:", typeof remitoEnvio.productos)
+              }
             }
             
             if (remitoEnvio && remitoEnvio.productos && remitoEnvio.productos.length > 0) {
               console.log("Remito de envío encontrado:", remitoEnvio)
               console.log("Productos en remito:", remitoEnvio.productos)
+              
+              // Guardar observaciones del remito si existen
+              if (remitoEnvio.observaciones) {
+                setObservacionesRemito(remitoEnvio.observaciones)
+              }
+              
+              // Filtrar y mapear productos con cantidadEnviada > 0
               const productos: typeof productosEnviados = remitoEnvio.productos
-                .filter((p: any) => p.cantidadEnviada && p.cantidadEnviada > 0)
+                .filter((p: any) => {
+                  const cantidadEnviada = p.cantidadEnviada || 0
+                  console.log(`Producto ${p.productoNombre}: cantidadEnviada=${cantidadEnviada}`)
+                  return cantidadEnviada > 0
+                })
                 .map((p: any) => ({
                   productoId: p.productoId,
                   productoNombre: p.productoNombre,
                   cantidadPedida: p.cantidadPedida || 0,
-                  cantidadEnviada: p.cantidadEnviada,
+                  cantidadEnviada: p.cantidadEnviada || 0,
                 }))
-              setProductosEnviados(productos)
+              
+              console.log("Productos filtrados (cantidadEnviada > 0):", productos.length)
               console.log("Productos cargados:", productos)
+              setProductosEnviados(productos)
             } else {
               console.log("No se encontró remito de envío o no tiene productos")
               if (remitoEnvio) {
                 console.log("Remito encontrado pero sin productos:", remitoEnvio)
+                console.log("Productos en remito:", remitoEnvio.productos)
               }
             }
           } else {
@@ -256,7 +295,17 @@ export default function RecepcionPage() {
           <h1 className="text-2xl font-bold">Registrar Recepción</h1>
         </div>
 
-        <div className="rounded-lg border bg-card p-6">
+        <div className="rounded-lg border bg-card p-6 space-y-6">
+          {observacionesRemito && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800 p-4">
+              <h4 className="font-semibold text-sm mb-2 text-blue-900 dark:text-blue-100">
+                Observaciones del envío:
+              </h4>
+              <p className="text-sm text-blue-800 dark:text-blue-200 whitespace-pre-wrap">
+                {observacionesRemito}
+              </p>
+            </div>
+          )}
           <RecepcionForm
             productosEnviados={productosEnviados}
             onConfirmar={handleConfirmarRecepcion}

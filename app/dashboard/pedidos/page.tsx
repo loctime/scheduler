@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { 
   Plus, Trash2, Copy, MessageCircle, RotateCcw, Upload, Package, 
   Construction, Pencil, Check, X, Cog, ExternalLink, Link as LinkIcon,
-  FileText, Download, Bell, Loader2
+  FileText, Download, Bell, Loader2, CheckCircle
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
@@ -15,9 +15,13 @@ import { useStockChatContext } from "@/contexts/stock-chat-context"
 import { usePedidos } from "@/hooks/use-pedidos"
 import { useEnlacePublico } from "@/hooks/use-enlace-publico"
 import { useRemitos } from "@/hooks/use-remitos"
+import { useRecepciones } from "@/hooks/use-recepciones"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { doc, setDoc, serverTimestamp, getDoc, updateDoc, deleteDoc } from "firebase/firestore"
-import type { Remito } from "@/lib/types"
+import type { Remito, Recepcion } from "@/lib/types"
+import { PedidoTimeline } from "@/components/pedidos/pedido-timeline"
+import { crearRemitoPedido } from "@/lib/remito-utils"
+import Link from "next/link"
 import { PedidosSidebar } from "@/components/pedidos/pedidos-sidebar"
 import { ProductosTable } from "@/components/pedidos/productos-table"
 import { 
@@ -64,10 +68,14 @@ export default function PedidosPage() {
     updateProductsOrder,
     calcularPedido,
     generarTextoPedido,
+    updatePedidoEstado,
+    updateRemitoEnvio,
+    updateEnlacePublico,
   } = usePedidos(user)
 
-  const { crearEnlacePublico, buscarEnlacesActivosPorPedido, loading: loadingEnlace } = useEnlacePublico(user)
-  const { obtenerRemitosPorPedido, descargarPDFRemito } = useRemitos(user)
+  const { crearEnlacePublico, buscarEnlacesActivosPorPedido, obtenerEnlacePublico, loading: loadingEnlace } = useEnlacePublico(user)
+  const { crearRemito, obtenerRemitosPorPedido, descargarPDFRemito } = useRemitos(user)
+  const { obtenerRecepcionesPorPedido } = useRecepciones(user)
   
   // Función para reiniciar pedido (eliminar remito de envío y volver a estado "creado")
   const reiniciarPedido = async () => {
@@ -125,6 +133,9 @@ export default function PedidosPage() {
   
   // Estado para remitos
   const [remitos, setRemitos] = useState<Remito[]>([])
+  
+  // Estado para recepciones
+  const [recepciones, setRecepciones] = useState<Recepcion[]>([])
   
   // Estado para enlace público activo
   const [enlaceActivo, setEnlaceActivo] = useState<{ id: string } | null>(null)
@@ -196,11 +207,12 @@ export default function PedidosPage() {
     }
   }, [selectedPedido])
 
-  // Cargar remitos y enlaces activos cuando cambia el pedido seleccionado
+  // Cargar remitos, recepciones y enlaces activos cuando cambia el pedido seleccionado
   useEffect(() => {
     const cargarDatos = async () => {
       if (!selectedPedido?.id) {
         setRemitos([])
+        setRecepciones([])
         setEnlaceActivo(null)
         return
       }
@@ -208,6 +220,9 @@ export default function PedidosPage() {
       try {
         const remitosData = await obtenerRemitosPorPedido(selectedPedido.id)
         setRemitos(remitosData)
+        
+        const recepcionesData = await obtenerRecepcionesPorPedido(selectedPedido.id)
+        setRecepciones(recepcionesData)
         
         // Buscar enlaces públicos activos para este pedido
         const enlacesActivos = await buscarEnlacesActivosPorPedido(selectedPedido.id)
@@ -225,12 +240,13 @@ export default function PedidosPage() {
       } catch (error) {
         console.error("Error al cargar datos:", error)
         setRemitos([])
+        setRecepciones([])
         setEnlaceActivo(null)
       }
     }
     
     cargarDatos()
-  }, [selectedPedido?.id, obtenerRemitosPorPedido, buscarEnlacesActivosPorPedido])
+  }, [selectedPedido?.id, obtenerRemitosPorPedido, obtenerRecepcionesPorPedido, buscarEnlacesActivosPorPedido])
 
   // Handlers
   const handleOpenCreate = () => {
@@ -359,6 +375,62 @@ export default function PedidosPage() {
     if (enlaceActivo) {
       const url = `${window.location.origin}/pedido-publico/${enlaceActivo.id}`
       window.open(url, "_blank")
+    }
+  }
+
+  // Funciones de control del pedido
+  const handleGenerarRemitoEnvio = async () => {
+    if (!selectedPedido || !products.length) return
+
+    const remitoData = crearRemitoPedido(selectedPedido, products, stockActual, calcularPedido)
+    const remito = await crearRemito(remitoData, selectedPedido.nombre)
+    
+    if (remito) {
+      await updateRemitoEnvio(selectedPedido.id, remito.id)
+      await updatePedidoEstado(selectedPedido.id, "enviado", new Date())
+      await descargarPDFRemito(remito)
+      
+      // Recargar remitos y pedido
+      const remitosData = await obtenerRemitosPorPedido(selectedPedido.id)
+      setRemitos(remitosData)
+      
+      // Recargar pedido desde Firestore
+      if (db) {
+        const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, selectedPedido.id))
+        if (pedidoDoc.exists()) {
+          setSelectedPedido({ id: pedidoDoc.id, ...pedidoDoc.data() } as any)
+        }
+      }
+    }
+  }
+
+  const handleGenerarEnlacePublicoDesdeControl = async () => {
+    if (!selectedPedido) return
+
+    const enlace = await crearEnlacePublico(selectedPedido.id)
+    if (enlace) {
+      await updateEnlacePublico(selectedPedido.id, enlace.id)
+      setEnlaceActivo({ id: enlace.id })
+      
+      const url = `${window.location.origin}/pedido-publico/${enlace.id}`
+      navigator.clipboard.writeText(url)
+      toast({
+        title: "Enlace copiado",
+        description: "El enlace público se ha copiado al portapapeles",
+      })
+    }
+  }
+
+  const handleMarcarCompletado = async () => {
+    if (!selectedPedido) return
+    await updatePedidoEstado(selectedPedido.id, "completado")
+    
+    // Recargar pedido desde Firestore
+    if (db) {
+      const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, selectedPedido.id))
+      if (pedidoDoc.exists()) {
+        setSelectedPedido({ id: pedidoDoc.id, ...pedidoDoc.data() } as any)
+      }
     }
   }
 
@@ -575,15 +647,6 @@ export default function PedidosPage() {
                         </Button>
                       )}
                       <Button 
-                        variant="outline" 
-                        size="icon" 
-                        className="h-8 w-8" 
-                        onClick={() => window.location.href = `/dashboard/pedidos/${selectedPedido.id}`}
-                        title="Ver detalle y control"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                      <Button 
                         variant={showConfig ? "default" : "outline"} 
                         size="icon" 
                         className="h-8 w-8" 
@@ -774,27 +837,87 @@ export default function PedidosPage() {
                   configMode={showConfig}
                 />
               ) : (
-                <div className="rounded-lg border bg-card p-4 space-y-3">
-                  {remitos.length === 0 ? (
-                    <div className="text-center py-8">
-                      <FileText className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-                      <p className="text-sm text-muted-foreground">
-                        No hay remitos para este pedido
-                      </p>
+                <div className="space-y-4">
+                  {/* Timeline del pedido */}
+                  {selectedPedido && (
+                    <div className="rounded-lg border bg-card p-4">
+                      <h3 className="text-sm font-semibold mb-3">Estado del Pedido</h3>
+                      <PedidoTimeline pedido={selectedPedido} />
                     </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-semibold flex items-center gap-2">
-                          <FileText className="h-4 w-4" />
-                          Remitos ({remitos.length})
-                          {remitos.some(r => r.final) && (
-                            <span className="text-xs text-muted-foreground ml-2">
-                              (Completado)
-                            </span>
-                          )}
-                        </h3>
+                  )}
+
+                  {/* Acciones de control según estado */}
+                  {selectedPedido && (
+                    <div className="rounded-lg border bg-card p-4 space-y-3">
+                      <h3 className="text-sm font-semibold">Acciones</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedPedido.estado === "creado" && productosAPedirActualizados.length > 0 && (
+                          <Button onClick={handleGenerarRemitoEnvio} size="sm">
+                            <FileText className="h-4 w-4 mr-2" />
+                            Generar Remito de Envío
+                          </Button>
+                        )}
+                        
+                        {selectedPedido.estado === "enviado" && !enlaceActivo && (
+                          <Button onClick={handleGenerarEnlacePublicoDesdeControl} size="sm" variant="outline">
+                            <LinkIcon className="h-4 w-4 mr-2" />
+                            Generar Enlace Público
+                          </Button>
+                        )}
+
+                        {enlaceActivo && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const url = `${window.location.origin}/pedido-publico/${enlaceActivo.id}`
+                              navigator.clipboard.writeText(url)
+                              toast({ title: "Enlace copiado" })
+                            }}
+                          >
+                            <LinkIcon className="h-4 w-4 mr-2" />
+                            Copiar Enlace Público
+                          </Button>
+                        )}
+
+                        {(selectedPedido.estado === "enviado" || selectedPedido.estado === "recibido") && (
+                          <Link href={`/dashboard/pedidos/${selectedPedido.id}/recepcion`}>
+                            <Button size="sm">
+                              <Package className="h-4 w-4 mr-2" />
+                              Registrar Recepción
+                            </Button>
+                          </Link>
+                        )}
+
+                        {selectedPedido.estado === "recibido" && (
+                          <Button onClick={handleMarcarCompletado} size="sm">
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Marcar como Completado
+                          </Button>
+                        )}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Remitos */}
+                  <div className="rounded-lg border bg-card p-4 space-y-3">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      Remitos ({remitos.length})
+                      {remitos.some(r => r.final) && (
+                        <span className="text-xs text-muted-foreground ml-2">
+                          (Completado)
+                        </span>
+                      )}
+                    </h3>
+                    {remitos.length === 0 ? (
+                      <div className="text-center py-6">
+                        <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">
+                          No hay remitos para este pedido
+                        </p>
+                      </div>
+                    ) : (
                       <div className="space-y-2">
                         {/* Mostrar primero el remito final si existe, luego los demás */}
                         {[...remitos]
@@ -809,10 +932,10 @@ export default function PedidosPage() {
                             className="flex items-center justify-between p-2.5 rounded-lg border bg-background hover:bg-accent/50 transition-colors"
                           >
                             <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium truncate">
-                            {remito.tipo === "pedido" ? "📋 Remito de Pedido" : remito.tipo === "envio" ? "📤 Remito de Envío" : remito.tipo === "recepcion" ? "📥 Remito de Recepción" : "↩️ Remito de Devolución"} - {remito.numero}
-                            {remito.final && " (Final)"}
-                          </p>
+                              <p className="text-xs font-medium truncate">
+                                {remito.tipo === "pedido" ? "📋 Remito de Pedido" : remito.tipo === "envio" ? "📤 Remito de Envío" : remito.tipo === "recepcion" ? "📥 Remito de Recepción" : "↩️ Remito de Devolución"} - {remito.numero}
+                                {remito.final && " (Final)"}
+                              </p>
                               <p className="text-[10px] text-muted-foreground mt-0.5">
                                 {remito.fecha?.toDate 
                                   ? remito.fecha.toDate().toLocaleDateString("es-AR", { 
@@ -841,7 +964,38 @@ export default function PedidosPage() {
                           </div>
                         ))}
                       </div>
-                    </>
+                    )}
+                  </div>
+
+                  {/* Recepciones */}
+                  {recepciones.length > 0 && (
+                    <div className="rounded-lg border bg-card p-4 space-y-3">
+                      <h3 className="text-sm font-semibold">Recepciones</h3>
+                      <div className="space-y-2">
+                        {recepciones.map((recepcion) => (
+                          <div
+                            key={recepcion.id}
+                            className="p-3 rounded-lg border bg-background"
+                          >
+                            <p className="text-xs font-medium">
+                              Recepción {recepcion.esParcial ? "(Parcial)" : "(Completa)"}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              {recepcion.fecha?.toDate 
+                                ? recepcion.fecha.toDate().toLocaleDateString("es-AR", { 
+                                    day: "2-digit", 
+                                    month: "2-digit", 
+                                    year: "numeric" 
+                                  })
+                                : "Sin fecha"}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              Productos: {recepcion.productos.length}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
