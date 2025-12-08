@@ -12,7 +12,7 @@ import { useRemitos } from "@/hooks/use-remitos"
 import { useEnlacePublico } from "@/hooks/use-enlace-publico"
 import { RecepcionForm } from "@/components/pedidos/recepcion-form"
 import { crearRemitoRecepcion, eliminarRemitosAnteriores } from "@/lib/remito-utils"
-import type { Remito, Pedido } from "@/lib/types"
+import type { Remito, Pedido, Producto } from "@/lib/types"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { doc, getDoc } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
@@ -150,7 +150,7 @@ export default function RecepcionPage() {
                   const productosData = productosSnapshot.docs.map((doc) => ({
                     id: doc.id,
                     ...doc.data(),
-                  }))
+                  })) as Producto[]
 
                   // Construir lista de productos enviados
                   Object.entries(enlace.productosDisponibles).forEach(([productoId, data]: [string, any]) => {
