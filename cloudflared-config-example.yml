@@ -1,0 +1,15 @@
+# Ejemplo de configuración de Cloudflare Tunnel
+# 
+# INSTRUCCIONES:
+# 1. Copia este archivo a: C:\Users\[TU-USUARIO]\.cloudflared\config.yml
+# 2. Reemplaza [TU-USUARIO] con tu nombre de usuario de Windows
+# 3. Reemplaza [TU-TUNNEL-ID] con el ID del túnel que obtuviste al crear el túnel
+# 4. Guarda el archivo
+
+tunnel: ollama-tunnel
+credentials-file: C:\Users\[TU-USUARIO]\.cloudflared\[TU-TUNNEL-ID].json
+
+ingress:
+  # Redirige todo el tráfico a Ollama en localhost
+  - service: http://localhost:11434
+

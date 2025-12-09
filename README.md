@@ -281,12 +281,27 @@ service cloud.firestore {
 
 El chat de stock funciona sin Ollama, pero puedes configurarlo para respuestas más inteligentes:
 
-1. Instala [Ollama](https://ollama.ai/) en tu servidor local o remoto
-2. Descarga un modelo compatible (ej: `ollama pull llama3.2`)
-3. El sistema detectará automáticamente si Ollama está disponible
-4. Si Ollama no está disponible, el chat funcionará con procesamiento básico de lenguaje natural
+#### Opción A: Ollama Local (Solo Desarrollo)
 
-**Nota:** Ollama es completamente opcional. El chat funciona perfectamente sin él.
+1. Instala [Ollama](https://ollama.ai/) en tu PC
+2. Descarga un modelo compatible (ej: `ollama pull llama3.2`)
+3. El sistema detectará automáticamente si Ollama está disponible en `http://localhost:11434`
+
+#### Opción B: Ollama con Cloudflare Tunnel (Para Presentación/Demo)
+
+Para exponer Ollama desde tu PC de forma segura usando Cloudflare Tunnel:
+
+1. Sigue la guía completa en [`CLOUDFLARE_TUNNEL_SETUP.md`](./CLOUDFLARE_TUNNEL_SETUP.md)
+2. O ejecuta el script `iniciar-ollama-tunnel.bat` que configura todo automáticamente
+3. Configura la variable de entorno `OLLAMA_URL` en Vercel con la URL del túnel
+
+#### Opción C: Ollama en Servidor (Para Producción)
+
+1. Instala [Ollama](https://ollama.ai/) en tu servidor (Railway, Render, VPS, etc.)
+2. Configura la variable de entorno `OLLAMA_URL` en Vercel con la URL del servidor
+3. Descarga un modelo compatible (ej: `ollama pull llama3.2`)
+
+**Nota:** Ollama es completamente opcional. El chat funciona perfectamente sin él usando procesamiento básico de lenguaje natural.
 
 ## Uso de la Aplicación
 
