@@ -25,6 +25,8 @@ function ChatContent() {
     nombreAsistente,
     modo,
     setModo,
+    modoIA,
+    setModoIA,
     productosAcumulados,
     pedidos,
     pedidoSeleccionado,
@@ -94,6 +96,8 @@ function ChatContent() {
           nombreAsistente={nombreAsistente}
           modo={modo}
           setModo={setModo}
+          modoIA={modoIA}
+          setModoIA={setModoIA}
           productosAcumulados={productosAcumulados}
           pedidos={pedidos}
           pedidoSeleccionado={pedidoSeleccionado}

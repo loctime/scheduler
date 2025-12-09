@@ -26,6 +26,8 @@ interface ChatInterfaceProps {
   nombreAsistente?: string
   modo?: "ingreso" | "egreso" | "pregunta" | "stock" | null
   setModo?: (modo: "ingreso" | "egreso" | "pregunta" | "stock" | null) => void
+  modoIA?: boolean
+  setModoIA?: (modoIA: boolean) => void
   productosAcumulados?: Array<{
     productoId: string
     producto: string
@@ -48,6 +50,8 @@ export function ChatInterface({
   nombreAsistente = "Stock Assistant",
   modo,
   setModo,
+  modoIA = false,
+  setModoIA,
   productosAcumulados = [],
   pedidos = [],
   pedidoSeleccionado,
@@ -235,7 +239,9 @@ export function ChatInterface({
                   </div>
                   <div className="flex items-center gap-2 bg-muted rounded-2xl rounded-tl-md px-4 py-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm text-muted-foreground">Pensando...</span>
+                    <span className="text-sm text-muted-foreground">
+                      {modoIA ? "🤖 IA procesando..." : "Pensando..."}
+                    </span>
                     {onCancelMessage && (
                       <Button
                         variant="ghost"
@@ -326,7 +332,7 @@ export function ChatInterface({
       {/* Botones de modo */}
       {setModo && (
         <div className="px-3 border-t border-border bg-muted/30">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button
               type="button"
               variant={modo === "ingreso" ? "default" : "outline"}
@@ -366,6 +372,21 @@ export function ChatInterface({
             >
               📊 Stock
             </Button>
+            {setModoIA && ollamaStatus.status === "ok" && ollamaStatus.modeloDisponible && (
+              <Button
+                type="button"
+                variant={modoIA ? "default" : "outline"}
+                onClick={() => {
+                  setModoIA(!modoIA)
+                  setTimeout(() => textareaRef.current?.focus(), 100)
+                }}
+                className={modoIA ? "bg-blue-600 hover:bg-blue-700 text-white" : ""}
+                size="sm"
+                title={modoIA ? "Desactivar modo IA" : "Activar modo IA (usa Ollama para respuestas más inteligentes)"}
+              >
+                🤖 {modoIA ? "IA ON" : "Modo IA"}
+              </Button>
+            )}
           </div>
         </div>
       )}

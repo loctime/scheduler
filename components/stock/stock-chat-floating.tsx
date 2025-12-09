@@ -19,6 +19,8 @@ export function StockChatFloating() {
     nombreAsistente,
     modo,
     setModo,
+    modoIA,
+    setModoIA,
     productosAcumulados,
     pedidos,
     pedidoSeleccionado,
@@ -123,6 +125,8 @@ export function StockChatFloating() {
                 nombreAsistente={nombreAsistente}
                 modo={modo}
                 setModo={setModo}
+                modoIA={modoIA}
+                setModoIA={setModoIA}
                 productosAcumulados={productosAcumulados}
                 pedidos={pedidos}
                 pedidoSeleccionado={pedidoSeleccionado}

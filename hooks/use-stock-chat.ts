@@ -71,6 +71,9 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
   // Modo del chat (ingreso/egreso/stock). null = modo pregunta (por defecto)
   const [modo, setModo] = useState<"ingreso" | "egreso" | "pregunta" | "stock" | null>(null)
   
+  // Modo IA: activar/desactivar uso de Ollama para generar respuestas
+  const [modoIA, setModoIA] = useState(false)
+  
   // Pedido seleccionado para filtrar productos (solo en modos ingreso/egreso/stock)
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<string | null>(null)
   
@@ -725,6 +728,60 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     }
   }, [productos, pedidos, stockActual, actualizarStock, actualizarStockDirecto, crearProducto, editarProducto, eliminarProducto, inicializarStockProductos])
 
+  // ==================== USAR OLLAMA PARA GENERAR RESPUESTA ====================
+  
+  const generarRespuestaConOllama = useCallback(async (mensaje: string, contexto: string): Promise<string> => {
+    // Obtener URL de Ollama y modelos disponibles desde el servidor
+    const statusResponse = await fetch("/api/stock-chat")
+    const statusData = await statusResponse.json()
+    const OLLAMA_URL = statusData.url
+    const modelosDisponibles = statusData.modelosDisponibles || []
+    
+    if (!OLLAMA_URL || modelosDisponibles.length === 0) {
+      throw new Error("Ollama no está configurado o no hay modelos disponibles")
+    }
+
+    // Usar el primer modelo disponible
+    const modelo = modelosDisponibles[0]
+
+    const prompt = `Eres un asistente inteligente y amigable. Responde de forma natural en español argentino.
+
+Puedes ayudar con:
+- Preguntas sobre inventario, stock, productos y pedidos (usa el contexto si está disponible)
+- Preguntas generales, matemáticas, conversación casual
+- Cualquier otra consulta
+
+Contexto del sistema (si aplica):
+${contexto}
+
+Usuario pregunta: ${mensaje}
+
+Responde de forma concisa, útil y amigable. Si es una pregunta sobre el inventario, usa el contexto. Si es una pregunta general, responde normalmente.`
+
+    try {
+      const response = await fetch(`${OLLAMA_URL}/api/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: modelo,
+          prompt: prompt,
+          stream: false,
+        }),
+        signal: abortControllerRef.current?.signal,
+      })
+
+      if (!response.ok) {
+        throw new Error("Error al generar respuesta con Ollama")
+      }
+
+      const data = await response.json()
+      return data.response || "No pude generar una respuesta."
+    } catch (error) {
+      console.error("Error usando Ollama:", error)
+      throw error
+    }
+  }, [])
+
   // ==================== ENVIAR MENSAJE ====================
 
   const enviarMensaje = useCallback(async (texto: string) => {
@@ -785,7 +842,44 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     abortControllerRef.current = new AbortController()
 
     try {
-      // Llamar al API
+      // Si modo IA está activo y Ollama está disponible, usar Ollama
+      if (modoIA && ollamaStatus.status === "ok" && ollamaStatus.modeloDisponible) {
+        try {
+          // Construir contexto para Ollama (solo si hay datos relevantes)
+          let contexto = ""
+          if (productosFiltrados.length > 0 || pedidos.length > 0) {
+            contexto = `Información del sistema de inventario:
+- Productos disponibles: ${productosFiltrados.length}
+- Pedidos/Proveedores: ${pedidos.length}
+- Productos con stock registrado: ${Object.keys(stockActual).length}
+
+Lista de productos (primeros 20):
+${productosFiltrados.slice(0, 20).map(p => {
+  const stock = stockActual[p.id] ?? 0
+  return `- ${p.nombre} (${stock} ${p.unidad || "unidades"})`
+}).join("\n")}
+
+Lista de pedidos:
+${pedidos.map(p => `- ${p.nombre}`).join("\n")}`
+          } else {
+            contexto = "No hay información de inventario disponible aún."
+          }
+
+          const respuestaIA = await generarRespuestaConOllama(texto, contexto)
+          addMessage({ tipo: "sistema", contenido: respuestaIA })
+          setIsProcessing(false)
+          return
+        } catch (errorIA) {
+          console.error("Error usando Ollama, usando procesamiento básico:", errorIA)
+          // Si falla Ollama, continuar con el procesamiento básico
+          addMessage({ 
+            tipo: "error", 
+            contenido: "Error al usar IA. Cambiando a modo básico..." 
+          })
+        }
+      }
+
+      // Llamar al API (procesamiento básico)
       const response = await fetch("/api/stock-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1051,7 +1145,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       setIsProcessing(false)
       abortControllerRef.current = null
     }
-  }, [isProcessing, productos, stockActual, pedidos, accionPendiente, addMessage, ejecutarAccion, modo, productosAcumulados])
+    }, [isProcessing, productos, stockActual, pedidos, accionPendiente, addMessage, ejecutarAccion, modo, productosAcumulados, modoIA, ollamaStatus, generarRespuestaConOllama, pedidoSeleccionado, nombreEmpresa])
 
   // Cancelar mensaje en proceso
   const cancelarMensaje = useCallback(() => {
@@ -1108,6 +1202,8 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     nombreAsistente,
     modo,
     setModo,
+    modoIA,
+    setModoIA,
     productosAcumulados,
     setProductosAcumulados,
     pedidoSeleccionado,

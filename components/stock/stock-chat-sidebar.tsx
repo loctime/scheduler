@@ -24,6 +24,8 @@ export function StockChatSidebar({ isOpen, onClose }: StockChatSidebarProps) {
     nombreAsistente,
     modo,
     setModo,
+    modoIA,
+    setModoIA,
     productosAcumulados,
     pedidos,
     pedidoSeleccionado,
@@ -65,6 +67,8 @@ export function StockChatSidebar({ isOpen, onClose }: StockChatSidebarProps) {
           nombreAsistente={nombreAsistente}
           modo={modo}
           setModo={setModo}
+          modoIA={modoIA}
+          setModoIA={setModoIA}
           productosAcumulados={productosAcumulados}
           pedidos={pedidos}
           pedidoSeleccionado={pedidoSeleccionado}
