@@ -315,7 +315,6 @@ export default function PedidoPublicoPage() {
       }
 
       console.log("✓ Confirmación completada exitosamente")
-      alert("Pedido confirmado y remito generado exitosamente. Gracias!")
       
       // Recargar la página para actualizar el estado
       window.location.reload()
@@ -363,7 +362,11 @@ export default function PedidoPublicoPage() {
             <div className="min-w-0">
               <h1 className="text-xl sm:text-2xl font-bold break-words">{pedido.nombre}</h1>
               <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                Complete la información de disponibilidad y cantidades a enviar
+                {nombreEmpresa || "Empresa"} • {new Date().toLocaleDateString('es-ES', { 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
               </p>
             </div>
           </div>
