@@ -229,11 +229,11 @@ export function RecepcionForm({
     <div className="space-y-4">
       {/* Header */}
       <div>
-        <h3 className="text-xl font-bold text-foreground mb-1">
+        <h3 className="text-lg sm:text-xl font-bold text-foreground mb-1">
           Control de Recepción {esParcial && "(Parcial)"}
         </h3>
         {productosEnviados.length > 0 && (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             {productosEnviados.length} {productosEnviados.length === 1 ? "producto" : "productos"}
           </p>
         )}
@@ -272,17 +272,17 @@ export function RecepcionForm({
                 className={cardClassName}
               >
                 {/* Línea superior: Producto • Pedida: X • Enviada: X */}
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className="text-base font-semibold text-foreground truncate">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 flex-wrap">
+                    <span className="text-sm sm:text-base font-semibold text-foreground truncate">
                       {producto.productoNombre}
                     </span>
-                    <span className="text-muted-foreground">•</span>
-                    <span className="text-sm text-muted-foreground whitespace-nowrap">
+                    <span className="hidden sm:inline text-muted-foreground">•</span>
+                    <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
                       Pedida: <span className="font-medium text-foreground">{producto.cantidadPedida}</span>
                     </span>
-                    <span className="text-muted-foreground">•</span>
-                    <span className="text-sm text-muted-foreground whitespace-nowrap">
+                    <span className="hidden sm:inline text-muted-foreground">•</span>
+                    <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
                       Enviada: <span className="font-medium text-foreground">{producto.cantidadEnviada}</span>
                     </span>
                   </div>
@@ -332,16 +332,16 @@ export function RecepcionForm({
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
                     <Button
                       type="button"
                       variant="outline"
                       size="icon"
-                      className="h-12 w-12 shrink-0 border-2 hover:bg-muted"
+                      className="h-10 w-10 sm:h-12 sm:w-12 shrink-0 border-2 hover:bg-muted"
                       onClick={() => decrementarCantidad(producto.productoId)}
                       disabled={data.cantidadRecibida === 0}
                     >
-                      <Minus className="h-5 w-5" />
+                      <Minus className="h-4 w-4 sm:h-5 sm:w-5" />
                     </Button>
                     <Input
                       id={`cantidad-${producto.productoId}`}
@@ -355,16 +355,16 @@ export function RecepcionForm({
                           parseInt(e.target.value) || 0
                         )
                       }
-                      className="text-lg font-semibold text-center h-12 border-2 flex-1"
+                      className="text-base sm:text-lg font-semibold text-center h-10 sm:h-12 border-2 flex-1"
                     />
                     <Button
                       type="button"
                       variant="outline"
                       size="icon"
-                      className="h-12 w-12 shrink-0 border-2 hover:bg-muted"
+                      className="h-10 w-10 sm:h-12 sm:w-12 shrink-0 border-2 hover:bg-muted"
                       onClick={() => incrementarCantidad(producto.productoId)}
                     >
-                      <Plus className="h-5 w-5" />
+                      <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
                     </Button>
                   </div>
                   {data.cantidadRecibida !== producto.cantidadEnviada && data.esDevolucion && (

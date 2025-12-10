@@ -536,10 +536,15 @@ export default function PedidosPage() {
       if (nuevoEnlace) {
         setEnlaceActivo({ id: nuevoEnlace.id })
         const url = `${window.location.origin}/pedido-publico/${nuevoEnlace.id}`
-        await navigator.clipboard.writeText(url)
+        
+        // Generar texto del pedido y combinarlo con el link
+        const textoPedido = generarTextoPedidoConAjustes()
+        const textoCompleto = `${textoPedido}\n\n\n${url}`
+        
+        await navigator.clipboard.writeText(textoCompleto)
         toast({
           title: "Enlace generado y copiado",
-          description: "El nuevo enlace público se ha generado y copiado al portapapeles",
+          description: "El pedido y el enlace público se han copiado al portapapeles",
         })
       }
     } catch (error: any) {
@@ -739,10 +744,15 @@ export default function PedidosPage() {
       setEnlaceActivo({ id: enlace.id })
       
       const url = `${window.location.origin}/pedido-publico/${enlace.id}`
-      navigator.clipboard.writeText(url)
+      
+      // Generar texto del pedido y combinarlo con el link
+      const textoPedido = generarTextoPedidoConAjustes()
+      const textoCompleto = `${textoPedido}\n\n\n${url}`
+      
+      navigator.clipboard.writeText(textoCompleto)
       toast({
         title: "Enlace copiado",
-        description: "El enlace público se ha copiado al portapapeles",
+        description: "El pedido y el enlace público se han copiado al portapapeles",
       })
     }
   }
@@ -894,16 +904,16 @@ export default function PedidosPage() {
             <>
               {/* Header del pedido - Mobile first */}
               <div className="rounded-lg border border-border bg-card p-1.5 space-y-1.5">
-                  {/* Fila 1: Nombre + pestañas + acciones */}
-                  <div className="flex items-center gap-2">
+                  {/* Fila 1: Nombre + acciones principales */}
+                  <div className="flex items-center gap-2 flex-wrap">
                     {isEditingName ? (
-                      <div className="flex items-center gap-1 min-w-0 flex-shrink-0">
+                      <div className="flex items-center gap-1 min-w-0 flex-1 sm:flex-initial">
                         <Input
                           ref={nameInputRef}
                           value={editingName}
                           onChange={(e) => setEditingName(e.target.value)}
                           onKeyDown={handleNameKeyDown}
-                          className="text-base font-bold h-8"
+                          className="text-sm sm:text-base font-bold h-8 flex-1"
                           placeholder="Nombre del pedido"
                         />
                         <Button variant="ghost" size="icon" onClick={handleSaveName} className="h-8 w-8 shrink-0 text-green-600">
@@ -914,52 +924,13 @@ export default function PedidosPage() {
                         </Button>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1 min-w-0 flex-shrink-0">
-                        <h2 className="text-base font-bold text-foreground truncate">{selectedPedido.nombre}</h2>
+                      <div className="flex items-center gap-1 min-w-0 flex-1 sm:flex-initial">
+                        <h2 className="text-sm sm:text-base font-bold text-foreground truncate">{selectedPedido.nombre}</h2>
                         <Button variant="ghost" size="icon" onClick={handleStartEditName} className="h-6 w-6 shrink-0 text-muted-foreground">
                           <Pencil className="h-3 w-3" />
                         </Button>
                       </div>
                     )}
-                    
-                    {/* Tabs: Productos / Remitos / Recepción */}
-                    <div className="flex gap-1 border-l border-r border-border px-2 flex-shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          "h-8 px-3 rounded-none border-b-2 border-transparent",
-                          activeTab === "productos" && "border-primary text-primary font-medium"
-                        )}
-                        onClick={() => setActiveTab("productos")}
-                      >
-                        Productos
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          "h-8 px-3 rounded-none border-b-2 border-transparent",
-                          activeTab === "remitos" && "border-primary text-primary font-medium"
-                        )}
-                        onClick={() => setActiveTab("remitos")}
-                      >
-                        Remitos {remitos.length > 0 && `(${remitos.length})`}
-                      </Button>
-                      {(selectedPedido.estado === "enviado" || selectedPedido.estado === "recibido") && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className={cn(
-                            "h-8 px-3 rounded-none border-b-2 border-transparent",
-                            activeTab === "recepcion" && "border-primary text-primary font-medium"
-                          )}
-                          onClick={() => setActiveTab("recepcion")}
-                        >
-                          Recepción
-                        </Button>
-                      )}
-                    </div>
                     
                     <div className="flex gap-1 shrink-0 ml-auto">
                       {selectedPedido.estado === "enviado" && (
@@ -994,6 +965,50 @@ export default function PedidosPage() {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
+                  </div>
+
+                  {/* Fila 2: Tabs - Compactas en móvil */}
+                  <div className="flex gap-0.5 sm:gap-1 border-t sm:border-t-0 border-l sm:border-l sm:border-r border-border">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-7 sm:h-8 px-1.5 sm:px-3 rounded-none border-b-2 border-transparent text-[11px] sm:text-sm font-medium flex-1 sm:flex-initial",
+                        activeTab === "productos" && "border-primary text-primary font-medium"
+                      )}
+                      onClick={() => setActiveTab("productos")}
+                    >
+                      <span className="hidden sm:inline">Productos</span>
+                      <span className="sm:hidden">Prod.</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-7 sm:h-8 px-1.5 sm:px-3 rounded-none border-b-2 border-transparent text-[11px] sm:text-sm font-medium flex-1 sm:flex-initial",
+                        activeTab === "remitos" && "border-primary text-primary font-medium"
+                      )}
+                      onClick={() => setActiveTab("remitos")}
+                    >
+                      <span className="hidden sm:inline">Remitos {remitos.length > 0 && `(${remitos.length})`}</span>
+                      <span className="sm:hidden">
+                        Rem. {remitos.length > 0 && `(${remitos.length})`}
+                      </span>
+                    </Button>
+                    {(selectedPedido.estado === "enviado" || selectedPedido.estado === "recibido") && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                          "h-7 sm:h-8 px-1.5 sm:px-3 rounded-none border-b-2 border-transparent text-[11px] sm:text-sm font-medium flex-1 sm:flex-initial",
+                          activeTab === "recepcion" && "border-primary text-primary font-medium"
+                        )}
+                        onClick={() => setActiveTab("recepcion")}
+                      >
+                        <span className="hidden sm:inline">Recepción</span>
+                        <span className="sm:hidden">Rec.</span>
+                      </Button>
+                    )}
                   </div>
 
                   {/* Sección colapsable: Encabezado + Formato */}
@@ -1061,9 +1076,9 @@ export default function PedidosPage() {
 
                   {/* Acciones de pedido */}
                   {products.length > 0 && (
-                    <div className="flex items-center gap-1.5 pt-1.5 border-t border-border">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-1.5 pt-1.5 border-t border-border">
                       <span className={cn(
-                        "text-[11px] font-medium px-1.5 py-0.5 rounded-full",
+                        "text-[11px] font-medium px-1.5 py-0.5 rounded-full shrink-0",
                         productosAPedirActualizados.length > 0 
                           ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                           : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
@@ -1074,78 +1089,81 @@ export default function PedidosPage() {
                         }
                       </span>
                       <div className="flex-1" />
-                      <Button 
-                        size="sm" 
-                        className="h-7 px-2"
-                        onClick={handleCopyPedido} 
-                        disabled={productosAPedirActualizados.length === 0}
-                      >
-                        <Copy className="h-3.5 w-3.5 sm:mr-1" />
-                        <span className="hidden sm:inline text-xs">Copiar pedido</span>
-                      </Button>
-                      <Button 
-                        size="sm"
-                        variant="outline"
-                        className="h-7 px-2"
-                        onClick={handleGenerarEnlace}
-                        disabled={productosAPedirActualizados.length === 0 || selectedPedido?.estado === "enviado" || selectedPedido?.estado === "recibido" || loadingEnlace}
-                        title="Generar nuevo enlace público"
-                      >
-                        {loadingEnlace ? (
-                          <>
-                            <Loader2 className="h-3.5 w-3.5 sm:mr-1 animate-spin" />
-                            <span className="hidden sm:inline text-xs">Generando...</span>
-                          </>
-                        ) : (
-                          <>
-                            <LinkIcon className="h-3.5 w-3.5 sm:mr-1" />
-                            <span className="hidden sm:inline text-xs">Generar link</span>
-                          </>
-                        )}
-                      </Button>
-                      {(enlaceActivo || selectedPedido?.estado === "enviado") && (
+                      <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto">
+                        <Button 
+                          size="sm" 
+                          className="h-7 px-2 flex-1 sm:flex-initial"
+                          onClick={handleCopyPedido} 
+                          disabled={productosAPedirActualizados.length === 0}
+                        >
+                          <Copy className="h-3.5 w-3.5 sm:mr-1" />
+                          <span className="hidden sm:inline text-xs">Copiar pedido</span>
+                        </Button>
                         <Button 
                           size="sm"
                           variant="outline"
-                          className={cn(
-                            "h-7 px-2 relative",
-                            selectedPedido?.estado === "enviado" && "bg-amber-50 border-amber-300 hover:bg-amber-100 dark:bg-amber-950 dark:border-amber-800"
-                          )}
-                          onClick={handleVerPedido}
-                          title={
-                            selectedPedido?.estado === "enviado" 
-                              ? "Controlar recepción del pedido enviado"
-                              : "Ver pedido público (solo lectura)"
-                          }
+                          className="h-7 px-2 flex-1 sm:flex-initial"
+                          onClick={handleGenerarEnlace}
+                          disabled={productosAPedirActualizados.length === 0 || selectedPedido?.estado === "enviado" || selectedPedido?.estado === "recibido" || loadingEnlace}
+                          title="Generar nuevo enlace público"
                         >
-                          {selectedPedido?.estado === "enviado" && (
-                            <Bell className="h-3.5 w-3.5 sm:mr-1 text-amber-600 dark:text-amber-400 animate-pulse" />
+                          {loadingEnlace ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 sm:mr-1 animate-spin" />
+                              <span className="hidden sm:inline text-xs">Generando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <LinkIcon className="h-3.5 w-3.5 sm:mr-1" />
+                              <span className="hidden sm:inline text-xs">Generar link</span>
+                            </>
                           )}
-                          {selectedPedido?.estado !== "enviado" && (
-                            <ExternalLink className="h-3.5 w-3.5 sm:mr-1" />
-                          )}
-                          <span className="hidden sm:inline text-xs">
-                            {selectedPedido?.estado === "enviado" ? "Controlar recepción" : "Ver pedido"}
-                          </span>
                         </Button>
-                      )}
-                      <Button 
-                        size="sm"
-                        className="h-7 px-2 bg-green-600 hover:bg-green-700 text-white"
-                        onClick={handleWhatsApp} 
-                        disabled={productosAPedirActualizados.length === 0}
-                      >
-                        <MessageCircle className="h-3.5 w-3.5 sm:mr-1" />
-                        <span className="hidden sm:inline text-xs">WA</span>
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="h-7 px-2"
-                        onClick={() => setClearDialogOpen(true)}
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                      </Button>
+                        {(enlaceActivo || selectedPedido?.estado === "enviado") && (
+                          <Button 
+                            size="sm"
+                            variant="outline"
+                            className={cn(
+                              "h-7 px-2 relative flex-1 sm:flex-initial",
+                              selectedPedido?.estado === "enviado" && "bg-amber-50 border-amber-300 hover:bg-amber-100 dark:bg-amber-950 dark:border-amber-800"
+                            )}
+                            onClick={handleVerPedido}
+                            title={
+                              selectedPedido?.estado === "enviado" 
+                                ? "Controlar recepción del pedido enviado"
+                                : "Ver pedido público (solo lectura)"
+                            }
+                          >
+                            {selectedPedido?.estado === "enviado" && (
+                              <Bell className="h-3.5 w-3.5 sm:mr-1 text-amber-600 dark:text-amber-400 animate-pulse" />
+                            )}
+                            {selectedPedido?.estado !== "enviado" && (
+                              <ExternalLink className="h-3.5 w-3.5 sm:mr-1" />
+                            )}
+                            <span className="hidden sm:inline text-xs">
+                              {selectedPedido?.estado === "enviado" ? "Controlar recepción" : "Ver pedido"}
+                            </span>
+                          </Button>
+                        )}
+                        <Button 
+                          size="sm"
+                          className="h-7 px-2 bg-green-600 hover:bg-green-700 text-white flex-1 sm:flex-initial"
+                          onClick={handleWhatsApp} 
+                          disabled={productosAPedirActualizados.length === 0}
+                        >
+                          <MessageCircle className="h-3.5 w-3.5 sm:mr-1" />
+                          <span className="hidden sm:inline text-xs">WA</span>
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-7 px-2 sm:px-2"
+                          onClick={() => setClearDialogOpen(true)}
+                          title="Limpiar stock"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
                   )}
               </div>
@@ -1233,8 +1251,13 @@ export default function PedidosPage() {
                               size="sm"
                               onClick={() => {
                                 const url = `${window.location.origin}/pedido-publico/${enlaceActivo.id}`
-                                navigator.clipboard.writeText(url)
-                                toast({ title: "Enlace copiado" })
+                                
+                                // Generar texto del pedido y combinarlo con el link
+                                const textoPedido = generarTextoPedidoConAjustes()
+                                const textoCompleto = `${textoPedido}\n\n\n${url}`
+                                
+                                navigator.clipboard.writeText(textoCompleto)
+                                toast({ title: "Pedido y enlace copiados", description: "El pedido y el enlace se han copiado al portapapeles" })
                               }}
                             >
                               <LinkIcon className="h-4 w-4 mr-2" />
