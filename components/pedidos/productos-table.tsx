@@ -262,6 +262,7 @@ export function ProductosTable({
                         <Input
                           ref={inputRef}
                           type="number"
+                          inputMode="numeric"
                           min="0"
                           value={inlineValue}
                           onChange={(e) => setInlineValue(e.target.value)}
@@ -298,6 +299,7 @@ export function ProductosTable({
                       ) : (
                         <Input
                           type="number"
+                          inputMode="numeric"
                           min="0"
                           value={stockActual[product.id] !== undefined ? stockActual[product.id] : ""}
                           onChange={(e) => {
@@ -397,6 +399,7 @@ export function ProductosTable({
                         <Input
                           ref={inputRef}
                           type="number"
+                          inputMode="numeric"
                           min="0"
                           value={inlineValue}
                           onChange={(e) => setInlineValue(e.target.value)}

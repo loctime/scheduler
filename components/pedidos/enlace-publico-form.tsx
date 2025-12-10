@@ -252,6 +252,7 @@ export function EnlacePublicoForm({
                     <Input
                       id={`cantidad-${producto.id}`}
                       type="number"
+                      inputMode="numeric"
                       min="0"
                       value={cantidadActual}
                       onChange={(e) => {

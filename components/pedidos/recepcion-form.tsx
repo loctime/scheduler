@@ -346,6 +346,7 @@ export function RecepcionForm({
                     <Input
                       id={`cantidad-${producto.productoId}`}
                       type="number"
+                      inputMode="numeric"
                       min="0"
                       value={data.cantidadRecibida}
                       onChange={(e) =>
