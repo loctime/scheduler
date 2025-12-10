@@ -17,6 +17,7 @@ interface RecepcionFormProps {
     productoNombre: string
     cantidadPedida: number
     cantidadEnviada: number
+    observacionesEnvio?: string
   }>
   onConfirmar: (recepcion: Omit<Recepcion, "id" | "createdAt">) => void | Promise<void>
   loading?: boolean
@@ -39,6 +40,9 @@ export function RecepcionForm({
       }
     >
   >({})
+  
+  // Estado para observaciones generales
+  const [observacionesGenerales, setObservacionesGenerales] = useState("")
 
   useEffect(() => {
     // Inicializar con cantidades enviadas
@@ -149,9 +153,12 @@ export function RecepcionForm({
       const cantidadDevolucion = calcularCantidadDevolucion(p, data)
       
       // Construir objeto de producto (sin campos undefined)
+      // Validar que productoNombre esté presente y sea válido
+      const nombreProducto = (p.productoNombre && p.productoNombre.trim()) || "Producto sin nombre"
+      
       const producto: any = {
         productoId: p.productoId,
-        productoNombre: p.productoNombre,
+        productoNombre: nombreProducto,
         cantidadEnviada: p.cantidadEnviada,
         cantidadRecibida: data.cantidadRecibida,
         estado: "ok", // Siempre "ok" por defecto
@@ -179,6 +186,7 @@ export function RecepcionForm({
       productos,
       esParcial: esParcial || false,
       completada: true,
+      observaciones: observacionesGenerales.trim() || undefined,
       userId: "", // Se completará en el componente padre
     })
   }
@@ -224,6 +232,23 @@ export function RecepcionForm({
                     Pedida: <span className="font-medium">{producto.cantidadPedida}</span>
                   </span>
                 </div>
+
+                {/* Observaciones del envío (si existen) */}
+                {producto.observacionesEnvio && (
+                  <div className="rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-2">
+                    <div className="flex items-start gap-2">
+                      <Package className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-blue-900 dark:text-blue-100 mb-0.5">
+                          Comentario del envío:
+                        </p>
+                        <p className="text-xs text-blue-800 dark:text-blue-200 whitespace-pre-wrap break-words">
+                          {producto.observacionesEnvio}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Enviada y Recibido en la misma línea - Mobile First */}
                 <div className="grid grid-cols-2 gap-2">
@@ -346,6 +371,23 @@ export function RecepcionForm({
             )
           })
         )}
+      </div>
+
+      {/* Observaciones generales */}
+      <div className="space-y-3 md:space-y-4 pt-3 border-t">
+        <div className="space-y-1">
+          <Label htmlFor="observaciones-generales" className="text-xs">
+            Observaciones Generales
+          </Label>
+          <Textarea
+            id="observaciones-generales"
+            value={observacionesGenerales}
+            onChange={(e) => setObservacionesGenerales(e.target.value)}
+            placeholder="Observaciones adicionales sobre la recepción..."
+            rows={3}
+            className="text-sm resize-none"
+          />
+        </div>
       </div>
 
       {/* Botón de confirmación - Mobile First */}

@@ -147,6 +147,7 @@ export default function PedidosPage() {
     productoNombre: string
     cantidadPedida: number
     cantidadEnviada: number
+    observacionesEnvio?: string
   }>>([])
   const [observacionesRemito, setObservacionesRemito] = useState<string | null>(null)
   const [loadingRecepcion, setLoadingRecepcion] = useState(false)
@@ -280,6 +281,21 @@ export default function PedidosPage() {
             }
             
             // Filtrar y mapear productos con cantidadEnviada > 0
+            // Extraer observaciones del remito que tienen formato "Producto: observación"
+            const observacionesPorProducto = new Map<string, string>()
+            if (remitoEnvio.observaciones) {
+              const lineas = remitoEnvio.observaciones.split('\n')
+              lineas.forEach(linea => {
+                if (linea.includes(':')) {
+                  const [nombreProducto, ...resto] = linea.split(':')
+                  const observacion = resto.join(':').trim()
+                  if (observacion) {
+                    observacionesPorProducto.set(nombreProducto.trim(), observacion)
+                  }
+                }
+              })
+            }
+            
             const productos = remitoEnvio.productos
               .filter((p: any) => {
                 const cantidadEnviada = p.cantidadEnviada || 0
@@ -290,6 +306,7 @@ export default function PedidosPage() {
                 productoNombre: p.productoNombre,
                 cantidadPedida: p.cantidadPedida || 0,
                 cantidadEnviada: p.cantidadEnviada || 0,
+                observacionesEnvio: observacionesPorProducto.get(p.productoNombre) || undefined,
               }))
             
             setProductosEnviados(productos)
@@ -324,6 +341,7 @@ export default function PedidosPage() {
                       productoNombre: producto.nombre,
                       cantidadPedida: producto.stockMinimo || 0,
                       cantidadEnviada: data.cantidadEnviada,
+                      observacionesEnvio: data.observaciones || undefined,
                     })
                   }
                 }

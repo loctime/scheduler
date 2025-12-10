@@ -6,11 +6,16 @@ import type { Remito, Pedido, Producto } from "./types"
  * Normaliza el nombre del pedido para usar en la numeración de remitos
  */
 function normalizarNombrePedido(nombre: string): string {
-  return nombre
+  if (!nombre || typeof nombre !== 'string') {
+    return "PEDIDO"
+  }
+  const normalizado = nombre
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "") // Solo letras y números
     .substring(0, 10) // Máximo 10 caracteres
-    || "PEDIDO" // Fallback si está vacío
+  
+  // Si después de normalizar está vacío, usar fallback
+  return normalizado || "PEDIDO"
 }
 
 /**
@@ -195,6 +200,8 @@ function consolidarProductosRemito(
   cantidadPedida: number
   cantidadEnviada?: number
   cantidadRecibida?: number
+  esDevolucion?: boolean
+  cantidadDevolucion?: number
 }> {
   // Crear un mapa de productos recibidos
   const productosRecibidosMap = new Map<string, any>()
@@ -225,7 +232,7 @@ function consolidarProductosRemito(
   productosPedidoMap.forEach((p, id) => {
     productosConsolidados.set(id, {
       productoId: id,
-      productoNombre: p.productoNombre,
+      productoNombre: (p.productoNombre && p.productoNombre.trim()) || "Producto sin nombre",
       cantidadPedida: p.cantidadPedida || 0,
       cantidadEnviada: 0,
       cantidadRecibida: 0,
@@ -236,10 +243,14 @@ function consolidarProductosRemito(
   productosEnvioMap.forEach((p, id) => {
     const consolidado = productosConsolidados.get(id) || {
       productoId: id,
-      productoNombre: p.productoNombre,
+      productoNombre: (p.productoNombre && p.productoNombre.trim()) || "Producto sin nombre",
       cantidadPedida: p.cantidadPedida || 0,
       cantidadEnviada: 0,
       cantidadRecibida: 0,
+    }
+    // Asegurar que el nombre del producto esté presente
+    if (p.productoNombre && p.productoNombre.trim()) {
+      consolidado.productoNombre = p.productoNombre.trim()
     }
     consolidado.cantidadEnviada = p.cantidadEnviada || 0
     if (!consolidado.cantidadPedida && p.cantidadPedida) {
@@ -252,10 +263,14 @@ function consolidarProductosRemito(
   productosRecibidosMap.forEach((p, id) => {
     const consolidado = productosConsolidados.get(id) || {
       productoId: id,
-      productoNombre: p.productoNombre,
+      productoNombre: p.productoNombre || "Producto sin nombre",
       cantidadPedida: 0,
       cantidadEnviada: 0,
       cantidadRecibida: 0,
+    }
+    // Asegurar que el nombre del producto esté presente (prioridad: recepción > envío > pedido)
+    if (p.productoNombre && p.productoNombre.trim()) {
+      consolidado.productoNombre = p.productoNombre.trim()
     }
     consolidado.cantidadRecibida = p.cantidadRecibida || 0
     if (!consolidado.cantidadEnviada && p.cantidadEnviada) {
@@ -263,6 +278,13 @@ function consolidarProductosRemito(
     }
     if (!consolidado.cantidadPedida && p.cantidadEnviada) {
       consolidado.cantidadPedida = p.cantidadEnviada
+    }
+    // Preservar información de devolución
+    if (p.esDevolucion !== undefined) {
+      consolidado.esDevolucion = p.esDevolucion
+    }
+    if (p.cantidadDevolucion !== undefined && p.cantidadDevolucion > 0) {
+      consolidado.cantidadDevolucion = p.cantidadDevolucion
     }
     productosConsolidados.set(id, consolidado)
   })
@@ -287,21 +309,69 @@ export function crearRemitoRecepcion(
     recepcion
   )
 
+  // Obtener hora actual para el remito
+  const ahora = new Date()
+  const horaActual = format(ahora, "HH:mm", { locale: es })
+
+  // Consolidar observaciones de múltiples fuentes
+  const observacionesArray: string[] = []
+  
+  // 1. Observaciones del remito de envío (del enlace público)
+  if (remitoEnvio?.observaciones && remitoEnvio.observaciones.trim()) {
+    observacionesArray.push(`ENVÍO:\n${remitoEnvio.observaciones.trim()}`)
+  }
+  
+  // 2. Observaciones de productos individuales de la recepción (incluyendo devoluciones)
+  const observacionesProductos = recepcion.productos
+    ?.map((p: any) => {
+      const partes: string[] = []
+      
+      // Si es devolución, indicarlo claramente
+      if (p.esDevolucion && p.cantidadDevolucion && p.cantidadDevolucion > 0) {
+        partes.push(`[DEVOLUCIÓN: ${p.cantidadDevolucion} unidades]`)
+      } else if (p.esDevolucion) {
+        partes.push(`[DEVOLUCIÓN]`)
+      }
+      
+      // Agregar observaciones del producto
+      if (p.observaciones && p.observaciones.trim()) {
+        partes.push(p.observaciones.trim())
+      }
+      
+      if (partes.length > 0) {
+        return `${p.productoNombre}: ${partes.join(" - ")}`
+      }
+      return null
+    })
+    .filter(Boolean)
+  
+  if (observacionesProductos && observacionesProductos.length > 0) {
+    observacionesArray.push(`RECEPCIÓN:\n${observacionesProductos.join("\n")}`)
+  }
+  
+  // 3. Observaciones generales de la recepción
+  if (recepcion.observaciones && recepcion.observaciones.trim()) {
+    observacionesArray.push(`OBSERVACIONES GENERALES:\n${recepcion.observaciones.trim()}`)
+  }
+
   // Construir el objeto del remito final
   const remitoData: any = {
     pedidoId: pedido.id,
     tipo: "recepcion",
-    fecha: recepcion.fecha || new Date(),
+    fecha: recepcion.fecha || ahora,
     desde: pedido.destinoDefault || "FABRICA",
     hacia: pedido.origenDefault || "LOCAL",
     productos: productosConsolidados,
     final: true, // Marcar como remito final
     userId: pedido.userId,
+    // Usar hora actual automáticamente
+    horaRetiroFabrica: horaActual,
+    horaRecepcionLocal: horaActual,
   }
 
-  // Solo incluir observaciones si hay contenido
-  if (recepcion.observaciones && recepcion.observaciones.trim().length > 0) {
-    remitoData.observaciones = recepcion.observaciones
+  // Incluir observaciones consolidadas si hay contenido
+  if (observacionesArray.length > 0) {
+    remitoData.observaciones = observacionesArray.join("\n\n")
   }
 
   return remitoData
@@ -409,16 +479,41 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
   pdf.setFontSize(10)
   pdf.setFont("helvetica", "bold")
   
-  // Si es remito final (recepcion con final=true), mostrar 3 columnas
+  // Si es remito final (recepcion con final=true), mostrar 3 o 4 columnas
   const esRemitoFinal = remito.final && remito.tipo === "recepcion"
   
+  // Verificar si hay devoluciones para determinar el número de columnas (solo para remitos finales)
+  const tieneDevoluciones = esRemitoFinal && remito.productos.some((p: any) => p.esDevolucion && p.cantidadDevolucion && p.cantidadDevolucion > 0)
+  
   if (esRemitoFinal) {
-    // Encabezado con 3 columnas
-    pdf.text("PRODUCTO", margin, yPos)
-    const colWidth = (pdfWidth - margin * 2) / 3
-    pdf.text("PEDIDA", margin + colWidth, yPos, { align: "center" })
-    pdf.text("ENVIADA", margin + colWidth * 2, yPos, { align: "center" })
-    pdf.text("RECIBIDA", pdfWidth - margin, yPos, { align: "right" })
+    
+    if (tieneDevoluciones) {
+      // Encabezado con 4 columnas
+      const productoWidth = (pdfWidth - margin * 2) * 0.45
+      const colWidth = (pdfWidth - margin * 2 - productoWidth) / 4
+      const pedidaX = margin + productoWidth
+      const enviadaX = pedidaX + colWidth
+      const recibidaX = enviadaX + colWidth
+      const devolucionX = recibidaX + colWidth
+      
+      pdf.text("PRODUCTO", margin, yPos)
+      pdf.text("PEDIDA", pedidaX + colWidth / 2, yPos, { align: "center" })
+      pdf.text("ENVIADA", enviadaX + colWidth / 2, yPos, { align: "center" })
+      pdf.text("RECIBIDA", recibidaX + colWidth / 2, yPos, { align: "center" })
+      pdf.text("DEV.", devolucionX + colWidth / 2, yPos, { align: "center" })
+    } else {
+      // Encabezado con 3 columnas
+      const productoWidth = (pdfWidth - margin * 2) * 0.5
+      const colWidth = (pdfWidth - margin * 2 - productoWidth) / 3
+      const pedidaX = margin + productoWidth
+      const enviadaX = pedidaX + colWidth
+      const recibidaX = enviadaX + colWidth
+      
+      pdf.text("PRODUCTO", margin, yPos)
+      pdf.text("PEDIDA", pedidaX + colWidth / 2, yPos, { align: "center" })
+      pdf.text("ENVIADA", enviadaX + colWidth / 2, yPos, { align: "center" })
+      pdf.text("RECIBIDA", recibidaX + colWidth / 2, yPos, { align: "center" })
+    }
   } else {
     // Encabezado con 1 columna
     pdf.text("PRODUCTO", margin, yPos)
@@ -439,27 +534,90 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
     }
 
     if (esRemitoFinal) {
-      // Mostrar 3 columnas para remito final
-      const colWidth = (pdfWidth - margin * 2) / 3
-      pdf.text(producto.productoNombre, margin + 2, yPos)
-      pdf.text(
-        (producto.cantidadPedida || 0).toString(),
-        margin + colWidth,
-        yPos,
-        { align: "center" }
-      )
-      pdf.text(
-        (producto.cantidadEnviada || 0).toString(),
-        margin + colWidth * 2,
-        yPos,
-        { align: "center" }
-      )
-      pdf.text(
-        (producto.cantidadRecibida || 0).toString(),
-        pdfWidth - margin,
-        yPos,
-        { align: "right" }
-      )
+      // Mostrar 3 o 4 columnas según si hay devoluciones
+      if (tieneDevoluciones) {
+        // Mostrar 4 columnas: Pedida, Enviada, Recibida, Devolución
+        const productoWidth = (pdfWidth - margin * 2) * 0.45
+        const colWidth = (pdfWidth - margin * 2 - productoWidth) / 4
+        const productoX = margin + 2
+        const pedidaX = margin + productoWidth
+        const enviadaX = pedidaX + colWidth
+        const recibidaX = enviadaX + colWidth
+        const devolucionX = recibidaX + colWidth
+        
+        // Nombre del producto (con truncamiento si es muy largo)
+        const nombreProducto = producto.productoNombre || "Producto sin nombre"
+        const maxWidth = productoWidth - 4
+        pdf.setFontSize(10)
+        const nombreTruncado = pdf.splitTextToSize(nombreProducto, maxWidth)[0] || nombreProducto.substring(0, 30)
+        pdf.text(nombreTruncado, productoX, yPos)
+        
+        // Cantidades
+        pdf.text(
+          (producto.cantidadPedida || 0).toString(),
+          pedidaX + colWidth / 2,
+          yPos,
+          { align: "center" }
+        )
+        pdf.text(
+          (producto.cantidadEnviada || 0).toString(),
+          enviadaX + colWidth / 2,
+          yPos,
+          { align: "center" }
+        )
+        pdf.text(
+          (producto.cantidadRecibida || 0).toString(),
+          recibidaX + colWidth / 2,
+          yPos,
+          { align: "center" }
+        )
+        // Cantidad de devolución (si aplica)
+        const cantidadDevolucion = (producto as any).cantidadDevolucion || 0
+        pdf.setFont(cantidadDevolucion > 0 ? "helvetica" : "helvetica", cantidadDevolucion > 0 ? "bold" : "normal")
+        pdf.setTextColor(cantidadDevolucion > 0 ? 200 : 0, 0, 0)
+        pdf.text(
+          cantidadDevolucion > 0 ? cantidadDevolucion.toString() : "-",
+          devolucionX + colWidth / 2,
+          yPos,
+          { align: "center" }
+        )
+        pdf.setTextColor(0, 0, 0) // Restaurar color negro
+      } else {
+        // Mostrar 3 columnas estándar: Pedida, Enviada, Recibida
+        const productoWidth = (pdfWidth - margin * 2) * 0.5
+        const colWidth = (pdfWidth - margin * 2 - productoWidth) / 3
+        const productoX = margin + 2
+        const pedidaX = margin + productoWidth
+        const enviadaX = pedidaX + colWidth
+        const recibidaX = enviadaX + colWidth
+        
+        // Nombre del producto (con truncamiento si es muy largo)
+        const nombreProducto = producto.productoNombre || "Producto sin nombre"
+        const maxWidth = productoWidth - 4
+        pdf.setFontSize(10)
+        const nombreTruncado = pdf.splitTextToSize(nombreProducto, maxWidth)[0] || nombreProducto.substring(0, 30)
+        pdf.text(nombreTruncado, productoX, yPos)
+        
+        // Cantidades
+        pdf.text(
+          (producto.cantidadPedida || 0).toString(),
+          pedidaX + colWidth / 2,
+          yPos,
+          { align: "center" }
+        )
+        pdf.text(
+          (producto.cantidadEnviada || 0).toString(),
+          enviadaX + colWidth / 2,
+          yPos,
+          { align: "center" }
+        )
+        pdf.text(
+          (producto.cantidadRecibida || 0).toString(),
+          recibidaX + colWidth / 2,
+          yPos,
+          { align: "center" }
+        )
+      }
     } else {
       // Mostrar 1 columna para remitos intermedios
       const cantidad = remito.tipo === "recepcion" && producto.cantidadRecibida !== undefined
@@ -475,38 +633,154 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
   })
 
   // Espacio para firmas
-  yPos = pdfHeight - 50
+  // Calcular espacio disponible para firmas (reservando espacio para footer)
+  const footerHeight = 15
+  const espacioFirmas = pdfHeight - footerHeight
+  
+  // Si quedó muy poco espacio, ir a nueva página
+  if (yPos > espacioFirmas - 40) {
+    pdf.addPage()
+    yPos = margin + 10
+  } else {
+    yPos = Math.max(yPos + 10, espacioFirmas - 50)
+  }
 
   // Línea separadora antes de firmas
   pdf.line(margin, yPos, pdfWidth - margin, yPos)
   yPos += 8
 
-  // Retiro de Fábrica
-  pdf.setFontSize(9)
-  pdf.text("Retiro de Fabrica: .......... Hs", margin, yPos)
-  if (remito.firmaEnvio) {
-    pdf.text(`Firma repartidor: ${remito.firmaEnvio.nombre}`, margin, yPos + 5)
-  } else {
-    pdf.text("Firma repartidor:", margin, yPos + 5)
+  // Procesar observaciones para separarlas por tipo (ENVÍO y RECEPCIÓN)
+  let observacionesEnvio = ""
+  let observacionesRecepcion = ""
+  if (remito.observaciones && remito.observaciones.trim()) {
+    const partes = remito.observaciones.split('\n\n')
+    partes.forEach(parte => {
+      if (parte.startsWith('ENVÍO:')) {
+        observacionesEnvio = parte.replace('ENVÍO:\n', '').trim()
+      } else if (parte.startsWith('RECEPCIÓN:')) {
+        observacionesRecepcion = parte.replace('RECEPCIÓN:\n', '').trim()
+      } else if (parte.startsWith('OBSERVACIONES GENERALES:')) {
+        // Si hay observaciones generales, agregarlas a recepción
+        observacionesRecepcion = (observacionesRecepcion ? observacionesRecepcion + '\n' : '') + parte.replace('OBSERVACIONES GENERALES:\n', '').trim()
+      }
+    })
   }
-  yPos += 12
 
-  // Recepción en Local
-  pdf.text("Recepcion en Local: .......... Hs", margin, yPos)
-  if (remito.firmaRecepcion) {
-    pdf.text(`Firma en recepcion: ${remito.firmaRecepcion.nombre}`, margin, yPos + 5)
-  } else {
-    pdf.text("Firma en recepcion:", margin, yPos + 5)
+  // Retiro de Fábrica (solo para remitos de recepción)
+  if (remito.tipo === "recepcion") {
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
+    // Usar hora del remito o hora actual como fallback
+    const horaRetiro = remito.horaRetiroFabrica || format(new Date(), "HH:mm", { locale: es })
+    
+    // Texto de retiro con observaciones al lado si existen
+    const textoRetiro = `Retiro de Fabrica: ${horaRetiro} Hs`
+    pdf.text(textoRetiro, margin, yPos)
+    
+    // Observaciones de envío al lado si existen
+    if (observacionesEnvio) {
+      pdf.setFontSize(8)
+      const maxWidth = pdfWidth - margin * 2 - 80 // Reservar espacio para "Retiro de Fabrica: XX:XX Hs"
+      const observacionesTexto = pdf.splitTextToSize(observacionesEnvio, maxWidth)
+      pdf.text(`Obs: ${observacionesTexto[0]}`, margin + 80, yPos)
+      if (observacionesTexto.length > 1) {
+        // Si hay más líneas, continuar abajo
+        observacionesTexto.slice(1).forEach((linea: string, idx: number) => {
+          pdf.text(linea, margin + 80, yPos + (idx + 1) * 4)
+        })
+      }
+    }
+    
+    pdf.setFontSize(9)
+    if (remito.firmaEnvio) {
+      pdf.text(`Firma repartidor: ${remito.firmaEnvio.nombre}`, margin, yPos + 5)
+    } else {
+      pdf.text("Firma repartidor:", margin, yPos + 5)
+    }
+    
+    // Ajustar yPos según si hay observaciones de envío
+    if (observacionesEnvio) {
+      const lineasObs = observacionesEnvio.split('\n').length
+      yPos += Math.max(12, lineasObs * 4 + 5)
+    } else {
+      yPos += 12
+    }
   }
-  yPos += 12
 
-  // Observaciones
-  pdf.text("Observaciones:", margin, yPos)
-  if (remito.observaciones) {
+  // Recepción en Local (solo para remitos de recepción)
+  if (remito.tipo === "recepcion") {
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
+    // Usar hora del remito o hora actual como fallback
+    const horaRecepcion = remito.horaRecepcionLocal || format(new Date(), "HH:mm", { locale: es })
+    
+    // Texto de recepción con observaciones al lado si existen
+    const textoRecepcion = `Recepcion en Local: ${horaRecepcion} Hs`
+    pdf.text(textoRecepcion, margin, yPos)
+    
+    // Observaciones de recepción al lado si existen
+    if (observacionesRecepcion) {
+      pdf.setFontSize(8)
+      const maxWidth = pdfWidth - margin * 2 - 85 // Reservar espacio para "Recepcion en Local: XX:XX Hs"
+      const observacionesTexto = pdf.splitTextToSize(observacionesRecepcion, maxWidth)
+      pdf.text(`Obs: ${observacionesTexto[0]}`, margin + 85, yPos)
+      if (observacionesTexto.length > 1) {
+        // Si hay más líneas, continuar abajo
+        observacionesTexto.slice(1).forEach((linea: string, idx: number) => {
+          pdf.text(linea, margin + 85, yPos + (idx + 1) * 4)
+        })
+      }
+    }
+    
+    pdf.setFontSize(9)
+    if (remito.firmaRecepcion) {
+      pdf.text(`Firma en recepcion: ${remito.firmaRecepcion.nombre}`, margin, yPos + 5)
+    } else {
+      pdf.text("Firma en recepcion:", margin, yPos + 5)
+    }
+    
+    // Ajustar yPos según si hay observaciones de recepción
+    if (observacionesRecepcion) {
+      const lineasObs = observacionesRecepcion.split('\n').length
+      yPos += Math.max(12, lineasObs * 4 + 5)
+    } else {
+      yPos += 12
+    }
+  }
+
+  // Para remitos que no sean de recepción, mostrar observaciones normalmente
+  if (remito.tipo !== "recepcion" && remito.observaciones && remito.observaciones.trim()) {
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Observaciones:", margin, yPos)
     pdf.setFontSize(8)
+    pdf.setFont("helvetica", "normal")
     const observaciones = pdf.splitTextToSize(remito.observaciones, pdfWidth - margin * 2)
     pdf.text(observaciones, margin + 2, yPos + 5)
+    yPos += observaciones.length * 4 + 7
   }
+
+  // Agregar footer en todas las páginas
+  const totalPages = pdf.internal.pages.length - 1
+  for (let i = 1; i <= totalPages; i++) {
+    pdf.setPage(i)
+    
+    // Línea separadora del footer
+    pdf.setDrawColor(200, 200, 200)
+    pdf.line(margin, pdfHeight - footerHeight, pdfWidth - margin, pdfHeight - footerHeight)
+    
+    // Texto del footer
+    pdf.setFontSize(7)
+    pdf.setFont("helvetica", "normal")
+    pdf.setTextColor(100, 100, 100)
+    const footerText = `PANIFICADOS Y EMPANADAS SANTA - Remito N°${remito.numero} - Página ${i} de ${totalPages}`
+    pdf.text(footerText, pdfWidth / 2, pdfHeight - footerHeight + 5, { align: "center" })
+    pdf.text(fechaTexto, pdfWidth / 2, pdfHeight - footerHeight + 10, { align: "center" })
+    pdf.setTextColor(0, 0, 0) // Restaurar color negro
+  }
+
+  // Volver a la última página
+  pdf.setPage(totalPages)
 
   // Descargar PDF
   const nombreArchivo = `remito-${remito.numero}-${fechaTexto.replace(/\//g, "-")}.pdf`

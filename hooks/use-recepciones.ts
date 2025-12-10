@@ -60,9 +60,9 @@ export function useRecepciones(user: any) {
         createdAt: serverTimestamp(),
       }
       
-      // Solo incluir observaciones si tiene valor
+      // Solo incluir campos opcionales si tienen valor
       if (recepcionData.observaciones && recepcionData.observaciones.trim()) {
-        recepcionDataLimpio.observaciones = recepcionData.observaciones
+        recepcionDataLimpio.observaciones = recepcionData.observaciones.trim()
       }
       
       const recepcionRef = await addDoc(collection(db, COLLECTIONS.RECEPCIONES), recepcionDataLimpio)

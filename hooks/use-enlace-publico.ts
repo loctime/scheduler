@@ -156,10 +156,30 @@ export function useEnlacePublico(user: any) {
     if (!db) return false
 
     try {
+      // Limpiar campos undefined antes de guardar (Firebase no permite undefined)
+      const productosDisponiblesLimpios = productosDisponibles 
+        ? Object.entries(productosDisponibles).reduce((acc, [key, value]) => {
+            const cleanedValue: any = {
+              disponible: value.disponible,
+            }
+            
+            // Solo incluir campos que no sean undefined
+            if (value.cantidadEnviada !== undefined) {
+              cleanedValue.cantidadEnviada = value.cantidadEnviada
+            }
+            if (value.observaciones !== undefined && value.observaciones !== null && value.observaciones !== "") {
+              cleanedValue.observaciones = value.observaciones
+            }
+            
+            acc[key] = cleanedValue
+            return acc
+          }, {} as Record<string, any>)
+        : undefined
+
       await setDoc(
         doc(db, COLLECTIONS.ENLACES_PUBLICOS, enlaceId),
         {
-          productosDisponibles,
+          productosDisponibles: productosDisponiblesLimpios,
           fechaAcceso: serverTimestamp(),
         },
         { merge: true }

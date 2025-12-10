@@ -282,6 +282,8 @@ export interface Remito {
   firmaEnvio?: { nombre: string, firma?: string } // Firma digital
   firmaRecepcion?: { nombre: string, firma?: string }
   observaciones?: string
+  horaRetiroFabrica?: string // Hora de retiro de fábrica (formato HH:mm)
+  horaRecepcionLocal?: string // Hora de recepción en local (formato HH:mm)
   final?: boolean // Indica si es el remito final (de recepción) que consolida todo
   userId: string
   createdAt?: any
@@ -305,6 +307,8 @@ export interface Recepcion {
   esParcial: boolean
   completada: boolean
   observaciones?: string
+  horaRetiroFabrica?: string // Hora de retiro de fábrica (formato HH:mm)
+  horaRecepcionLocal?: string // Hora de recepción en local (formato HH:mm)
   userId: string
   createdAt?: any
 }

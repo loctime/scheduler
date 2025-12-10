@@ -184,13 +184,11 @@ export function EnlacePublicoForm({
                         id={`cantidad-${producto.id}`}
                         type="number"
                         min="0"
-                        value={productoData.cantidadEnviada || cantidadPedida}
-                        onChange={(e) =>
-                          updateCantidadEnviada(
-                            producto.id,
-                            parseInt(e.target.value) || 0
-                          )
-                        }
+                        value={productoData.cantidadEnviada !== undefined ? productoData.cantidadEnviada : cantidadPedida}
+                        onChange={(e) => {
+                          const valor = e.target.value === "" ? 0 : parseInt(e.target.value) || 0
+                          updateCantidadEnviada(producto.id, valor)
+                        }}
                         placeholder={cantidadPedida.toString()}
                         className="text-sm"
                       />
@@ -201,7 +199,7 @@ export function EnlacePublicoForm({
                       </Label>
                       <Textarea
                         id={`obs-${producto.id}`}
-                        value={productoData.observaciones || ""}
+                        value={productoData.observaciones ?? ""}
                         onChange={(e) =>
                           updateObservaciones(producto.id, e.target.value)
                         }
@@ -220,7 +218,19 @@ export function EnlacePublicoForm({
 
       <div className="flex justify-end gap-2 pt-4 border-t">
         <Button
-          onClick={() => onConfirmar(productosDisponibles)}
+          onClick={() => {
+            // Limpiar campos que no deben guardarse en Firebase (completo, listo)
+            const productosDisponiblesLimpios = Object.entries(productosDisponibles).reduce((acc, [key, value]) => {
+              acc[key] = {
+                disponible: value.disponible,
+                cantidadEnviada: value.cantidadEnviada,
+                observaciones: value.observaciones,
+              }
+              return acc
+            }, {} as Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string }>)
+            
+            onConfirmar(productosDisponiblesLimpios)
+          }}
           disabled={loading}
           className="w-full sm:w-auto min-w-[150px]"
         >
