@@ -90,11 +90,11 @@ export function RecepcionForm({
         }
       }
       
-      // Si se marca devolución, validar que recibido != enviada y habilitar comentario
+      // Si se marca devolución, validar que hay faltante (recibido < enviada) y habilitar comentario
       if (field === "esDevolucion" && value === true) {
         const cantidadRecibida = currentData.cantidadRecibida
-        if (cantidadRecibida === producto.cantidadEnviada) {
-          // No permitir marcar devolución si recibido = enviada
+        // No permitir marcar devolución si recibido >= enviada (no hay productos a devolver)
+        if (cantidadRecibida >= producto.cantidadEnviada) {
           return prev
         }
         // Habilitar comentario automáticamente cuando se marca como devolución
@@ -129,8 +129,10 @@ export function RecepcionForm({
   }
   
   // Validar si se puede marcar como devolución
+  // Solo se puede marcar si hay faltante (recibido < enviada)
+  // Si recibido >= enviada, no hay productos a devolver
   const puedeMarcarDevolucion = (producto: typeof productosEnviados[0], data: typeof productosRecepcion[string]) => {
-    return data.cantidadRecibida !== producto.cantidadEnviada
+    return data.cantidadRecibida < producto.cantidadEnviada
   }
   
   // Validar formulario antes de confirmar
@@ -305,9 +307,31 @@ export function RecepcionForm({
 
                 {/* Campo numérico con botones para Recibido */}
                 <div>
-                  <Label htmlFor={`cantidad-${producto.productoId}`} className="text-sm font-medium text-foreground mb-2 block">
-                    Cantidad recibida
-                  </Label>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <Label htmlFor={`cantidad-${producto.productoId}`} className="text-sm font-medium text-foreground">
+                      Cantidad recibida
+                    </Label>
+                    {data.cantidadRecibida !== producto.cantidadEnviada && (
+                      <div className="flex items-center gap-1.5">
+                        {data.cantidadRecibida < producto.cantidadEnviada && (
+                          <>
+                            <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                            <span className="text-xs text-foreground">
+                              Faltan <span className="font-semibold">{producto.cantidadEnviada - data.cantidadRecibida}</span>
+                            </span>
+                          </>
+                        )}
+                        {data.cantidadRecibida > producto.cantidadEnviada && (
+                          <>
+                            <AlertTriangle className="h-3.5 w-3.5 text-red-600 dark:text-red-400 shrink-0" />
+                            <span className="text-xs text-foreground">
+                              Excede <span className="font-semibold">{data.cantidadRecibida - producto.cantidadEnviada}</span>
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     <Button
                       type="button"
@@ -343,31 +367,14 @@ export function RecepcionForm({
                       <Plus className="h-5 w-5" />
                     </Button>
                   </div>
+                  {data.cantidadRecibida !== producto.cantidadEnviada && data.esDevolucion && (
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      {data.cantidadRecibida < producto.cantidadEnviada 
+                        ? "Se devolverán las unidades faltantes"
+                        : "Se devolverán los productos excedentes"}
+                    </p>
+                  )}
                 </div>
-
-                {/* Información de diferencia */}
-                {data.cantidadRecibida !== producto.cantidadEnviada && (
-                  <div className="rounded-lg border-2 p-2.5">
-                    {data.cantidadRecibida < producto.cantidadEnviada && (
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                        <p className="text-xs text-foreground">
-                          Faltan <span className="font-semibold">{producto.cantidadEnviada - data.cantidadRecibida}</span> unidades
-                          {data.esDevolucion && " • Se devolverán las unidades faltantes"}
-                        </p>
-                      </div>
-                    )}
-                    {data.cantidadRecibida > producto.cantidadEnviada && (
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0" />
-                        <p className="text-xs text-foreground">
-                          Excedente de <span className="font-semibold">{data.cantidadRecibida - producto.cantidadEnviada}</span> unidades
-                          {data.esDevolucion && " • Se devolverán los productos excedentes"}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {/* Checkbox de comentario */}
                 <div>
