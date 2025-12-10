@@ -565,12 +565,54 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
           yPos,
           { align: "center" }
         )
+        
+        // Calcular indicador visual para cantidad recibida
+        const cantidadPedida = producto.cantidadPedida || 0
+        const cantidadEnviada = producto.cantidadEnviada || 0
+        const cantidadRecibida = producto.cantidadRecibida || 0
+        
+        let indicador = ""
+        let colorIndicador = [0, 0, 0] // Negro por defecto
+        
+        if (cantidadRecibida > cantidadEnviada) {
+          // Recibido más de lo enviado: flecha arriba
+          indicador = "↑"
+          colorIndicador = [0, 150, 0] // Verde
+        } else if (cantidadRecibida < cantidadEnviada) {
+          // Recibido menos de lo enviado: flecha abajo
+          indicador = "↓"
+          colorIndicador = [200, 0, 0] // Rojo
+        } else if (cantidadRecibida === cantidadEnviada && cantidadRecibida !== cantidadPedida) {
+          // No se recibió lo que se pidió (pero sí lo enviado): X
+          indicador = "X"
+          colorIndicador = [200, 0, 0] // Rojo
+        }
+        
+        // Mostrar cantidad recibida con indicador
+        const textoRecibida = cantidadRecibida.toString()
         pdf.text(
-          (producto.cantidadRecibida || 0).toString(),
-          recibidaX + colWidth / 2,
+          textoRecibida,
+          recibidaX + colWidth / 2 - (indicador ? 4 : 0),
           yPos,
           { align: "center" }
         )
+        
+        // Mostrar indicador visual si existe
+        if (indicador) {
+          pdf.setFontSize(12)
+          pdf.setFont("helvetica", "bold")
+          pdf.setTextColor(colorIndicador[0], colorIndicador[1], colorIndicador[2])
+          pdf.text(
+            indicador,
+            recibidaX + colWidth / 2 + 6,
+            yPos - 1,
+            { align: "center" }
+          )
+          pdf.setFontSize(10)
+          pdf.setFont("helvetica", "normal")
+          pdf.setTextColor(0, 0, 0) // Restaurar color negro
+        }
+        
         // Cantidad de devolución (si aplica)
         const cantidadDevolucion = (producto as any).cantidadDevolucion || 0
         pdf.setFont(cantidadDevolucion > 0 ? "helvetica" : "helvetica", cantidadDevolucion > 0 ? "bold" : "normal")
@@ -611,12 +653,53 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
           yPos,
           { align: "center" }
         )
+        
+        // Calcular indicador visual para cantidad recibida
+        const cantidadPedida = producto.cantidadPedida || 0
+        const cantidadEnviada = producto.cantidadEnviada || 0
+        const cantidadRecibida = producto.cantidadRecibida || 0
+        
+        let indicador = ""
+        let colorIndicador = [0, 0, 0] // Negro por defecto
+        
+        if (cantidadRecibida > cantidadEnviada) {
+          // Recibido más de lo enviado: flecha arriba
+          indicador = "↑"
+          colorIndicador = [0, 150, 0] // Verde
+        } else if (cantidadRecibida < cantidadEnviada) {
+          // Recibido menos de lo enviado: flecha abajo
+          indicador = "↓"
+          colorIndicador = [200, 0, 0] // Rojo
+        } else if (cantidadRecibida === cantidadEnviada && cantidadRecibida !== cantidadPedida) {
+          // No se recibió lo que se pidió (pero sí lo enviado): X
+          indicador = "X"
+          colorIndicador = [200, 0, 0] // Rojo
+        }
+        
+        // Mostrar cantidad recibida con indicador
+        const textoRecibida = cantidadRecibida.toString()
         pdf.text(
-          (producto.cantidadRecibida || 0).toString(),
-          recibidaX + colWidth / 2,
+          textoRecibida,
+          recibidaX + colWidth / 2 - (indicador ? 4 : 0),
           yPos,
           { align: "center" }
         )
+        
+        // Mostrar indicador visual si existe
+        if (indicador) {
+          pdf.setFontSize(12)
+          pdf.setFont("helvetica", "bold")
+          pdf.setTextColor(colorIndicador[0], colorIndicador[1], colorIndicador[2])
+          pdf.text(
+            indicador,
+            recibidaX + colWidth / 2 + 6,
+            yPos - 1,
+            { align: "center" }
+          )
+          pdf.setFontSize(10)
+          pdf.setFont("helvetica", "normal")
+          pdf.setTextColor(0, 0, 0) // Restaurar color negro
+        }
       }
     } else {
       // Mostrar 1 columna para remitos intermedios
@@ -673,38 +756,32 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
     // Usar hora del remito o hora actual como fallback
     const horaRetiro = remito.horaRetiroFabrica || format(new Date(), "HH:mm", { locale: es })
     
-    // Texto de retiro con observaciones al lado si existen
+    // Texto de retiro
     const textoRetiro = `Retiro de Fabrica: ${horaRetiro} Hs`
     pdf.text(textoRetiro, margin, yPos)
+    yPos += 5
     
-    // Observaciones de envío al lado si existen
-    if (observacionesEnvio) {
+    // Observaciones de envío debajo del texto de retiro si existen
+    if (observacionesEnvio && observacionesEnvio.trim()) {
       pdf.setFontSize(8)
-      const maxWidth = pdfWidth - margin * 2 - 80 // Reservar espacio para "Retiro de Fabrica: XX:XX Hs"
-      const observacionesTexto = pdf.splitTextToSize(observacionesEnvio, maxWidth)
-      pdf.text(`Obs: ${observacionesTexto[0]}`, margin + 80, yPos)
-      if (observacionesTexto.length > 1) {
-        // Si hay más líneas, continuar abajo
-        observacionesTexto.slice(1).forEach((linea: string, idx: number) => {
-          pdf.text(linea, margin + 80, yPos + (idx + 1) * 4)
-        })
-      }
+      pdf.setFont("helvetica", "italic")
+      const maxWidth = pdfWidth - margin * 2
+      const observacionesTexto = pdf.splitTextToSize(observacionesEnvio.trim(), maxWidth)
+      observacionesTexto.forEach((linea: string, idx: number) => {
+        pdf.text(linea, margin + 5, yPos + (idx * 4))
+      })
+      yPos += observacionesTexto.length * 4 + 3
     }
     
+    // Firma repartidor
     pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
     if (remito.firmaEnvio) {
-      pdf.text(`Firma repartidor: ${remito.firmaEnvio.nombre}`, margin, yPos + 5)
+      pdf.text(`Firma repartidor: ${remito.firmaEnvio.nombre}`, margin, yPos)
     } else {
-      pdf.text("Firma repartidor:", margin, yPos + 5)
+      pdf.text("Firma repartidor:", margin, yPos)
     }
-    
-    // Ajustar yPos según si hay observaciones de envío
-    if (observacionesEnvio) {
-      const lineasObs = observacionesEnvio.split('\n').length
-      yPos += Math.max(12, lineasObs * 4 + 5)
-    } else {
-      yPos += 12
-    }
+    yPos += 8
   }
 
   // Recepción en Local (solo para remitos de recepción)
@@ -714,38 +791,32 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
     // Usar hora del remito o hora actual como fallback
     const horaRecepcion = remito.horaRecepcionLocal || format(new Date(), "HH:mm", { locale: es })
     
-    // Texto de recepción con observaciones al lado si existen
+    // Texto de recepción
     const textoRecepcion = `Recepcion en Local: ${horaRecepcion} Hs`
     pdf.text(textoRecepcion, margin, yPos)
+    yPos += 5
     
-    // Observaciones de recepción al lado si existen
-    if (observacionesRecepcion) {
+    // Observaciones de recepción debajo del texto de recepción si existen
+    if (observacionesRecepcion && observacionesRecepcion.trim()) {
       pdf.setFontSize(8)
-      const maxWidth = pdfWidth - margin * 2 - 85 // Reservar espacio para "Recepcion en Local: XX:XX Hs"
-      const observacionesTexto = pdf.splitTextToSize(observacionesRecepcion, maxWidth)
-      pdf.text(`Obs: ${observacionesTexto[0]}`, margin + 85, yPos)
-      if (observacionesTexto.length > 1) {
-        // Si hay más líneas, continuar abajo
-        observacionesTexto.slice(1).forEach((linea: string, idx: number) => {
-          pdf.text(linea, margin + 85, yPos + (idx + 1) * 4)
-        })
-      }
+      pdf.setFont("helvetica", "italic")
+      const maxWidth = pdfWidth - margin * 2
+      const observacionesTexto = pdf.splitTextToSize(observacionesRecepcion.trim(), maxWidth)
+      observacionesTexto.forEach((linea: string, idx: number) => {
+        pdf.text(linea, margin + 5, yPos + (idx * 4))
+      })
+      yPos += observacionesTexto.length * 4 + 3
     }
     
+    // Firma en recepción
     pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
     if (remito.firmaRecepcion) {
-      pdf.text(`Firma en recepcion: ${remito.firmaRecepcion.nombre}`, margin, yPos + 5)
+      pdf.text(`Firma en recepcion: ${remito.firmaRecepcion.nombre}`, margin, yPos)
     } else {
-      pdf.text("Firma en recepcion:", margin, yPos + 5)
+      pdf.text("Firma en recepcion:", margin, yPos)
     }
-    
-    // Ajustar yPos según si hay observaciones de recepción
-    if (observacionesRecepcion) {
-      const lineasObs = observacionesRecepcion.split('\n').length
-      yPos += Math.max(12, lineasObs * 4 + 5)
-    } else {
-      yPos += 12
-    }
+    yPos += 8
   }
 
   // Para remitos que no sean de recepción, mostrar observaciones normalmente

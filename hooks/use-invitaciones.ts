@@ -69,7 +69,7 @@ export function useInvitaciones(user: any) {
           } as InvitacionLink
 
           // Si el link fue usado, obtener el email del usuario
-          if (linkData.usado && linkData.usadoPor) {
+          if (linkData.usado && linkData.usadoPor && db) {
             try {
               const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, linkData.usadoPor))
               if (userDoc.exists()) {
