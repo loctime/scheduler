@@ -18,6 +18,8 @@ interface ProductosTableProps {
   onImport: () => void
   onProductsOrderUpdate?: (newOrder: string[]) => Promise<boolean>
   calcularPedido: (stockMinimo: number, stockActualValue: number | undefined) => number
+  ajustesPedido?: Record<string, number> // Ajustes manuales a la cantidad a pedir
+  onAjustePedidoChange?: (productId: string, ajuste: number) => void // Función para cambiar el ajuste
   configMode?: boolean
 }
 
@@ -30,6 +32,8 @@ export function ProductosTable({
   onImport,
   onProductsOrderUpdate,
   calcularPedido,
+  ajustesPedido = {},
+  onAjustePedidoChange,
   configMode = false,
 }: ProductosTableProps) {
   // Sincronizar el modo con configMode del padre
@@ -213,7 +217,9 @@ export function ProductosTable({
             const isEditing = editingField?.id === product.id
             const editingThisField = isEditing ? editingField?.field : null
             const stockActualValue = stockActual[product.id] ?? 0
-            const pedidoCalculado = calcularPedido(product.stockMinimo, stockActualValue)
+            const pedidoBase = calcularPedido(product.stockMinimo, stockActualValue)
+            const ajuste = ajustesPedido[product.id] ?? 0
+            const pedidoCalculado = Math.max(0, pedidoBase + ajuste)
             
             return (
               <div 
@@ -318,9 +324,15 @@ export function ProductosTable({
                           size="icon"
                           className="h-9 w-9"
                           onClick={() => {
-                            onStockChange(product.id, stockActualValue + 1)
+                            if (onAjustePedidoChange) {
+                              const nuevoAjuste = (ajuste ?? 0) - 1
+                              onAjustePedidoChange(product.id, nuevoAjuste)
+                            } else {
+                              // Fallback: si no hay función de ajuste, aumentar stock (comportamiento antiguo)
+                              onStockChange(product.id, stockActualValue + 1)
+                            }
                           }}
-                          disabled={pedidoCalculado <= 0}
+                          disabled={pedidoCalculado <= 0 && (!onAjustePedidoChange || (ajuste ?? 0) <= 0)}
                         >
                           <Minus className="h-4 w-4" />
                         </Button>
@@ -335,11 +347,16 @@ export function ProductosTable({
                           size="icon"
                           className="h-9 w-9"
                           onClick={() => {
-                            if (stockActualValue > 0) {
-                              onStockChange(product.id, stockActualValue - 1)
+                            if (onAjustePedidoChange) {
+                              const nuevoAjuste = (ajuste ?? 0) + 1
+                              onAjustePedidoChange(product.id, nuevoAjuste)
+                            } else {
+                              // Fallback: si no hay función de ajuste, disminuir stock (comportamiento antiguo)
+                              if (stockActualValue > 0) {
+                                onStockChange(product.id, stockActualValue - 1)
+                              }
                             }
                           }}
-                          disabled={stockActualValue <= 0}
                         >
                           <Plus className="h-4 w-4" />
                         </Button>

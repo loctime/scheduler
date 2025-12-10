@@ -683,9 +683,11 @@ export default function ConfiguracionPage() {
                         <p className="text-xs text-muted-foreground font-mono truncate">
                           {url}
                         </p>
-                        {link.usado && link.usadoPorEmail && (
+                        {link.usado && (
                           <p className="text-xs text-muted-foreground mt-1">
-                            Vinculado por: <span className="font-medium">{link.usadoPorEmail}</span>
+                            Vinculado por: <span className="font-medium">
+                              {link.usadoPorEmail || "Cargando..."}
+                            </span>
                           </p>
                         )}
                       </div>

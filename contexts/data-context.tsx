@@ -2,7 +2,8 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react"
 import { collection, query, orderBy, onSnapshot, getDocs, where, doc, getDoc } from "firebase/firestore"
-import { db, COLLECTIONS } from "@/lib/firebase"
+import { signOut } from "firebase/auth"
+import { db, COLLECTIONS, auth } from "@/lib/firebase"
 import { Empleado, Turno } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 
@@ -77,6 +78,29 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
       
       if (userDoc.exists()) {
         const data = userDoc.data()
+        
+        // Si el usuario es invitado, verificar que el link de invitación aún existe
+        if (data.role === "invited" && data.ownerId) {
+          // Buscar si existe algún link de invitación usado por este usuario
+          const invitacionesQuery = query(
+            collection(db, COLLECTIONS.INVITACIONES),
+            where("usadoPor", "==", user.uid),
+            where("ownerId", "==", data.ownerId)
+          )
+          const invitacionesSnapshot = await getDocs(invitacionesQuery)
+          
+          // Si no existe ningún link de invitación para este usuario, cerrar sesión
+          if (invitacionesSnapshot.empty) {
+            console.warn("⚠️ Usuario invitado sin link de invitación válido. Cerrando sesión...")
+            setUserData(null)
+            // Cerrar sesión del usuario
+            if (auth) {
+              await signOut(auth)
+            }
+            return
+          }
+        }
+        
         setUserData({
           uid: data.uid || user.uid,
           email: data.email || user.email,

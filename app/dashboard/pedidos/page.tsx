@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useMemo } from "react"
+import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -151,10 +151,32 @@ export default function PedidosPage() {
     return stockActualGlobal || stockActualLocal
   }, [stockActualGlobal, stockActualLocal])
   
-  // Recalcular productosAPedir con el stock global
+  // Estado para ajustes manuales de pedido (no afecta el stock real)
+  const [ajustesPedido, setAjustesPedido] = useState<Record<string, number>>({})
+  
+  // Función para calcular pedido con ajuste
+  const calcularPedidoConAjuste = useCallback((stockMinimo: number, stockActualValue: number | undefined, productoId: string): number => {
+    const pedidoBase = calcularPedido(stockMinimo, stockActualValue)
+    const ajuste = ajustesPedido[productoId] ?? 0
+    return Math.max(0, pedidoBase + ajuste)
+  }, [calcularPedido, ajustesPedido])
+  
+  // Función para cambiar el ajuste de pedido
+  const handleAjustePedidoChange = useCallback((productId: string, ajuste: number) => {
+    setAjustesPedido(prev => {
+      if (ajuste === 0) {
+        const nuevo = { ...prev }
+        delete nuevo[productId]
+        return nuevo
+      }
+      return { ...prev, [productId]: ajuste }
+    })
+  }, [])
+  
+  // Recalcular productosAPedir con el stock global y ajustes
   const productosAPedirActualizados = useMemo(() => {
-    return products.filter(p => calcularPedido(p.stockMinimo, stockActual[p.id]) > 0)
-  }, [products, stockActual, calcularPedido])
+    return products.filter(p => calcularPedidoConAjuste(p.stockMinimo, stockActual[p.id], p.id) > 0)
+  }, [products, stockActual, calcularPedidoConAjuste])
   
   // Dialog states
   const [createPedidoOpen, setCreatePedidoOpen] = useState(false)
@@ -283,13 +305,32 @@ export default function PedidosPage() {
     setClearDialogOpen(false)
   }
 
+  // Generar texto del pedido con ajustes
+  const generarTextoPedidoConAjustes = useCallback((): string => {
+    if (!selectedPedido) return ""
+    
+    const lineas = productosAPedirActualizados.map(p => {
+      const cantidad = calcularPedidoConAjuste(p.stockMinimo, stockActual[p.id], p.id)
+      let texto = selectedPedido.formatoSalida
+      texto = texto.replace(/{nombre}/g, p.nombre)
+      texto = texto.replace(/{cantidad}/g, cantidad.toString())
+      texto = texto.replace(/{unidad}/g, p.unidad || "")
+      return texto.trim()
+    })
+    
+    // Usar mensaje previo personalizado o el default con emoji
+    const encabezado = selectedPedido.mensajePrevio?.trim() || `📦 ${selectedPedido.nombre}`
+    
+    return `${encabezado}\n\n${lineas.join("\n")}\n\nTotal: ${productosAPedirActualizados.length} productos`
+  }, [selectedPedido, productosAPedirActualizados, stockActual, calcularPedidoConAjuste])
+
   const handleCopyPedido = async () => {
     if (productosAPedirActualizados.length === 0) {
       toast({ title: "Sin pedidos", description: "No hay productos que pedir" })
       return
     }
     try {
-      await navigator.clipboard.writeText(generarTextoPedido())
+      await navigator.clipboard.writeText(generarTextoPedidoConAjustes())
       toast({ title: "Copiado", description: "Pedido copiado al portapapeles" })
     } catch {
       toast({ title: "Error", description: "No se pudo copiar", variant: "destructive" })
@@ -301,7 +342,7 @@ export default function PedidosPage() {
       toast({ title: "Sin pedidos", description: "No hay productos que pedir" })
       return
     }
-    const encoded = encodeURIComponent(generarTextoPedido())
+    const encoded = encodeURIComponent(generarTextoPedidoConAjustes())
     window.open(`https://wa.me/?text=${encoded}`, "_blank")
   }
 
@@ -346,7 +387,7 @@ export default function PedidosPage() {
       // Calcular cantidades a pedir solo para productos que realmente necesitan ser pedidos
       const cantidadesPedidas: Record<string, number> = {}
       products.forEach(p => {
-        const cantidad = calcularPedido(p.stockMinimo, stockActual[p.id])
+        const cantidad = calcularPedidoConAjuste(p.stockMinimo, stockActual[p.id], p.id)
         if (cantidad > 0) {
           cantidadesPedidas[p.id] = cantidad // Solo guardar productos que necesitan ser pedidos
           console.log(`Producto ${p.nombre}: stockMinimo=${p.stockMinimo}, stockActual=${stockActual[p.id]}, cantidadPedida=${cantidad}`)
@@ -393,7 +434,7 @@ export default function PedidosPage() {
   const handleGenerarRemitoEnvio = async () => {
     if (!selectedPedido || !products.length) return
 
-    const remitoData = crearRemitoPedido(selectedPedido, products, stockActual, calcularPedido)
+    const remitoData = crearRemitoPedido(selectedPedido, products, stockActual, calcularPedido, ajustesPedido)
     const remito = await crearRemito(remitoData, selectedPedido.nombre)
     
     if (remito) {
@@ -421,7 +462,7 @@ export default function PedidosPage() {
     // Calcular cantidades a pedir solo para productos que realmente necesitan ser pedidos
     const cantidadesPedidas: Record<string, number> = {}
     products.forEach(p => {
-      const cantidad = calcularPedido(p.stockMinimo, stockActual[p.id])
+      const cantidad = calcularPedidoConAjuste(p.stockMinimo, stockActual[p.id], p.id)
       if (cantidad > 0) {
         cantidadesPedidas[p.id] = cantidad // Solo guardar productos que necesitan ser pedidos
       }
@@ -842,6 +883,8 @@ export default function PedidosPage() {
                   onImport={() => setImportDialogOpen(true)}
                   onProductsOrderUpdate={updateProductsOrder}
                   calcularPedido={calcularPedido}
+                  ajustesPedido={ajustesPedido}
+                  onAjustePedidoChange={handleAjustePedidoChange}
                   configMode={showConfig}
                 />
               ) : (

@@ -62,10 +62,10 @@ export function useInvitaciones(user: any) {
       )
       const snapshot = await getDocs(q)
       const linksData = await Promise.all(
-        snapshot.docs.map(async (doc) => {
+        snapshot.docs.map(async (linkDoc) => {
           const linkData = {
-            id: doc.id,
-            ...doc.data(),
+            id: linkDoc.id,
+            ...linkDoc.data(),
           } as InvitacionLink
 
           // Si el link fue usado, obtener el email del usuario
@@ -73,12 +73,20 @@ export function useInvitaciones(user: any) {
             try {
               const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, linkData.usadoPor))
               if (userDoc.exists()) {
-                linkData.usadoPorEmail = userDoc.data().email || "Email no disponible"
+                const userData = userDoc.data()
+                linkData.usadoPorEmail = userData.email || "Email no disponible"
+                console.log("📧 Email cargado para link:", linkData.id, "->", linkData.usadoPorEmail)
+              } else {
+                console.warn("⚠️ Usuario no encontrado para link:", linkData.id, "usadoPor:", linkData.usadoPor)
+                linkData.usadoPorEmail = "Usuario no encontrado"
               }
             } catch (error) {
               console.error("Error obteniendo email del usuario:", error)
-              linkData.usadoPorEmail = "Email no disponible"
+              linkData.usadoPorEmail = "Error al cargar email"
             }
+          } else if (linkData.usado && !linkData.usadoPor) {
+            console.warn("⚠️ Link marcado como usado pero sin usadoPor:", linkData.id)
+            linkData.usadoPorEmail = "No disponible"
           }
 
           return linkData
@@ -135,23 +143,31 @@ export function useInvitaciones(user: any) {
       // Si se solicita eliminar el usuario y existe un usuario vinculado
       if (eliminarUsuario && linkData.usadoPor) {
         try {
+          console.log("🗑️ Eliminando usuario:", linkData.usadoPor)
           await deleteDoc(doc(db, COLLECTIONS.USERS, linkData.usadoPor))
+          console.log("✅ Usuario eliminado exitosamente")
           toast({
             title: "Usuario eliminado",
             description: "El usuario vinculado ha sido eliminado",
           })
         } catch (error: any) {
-          console.error("Error eliminando usuario:", error)
+          console.error("❌ Error eliminando usuario:", error)
+          console.error("❌ Código de error:", error.code)
+          console.error("❌ Mensaje:", error.message)
           toast({
-            title: "Advertencia",
-            description: "El link fue eliminado pero no se pudo eliminar el usuario",
+            title: "Error al eliminar usuario",
+            description: error.message || "No se pudo eliminar el usuario. Verifica las reglas de Firestore.",
             variant: "destructive",
           })
+          // No continuar si no se pudo eliminar el usuario
+          return
         }
       }
 
       // Eliminar el link
+      console.log("🗑️ Eliminando link:", linkId)
       await deleteDoc(doc(db, COLLECTIONS.INVITACIONES, linkId))
+      console.log("✅ Link eliminado exitosamente")
       await cargarLinks()
       
       toast({

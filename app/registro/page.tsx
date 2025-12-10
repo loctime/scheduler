@@ -84,6 +84,7 @@ export default function RegistroPage() {
       setLoading(true)
 
       // Buscar el link de invitación nuevamente para asegurarnos de que sigue válido
+      // IMPORTANTE: Verificar ANTES de autenticar para evitar que alguien use un link ya usado
       const q = query(
         collection(db, COLLECTIONS.INVITACIONES),
         where("token", "==", token),
@@ -93,7 +94,12 @@ export default function RegistroPage() {
       const snapshot = await getDocs(q)
 
       if (snapshot.empty) {
-        throw new Error("Token de invitación inválido o ya fue usado")
+        toast({
+          title: "Link ya usado",
+          description: "Este link de invitación ya fue usado por otro usuario. Solicita un nuevo link.",
+          variant: "destructive",
+        })
+        return
       }
 
       const linkDoc = snapshot.docs[0]
@@ -132,6 +138,18 @@ export default function RegistroPage() {
           updatedAt: serverTimestamp(),
         })
         console.log("✅ Usuario actualizado exitosamente")
+
+        // Marcar link como usado si no estaba ya usado
+        const linkData = linkDoc.data()
+        if (!linkData.usado) {
+          console.log("🔗 Marcando invitación como usada (usuario existente), linkDoc.id:", linkDoc.id)
+          await updateDoc(doc(db, COLLECTIONS.INVITACIONES, linkDoc.id), {
+            usado: true,
+            usadoPor: user.uid,
+            usadoEn: serverTimestamp(),
+          })
+          console.log("✅ Invitación marcada como usada")
+        }
       } else {
         // Crear nuevo documento de usuario con role 'invited' y ownerId
         console.log("➕ Creando nuevo usuario con role 'invited' y ownerId:", ownerId)

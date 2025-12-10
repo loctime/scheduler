@@ -2,8 +2,15 @@
 
 // Colección: apps/horarios/users
 match /apps/horarios/users/{userId} {
-  // Solo el usuario puede leer su propio documento
-  allow read: if isAuth() && userId == uid();
+  // Permitir lectura:
+  // - El usuario puede leer su propio documento
+  // - El dueño puede leer documentos de usuarios invitados vinculados a sus invitaciones
+  allow read: if isAuth() && (
+    userId == uid()
+    || (exists(/databases/$(db)/documents/apps/horarios/users/$(userId))
+      && get(/databases/$(db)/documents/apps/horarios/users/$(userId)).data.role == 'invited'
+      && get(/databases/$(db)/documents/apps/horarios/users/$(userId)).data.ownerId == uid())
+  );
   // Crear: el usuario puede crear su propio documento
   allow create: if isAuth() && userId == uid();
   // Actualizar: el usuario puede actualizar su propio documento

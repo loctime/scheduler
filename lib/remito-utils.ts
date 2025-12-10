@@ -64,14 +64,21 @@ export function crearRemitoPedido(
   pedido: Pedido,
   productos: Producto[],
   stockActual: Record<string, number>,
-  calcularPedido: (stockMinimo: number, stockActual?: number) => number
+  calcularPedido: (stockMinimo: number, stockActual?: number) => number,
+  ajustesPedido?: Record<string, number> // Ajustes manuales a la cantidad a pedir
 ): Omit<Remito, "id" | "numero" | "createdAt"> {
   const productosAPedir = productos
-    .filter(p => calcularPedido(p.stockMinimo, stockActual[p.id]) > 0)
-    .map(p => ({
+    .map(p => {
+      const pedidoBase = calcularPedido(p.stockMinimo, stockActual[p.id])
+      const ajuste = ajustesPedido?.[p.id] ?? 0
+      const cantidadFinal = Math.max(0, pedidoBase + ajuste)
+      return { producto: p, cantidadFinal }
+    })
+    .filter(({ cantidadFinal }) => cantidadFinal > 0)
+    .map(({ producto: p, cantidadFinal }) => ({
       productoId: p.id,
       productoNombre: p.nombre,
-      cantidadPedida: calcularPedido(p.stockMinimo, stockActual[p.id]),
+      cantidadPedida: cantidadFinal,
     }))
 
   return {
