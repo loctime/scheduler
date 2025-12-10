@@ -337,6 +337,7 @@ export interface InvitacionLink {
   activo: boolean
   usado: boolean
   usadoPor?: string // ID del usuario que usó el link
+  usadoPorEmail?: string // Email del usuario que usó el link
   usadoEn?: any // Timestamp de cuando se usó
   createdAt?: any
   expiresAt?: any // Opcional: fecha de expiración

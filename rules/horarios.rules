@@ -13,8 +13,15 @@ match /apps/horarios/users/{userId} {
     !('uid' in request.resource.data) || 
     request.resource.data.uid == resource.data.uid
   );
-  // No permitir eliminar usuarios
-  allow delete: if false;
+  // Eliminar: 
+  // - El usuario puede eliminar su propio documento
+  // - El dueño puede eliminar usuarios invitados vinculados a sus invitaciones
+  allow delete: if isAuth() && (
+    userId == uid()
+    || (exists(/databases/$(db)/documents/apps/horarios/users/$(userId))
+      && get(/databases/$(db)/documents/apps/horarios/users/$(userId)).data.role == 'invited'
+      && get(/databases/$(db)/documents/apps/horarios/users/$(userId)).data.ownerId == uid())
+  );
 }
 
 // Colección: apps/horarios/employees
@@ -101,6 +108,8 @@ match /apps/horarios/invitaciones/{invitacionId} {
       && (!('activo' in request.resource.data) || request.resource.data.activo == resource.data.activo)
     )
   );
+  // Eliminar: solo el dueño puede eliminar sus invitaciones
+  allow delete: if isAuth() && resource.data.ownerId == uid();
 }
 
 // Colección: apps/horarios/pedidos

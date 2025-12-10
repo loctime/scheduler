@@ -14,6 +14,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2, Save, Plus, Trash2, Copy, Link as LinkIcon, X } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Separator } from "@/components/ui/separator"
 import { MedioTurno, InvitacionLink } from "@/lib/types"
 import { useInvitaciones } from "@/hooks/use-invitaciones"
@@ -40,7 +50,8 @@ export default function ConfiguracionPage() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const { links, loading: loadingLinks, crearLinkInvitacion, desactivarLink } = useInvitaciones(user)
+  const { links, loading: loadingLinks, crearLinkInvitacion, eliminarLink } = useInvitaciones(user)
+  const [linkAEliminar, setLinkAEliminar] = useState<InvitacionLink | null>(null)
   const [config, setConfig] = useState<Configuracion>({
     nombreEmpresa: "Empleado",
     colorEmpresa: undefined,
@@ -672,6 +683,11 @@ export default function ConfiguracionPage() {
                         <p className="text-xs text-muted-foreground font-mono truncate">
                           {url}
                         </p>
+                        {link.usado && link.usadoPorEmail && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Vinculado por: <span className="font-medium">{link.usadoPorEmail}</span>
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-center gap-1">
                         {link.activo && !link.usado && (
@@ -684,16 +700,15 @@ export default function ConfiguracionPage() {
                             <Copy className="h-4 w-4" />
                           </Button>
                         )}
-                        {link.activo && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => desactivarLink(link.id)}
-                            className="h-8 w-8 text-destructive"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setLinkAEliminar(link)}
+                          className="h-8 w-8 text-destructive"
+                          title="Eliminar link y usuario vinculado"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   )
@@ -718,6 +733,45 @@ export default function ConfiguracionPage() {
             )}
           </Button>
         </div>
+
+        {/* Diálogo de confirmación para eliminar link */}
+        <AlertDialog open={!!linkAEliminar} onOpenChange={(open) => !open && setLinkAEliminar(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar link de invitación?</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div>
+                  Esta acción eliminará permanentemente:
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>El link de invitación</li>
+                    {linkAEliminar?.usado && linkAEliminar?.usadoPorEmail && (
+                      <li>
+                        <strong>El usuario vinculado: {linkAEliminar.usadoPorEmail}</strong>
+                      </li>
+                    )}
+                  </ul>
+                  <p className="mt-2 font-semibold text-destructive">
+                    Esta acción no se puede deshacer.
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (linkAEliminar) {
+                    eliminarLink(linkAEliminar.id, true)
+                    setLinkAEliminar(null)
+                  }
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Eliminar todo
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   )
