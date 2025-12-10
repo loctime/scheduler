@@ -18,11 +18,13 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
 import { Pedido, Producto } from "@/lib/types"
+import { useData } from "@/contexts/data-context"
 
 const DEFAULT_FORMAT = "{nombre} ({cantidad})"
 
 export function usePedidos(user: any) {
   const { toast } = useToast()
+  const { userData } = useData()
   
   const [pedidos, setPedidos] = useState<Pedido[]>([])
   const [products, setProducts] = useState<Producto[]>([])
@@ -35,9 +37,15 @@ export function usePedidos(user: any) {
     if (!user || !db) return
     
     try {
+      // Si el usuario es invitado, cargar pedidos del ownerId
+      // Si no, cargar pedidos del userId normal
+      const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
+        ? userData.ownerId 
+        : user.uid
+      
       const pedidosQuery = query(
         collection(db, COLLECTIONS.PEDIDOS),
-        where("userId", "==", user.uid)
+        where("userId", "==", userIdToQuery)
       )
       const snapshot = await getDocs(pedidosQuery)
       const pedidosData = snapshot.docs.map((doc) => ({
@@ -59,7 +67,7 @@ export function usePedidos(user: any) {
         variant: "destructive",
       })
     }
-  }, [user, selectedPedido, toast])
+  }, [user, userData, selectedPedido, toast])
 
   // Cargar productos del pedido seleccionado
   const loadProducts = useCallback(async () => {
@@ -69,9 +77,14 @@ export function usePedidos(user: any) {
     }
     
     try {
+      // Si el usuario es invitado, usar ownerId para cargar productos
+      const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
+        ? userData.ownerId 
+        : user.uid
+      
       const productsQuery = query(
         collection(db, COLLECTIONS.PRODUCTS),
-        where("userId", "==", user.uid),
+        where("userId", "==", userIdToQuery),
         where("pedidoId", "==", selectedPedido.id)
       )
       const snapshot = await getDocs(productsQuery)
@@ -212,6 +225,12 @@ export function usePedidos(user: any) {
   const createPedido = useCallback(async (nombre: string, stockMinimoDefault: number, formatoSalida: string) => {
     if (!db || !user) return null
     
+    // Los usuarios invitados no pueden crear pedidos
+    if (userData?.role === "invited") {
+      toast({ title: "Error", description: "Los usuarios invitados no pueden crear pedidos", variant: "destructive" })
+      return null
+    }
+    
     if (!nombre.trim()) {
       toast({ title: "Error", description: "El nombre es requerido", variant: "destructive" })
       return null
@@ -247,7 +266,7 @@ export function usePedidos(user: any) {
       toast({ title: "Error", description: "No se pudo crear el pedido", variant: "destructive" })
       return null
     }
-  }, [user, toast])
+  }, [user, userData, toast])
 
   // Actualizar pedido
   const updatePedido = useCallback(async (nombre: string, stockMinimoDefault: number, formatoSalida: string, mensajePrevio?: string) => {
@@ -351,6 +370,11 @@ export function usePedidos(user: any) {
         }
       })
 
+      // Si el usuario es invitado, usar ownerId para crear productos
+      const userIdToUse = userData?.role === "invited" && userData?.ownerId 
+        ? userData.ownerId 
+        : user.uid
+      
       for (const nombre of nuevos) {
         const docRef = doc(collection(db, COLLECTIONS.PRODUCTS))
         batch.set(docRef, {
@@ -359,7 +383,7 @@ export function usePedidos(user: any) {
           stockMinimo: selectedPedido.stockMinimoDefault,
           unidad: "U",
           orden: nombresMap.get(nombre) ?? maxOrden + nuevos.indexOf(nombre),
-          userId: user.uid,
+          userId: userIdToUse,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         })
@@ -378,7 +402,7 @@ export function usePedidos(user: any) {
       toast({ title: "Error", description: "No se pudo importar", variant: "destructive" })
       return false
     }
-  }, [user, selectedPedido, products, loadProducts, toast])
+  }, [user, userData, selectedPedido, products, loadProducts, toast])
 
   // Actualizar producto
   const updateProduct = useCallback(async (productId: string, field: string, value: string) => {

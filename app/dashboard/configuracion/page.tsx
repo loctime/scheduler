@@ -13,9 +13,10 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2, Save, Plus, Trash2 } from "lucide-react"
+import { Loader2, Save, Plus, Trash2, Copy, Link as LinkIcon, X } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
-import { MedioTurno } from "@/lib/types"
+import { MedioTurno, InvitacionLink } from "@/lib/types"
+import { useInvitaciones } from "@/hooks/use-invitaciones"
 
 // Función helper para determinar el color de texto según el contraste
 const getContrastColor = (hexColor: string): string => {
@@ -39,6 +40,7 @@ export default function ConfiguracionPage() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const { links, loading: loadingLinks, crearLinkInvitacion, desactivarLink } = useInvitaciones(user)
   const [config, setConfig] = useState<Configuracion>({
     nombreEmpresa: "Empleado",
     colorEmpresa: undefined,
@@ -213,6 +215,15 @@ export default function ConfiguracionPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const copiarLink = (token: string) => {
+    const url = `${window.location.origin}/registro?token=${token}`
+    navigator.clipboard.writeText(url)
+    toast({
+      title: "Link copiado",
+      description: "El link de invitación ha sido copiado al portapapeles",
+    })
   }
 
   if (loading) {
@@ -603,6 +614,92 @@ export default function ConfiguracionPage() {
                 onCheckedChange={(checked) => setConfig({ ...config, formatoHora24: checked })}
               />
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Invitaciones de Colaboradores</CardTitle>
+            <CardDescription>
+              Crea links únicos para invitar a tus compañeros de trabajo. Los usuarios invitados podrán acceder y modificar la página de pedidos desde sus propios dispositivos.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={async () => {
+                const link = await crearLinkInvitacion()
+                if (link) {
+                  copiarLink(link.token)
+                }
+              }}
+              className="w-full"
+            >
+              <LinkIcon className="mr-2 h-4 w-4" />
+              Crear nuevo link de invitación
+            </Button>
+
+            {loadingLinks ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : links.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No hay links de invitación creados. Crea uno para empezar.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {links.map((link) => {
+                  const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/registro?token=${link.token}`
+                  return (
+                    <div
+                      key={link.id}
+                      className="flex items-center gap-2 p-3 border rounded-lg"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-xs px-2 py-1 rounded ${
+                            link.activo && !link.usado
+                              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                              : link.usado
+                              ? "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
+                              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                          }`}>
+                            {link.usado ? "Usado" : link.activo ? "Activo" : "Inactivo"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground font-mono truncate">
+                          {url}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {link.activo && !link.usado && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => copiarLink(link.token)}
+                            className="h-8 w-8"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {link.activo && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => desactivarLink(link.id)}
+                            className="h-8 w-8 text-destructive"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 

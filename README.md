@@ -795,6 +795,7 @@ Consulta `scripts/README.md` para scripts de utilidad como:
 
 Este README cubre las funcionalidades principales. Para información más detallada, consulta:
 
+- **[CHAT_STOCK_DOCUMENTACION.md](./CHAT_STOCK_DOCUMENTACION.md)**: Documentación completa del Chat de Stock (funciones, comandos, ejemplos)
 - **[FIREBASE_SETUP.md](./FIREBASE_SETUP.md)**: Guía detallada de configuración de Firebase
 - **[VERCEL_DEPLOY.md](./VERCEL_DEPLOY.md)**: Guía rápida de deploy en Vercel
 - **[rules/README.md](./rules/README.md)**: Arquitectura y gestión de reglas de Firestore

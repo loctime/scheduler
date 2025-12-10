@@ -55,4 +55,5 @@ export const COLLECTIONS = {
   REMITOS: getCollectionPath("remitos"),
   RECEPCIONES: getCollectionPath("recepciones"),
   ENLACES_PUBLICOS: getCollectionPath("enlaces_publicos"),
+  INVITACIONES: getCollectionPath("invitaciones"),
 } as const

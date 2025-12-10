@@ -329,3 +329,15 @@ export interface EnlacePublico {
   fechaAcceso?: any
   createdAt?: any
 }
+
+export interface InvitacionLink {
+  id: string
+  token: string // Token único para el link
+  ownerId: string // ID del usuario que creó el link
+  activo: boolean
+  usado: boolean
+  usadoPor?: string // ID del usuario que usó el link
+  usadoEn?: any // Timestamp de cuando se usó
+  createdAt?: any
+  expiresAt?: any // Opcional: fecha de expiración
+}

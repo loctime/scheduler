@@ -1,10 +1,19 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react"
-import { collection, query, orderBy, onSnapshot, getDocs, where } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, getDocs, where, doc, getDoc } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { Empleado, Turno } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
+
+interface UserData {
+  uid: string
+  email?: string
+  displayName?: string
+  photoURL?: string
+  role?: string
+  ownerId?: string
+}
 
 interface DataContextType {
   employees: Empleado[]
@@ -12,6 +21,7 @@ interface DataContextType {
   loading: boolean
   error: string | null
   user: any
+  userData: UserData | null
   refreshEmployees: () => Promise<void>
   refreshShifts: () => Promise<void>
 }
@@ -23,6 +33,7 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
   const [shifts, setShifts] = useState<Turno[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [userData, setUserData] = useState<UserData | null>(null)
   const { toast } = useToast()
 
   // Cache en localStorage
@@ -53,10 +64,59 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
     }
   }
 
+  // Cargar datos del usuario desde Firestore
+  const loadUserData = useCallback(async () => {
+    if (!user || !db) {
+      setUserData(null)
+      return
+    }
+
+    try {
+      const userRef = doc(db, COLLECTIONS.USERS, user.uid)
+      const userDoc = await getDoc(userRef)
+      
+      if (userDoc.exists()) {
+        const data = userDoc.data()
+        setUserData({
+          uid: data.uid || user.uid,
+          email: data.email || user.email,
+          displayName: data.displayName || user.displayName,
+          photoURL: data.photoURL || user.photoURL,
+          role: data.role || "user",
+          ownerId: data.ownerId,
+        })
+      } else {
+        // Si no existe el documento, crear uno por defecto
+        setUserData({
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          role: "user",
+        })
+      }
+    } catch (err: any) {
+      console.error("Error loading user data:", err)
+      // En caso de error, usar datos básicos del auth
+      setUserData({
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        role: "user",
+      })
+    }
+  }, [user])
+
   const refreshEmployees = useCallback(async () => {
     if (!user || !db) return
 
     try {
+      // Determinar el userId a usar: si es invitado, usar ownerId, sino usar su propio uid
+      const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
+        ? userData.ownerId 
+        : user.uid
+
       // Intentar cargar desde cache primero
       const cached = loadFromCache(CACHE_KEY_EMPLOYEES)
       if (cached) {
@@ -66,7 +126,7 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
       // Cargar desde Firestore
       const employeesQuery = query(
         collection(db, COLLECTIONS.EMPLOYEES),
-        where("userId", "==", user.uid),
+        where("userId", "==", userIdToQuery),
         orderBy("name")
       )
       const snapshot = await getDocs(employeesQuery)
@@ -87,12 +147,17 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
         variant: "destructive",
       })
     }
-  }, [user, toast])
+  }, [user, userData, toast])
 
   const refreshShifts = useCallback(async () => {
     if (!user || !db) return
 
     try {
+      // Determinar el userId a usar: si es invitado, usar ownerId, sino usar su propio uid
+      const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
+        ? userData.ownerId 
+        : user.uid
+
       // Intentar cargar desde cache primero
       const cached = loadFromCache(CACHE_KEY_SHIFTS)
       if (cached) {
@@ -102,7 +167,7 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
       // Cargar desde Firestore
       const shiftsQuery = query(
         collection(db, COLLECTIONS.SHIFTS),
-        where("userId", "==", user.uid),
+        where("userId", "==", userIdToQuery),
         orderBy("name")
       )
       const snapshot = await getDocs(shiftsQuery)
@@ -123,10 +188,19 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
         variant: "destructive",
       })
     }
-  }, [user, toast])
+  }, [user, userData, toast])
+
+  // Cargar datos del usuario primero
+  useEffect(() => {
+    if (user) {
+      loadUserData()
+    } else {
+      setUserData(null)
+    }
+  }, [user, loadUserData])
 
   useEffect(() => {
-    if (!user || !db) {
+    if (!user || !db || !userData) {
       setEmployees([])
       setShifts([])
       setLoading(false)
@@ -134,6 +208,11 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
     }
 
     setLoading(true)
+
+    // Determinar el userId a usar para las queries
+    const userIdToQuery = userData.role === "invited" && userData.ownerId 
+      ? userData.ownerId 
+      : user.uid
 
     // Cargar datos iniciales
     Promise.all([refreshEmployees(), refreshShifts()]).finally(() => {
@@ -144,12 +223,12 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
     // Solo para cambios críticos, no para cada actualización
     const employeesQuery = query(
       collection(db, COLLECTIONS.EMPLOYEES),
-      where("userId", "==", user.uid),
+      where("userId", "==", userIdToQuery),
       orderBy("name")
     )
     const shiftsQuery = query(
       collection(db, COLLECTIONS.SHIFTS),
-      where("userId", "==", user.uid),
+      where("userId", "==", userIdToQuery),
       orderBy("name")
     )
 
@@ -188,10 +267,10 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
       unsubscribeEmployees()
       unsubscribeShifts()
     }
-  }, [user, refreshEmployees, refreshShifts])
+  }, [user, userData, refreshEmployees, refreshShifts])
 
   return (
-    <DataContext.Provider value={{ employees, shifts, loading, error, user, refreshEmployees, refreshShifts }}>
+    <DataContext.Provider value={{ employees, shifts, loading, error, user, userData, refreshEmployees, refreshShifts }}>
       {children}
     </DataContext.Provider>
   )

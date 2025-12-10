@@ -26,6 +26,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useStockChatContext } from "@/contexts/stock-chat-context"
+import { useData } from "@/contexts/data-context"
 
 interface DashboardLayoutProps {
   children: ReactNode
@@ -43,6 +44,7 @@ const navItems = [
 export function DashboardLayout({ children, user }: DashboardLayoutProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { userData } = useData()
   
   // Obtener estado del chat para ajustar el padding del contenido
   let chatIsOpen = false
@@ -58,9 +60,19 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     await signOut(auth)
   }
 
+  // Filtrar navItems según el role del usuario
+  const navItemsFiltered = navItems.filter((item) => {
+    // Si el usuario es invitado, solo mostrar Pedidos
+    if (userData?.role === "invited") {
+      return item.href === "/dashboard/pedidos"
+    }
+    // Usuarios normales ven todas las páginas
+    return true
+  })
+
   const NavContent = ({ onItemClick }: { onItemClick?: () => void }) => (
     <div className="flex flex-col gap-1 md:flex-row">
-      {navItems.map((item) => {
+      {navItemsFiltered.map((item) => {
         const Icon = item.icon
         const isActive = pathname === item.href
         return (

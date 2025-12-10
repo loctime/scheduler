@@ -16,9 +16,11 @@ import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
 import { Remito } from "@/lib/types"
 import { generarNumeroRemito, generarPDFRemito, eliminarRemitosAnteriores } from "@/lib/remito-utils"
+import { useData } from "@/contexts/data-context"
 
 export function useRemitos(user: any) {
   const { toast } = useToast()
+  const { userData } = useData()
   const [loading, setLoading] = useState(false)
 
   // Crear remito
@@ -86,11 +88,17 @@ export function useRemitos(user: any) {
     if (!db || !user) return []
 
     try {
+      // Si el usuario es invitado, usar ownerId para consultar remitos
+      // Si no, usar userId normal
+      const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
+        ? userData.ownerId 
+        : user.uid
+
       // Primero intentar obtener remitos filtrando por pedidoId y userId
       const remitosQuery = query(
         collection(db, COLLECTIONS.REMITOS),
         where("pedidoId", "==", pedidoId),
-        where("userId", "==", user.uid)
+        where("userId", "==", userIdToQuery)
       )
       const snapshot = await getDocs(remitosQuery)
       const remitos = snapshot.docs.map((doc) => ({
@@ -110,10 +118,13 @@ export function useRemitos(user: any) {
           ...doc.data(),
         })) as Remito[]
         
-        // Filtrar manualmente por userId del pedido (verificar que el pedido pertenece al usuario)
+        // Filtrar manualmente por userId del pedido (verificar que el pedido pertenece al usuario o ownerId)
         const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId))
-        if (pedidoDoc.exists() && pedidoDoc.data().userId === user.uid) {
-          return remitosSinUser
+        if (pedidoDoc.exists()) {
+          const pedidoUserId = pedidoDoc.data().userId
+          if (pedidoUserId === userIdToQuery) {
+            return remitosSinUser
+          }
         }
       }
       
@@ -122,7 +133,7 @@ export function useRemitos(user: any) {
       logger.error("Error al obtener remitos:", error)
       return []
     }
-  }, [user])
+  }, [user, userData])
 
   // Obtener un remito por ID
   const obtenerRemito = useCallback(async (
