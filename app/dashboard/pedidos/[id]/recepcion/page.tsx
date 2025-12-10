@@ -14,7 +14,7 @@ import { RecepcionForm } from "@/components/pedidos/recepcion-form"
 import { crearRemitoRecepcion, eliminarRemitosAnteriores } from "@/lib/remito-utils"
 import type { Remito, Pedido, Producto } from "@/lib/types"
 import { db, COLLECTIONS } from "@/lib/firebase"
-import { doc, getDoc } from "firebase/firestore"
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import type { Recepcion } from "@/lib/types"
 
@@ -203,6 +203,40 @@ export default function RecepcionPage() {
 
       if (!recepcion) return
 
+      // Actualizar stock: sumar cantidad recibida
+      if (db && recepcion.productos) {
+        for (const productoRecepcion of recepcion.productos) {
+          // Sumar la cantidad recibida al stock
+          if (productoRecepcion.cantidadRecibida > 0) {
+            const stockDocId = `${user.uid}_${productoRecepcion.productoId}`
+            const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
+            
+            // Obtener stock actual
+            const stockDoc = await getDoc(stockDocRef)
+            const stockActual = stockDoc.exists() ? stockDoc.data().cantidad || 0 : 0
+            const nuevoStock = stockActual + productoRecepcion.cantidadRecibida
+            
+            // Actualizar o crear stock según exista
+            if (stockDoc.exists()) {
+              // Actualizar documento existente
+              await updateDoc(stockDocRef, {
+                cantidad: nuevoStock,
+                ultimaActualizacion: serverTimestamp(),
+              })
+            } else {
+              // Crear nuevo documento
+              await setDoc(stockDocRef, {
+                productoId: productoRecepcion.productoId,
+                pedidoId: pedido.id,
+                cantidad: nuevoStock,
+                ultimaActualizacion: serverTimestamp(),
+                userId: user.uid,
+              })
+            }
+          }
+        }
+      }
+
       // Buscar remitos anteriores (pedido y envío) para consolidar
       const remitosAnteriores = await obtenerRemitosPorPedido(pedido.id)
       const remitoPedido = remitosAnteriores.find(r => r.tipo === "pedido") || null
@@ -229,7 +263,7 @@ export default function RecepcionPage() {
 
         toast({
           title: "Recepción registrada",
-          description: "La recepción se ha registrado y el remito se ha generado",
+          description: "La recepción se ha registrado, el stock se ha actualizado y el remito se ha generado",
         })
 
         // Redirigir a la vista del pedido

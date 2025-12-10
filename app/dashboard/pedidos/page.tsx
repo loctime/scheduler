@@ -584,35 +584,57 @@ export default function PedidosPage() {
 
       if (!recepcion) return
 
-      // Actualizar stock: sumar cantidad recibida menos devoluciones
+      // Actualizar stock: sumar cantidad recibida
       if (db && recepcion.productos) {
-        const stockUpdates: Promise<void>[] = []
-        
         for (const productoRecepcion of recepcion.productos) {
-          const cantidadDevolucion = productoRecepcion.cantidadDevolucion || 0
-          // Stock a sumar = cantidad recibida - cantidad a devolver
-          const cantidadASumar = productoRecepcion.cantidadRecibida - cantidadDevolucion
-          
-          if (cantidadASumar > 0) {
-            const stockDocId = `${user.uid}_${productoRecepcion.productoId}`
-            const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
-            
-            // Obtener stock actual
-            const stockDoc = await getDoc(stockDocRef)
-            const stockActual = stockDoc.exists() ? stockDoc.data().cantidad || 0 : 0
-            const nuevoStock = stockActual + cantidadASumar
-            
-            // Actualizar stock
-            await setDoc(stockDocRef, {
-              productoId: productoRecepcion.productoId,
-              pedidoId: selectedPedido.id,
-              cantidad: nuevoStock,
-              ultimaActualizacion: serverTimestamp(),
-              userId: user.uid,
-            }, { merge: true })
-            
-            // Actualizar estado local
-            setStockActual(prev => ({ ...prev, [productoRecepcion.productoId]: nuevoStock }))
+          // Sumar la cantidad recibida al stock
+          if (productoRecepcion.cantidadRecibida > 0) {
+            try {
+              const stockDocId = `${user.uid}_${productoRecepcion.productoId}`
+              const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
+              
+              // Intentar actualizar usando transacción o incremento
+              // Primero intentar actualizar (si existe)
+              try {
+                const stockDoc = await getDoc(stockDocRef)
+                if (stockDoc.exists()) {
+                  const stockActual = stockDoc.data().cantidad || 0
+                  const nuevoStock = stockActual + productoRecepcion.cantidadRecibida
+                  await updateDoc(stockDocRef, {
+                    cantidad: nuevoStock,
+                    ultimaActualizacion: serverTimestamp(),
+                  })
+                  setStockActual(prev => ({ ...prev, [productoRecepcion.productoId]: nuevoStock }))
+                } else {
+                  // Crear nuevo documento
+                  await setDoc(stockDocRef, {
+                    productoId: productoRecepcion.productoId,
+                    pedidoId: selectedPedido.id,
+                    cantidad: productoRecepcion.cantidadRecibida,
+                    ultimaActualizacion: serverTimestamp(),
+                    userId: user.uid,
+                  })
+                  setStockActual(prev => ({ ...prev, [productoRecepcion.productoId]: productoRecepcion.cantidadRecibida }))
+                }
+              } catch (error: any) {
+                // Si falla la lectura o actualización, intentar crear directamente
+                if (error?.code === 'permission-denied' || error?.code === 'not-found') {
+                  await setDoc(stockDocRef, {
+                    productoId: productoRecepcion.productoId,
+                    pedidoId: selectedPedido.id,
+                    cantidad: productoRecepcion.cantidadRecibida,
+                    ultimaActualizacion: serverTimestamp(),
+                    userId: user.uid,
+                  })
+                  setStockActual(prev => ({ ...prev, [productoRecepcion.productoId]: productoRecepcion.cantidadRecibida }))
+                } else {
+                  throw error
+                }
+              }
+            } catch (stockError) {
+              console.error("Error al actualizar stock para producto:", productoRecepcion.productoId, stockError)
+              // Continuar con otros productos aunque falle uno
+            }
           }
         }
       }

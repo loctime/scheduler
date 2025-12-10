@@ -224,14 +224,25 @@ match /apps/horarios/stock_movimientos/{movimientoId} {
 // Colección: apps/horarios/stock_actual
 match /apps/horarios/stock_actual/{stockId} {
   // Solo el dueño puede leer su stock (stockId = {userId}_{productoId})
-  allow read: if isAuth() && resource.data.userId == uid();
-  // Crear: verificar que userId sea correcto
-  allow create: if isAuth() && request.resource.data.userId == uid();
+  // Permitir lectura si el stockId comienza con el userId del usuario
+  // o si el documento existe y el userId coincide
+  allow read: if isAuth() && (
+    stockId.matches(uid() + '_.*')
+    || (resource.data != null && resource.data.userId == uid())
+  );
+  // Crear: verificar que userId sea correcto y que el stockId comience con el userId
+  allow create: if isAuth() 
+    && request.resource.data.userId == uid()
+    && stockId.matches(uid() + '_.*');
   // Actualizar: verificar propiedad y proteger userId
-  allow update: if isAuth() && resource.data.userId == uid()
+  allow update: if isAuth() 
+    && stockId.matches(uid() + '_.*')
+    && resource.data.userId == uid()
     && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId);
   // Eliminar: solo el dueño
-  allow delete: if isAuth() && resource.data.userId == uid();
+  allow delete: if isAuth() 
+    && stockId.matches(uid() + '_.*')
+    && resource.data.userId == uid();
 }
 
 // Colección: apps/horarios/remitos
