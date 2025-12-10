@@ -566,6 +566,39 @@ export default function PedidosPage() {
 
       if (!recepcion) return
 
+      // Actualizar stock: sumar cantidad recibida menos devoluciones
+      if (db && recepcion.productos) {
+        const stockUpdates: Promise<void>[] = []
+        
+        for (const productoRecepcion of recepcion.productos) {
+          const cantidadDevolucion = productoRecepcion.cantidadDevolucion || 0
+          // Stock a sumar = cantidad recibida - cantidad a devolver
+          const cantidadASumar = productoRecepcion.cantidadRecibida - cantidadDevolucion
+          
+          if (cantidadASumar > 0) {
+            const stockDocId = `${user.uid}_${productoRecepcion.productoId}`
+            const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
+            
+            // Obtener stock actual
+            const stockDoc = await getDoc(stockDocRef)
+            const stockActual = stockDoc.exists() ? stockDoc.data().cantidad || 0 : 0
+            const nuevoStock = stockActual + cantidadASumar
+            
+            // Actualizar stock
+            await setDoc(stockDocRef, {
+              productoId: productoRecepcion.productoId,
+              pedidoId: selectedPedido.id,
+              cantidad: nuevoStock,
+              ultimaActualizacion: serverTimestamp(),
+              userId: user.uid,
+            }, { merge: true })
+            
+            // Actualizar estado local
+            setStockActual(prev => ({ ...prev, [productoRecepcion.productoId]: nuevoStock }))
+          }
+        }
+      }
+
       // Buscar remitos anteriores (pedido y envío) para consolidar
       const remitosAnteriores = await obtenerRemitosPorPedido(selectedPedido.id)
       const remitoPedido = remitosAnteriores.find(r => r.tipo === "pedido") || null
@@ -604,17 +637,17 @@ export default function PedidosPage() {
 
         toast({
           title: "Recepción registrada",
-          description: "La recepción se ha registrado y el remito se ha generado",
+          description: "La recepción se ha registrado, el stock se ha actualizado y el remito se ha generado",
         })
 
         // Cambiar a la pestaña de remitos para ver el nuevo remito
         setActiveTab("remitos")
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al confirmar recepción:", error)
       toast({
         title: "Error",
-        description: "No se pudo registrar la recepción",
+        description: error?.message || "No se pudo registrar la recepción",
         variant: "destructive",
       })
     } finally {

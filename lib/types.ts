@@ -300,6 +300,7 @@ export interface Recepcion {
     estado: "ok" | "danado" | "vencido" | "faltante"
     observaciones?: string
     esDevolucion?: boolean // Si se devuelve a la fábrica
+    cantidadDevolucion?: number // Cantidad a devolver (faltante o excedente)
   }>
   esParcial: boolean
   completada: boolean

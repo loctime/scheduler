@@ -26,11 +26,34 @@ export function useRecepciones(user: any) {
 
     setLoading(true)
     try {
+      // Limpiar productos: eliminar campos undefined
+      const productosLimpios = recepcionData.productos.map((producto: any) => {
+        const productoLimpio: any = {
+          productoId: producto.productoId,
+          productoNombre: producto.productoNombre,
+          cantidadEnviada: producto.cantidadEnviada,
+          cantidadRecibida: producto.cantidadRecibida,
+          estado: producto.estado || "ok",
+          esDevolucion: producto.esDevolucion || false,
+        }
+        
+        // Solo incluir campos opcionales si tienen valor
+        if (producto.cantidadDevolucion !== undefined && producto.cantidadDevolucion > 0) {
+          productoLimpio.cantidadDevolucion = producto.cantidadDevolucion
+        }
+        
+        if (producto.observaciones && producto.observaciones.trim()) {
+          productoLimpio.observaciones = producto.observaciones.trim()
+        }
+        
+        return productoLimpio
+      })
+      
       // Filtrar campos undefined antes de enviar a Firestore
       const recepcionDataLimpio: any = {
         pedidoId: recepcionData.pedidoId,
         fecha: recepcionData.fecha || serverTimestamp(),
-        productos: recepcionData.productos,
+        productos: productosLimpios,
         esParcial: recepcionData.esParcial || false,
         completada: recepcionData.completada !== undefined ? recepcionData.completada : true,
         userId: user.uid,
