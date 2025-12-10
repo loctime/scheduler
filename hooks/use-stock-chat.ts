@@ -178,6 +178,16 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
           })
         : productosData
       
+      // Ordenar por orden, y si tienen el mismo orden, alfabéticamente (igual que en pedidos)
+      productosFiltrados.sort((a, b) => {
+        const ordenA = a.orden ?? 0
+        const ordenB = b.orden ?? 0
+        if (ordenA !== ordenB) {
+          return ordenA - ordenB
+        }
+        return a.nombre.localeCompare(b.nombre)
+      })
+      
       setProductos(productosFiltrados)
       setLoadingStock(false)
     })
