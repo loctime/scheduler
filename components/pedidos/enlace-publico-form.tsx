@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Package, Check } from "lucide-react"
+import { Package, Check, Plus, Minus } from "lucide-react"
 import type { Producto, EnlacePublico } from "@/lib/types"
 
 interface EnlacePublicoFormProps {
@@ -30,11 +30,33 @@ export function EnlacePublicoForm({
   const [productosDisponiblesOriginales, setProductosDisponiblesOriginales] = useState<
     Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string; completo?: boolean; listo?: boolean }>
   >(enlacePublico?.productosDisponibles || {})
+  const [observacionesHabilitadas, setObservacionesHabilitadas] = useState<Record<string, boolean>>(
+    () => {
+      const initial: Record<string, boolean> = {}
+      const productos = enlacePublico?.productosDisponibles
+      if (productos) {
+        Object.keys(productos).forEach((key) => {
+          if (productos[key]?.observaciones) {
+            initial[key] = true
+          }
+        })
+      }
+      return initial
+    }
+  )
 
   useEffect(() => {
-    if (enlacePublico?.productosDisponibles) {
-      setProductosDisponibles(enlacePublico.productosDisponibles)
-      setProductosDisponiblesOriginales(enlacePublico.productosDisponibles)
+    const productos = enlacePublico?.productosDisponibles
+    if (productos) {
+      setProductosDisponibles(productos)
+      setProductosDisponiblesOriginales(productos)
+      const habilitadas: Record<string, boolean> = {}
+      Object.keys(productos).forEach((key) => {
+        if (productos[key]?.observaciones) {
+          habilitadas[key] = true
+        }
+      })
+      setObservacionesHabilitadas(habilitadas)
     }
   }, [enlacePublico])
 
@@ -61,8 +83,8 @@ export function EnlacePublicoForm({
       ...prev,
       [productoId]: {
         ...prev[productoId],
-        disponible: true,
-        cantidadEnviada: cantidad > 0 ? cantidad : undefined,
+        disponible: cantidad > 0,
+        cantidadEnviada: cantidad >= 0 ? cantidad : undefined,
         completo: undefined,
         listo: cantidad > 0 ? prev[productoId]?.listo : undefined,
       },
@@ -103,6 +125,34 @@ export function EnlacePublicoForm({
         completo: prev[productoId]?.listo ? prev[productoId]?.completo : undefined,
       },
     }))
+  }
+
+  const incrementarCantidad = (productoId: string) => {
+    const productoData = productosDisponibles[productoId] || {}
+    const cantidadActual = productoData.cantidadEnviada !== undefined ? productoData.cantidadEnviada : 0
+    updateCantidadEnviada(productoId, cantidadActual + 1)
+  }
+
+  const decrementarCantidad = (productoId: string) => {
+    const productoData = productosDisponibles[productoId] || {}
+    const cantidadActual = productoData.cantidadEnviada !== undefined ? productoData.cantidadEnviada : 0
+    if (cantidadActual > 0) {
+      updateCantidadEnviada(productoId, cantidadActual - 1)
+    }
+  }
+
+  const toggleObservacionesHabilitadas = (productoId: string) => {
+    setObservacionesHabilitadas((prev) => {
+      const nuevoEstado = !prev[productoId]
+      if (!nuevoEstado) {
+        // Si se deshabilita, limpiar las observaciones
+        updateObservaciones(productoId, "")
+      }
+      return {
+        ...prev,
+        [productoId]: nuevoEstado,
+      }
+    })
   }
 
   return (
@@ -180,33 +230,64 @@ export function EnlacePublicoForm({
                       <Label htmlFor={`cantidad-${producto.id}`} className="text-xs sm:text-sm">
                         Cantidad a enviar
                       </Label>
-                      <Input
-                        id={`cantidad-${producto.id}`}
-                        type="number"
-                        min="0"
-                        value={productoData.cantidadEnviada !== undefined ? productoData.cantidadEnviada : cantidadPedida}
-                        onChange={(e) => {
-                          const valor = e.target.value === "" ? 0 : parseInt(e.target.value) || 0
-                          updateCantidadEnviada(producto.id, valor)
-                        }}
-                        placeholder={cantidadPedida.toString()}
-                        className="text-sm"
-                      />
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 shrink-0"
+                          onClick={() => decrementarCantidad(producto.id)}
+                          disabled={(productoData.cantidadEnviada !== undefined ? productoData.cantidadEnviada : 0) === 0}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <Input
+                          id={`cantidad-${producto.id}`}
+                          type="number"
+                          min="0"
+                          value={productoData.cantidadEnviada !== undefined ? productoData.cantidadEnviada : 0}
+                          onChange={(e) => {
+                            const valor = e.target.value === "" ? 0 : parseInt(e.target.value) || 0
+                            updateCantidadEnviada(producto.id, valor)
+                          }}
+                          placeholder={cantidadPedida.toString()}
+                          className="text-sm text-center"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 shrink-0"
+                          onClick={() => incrementarCantidad(producto.id)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor={`obs-${producto.id}`} className="text-xs sm:text-sm">
-                        Observaciones (opcional)
-                      </Label>
-                      <Textarea
-                        id={`obs-${producto.id}`}
-                        value={productoData.observaciones ?? ""}
-                        onChange={(e) =>
-                          updateObservaciones(producto.id, e.target.value)
-                        }
-                        placeholder="Notas sobre este producto..."
-                        rows={1}
-                        className="text-sm resize-none"
-                      />
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id={`habilitar-obs-${producto.id}`}
+                          checked={!!observacionesHabilitadas[producto.id]}
+                          onCheckedChange={() => toggleObservacionesHabilitadas(producto.id)}
+                          className="h-4 w-4"
+                        />
+                        <Label htmlFor={`habilitar-obs-${producto.id}`} className="text-xs sm:text-sm cursor-pointer">
+                          Observaciones (opcional)
+                        </Label>
+                      </div>
+                      {observacionesHabilitadas[producto.id] && (
+                        <Textarea
+                          id={`obs-${producto.id}`}
+                          value={productoData.observaciones ?? ""}
+                          onChange={(e) =>
+                            updateObservaciones(producto.id, e.target.value)
+                          }
+                          placeholder="Notas sobre este producto..."
+                          rows={1}
+                          className="text-sm resize-none"
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
