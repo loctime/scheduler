@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Package, Check, AlertTriangle } from "lucide-react"
+import { Package, Check, AlertTriangle, Plus, Minus } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { cn } from "@/lib/utils"
 import type { Recepcion } from "@/lib/types"
@@ -43,17 +43,26 @@ export function RecepcionForm({
   
   // Estado para observaciones generales
   const [observacionesGenerales, setObservacionesGenerales] = useState("")
+  
+  // Estado para controlar si el comentario está habilitado
+  const [comentariosHabilitados, setComentariosHabilitados] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     // Inicializar con cantidades enviadas
     const inicial: typeof productosRecepcion = {}
+    const habilitados: Record<string, boolean> = {}
     productosEnviados.forEach((p) => {
       inicial[p.productoId] = {
         cantidadRecibida: p.cantidadEnviada,
         esDevolucion: false,
       }
+      // Si hay observaciones previas, habilitar el comentario
+      if (inicial[p.productoId].observaciones) {
+        habilitados[p.productoId] = true
+      }
     })
     setProductosRecepcion(inicial)
+    setComentariosHabilitados(habilitados)
   }, [productosEnviados])
 
   const updateProducto = (
@@ -81,13 +90,18 @@ export function RecepcionForm({
         }
       }
       
-      // Si se marca devolución, validar que recibido != enviada
+      // Si se marca devolución, validar que recibido != enviada y habilitar comentario
       if (field === "esDevolucion" && value === true) {
         const cantidadRecibida = currentData.cantidadRecibida
         if (cantidadRecibida === producto.cantidadEnviada) {
           // No permitir marcar devolución si recibido = enviada
           return prev
         }
+        // Habilitar comentario automáticamente cuando se marca como devolución
+        setComentariosHabilitados(prev => ({
+          ...prev,
+          [productoId]: true
+        }))
       }
       
       return {
@@ -191,24 +205,41 @@ export function RecepcionForm({
     })
   }
 
+  // Función para incrementar cantidad recibida
+  const incrementarCantidad = (productoId: string) => {
+    const producto = productosEnviados.find(p => p.productoId === productoId)
+    if (!producto) return
+    const data = productosRecepcion[productoId] || { cantidadRecibida: producto.cantidadEnviada }
+    updateProducto(productoId, "cantidadRecibida", data.cantidadRecibida + 1)
+  }
+
+  // Función para decrementar cantidad recibida
+  const decrementarCantidad = (productoId: string) => {
+    const producto = productosEnviados.find(p => p.productoId === productoId)
+    if (!producto) return
+    const data = productosRecepcion[productoId] || { cantidadRecibida: producto.cantidadEnviada }
+    if (data.cantidadRecibida > 0) {
+      updateProducto(productoId, "cantidadRecibida", data.cantidadRecibida - 1)
+    }
+  }
+
   return (
-    <div className="space-y-3 md:space-y-4">
-      {/* Header compacto */}
-      <div className="flex items-center gap-2">
-        <Package className="h-4 w-4 shrink-0" />
-        <h3 className="text-sm font-semibold">
+    <div className="space-y-4">
+      {/* Header */}
+      <div>
+        <h3 className="text-xl font-bold text-foreground mb-1">
           Control de Recepción {esParcial && "(Parcial)"}
         </h3>
         {productosEnviados.length > 0 && (
-          <span className="text-xs text-muted-foreground ml-auto">
+          <p className="text-sm text-muted-foreground">
             {productosEnviados.length} {productosEnviados.length === 1 ? "producto" : "productos"}
-          </span>
+          </p>
         )}
       </div>
 
-      <div className="space-y-2 md:space-y-3">
+      <div className="space-y-4">
         {productosEnviados.length === 0 ? (
-          <div className="text-center py-6 text-sm text-muted-foreground">
+          <div className="text-center py-8 text-sm text-muted-foreground">
             No hay productos para recibir
           </div>
         ) : (
@@ -218,28 +249,50 @@ export function RecepcionForm({
               esDevolucion: false,
             }
 
+            // Determinar el color del recuadro según la cantidad
+            let cardClassName = "rounded-xl border-2 p-4 space-y-4 transition-all "
+            if (data.cantidadRecibida > producto.cantidadEnviada) {
+              // Rojo si recibido > enviado
+              cardClassName += "border-red-500 bg-red-50 dark:bg-red-950/40 shadow-md"
+            } else if (data.cantidadRecibida === producto.cantidadEnviada && data.cantidadRecibida > 0) {
+              // Azul si recibido = enviado
+              cardClassName += "border-blue-500 bg-blue-50 dark:bg-blue-950/40 shadow-md"
+            } else if (data.cantidadRecibida < producto.cantidadEnviada) {
+              // Amarillo si recibido < enviado
+              cardClassName += "border-amber-500 bg-amber-50 dark:bg-amber-950/40 shadow-md"
+            } else {
+              cardClassName += "border-border bg-card shadow-sm hover:shadow-md"
+            }
+
             return (
               <div
                 key={producto.productoId}
-                className="rounded-lg border p-2.5 md:p-3 space-y-2.5 md:space-y-3"
+                className={cardClassName}
               >
-                {/* Nombre del producto y cantidad pedida */}
-                <div className="flex items-center justify-between gap-2">
-                  <Label className="text-sm font-medium truncate flex-1">
-                    {producto.productoNombre}
-                  </Label>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                    Pedida: <span className="font-medium">{producto.cantidadPedida}</span>
-                  </span>
+                {/* Línea superior: Producto • Pedida: X • Enviada: X */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className="text-base font-semibold text-foreground truncate">
+                      {producto.productoNombre}
+                    </span>
+                    <span className="text-muted-foreground">•</span>
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">
+                      Pedida: <span className="font-medium text-foreground">{producto.cantidadPedida}</span>
+                    </span>
+                    <span className="text-muted-foreground">•</span>
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">
+                      Enviada: <span className="font-medium text-foreground">{producto.cantidadEnviada}</span>
+                    </span>
+                  </div>
                 </div>
 
                 {/* Observaciones del envío (si existen) */}
                 {producto.observacionesEnvio && (
-                  <div className="rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-2">
+                  <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 border-2 border-blue-200 dark:border-blue-800 p-3">
                     <div className="flex items-start gap-2">
-                      <Package className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                      <Package className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-blue-900 dark:text-blue-100 mb-0.5">
+                        <p className="text-xs font-medium text-blue-900 dark:text-blue-100 mb-1">
                           Comentario del envío:
                         </p>
                         <p className="text-xs text-blue-800 dark:text-blue-200 whitespace-pre-wrap break-words">
@@ -250,25 +303,22 @@ export function RecepcionForm({
                   </div>
                 )}
 
-                {/* Enviada y Recibido en la misma línea - Mobile First */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label htmlFor={`enviada-${producto.productoId}`} className="text-xs">
-                      Enviada
-                    </Label>
-                    <Input
-                      id={`enviada-${producto.productoId}`}
-                      type="number"
-                      value={producto.cantidadEnviada}
-                      disabled
-                      className="bg-muted text-sm h-9"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor={`cantidad-${producto.productoId}`} className="text-xs">
-                      Recibido
-                    </Label>
+                {/* Campo numérico con botones para Recibido */}
+                <div>
+                  <Label htmlFor={`cantidad-${producto.productoId}`} className="text-sm font-medium text-foreground mb-2 block">
+                    Cantidad recibida
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-12 w-12 shrink-0 border-2 hover:bg-muted"
+                      onClick={() => decrementarCantidad(producto.productoId)}
+                      disabled={data.cantidadRecibida === 0}
+                    >
+                      <Minus className="h-5 w-5" />
+                    </Button>
                     <Input
                       id={`cantidad-${producto.productoId}`}
                       type="number"
@@ -281,62 +331,98 @@ export function RecepcionForm({
                           parseInt(e.target.value) || 0
                         )
                       }
-                      className="text-sm h-9"
+                      className="text-lg font-semibold text-center h-12 border-2 flex-1"
                     />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-12 w-12 shrink-0 border-2 hover:bg-muted"
+                      onClick={() => incrementarCantidad(producto.productoId)}
+                    >
+                      <Plus className="h-5 w-5" />
+                    </Button>
                   </div>
                 </div>
 
-                {/* Comentario */}
-                <div className="space-y-1">
-                  <Label htmlFor={`obs-${producto.productoId}`} className="text-xs">
-                    Comentario
-                  </Label>
-                  <Textarea
-                    id={`obs-${producto.productoId}`}
-                    value={data.observaciones || ""}
-                    onChange={(e) =>
-                      updateProducto(
-                        producto.productoId,
-                        "observaciones",
-                        e.target.value
-                      )
-                    }
-                    placeholder={data.esDevolucion ? "Comentario obligatorio para devolución..." : "Nota breve..."}
-                    rows={2}
-                    className={cn(
-                      "text-sm resize-none",
-                      data.esDevolucion && !data.observaciones?.trim() && "border-amber-500 focus:border-amber-500"
-                    )}
-                    required={data.esDevolucion}
-                  />
-                </div>
-
-                {/* Información de devolución y advertencias */}
+                {/* Información de diferencia */}
                 {data.cantidadRecibida !== producto.cantidadEnviada && (
-                  <div className="space-y-1.5 pt-1">
+                  <div className="rounded-lg border-2 p-2.5">
                     {data.cantidadRecibida < producto.cantidadEnviada && (
-                      <Alert className="py-2">
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                        <AlertDescription className="text-xs">
-                          Faltan {producto.cantidadEnviada - data.cantidadRecibida} unidades. 
-                          {data.esDevolucion && " Se devolverán las unidades faltantes."}
-                        </AlertDescription>
-                      </Alert>
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <p className="text-xs text-foreground">
+                          Faltan <span className="font-semibold">{producto.cantidadEnviada - data.cantidadRecibida}</span> unidades
+                          {data.esDevolucion && " • Se devolverán las unidades faltantes"}
+                        </p>
+                      </div>
                     )}
                     {data.cantidadRecibida > producto.cantidadEnviada && (
-                      <Alert className="py-2 border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
-                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                        <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
-                          Excedente de {data.cantidadRecibida - producto.cantidadEnviada} unidades.
-                          {data.esDevolucion && " Se devolverán los productos excedentes (no se sumarán al stock)."}
-                        </AlertDescription>
-                      </Alert>
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0" />
+                        <p className="text-xs text-foreground">
+                          Excedente de <span className="font-semibold">{data.cantidadRecibida - producto.cantidadEnviada}</span> unidades
+                          {data.esDevolucion && " • Se devolverán los productos excedentes"}
+                        </p>
+                      </div>
                     )}
                   </div>
                 )}
 
+                {/* Checkbox de comentario */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Checkbox
+                      id={`habilitar-obs-${producto.productoId}`}
+                      checked={comentariosHabilitados[producto.productoId] || data.esDevolucion}
+                      onCheckedChange={(checked) => {
+                        if (data.esDevolucion) return // No permitir desmarcar si es devolución
+                        const isChecked = checked === true
+                        setComentariosHabilitados(prev => ({
+                          ...prev,
+                          [producto.productoId]: isChecked
+                        }))
+                        if (!isChecked) {
+                          updateProducto(producto.productoId, "observaciones", "")
+                        }
+                      }}
+                      disabled={data.esDevolucion}
+                      className="h-4 w-4"
+                    />
+                    <Label htmlFor={`habilitar-obs-${producto.productoId}`} className="text-sm font-medium text-foreground cursor-pointer">
+                      Agregar comentario
+                      {data.esDevolucion && " *"}
+                    </Label>
+                  </div>
+                  {(comentariosHabilitados[producto.productoId] || data.esDevolucion) && (
+                    <Textarea
+                      id={`obs-${producto.productoId}`}
+                      value={data.observaciones || ""}
+                      onChange={(e) =>
+                        updateProducto(
+                          producto.productoId,
+                          "observaciones",
+                          e.target.value
+                        )
+                      }
+                      placeholder={data.esDevolucion ? "Comentario obligatorio para devolución..." : "Escribe un comentario..."}
+                      rows={2}
+                      className={cn(
+                        "text-sm resize-none border-2",
+                        data.esDevolucion && !data.observaciones?.trim() && "border-amber-500 focus:border-amber-500"
+                      )}
+                      required={data.esDevolucion}
+                    />
+                  )}
+                  {data.esDevolucion && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-1">
+                      * Comentario obligatorio para devoluciones
+                    </p>
+                  )}
+                </div>
+
                 {/* Checkbox de devolución */}
-                <div className="flex items-center gap-2 pt-0.5">
+                <div className="flex items-center gap-2 pt-1 border-t">
                   <Checkbox
                     id={`devolucion-${producto.productoId}`}
                     checked={data.esDevolucion}
@@ -348,25 +434,18 @@ export function RecepcionForm({
                         checked
                       )
                     }
+                    className="h-4 w-4"
                   />
                   <Label 
                     htmlFor={`devolucion-${producto.productoId}`}
                     className={cn(
-                      "text-xs cursor-pointer",
+                      "text-sm font-medium cursor-pointer",
                       !puedeMarcarDevolucion(producto, data) && "text-muted-foreground cursor-not-allowed"
                     )}
                   >
                     Marcar como devolución
-                    {data.esDevolucion && " *"}
                   </Label>
                 </div>
-                
-                {/* Mensaje de comentario obligatorio */}
-                {data.esDevolucion && (
-                  <div className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                    * Comentario obligatorio para devoluciones
-                  </div>
-                )}
               </div>
             )
           })
@@ -374,9 +453,9 @@ export function RecepcionForm({
       </div>
 
       {/* Observaciones generales */}
-      <div className="space-y-3 md:space-y-4 pt-3 border-t">
+      <div className="space-y-3 pt-3 border-t-2">
         <div className="space-y-1">
-          <Label htmlFor="observaciones-generales" className="text-xs">
+          <Label htmlFor="observaciones-generales" className="text-sm font-medium text-foreground">
             Observaciones Generales
           </Label>
           <Textarea
@@ -385,24 +464,25 @@ export function RecepcionForm({
             onChange={(e) => setObservacionesGenerales(e.target.value)}
             placeholder="Observaciones adicionales sobre la recepción..."
             rows={3}
-            className="text-sm resize-none"
+            className="text-sm resize-none border-2"
           />
         </div>
       </div>
 
-      {/* Botón de confirmación - Mobile First */}
-      <div className="flex justify-end gap-2 pt-3 border-t">
+      {/* Botón de confirmación */}
+      <div className="sticky bottom-0 pt-4 pb-2 bg-background border-t-2 mt-6">
         <Button
           onClick={handleConfirmar}
           disabled={loading}
-          className="w-full md:w-auto min-w-[140px] h-10"
+          className="w-full h-12 text-base font-semibold shadow-lg"
+          size="lg"
         >
           {loading ? (
             "Registrando..."
           ) : (
             <>
-              <Check className="h-4 w-4 mr-1.5" />
-              <span>Confirmar Recepción</span>
+              <Check className="h-5 w-5 mr-2" />
+              Confirmar Recepción
             </>
           )}
         </Button>
