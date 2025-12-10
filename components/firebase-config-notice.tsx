@@ -51,9 +51,9 @@ export function FirebaseConfigNotice() {
             </div>
 
             <div>
-              <h3 className="font-semibold mb-2">Paso 4: Configurar Variables en v0</h3>
+              <h3 className="font-semibold mb-2">Paso 4: Configurar Variables de Entorno</h3>
               <p className="text-sm text-muted-foreground mb-3">
-                En el sidebar izquierdo de v0, ve a <strong>Vars</strong> y agrega las siguientes variables:
+                Crea un archivo <strong>.env.local</strong> en la raíz del proyecto y agrega las siguientes variables:
               </p>
               <div className="bg-muted p-4 rounded-lg text-sm font-mono space-y-1">
                 <div>NEXT_PUBLIC_FIREBASE_API_KEY</div>

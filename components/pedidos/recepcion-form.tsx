@@ -6,9 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Package, Check, X, Minus } from "lucide-react"
-import { cn } from "@/lib/utils"
-import type { Recepcion, EnlacePublico } from "@/lib/types"
+import { Package, Check } from "lucide-react"
+import type { Recepcion } from "@/lib/types"
 
 interface RecepcionFormProps {
   productosEnviados: Array<{
@@ -33,7 +32,6 @@ export function RecepcionForm({
       string,
       {
         cantidadRecibida: number
-        estado: "ok" | "danado" | "vencido" | "faltante"
         observaciones?: string
         esDevolucion?: boolean
       }
@@ -46,7 +44,6 @@ export function RecepcionForm({
     productosEnviados.forEach((p) => {
       inicial[p.productoId] = {
         cantidadRecibida: p.cantidadEnviada,
-        estado: "ok",
         esDevolucion: false,
       }
     })
@@ -71,7 +68,6 @@ export function RecepcionForm({
     const productos = productosEnviados.map((p) => {
       const data = productosRecepcion[p.productoId] || {
         cantidadRecibida: p.cantidadEnviada,
-        estado: "ok" as const,
         esDevolucion: false,
       }
       // Construir objeto de producto, eliminando campos undefined
@@ -80,7 +76,7 @@ export function RecepcionForm({
         productoNombre: p.productoNombre,
         cantidadEnviada: p.cantidadEnviada,
         cantidadRecibida: data.cantidadRecibida,
-        estado: data.estado,
+        estado: "ok", // Siempre "ok" por defecto
         esDevolucion: data.esDevolucion || false,
       }
       // Solo incluir observaciones si tiene valor
@@ -100,58 +96,52 @@ export function RecepcionForm({
     })
   }
 
-  console.log("RecepcionForm - productosEnviados:", productosEnviados)
-  console.log("RecepcionForm - cantidad de productos:", productosEnviados.length)
-
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="space-y-3 sm:space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-2">
-          <div className="flex items-center gap-2">
-            <Package className="h-4 w-4 sm:h-5 sm:w-5" />
-            <h3 className="text-base sm:text-lg font-semibold">
-              Control de Recepción {esParcial && "(Parcial)"}
-            </h3>
-          </div>
-          {productosEnviados.length > 0 && (
-            <span className="text-xs sm:text-sm text-muted-foreground">
-              ({productosEnviados.length} {productosEnviados.length === 1 ? "producto" : "productos"})
-            </span>
-          )}
-        </div>
+    <div className="space-y-3 md:space-y-4">
+      {/* Header compacto */}
+      <div className="flex items-center gap-2">
+        <Package className="h-4 w-4 shrink-0" />
+        <h3 className="text-sm font-semibold">
+          Control de Recepción {esParcial && "(Parcial)"}
+        </h3>
+        {productosEnviados.length > 0 && (
+          <span className="text-xs text-muted-foreground ml-auto">
+            {productosEnviados.length} {productosEnviados.length === 1 ? "producto" : "productos"}
+          </span>
+        )}
+      </div>
 
-        <div className="space-y-3 sm:space-y-4">
-          {productosEnviados.length === 0 ? (
-            <div className="text-center py-6 sm:py-8 text-sm sm:text-base text-muted-foreground">
-              No hay productos para recibir
-            </div>
-          ) : (
-            productosEnviados.map((producto) => {
+      <div className="space-y-2 md:space-y-3">
+        {productosEnviados.length === 0 ? (
+          <div className="text-center py-6 text-sm text-muted-foreground">
+            No hay productos para recibir
+          </div>
+        ) : (
+          productosEnviados.map((producto) => {
             const data = productosRecepcion[producto.productoId] || {
               cantidadRecibida: producto.cantidadEnviada,
-              estado: "ok" as const,
               esDevolucion: false,
             }
 
             return (
               <div
                 key={producto.productoId}
-                className="rounded-lg border p-3 sm:p-4 space-y-3 sm:space-y-4"
+                className="rounded-lg border p-2.5 md:p-3 space-y-2.5 md:space-y-3"
               >
-                {/* Nombre y cantidad pedida en la misma línea */}
+                {/* Nombre del producto y cantidad pedida */}
                 <div className="flex items-center justify-between gap-2">
-                  <Label className="text-base sm:text-lg font-medium truncate">
+                  <Label className="text-sm font-medium truncate flex-1">
                     {producto.productoNombre}
                   </Label>
-                  <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
-                    <span className="font-medium">Pedida:</span> {producto.cantidadPedida}
+                  <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                    Pedida: <span className="font-medium">{producto.cantidadPedida}</span>
                   </span>
                 </div>
 
-                {/* Enviada, recibida, comentario y estado: mobile-first sin scroll horizontal */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-[120px_120px_1fr_auto] gap-3 sm:gap-4 items-start">
+                {/* Enviada y Recibido en la misma línea - Mobile First */}
+                <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <Label htmlFor={`enviada-${producto.productoId}`} className="text-xs sm:text-sm">
+                    <Label htmlFor={`enviada-${producto.productoId}`} className="text-xs">
                       Enviada
                     </Label>
                     <Input
@@ -159,12 +149,12 @@ export function RecepcionForm({
                       type="number"
                       value={producto.cantidadEnviada}
                       disabled
-                      className="bg-muted text-sm"
+                      className="bg-muted text-sm h-9"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <Label htmlFor={`cantidad-${producto.productoId}`} className="text-xs sm:text-sm">
+                    <Label htmlFor={`cantidad-${producto.productoId}`} className="text-xs">
                       Recibido
                     </Label>
                     <Input
@@ -179,78 +169,34 @@ export function RecepcionForm({
                           parseInt(e.target.value) || 0
                         )
                       }
-                      className="text-sm"
+                      className="text-sm h-9"
                     />
-                  </div>
-
-                  <div className="space-y-1 sm:col-span-2 md:col-span-1">
-                    <Label htmlFor={`obs-${producto.productoId}`} className="text-xs sm:text-sm">
-                      Comentario
-                    </Label>
-                    <Textarea
-                      id={`obs-${producto.productoId}`}
-                      value={data.observaciones || ""}
-                      onChange={(e) =>
-                        updateProducto(
-                          producto.productoId,
-                          "observaciones",
-                          e.target.value
-                        )
-                      }
-                      placeholder="Nota breve..."
-                      rows={1}
-                      className="text-sm resize-none"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs sm:text-sm block mb-1.5">Estado</Label>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant={data.estado === "ok" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => updateProducto(producto.productoId, "estado", "ok")}
-                        className={cn(
-                          "flex-1 sm:flex-initial min-w-[44px] h-9 sm:h-10",
-                          data.estado === "ok" && "bg-green-600 hover:bg-green-700 text-white"
-                        )}
-                        aria-label="Estado OK"
-                      >
-                        <Check className="h-4 w-4 sm:h-5 sm:w-5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={data.estado === "danado" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => updateProducto(producto.productoId, "estado", "danado")}
-                        className={cn(
-                          "flex-1 sm:flex-initial min-w-[44px] h-9 sm:h-10",
-                          data.estado === "danado" && "bg-red-600 hover:bg-red-700 text-white"
-                        )}
-                        aria-label="Estado con error"
-                      >
-                        <X className="h-4 w-4 sm:h-5 sm:w-5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={data.estado === "faltante" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => updateProducto(producto.productoId, "estado", "faltante")}
-                        className={cn(
-                          "flex-1 sm:flex-initial min-w-[44px] h-9 sm:h-10",
-                          data.estado === "faltante" && "bg-yellow-600 hover:bg-yellow-700 text-white"
-                        )}
-                        aria-label="Estado parcial"
-                      >
-                        <Minus className="h-4 w-4 sm:h-5 sm:w-5" />
-                      </Button>
-                    </div>
                   </div>
                 </div>
 
+                {/* Comentario */}
+                <div className="space-y-1">
+                  <Label htmlFor={`obs-${producto.productoId}`} className="text-xs">
+                    Comentario
+                  </Label>
+                  <Textarea
+                    id={`obs-${producto.productoId}`}
+                    value={data.observaciones || ""}
+                    onChange={(e) =>
+                      updateProducto(
+                        producto.productoId,
+                        "observaciones",
+                        e.target.value
+                      )
+                    }
+                    placeholder="Nota breve..."
+                    rows={2}
+                    className="text-sm resize-none"
+                  />
+                </div>
+
                 {/* Checkbox de devolución */}
-                <div className="flex items-center gap-2 pt-1">
+                <div className="flex items-center gap-2 pt-0.5">
                   <Checkbox
                     id={`devolucion-${producto.productoId}`}
                     checked={data.esDevolucion}
@@ -264,31 +210,30 @@ export function RecepcionForm({
                   />
                   <Label 
                     htmlFor={`devolucion-${producto.productoId}`}
-                    className="text-xs sm:text-sm cursor-pointer"
+                    className="text-xs cursor-pointer"
                   >
                     Marcar como devolución
                   </Label>
                 </div>
               </div>
             )
-            })
-          )}
-        </div>
+          })
+        )}
       </div>
 
-      <div className="flex justify-end gap-2 pt-4 border-t">
+      {/* Botón de confirmación - Mobile First */}
+      <div className="flex justify-end gap-2 pt-3 border-t">
         <Button
           onClick={handleConfirmar}
           disabled={loading}
-          className="w-full sm:w-auto min-w-[150px]"
+          className="w-full md:w-auto min-w-[140px] h-10"
         >
           {loading ? (
             "Registrando..."
           ) : (
             <>
-              <Check className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Confirmar Recepción</span>
-              <span className="sm:hidden">Confirmar</span>
+              <Check className="h-4 w-4 mr-1.5" />
+              <span>Confirmar Recepción</span>
             </>
           )}
         </Button>

@@ -67,7 +67,7 @@ const firebaseConfig = {
 
 ## Paso 5: Configurar Variables de Entorno
 
-En v0, ve a la sección **Vars** en el sidebar y agrega:
+Crea un archivo `.env.local` en la raíz del proyecto y agrega:
 
 \`\`\`
 NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX

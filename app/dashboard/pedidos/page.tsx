@@ -20,10 +20,11 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import { doc, setDoc, serverTimestamp, getDoc, updateDoc, deleteDoc } from "firebase/firestore"
 import type { Remito, Recepcion } from "@/lib/types"
 import { PedidoTimeline } from "@/components/pedidos/pedido-timeline"
-import { crearRemitoPedido } from "@/lib/remito-utils"
+import { crearRemitoPedido, crearRemitoRecepcion } from "@/lib/remito-utils"
 import Link from "next/link"
 import { PedidosSidebar } from "@/components/pedidos/pedidos-sidebar"
 import { ProductosTable } from "@/components/pedidos/productos-table"
+import { RecepcionForm } from "@/components/pedidos/recepcion-form"
 import { 
   PedidoFormDialog, 
   ImportDialog, 
@@ -74,8 +75,8 @@ export default function PedidosPage() {
   } = usePedidos(user)
 
   const { crearEnlacePublico, buscarEnlacesActivosPorPedido, obtenerEnlacePublico, loading: loadingEnlace } = useEnlacePublico(user)
-  const { crearRemito, obtenerRemitosPorPedido, descargarPDFRemito } = useRemitos(user)
-  const { obtenerRecepcionesPorPedido } = useRecepciones(user)
+  const { crearRemito, obtenerRemitosPorPedido, descargarPDFRemito, obtenerRemito } = useRemitos(user)
+  const { obtenerRecepcionesPorPedido, crearRecepcion } = useRecepciones(user)
   
   // Función para reiniciar pedido (eliminar remito de envío y volver a estado "creado")
   const reiniciarPedido = async () => {
@@ -140,6 +141,16 @@ export default function PedidosPage() {
   // Estado para enlace público activo
   const [enlaceActivo, setEnlaceActivo] = useState<{ id: string } | null>(null)
   
+  // Estado para recepción
+  const [productosEnviados, setProductosEnviados] = useState<Array<{
+    productoId: string
+    productoNombre: string
+    cantidadPedida: number
+    cantidadEnviada: number
+  }>>([])
+  const [observacionesRemito, setObservacionesRemito] = useState<string | null>(null)
+  const [loadingRecepcion, setLoadingRecepcion] = useState(false)
+  
   // Mejorar la lógica de merge: los cambios locales tienen prioridad sobre los globales
   // Esto evita que el listener de Firestore sobrescriba los cambios del usuario
   const stockActual = useMemo(() => {
@@ -199,7 +210,7 @@ export default function PedidosPage() {
   const mensajeInputRef = useRef<HTMLInputElement>(null)
   
   // Tab state
-  const [activeTab, setActiveTab] = useState<"productos" | "remitos">("productos")
+  const [activeTab, setActiveTab] = useState<"productos" | "remitos" | "recepcion">("productos")
 
   // Focus input when entering edit mode
   useEffect(() => {
@@ -228,6 +239,114 @@ export default function PedidosPage() {
       setEditingMensaje(selectedPedido.mensajePrevio || "")
     }
   }, [selectedPedido])
+
+  // Cargar datos de recepción cuando se selecciona la pestaña de recepción
+  useEffect(() => {
+    const cargarDatosRecepcion = async () => {
+      if (activeTab !== "recepcion" || !selectedPedido?.id) {
+        setProductosEnviados([])
+        setObservacionesRemito(null)
+        return
+      }
+
+      if (!db) return
+
+      setLoadingRecepcion(true)
+      try {
+        // Obtener productos enviados desde el remito de envío (si el pedido está en estado "enviado")
+        if (selectedPedido.estado === "enviado" || selectedPedido.estado === "recibido") {
+          let remitoEnvio = null
+          if (selectedPedido.remitoEnvioId) {
+            remitoEnvio = await obtenerRemito(selectedPedido.remitoEnvioId)
+          }
+          
+          // Si no se encontró por ID, buscar en todos los remitos del pedido
+          if (!remitoEnvio || !remitoEnvio.productos || remitoEnvio.productos.length === 0) {
+            const remitos = await obtenerRemitosPorPedido(selectedPedido.id)
+            
+            if (selectedPedido.remitoEnvioId) {
+              remitoEnvio = remitos.find(r => r.id === selectedPedido.remitoEnvioId && r.tipo === "envio")
+            }
+            
+            if (!remitoEnvio) {
+              remitoEnvio = remitos.find(r => r.tipo === "envio")
+            }
+          }
+          
+          if (remitoEnvio && remitoEnvio.productos && remitoEnvio.productos.length > 0) {
+            // Guardar observaciones del remito si existen
+            if (remitoEnvio.observaciones) {
+              setObservacionesRemito(remitoEnvio.observaciones)
+            }
+            
+            // Filtrar y mapear productos con cantidadEnviada > 0
+            const productos = remitoEnvio.productos
+              .filter((p: any) => {
+                const cantidadEnviada = p.cantidadEnviada || 0
+                return cantidadEnviada > 0
+              })
+              .map((p: any) => ({
+                productoId: p.productoId,
+                productoNombre: p.productoNombre,
+                cantidadPedida: p.cantidadPedida || 0,
+                cantidadEnviada: p.cantidadEnviada || 0,
+              }))
+            
+            setProductosEnviados(productos)
+          }
+        } else {
+          // Fallback: buscar en enlace público si existe (para pedidos antiguos)
+          if (selectedPedido.enlacePublicoId) {
+            const enlace = await obtenerEnlacePublico(selectedPedido.enlacePublicoId)
+            
+            if (enlace?.productosDisponibles) {
+              const productos: typeof productosEnviados = []
+              
+              // Necesitamos obtener los productos del pedido para tener los nombres
+              const { collection, query, where, getDocs } = await import("firebase/firestore")
+              const productosQuery = query(
+                collection(db, COLLECTIONS.PRODUCTS),
+                where("pedidoId", "==", selectedPedido.id)
+              )
+              const productosSnapshot = await getDocs(productosQuery)
+              const productosData = productosSnapshot.docs.map((doc) => ({
+                id: doc.id,
+                ...doc.data(),
+              })) as any[]
+
+              // Construir lista de productos enviados
+              Object.entries(enlace.productosDisponibles).forEach(([productoId, data]: [string, any]) => {
+                if (data.disponible && data.cantidadEnviada) {
+                  const producto = productosData.find(p => p.id === productoId)
+                  if (producto) {
+                    productos.push({
+                      productoId: producto.id,
+                      productoNombre: producto.nombre,
+                      cantidadPedida: producto.stockMinimo || 0,
+                      cantidadEnviada: data.cantidadEnviada,
+                    })
+                  }
+                }
+              })
+
+              setProductosEnviados(productos)
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error al cargar datos de recepción:", error)
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los datos de recepción",
+          variant: "destructive",
+        })
+      } finally {
+        setLoadingRecepcion(false)
+      }
+    }
+
+    cargarDatosRecepcion()
+  }, [activeTab, selectedPedido?.id, selectedPedido?.estado, selectedPedido?.remitoEnvioId, selectedPedido?.enlacePublicoId, obtenerRemito, obtenerRemitosPorPedido, obtenerEnlacePublico, toast])
 
   // Cargar remitos, recepciones y enlaces activos cuando cambia el pedido seleccionado
   useEffect(() => {
@@ -417,9 +536,9 @@ export default function PedidosPage() {
   const handleVerPedido = () => {
     if (!selectedPedido) return
 
-    // Si el pedido está en estado "enviado", ir a la página de recepción
-    if (selectedPedido.estado === "enviado") {
-      window.location.href = `/dashboard/pedidos/${selectedPedido.id}/recepcion`
+    // Si el pedido está en estado "enviado" o "recibido", cambiar a la pestaña de recepción
+    if (selectedPedido.estado === "enviado" || selectedPedido.estado === "recibido") {
+      setActiveTab("recepcion")
       return
     }
 
@@ -427,6 +546,79 @@ export default function PedidosPage() {
     if (enlaceActivo) {
       const url = `${window.location.origin}/pedido-publico/${enlaceActivo.id}`
       window.open(url, "_blank")
+    }
+  }
+
+  // Handler para confirmar recepción
+  const handleConfirmarRecepcion = async (
+    recepcionData: Omit<Recepcion, "id" | "createdAt">
+  ) => {
+    if (!selectedPedido) return
+
+    setLoadingRecepcion(true)
+    try {
+      // Crear recepción
+      const recepcion = await crearRecepcion({
+        ...recepcionData,
+        pedidoId: selectedPedido.id,
+        userId: user.uid,
+      })
+
+      if (!recepcion) return
+
+      // Buscar remitos anteriores (pedido y envío) para consolidar
+      const remitosAnteriores = await obtenerRemitosPorPedido(selectedPedido.id)
+      const remitoPedido = remitosAnteriores.find(r => r.tipo === "pedido") || null
+      const remitoEnvio = remitosAnteriores.find(r => r.tipo === "envio") || null
+
+      // Generar remito de recepción consolidado
+      const remitoData = crearRemitoRecepcion(selectedPedido, recepcion, remitoPedido, remitoEnvio)
+      const remito = await crearRemito(remitoData, selectedPedido.nombre)
+
+      if (remito && db) {
+        // Actualizar recepción con remito ID
+        await updateDoc(doc(db, COLLECTIONS.RECEPCIONES, recepcion.id), {
+          remitoId: remito.id,
+        })
+
+        // Actualizar estado del pedido
+        // Si la recepción no es parcial, marcar como completado automáticamente
+        const nuevoEstado = recepcionData.esParcial ? "recibido" : "completado"
+        await updatePedidoEstado(selectedPedido.id, nuevoEstado, undefined, new Date())
+
+        // Descargar PDF del remito
+        await descargarPDFRemito(remito)
+
+        // Recargar datos
+        const remitosData = await obtenerRemitosPorPedido(selectedPedido.id)
+        setRemitos(remitosData)
+        
+        const recepcionesData = await obtenerRecepcionesPorPedido(selectedPedido.id)
+        setRecepciones(recepcionesData)
+
+        // Recargar pedido desde Firestore
+        const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, selectedPedido.id))
+        if (pedidoDoc.exists()) {
+          setSelectedPedido({ id: pedidoDoc.id, ...pedidoDoc.data() } as any)
+        }
+
+        toast({
+          title: "Recepción registrada",
+          description: "La recepción se ha registrado y el remito se ha generado",
+        })
+
+        // Cambiar a la pestaña de remitos para ver el nuevo remito
+        setActiveTab("remitos")
+      }
+    } catch (error) {
+      console.error("Error al confirmar recepción:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo registrar la recepción",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingRecepcion(false)
     }
   }
 
@@ -657,7 +849,7 @@ export default function PedidosPage() {
                       </div>
                     )}
                     
-                    {/* Tabs: Productos / Remitos */}
+                    {/* Tabs: Productos / Remitos / Recepción */}
                     <div className="flex gap-1 border-l border-r border-border px-2 flex-shrink-0">
                       <Button
                         variant="ghost"
@@ -681,6 +873,19 @@ export default function PedidosPage() {
                       >
                         Remitos {remitos.length > 0 && `(${remitos.length})`}
                       </Button>
+                      {(selectedPedido.estado === "enviado" || selectedPedido.estado === "recibido") && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-8 px-3 rounded-none border-b-2 border-transparent",
+                            activeTab === "recepcion" && "border-primary text-primary font-medium"
+                          )}
+                          onClick={() => setActiveTab("recepcion")}
+                        >
+                          Recepción
+                        </Button>
+                      )}
                     </div>
                     
                     <div className="flex gap-1 shrink-0 ml-auto">
@@ -887,6 +1092,41 @@ export default function PedidosPage() {
                   onAjustePedidoChange={handleAjustePedidoChange}
                   configMode={showConfig}
                 />
+              ) : activeTab === "recepcion" ? (
+                <div className="space-y-3 md:space-y-4">
+                  {loadingRecepcion ? (
+                    <div className="flex items-center justify-center h-64 md:h-96">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    </div>
+                  ) : productosEnviados.length === 0 ? (
+                    <div className="rounded-lg border bg-card p-4 md:p-6 text-center">
+                      <Package className="h-8 w-8 md:h-10 md:w-10 mx-auto text-muted-foreground mb-2 md:mb-3" />
+                      <h3 className="text-sm md:text-base font-semibold mb-1">No hay productos para recibir</h3>
+                      <p className="text-muted-foreground text-xs md:text-sm">
+                        Primero debe generarse un remito de envío para poder registrar la recepción.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border bg-card p-2.5 md:p-4 space-y-3 md:space-y-4">
+                      {observacionesRemito && (
+                        <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800 p-2.5 md:p-3">
+                          <h4 className="font-semibold text-xs mb-1.5 md:mb-2 text-blue-900 dark:text-blue-100">
+                            Observaciones del envío:
+                          </h4>
+                          <p className="text-xs text-blue-800 dark:text-blue-200 whitespace-pre-wrap">
+                            {observacionesRemito}
+                          </p>
+                        </div>
+                      )}
+                      <RecepcionForm
+                        productosEnviados={productosEnviados}
+                        onConfirmar={handleConfirmarRecepcion}
+                        loading={loadingRecepcion}
+                        esParcial={false}
+                      />
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="space-y-4">
                   {/* Timeline y Acciones fusionados */}
@@ -930,12 +1170,13 @@ export default function PedidosPage() {
                           )}
 
                           {(selectedPedido.estado === "enviado" || selectedPedido.estado === "recibido") && (
-                            <Link href={`/dashboard/pedidos/${selectedPedido.id}/recepcion`}>
-                              <Button size="sm">
-                                <Package className="h-4 w-4 mr-2" />
-                                Registrar Recepción
-                              </Button>
-                            </Link>
+                            <Button 
+                              size="sm"
+                              onClick={() => setActiveTab("recepcion")}
+                            >
+                              <Package className="h-4 w-4 mr-2" />
+                              Registrar Recepción
+                            </Button>
                           )}
                         </div>
                       </div>
