@@ -17,10 +17,12 @@ import { logger } from "@/lib/logger"
 import { Remito } from "@/lib/types"
 import { generarNumeroRemito, generarPDFRemito, eliminarRemitosAnteriores } from "@/lib/remito-utils"
 import { useData } from "@/contexts/data-context"
+import { useConfig } from "@/hooks/use-config"
 
 export function useRemitos(user: any) {
   const { toast } = useToast()
   const { userData } = useData()
+  const { config } = useConfig(user)
   const [loading, setLoading] = useState(false)
 
   // Crear remito
@@ -156,7 +158,20 @@ export function useRemitos(user: any) {
   // Generar y descargar PDF del remito
   const descargarPDFRemito = useCallback(async (remito: Remito) => {
     try {
-      await generarPDFRemito(remito)
+      // Obtener nombre del pedido
+      let nombrePedido: string | undefined
+      if (remito.pedidoId && db) {
+        try {
+          const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, remito.pedidoId))
+          if (pedidoDoc.exists()) {
+            nombrePedido = pedidoDoc.data().nombre
+          }
+        } catch (error) {
+          logger.warn("Error al obtener nombre del pedido:", error)
+        }
+      }
+      
+      await generarPDFRemito(remito, config?.nombreEmpresa, nombrePedido)
       toast({
         title: "PDF generado",
         description: "El remito se ha descargado correctamente",
@@ -169,7 +184,7 @@ export function useRemitos(user: any) {
         variant: "destructive",
       })
     }
-  }, [toast])
+  }, [toast, config, db])
 
   return {
     loading,

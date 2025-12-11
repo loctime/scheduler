@@ -418,7 +418,7 @@ export async function eliminarRemitosAnteriores(
 /**
  * Genera un PDF del remito usando jsPDF
  */
-export async function generarPDFRemito(remito: Remito): Promise<void> {
+export async function generarPDFRemito(remito: Remito, nombreEmpresa?: string, nombrePedido?: string): Promise<void> {
   const jsPDF = (await import("jspdf")).default
   
   const pdf = new jsPDF("p", "mm", "a4")
@@ -427,16 +427,12 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
   const margin = 15
   let yPos = margin
 
-  // Título
+  // Título - formato: "nombrepedido: -- nombreempresa"
   pdf.setFontSize(16)
   pdf.setFont("helvetica", "bold")
-  const titulo = remito.tipo === "pedido"
-    ? "PEDIDO PANIFICADOS Y EMPANADAS SANTA"
-    : remito.tipo === "envio" 
-    ? "ENTREGA PANIFICADOS Y EMPANADAS SANTA"
-    : remito.tipo === "recepcion"
-    ? "RECEPCIÓN PANIFICADOS Y EMPANADAS SANTA"
-    : "DEVOLUCIÓN PANIFICADOS Y EMPANADAS SANTA"
+  const empresa = nombreEmpresa || "PANIFICADOS Y EMPANADAS SANTA"
+  const pedido = nombrePedido || "PEDIDO"
+  const titulo = `${pedido}: -- ${empresa}`
   pdf.text(titulo, pdfWidth / 2, yPos, { align: "center" })
   yPos += 10
 
@@ -464,10 +460,52 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
 
   yPos += 8
 
-  // Partida y Entrega
+  // Partida y Entrega - agregar horas si están disponibles
   pdf.setFontSize(10)
-  pdf.text(`PARTIDA: ${remito.desde} / LOCAL:`, margin, yPos)
-  pdf.text(`ENTREGA: ${remito.hacia} / LOCAL:`, margin, yPos + 5)
+  
+  // Obtener hora de partida (hora de retiro/salida)
+  let horaPartida: string | undefined
+  if (remito.horaRetiroFabrica) {
+    horaPartida = remito.horaRetiroFabrica
+  } else if (remito.fecha) {
+    try {
+      const fechaObj = remito.fecha instanceof Date 
+        ? remito.fecha 
+        : (typeof remito.fecha === 'object' && 'toDate' in remito.fecha 
+          ? remito.fecha.toDate() 
+          : new Date(remito.fecha))
+      horaPartida = format(fechaObj, "HH:mm", { locale: es })
+    } catch {
+      horaPartida = undefined
+    }
+  }
+  
+  // Obtener hora de entrega (hora de recepción/llegada)
+  let horaEntrega: string | undefined
+  if (remito.horaRecepcionLocal) {
+    horaEntrega = remito.horaRecepcionLocal
+  } else if (remito.fecha && remito.tipo === "recepcion") {
+    try {
+      const fechaObj = remito.fecha instanceof Date 
+        ? remito.fecha 
+        : (typeof remito.fecha === 'object' && 'toDate' in remito.fecha 
+          ? remito.fecha.toDate() 
+          : new Date(remito.fecha))
+      horaEntrega = format(fechaObj, "HH:mm", { locale: es })
+    } catch {
+      horaEntrega = undefined
+    }
+  }
+  
+  const textoPartida = horaPartida 
+    ? `PARTIDA: ${remito.desde} / HORA: ${horaPartida} Hs`
+    : `PARTIDA: ${remito.desde}`
+  const textoEntrega = horaEntrega
+    ? `ENTREGA: ${remito.hacia} / HORA: ${horaEntrega} Hs`
+    : `ENTREGA: ${remito.hacia}`
+  
+  pdf.text(textoPartida, margin, yPos)
+  pdf.text(textoEntrega, margin, yPos + 5)
   yPos += 12
 
   // Línea separadora
@@ -1142,7 +1180,8 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
     pdf.setFontSize(7)
     pdf.setFont("helvetica", "normal")
     pdf.setTextColor(100, 100, 100)
-    const footerText = `PANIFICADOS Y EMPANADAS SANTA - Remito N°${remito.numero} - Página ${i} de ${totalPages}`
+    const empresaFooter = nombreEmpresa || "PANIFICADOS Y EMPANADAS SANTA"
+    const footerText = `${empresaFooter} - Remito N°${remito.numero} - Página ${i} de ${totalPages}`
     pdf.text(footerText, pdfWidth / 2, pdfHeight - footerHeight + 5, { align: "center" })
     pdf.text(fechaTexto, pdfWidth / 2, pdfHeight - footerHeight + 10, { align: "center" })
     pdf.setTextColor(0, 0, 0) // Restaurar color negro
