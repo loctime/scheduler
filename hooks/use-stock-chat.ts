@@ -499,6 +499,15 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
           throw new Error("Producto no identificado")
         }
         
+        // Validar que el producto pertenezca al pedido seleccionado (si hay uno)
+        if (pedidoSeleccionado && (modo === "ingreso" || modo === "egreso")) {
+          const producto = productos.find(p => p.id === accion.productoId)
+          if (!producto || producto.pedidoId !== pedidoSeleccionado) {
+            const pedido = pedidos.find(p => p.id === pedidoSeleccionado)
+            return `❌ El producto "${producto?.nombre || accion.producto}" no pertenece al pedido "${pedido?.nombre || "seleccionado"}". Seleccioná el pedido correcto o usá un producto de ese pedido.`
+          }
+        }
+        
         if (!accion.cantidad || accion.cantidad <= 0) {
           console.error(`[EJECUTAR] Error: Cantidad inválida o faltante`, accion)
           return `Para ${accion.accion === "entrada" ? "agregar" : "quitar"} stock necesito saber la cantidad. Por ejemplo: "saco 2 cajas de ${accion.producto || "X"}"`
@@ -547,6 +556,15 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
           }
           console.error(`[EJECUTAR] Error: Producto no identificado`, accion)
           throw new Error("Producto no identificado")
+        }
+        
+        // Validar que el producto pertenezca al pedido seleccionado (si hay uno)
+        if (pedidoSeleccionado && modo === "stock") {
+          const producto = productos.find(p => p.id === accion.productoId)
+          if (!producto || producto.pedidoId !== pedidoSeleccionado) {
+            const pedido = pedidos.find(p => p.id === pedidoSeleccionado)
+            return `❌ El producto "${producto?.nombre || accion.producto}" no pertenece al pedido "${pedido?.nombre || "seleccionado"}". Seleccioná el pedido correcto o usá un producto de ese pedido.`
+          }
         }
         
         if (accion.cantidad === undefined || accion.cantidad === null || accion.cantidad < 0) {
@@ -743,7 +761,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       default:
         return accion.mensaje || "No entendí. ¿Podés reformular?"
     }
-  }, [productos, pedidos, stockActual, actualizarStock, actualizarStockDirecto, crearProducto, editarProducto, eliminarProducto, inicializarStockProductos])
+  }, [productos, pedidos, stockActual, actualizarStock, actualizarStockDirecto, crearProducto, editarProducto, eliminarProducto, inicializarStockProductos, pedidoSeleccionado, modo])
 
   // ==================== USAR OLLAMA PARA GENERAR RESPUESTA ====================
   

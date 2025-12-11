@@ -94,7 +94,23 @@ export function useRemitos(user: any) {
         ? userData.ownerId 
         : user.uid
 
-      // Primero intentar obtener remitos filtrando por pedidoId y userId
+      // Primero verificar que el pedido pertenece al usuario
+      const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId))
+      if (!pedidoDoc.exists()) {
+        logger.warn(`Pedido ${pedidoId} no existe`)
+        return []
+      }
+
+      const pedidoUserId = pedidoDoc.data().userId
+      
+      // Verificar que el pedido pertenece al usuario o a su ownerId
+      if (pedidoUserId !== userIdToQuery) {
+        logger.warn(`Pedido ${pedidoId} no pertenece al usuario ${userIdToQuery}`)
+        return []
+      }
+
+      // Obtener remitos filtrando por pedidoId y userId
+      // Si el remito no tiene userId (creado sin autenticación), usar el userId del pedido
       const remitosQuery = query(
         collection(db, COLLECTIONS.REMITOS),
         where("pedidoId", "==", pedidoId),
@@ -106,31 +122,14 @@ export function useRemitos(user: any) {
         ...doc.data(),
       })) as Remito[]
       
-      // Si no se encontraron remitos, intentar solo por pedidoId (para remitos creados sin autenticación)
-      if (remitos.length === 0) {
-        const remitosQuerySinUser = query(
-          collection(db, COLLECTIONS.REMITOS),
-          where("pedidoId", "==", pedidoId)
-        )
-        const snapshotSinUser = await getDocs(remitosQuerySinUser)
-        const remitosSinUser = snapshotSinUser.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Remito[]
-        
-        // Filtrar manualmente por userId del pedido (verificar que el pedido pertenece al usuario o ownerId)
-        const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId))
-        if (pedidoDoc.exists()) {
-          const pedidoUserId = pedidoDoc.data().userId
-          if (pedidoUserId === userIdToQuery) {
-            return remitosSinUser
-          }
-        }
-      }
-      
       return remitos
     } catch (error: any) {
-      logger.error("Error al obtener remitos:", error)
+      // Si el error es de permisos, loguearlo pero no mostrar error al usuario
+      if (error.code === 'permission-denied') {
+        logger.warn("Error de permisos al obtener remitos:", error)
+      } else {
+        logger.error("Error al obtener remitos:", error)
+      }
       return []
     }
   }, [user, userData])

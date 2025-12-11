@@ -6,6 +6,7 @@ interface ProductoInfo {
   nombre: string
   unidad?: string
   stockActual?: number
+  pedidoId?: string
 }
 
 // ==================== API ROUTE SIMPLIFICADA ====================
@@ -408,6 +409,17 @@ export async function POST(request: NextRequest) {
       
       if (!productoEncontrado) {
         const nombreMencionado = palabras.join(" ")
+        // Si hay pedido seleccionado, mencionarlo en el mensaje
+        if (pedidoSeleccionado) {
+          const pedido = pedidos.find((p: any) => p.id === pedidoSeleccionado)
+          return NextResponse.json({
+            accion: {
+              accion: "conversacion",
+              mensaje: `No encontré "${nombreMencionado}" en el pedido "${pedido?.nombre || "seleccionado"}". Verificá que el producto pertenezca a ese pedido o seleccioná otro pedido.`,
+              confianza: 0.5,
+            }
+          })
+        }
         return NextResponse.json({
           accion: {
             accion: "conversacion",
@@ -415,6 +427,21 @@ export async function POST(request: NextRequest) {
             confianza: 0.5,
           }
         })
+      }
+      
+      // Validar que el producto encontrado pertenezca al pedido seleccionado (si hay uno)
+      if (pedidoSeleccionado && modo === "stock") {
+        const productoCompleto = productos.find((p: { id: string; pedidoId?: string }) => p.id === productoEncontrado!.id)
+        if (!productoCompleto || productoCompleto.pedidoId !== pedidoSeleccionado) {
+          const pedido = pedidos.find((p: any) => p.id === pedidoSeleccionado)
+          return NextResponse.json({
+            accion: {
+              accion: "conversacion",
+              mensaje: `❌ El producto "${productoEncontrado.nombre}" no pertenece al pedido "${pedido?.nombre || "seleccionado"}". Seleccioná el pedido correcto o usá un producto de ese pedido.`,
+              confianza: 0.9,
+            }
+          })
+        }
       }
       
       // Retornar acción para actualizar stock directamente
@@ -437,12 +464,19 @@ export async function POST(request: NextRequest) {
     console.log(`[STOCK-CHAT] Mensaje: "${msgNormalizado}"`)
     console.log(`[STOCK-CHAT] Modo: ${modoActual}`)
     
+    // Filtrar productos según pedido seleccionado (si aplica)
+    let productosFiltrados = productos
+    if (pedidoSeleccionado && (modoActual === "ingreso" || modoActual === "egreso")) {
+      productosFiltrados = productos.filter((p: { pedidoId?: string }) => p.pedidoId === pedidoSeleccionado)
+    }
+    
     // Construir lista de productos
-    const productosConStock: ProductoInfo[] = productos.map((p: { id: string; nombre: string; unidad?: string }) => ({
+    const productosConStock: ProductoInfo[] = productosFiltrados.map((p: { id: string; nombre: string; unidad?: string; pedidoId?: string }) => ({
       id: p.id,
       nombre: p.nombre,
       unidad: p.unidad,
       stockActual: stockActual[p.id] ?? 0,
+      pedidoId: p.pedidoId,
     }))
     
     // Extraer cantidad (número)
@@ -530,6 +564,17 @@ export async function POST(request: NextRequest) {
     
     if (!productoEncontrado) {
       const nombreMencionado = palabras.join(" ")
+      // Si hay pedido seleccionado, mencionarlo en el mensaje
+      if (pedidoSeleccionado) {
+        const pedido = pedidos.find((p: any) => p.id === pedidoSeleccionado)
+        return NextResponse.json({
+          accion: {
+            accion: "conversacion",
+            mensaje: `No encontré "${nombreMencionado}" en el pedido "${pedido?.nombre || "seleccionado"}". Verificá que el producto pertenezca a ese pedido o seleccioná otro pedido.`,
+            confianza: 0.5,
+          }
+        })
+      }
       return NextResponse.json({
         accion: {
           accion: "conversacion",
@@ -537,6 +582,21 @@ export async function POST(request: NextRequest) {
           confianza: 0.5,
         }
       })
+    }
+    
+    // Validar que el producto encontrado pertenezca al pedido seleccionado (si hay uno)
+    if (pedidoSeleccionado && (modoActual === "ingreso" || modoActual === "egreso")) {
+      const productoCompleto = productos.find((p: { id: string; pedidoId?: string }) => p.id === productoEncontrado!.id)
+      if (!productoCompleto || productoCompleto.pedidoId !== pedidoSeleccionado) {
+        const pedido = pedidos.find((p: any) => p.id === pedidoSeleccionado)
+        return NextResponse.json({
+          accion: {
+            accion: "conversacion",
+            mensaje: `❌ El producto "${productoEncontrado.nombre}" no pertenece al pedido "${pedido?.nombre || "seleccionado"}". Seleccioná el pedido correcto o usá un producto de ese pedido.`,
+            confianza: 0.9,
+          }
+        })
+      }
     }
     
     // Todo bien, agregar a lista acumulada (no confirmar inmediatamente)
