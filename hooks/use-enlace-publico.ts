@@ -15,10 +15,17 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
 import { EnlacePublico, Producto } from "@/lib/types"
+import { useData } from "@/contexts/data-context"
 
 export function useEnlacePublico(user: any) {
   const { toast } = useToast()
+  const { userData } = useData()
   const [loading, setLoading] = useState(false)
+  
+  // Determinar el userId a usar: si es invitado, usar ownerId, sino usar su propio uid
+  const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
+    ? userData.ownerId 
+    : user?.uid
 
   // Crear enlace público
   const crearEnlacePublico = useCallback(async (
@@ -38,7 +45,8 @@ export function useEnlacePublico(user: any) {
         throw new Error("El pedido no existe")
       }
       const pedidoData = pedidoDoc.data()
-      if (pedidoData.userId !== user.uid) {
+      // Verificar que el pedido pertenece al usuario o a su ownerId (si es invitado)
+      if (pedidoData.userId !== userIdToQuery) {
         throw new Error("No tienes permiso para crear enlaces de este pedido")
       }
 
@@ -52,7 +60,7 @@ export function useEnlacePublico(user: any) {
         collection(db, COLLECTIONS.ENLACES_PUBLICOS),
         where("pedidoId", "==", pedidoId),
         where("activo", "==", true),
-        where("userId", "==", user.uid)
+        where("userId", "==", userIdToQuery)
       )
       const enlacesActivosSnapshot = await getDocs(enlacesActivosQuery)
       const desactivarPromesas = enlacesActivosSnapshot.docs.map((doc) =>
@@ -65,7 +73,7 @@ export function useEnlacePublico(user: any) {
       const productosQuery = query(
         collection(db, COLLECTIONS.PRODUCTS),
         where("pedidoId", "==", pedidoId),
-        where("userId", "==", user.uid)
+        where("userId", "==", userIdToQuery)
       )
       const productosSnapshot = await getDocs(productosQuery)
       const productosData = productosSnapshot.docs.map((doc) => ({
@@ -98,7 +106,7 @@ export function useEnlacePublico(user: any) {
       const enlaceData: Omit<EnlacePublico, "id"> = {
         pedidoId,
         activo: true,
-        userId: user.uid, // Incluir userId para las reglas de seguridad
+        userId: userIdToQuery, // Incluir userId para las reglas de seguridad (puede ser ownerId si es invitado)
         productosSnapshot: productosSnapshotData, // Guardar snapshot
         createdAt: serverTimestamp(),
       }
@@ -219,11 +227,16 @@ export function useEnlacePublico(user: any) {
     if (!db || !user) return []
 
     try {
+      // Determinar el userId a usar: si es invitado, usar ownerId, sino usar su propio uid
+      const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
+        ? userData.ownerId 
+        : user?.uid
+      
       const enlacesQuery = query(
         collection(db, COLLECTIONS.ENLACES_PUBLICOS),
         where("pedidoId", "==", pedidoId),
         where("activo", "==", true),
-        where("userId", "==", user.uid)
+        where("userId", "==", userIdToQuery)
       )
       const snapshot = await getDocs(enlacesQuery)
       return snapshot.docs.map((doc) => ({

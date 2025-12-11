@@ -352,18 +352,36 @@ service cloud.firestore {
     
     // Colección: apps/horarios/enlaces_publicos
     match /apps/horarios/enlaces_publicos/{enlaceId} {
+      // Helper para verificar si el usuario es invitado
+      function isInvitedUser() {
+        return isAuth() 
+          && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+          && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'invited';
+      }
+      // Helper para obtener el ownerId del usuario invitado
+      function getOwnerId() {
+        return isInvitedUser() 
+          ? get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId
+          : null;
+      }
+      
       // Permitir lectura pública (para que la fábrica pueda acceder sin login)
       allow read: if true;
-      // Crear: verificar que userId sea correcto (la app debe incluir userId al crear)
-      allow create: if isAuth() && request.resource.data.userId == uid();
+      // Crear: verificar que userId sea correcto (permite usuarios invitados crear con ownerId)
+      allow create: if isAuth() && (
+        request.resource.data.userId == uid()
+        || (isInvitedUser() && getOwnerId() != null && request.resource.data.userId == getOwnerId())
+      );
       // Actualizar: 
-      // - Si está autenticado: verificar propiedad y proteger userId
+      // - Si está autenticado: verificar propiedad y proteger userId (permite usuarios invitados actualizar con ownerId)
       // - Si NO está autenticado: permitir actualizar cuando está activo
       //   - Proteger campos sensibles (userId, pedidoId, createdAt)
       //   - Permitir actualizar productosDisponibles, fechaAcceso
       //   - Permitir desactivar solo si el pedido está enviado
-      allow update: if (isAuth() && resource.data.userId == uid()
-        && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId))
+      allow update: if (isAuth() && (
+        resource.data.userId == uid()
+        || (isInvitedUser() && getOwnerId() != null && resource.data.userId == getOwnerId())
+      ) && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId))
         || (!isAuth() 
           && resource.data.activo == true
           // Proteger campos sensibles
