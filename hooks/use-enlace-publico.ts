@@ -15,12 +15,26 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
 import { EnlacePublico, Producto } from "@/lib/types"
-import { useData } from "@/contexts/data-context"
+import { useContext } from "react"
+import { DataContext } from "@/contexts/data-context"
+
+// Helper para obtener userData de forma segura sin lanzar error
+function useUserDataSafe() {
+  try {
+    const context = useContext(DataContext)
+    return context?.userData || null
+  } catch {
+    // Si el contexto no está disponible, retornar null
+    return null
+  }
+}
 
 export function useEnlacePublico(user: any) {
   const { toast } = useToast()
-  const { userData } = useData()
   const [loading, setLoading] = useState(false)
+  
+  // Obtener userData de forma segura (puede ser null si no hay DataProvider)
+  const userData = useUserDataSafe()
   
   // Determinar el userId a usar: si es invitado, usar ownerId, sino usar su propio uid
   const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
