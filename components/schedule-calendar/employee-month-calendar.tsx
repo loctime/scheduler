@@ -20,12 +20,12 @@ interface EmployeeMonthCalendarProps {
   weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6
 }
 
-const normalizeAssignments = (value: ShiftAssignmentValue | null | undefined): Array<{ shiftId?: string; type?: string }> => {
+const normalizeAssignments = (value: ShiftAssignmentValue | null | undefined): Array<{ shiftId?: string; type?: string; texto?: string }> => {
   if (!value || !Array.isArray(value) || value.length === 0) return []
   if (typeof value[0] === "string") {
     return (value as string[]).map((shiftId) => ({ shiftId, type: "shift" }))
   }
-  return (value as Array<{ shiftId?: string; type?: string }>).map((assignment) => ({
+  return (value as Array<{ shiftId?: string; type?: string; texto?: string }>).map((assignment) => ({
     ...assignment,
     type: assignment.type || "shift",
   }))
