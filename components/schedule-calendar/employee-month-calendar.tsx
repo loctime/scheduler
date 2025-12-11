@@ -190,6 +190,16 @@ export function EmployeeMonthCalendar({
                       {/* Asignaciones de turnos */}
                       <div className="space-y-0.5 mt-1">
                         {normalizedAssignments.slice(0, 2).map((assignment, idx) => {
+                          if (assignment.type === "nota") {
+                            return (
+                              <div
+                                key={idx}
+                                className="text-[10px] px-1 py-0.5 rounded bg-muted/50 text-muted-foreground text-center truncate italic"
+                              >
+                                {assignment.texto || "Nota"}
+                              </div>
+                            )
+                          }
                           if (assignment.type === "franco") {
                             return (
                               <div

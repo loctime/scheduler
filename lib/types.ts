@@ -23,12 +23,13 @@ export interface Turno {
 
 // Asignación de turno con horarios ajustados opcionales
 export interface ShiftAssignment {
-  shiftId?: string // Opcional para franco/medio_franco
-  type?: "shift" | "franco" | "medio_franco" // Tipo de asignación (por defecto "shift")
+  shiftId?: string // Opcional para franco/medio_franco/nota
+  type?: "shift" | "franco" | "medio_franco" | "nota" // Tipo de asignación (por defecto "shift")
   startTime?: string // horario ajustado (opcional, si no existe usa el del turno base)
   endTime?: string // horario ajustado (opcional)
   startTime2?: string // segunda franja ajustada (opcional)
   endTime2?: string // segunda franja ajustada (opcional)
+  texto?: string // Texto personalizado para notas (solo cuando type === "nota")
 }
 
 // Tipo que soporta tanto formato antiguo (string[]) como nuevo (ShiftAssignment[])

@@ -1,14 +1,23 @@
 "use client"
 
-import React from "react"
+import React, { useState } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { Empleado, Turno, ShiftAssignment, MedioTurno } from "@/lib/types"
 import { CellAssignments } from "./cell-assignments"
 import { InlineShiftSelector } from "./inline-shift-selector"
-import { GripVertical, Plus, RotateCcw, Lock, Download } from "lucide-react"
+import { GripVertical, Plus, RotateCcw, Lock, Download, FileText } from "lucide-react"
 import { getDay, parseISO } from "date-fns"
 import type { EmployeeMonthlyStats } from "../index"
 import { formatStatValue } from "../utils/schedule-grid-utils"
@@ -29,6 +38,13 @@ interface ScheduleGridMobileProps {
   isClickable: boolean
   onCellClick: (date: string, employeeId: string) => void
   onQuickAssignments?: (date: string, employeeId: string, assignments: ShiftAssignment[]) => void
+  onAssignmentUpdate?: (
+    date: string,
+    employeeId: string,
+    assignments: ShiftAssignment[],
+    options?: { scheduleId?: string }
+  ) => void
+  scheduleId?: string
   readonly?: boolean
   employeeStats?: Record<string, EmployeeMonthlyStats>
   shifts: Turno[]
@@ -53,6 +69,8 @@ export function ScheduleGridMobile({
   isClickable,
   onCellClick,
   onQuickAssignments,
+  onAssignmentUpdate,
+  scheduleId,
   readonly = false,
   employeeStats,
   shifts,
@@ -65,6 +83,58 @@ export function ScheduleGridMobile({
   onExportEmployeeImage,
   weekStartDate,
 }: ScheduleGridMobileProps) {
+  const [notaDialogOpen, setNotaDialogOpen] = useState(false)
+  const [notaData, setNotaData] = useState<{ date: string; employeeId: string; texto: string } | null>(null)
+
+  const handleOpenNotaDialog = (date: string, employeeId: string) => {
+    const assignments = getEmployeeAssignments(employeeId, date)
+    const existingNota = assignments.find((a) => a.type === "nota")
+    setNotaData({
+      date,
+      employeeId,
+      texto: existingNota?.texto || "",
+    })
+    setNotaDialogOpen(true)
+  }
+
+  const handleSaveNota = () => {
+    if (!onAssignmentUpdate || !notaData) return
+
+    const trimmedTexto = notaData.texto.trim()
+    const assignments = getEmployeeAssignments(notaData.employeeId, notaData.date)
+
+    if (trimmedTexto === "") {
+      // Si el texto está vacío, eliminar la nota
+      const updatedAssignments = assignments.filter((a) => a.type !== "nota")
+      onAssignmentUpdate(notaData.date, notaData.employeeId, updatedAssignments, { scheduleId })
+    } else {
+      // Crear o actualizar la nota
+      const notaAssignment: ShiftAssignment = {
+        type: "nota",
+        texto: trimmedTexto,
+      }
+
+      // Si ya existe una nota, reemplazarla; si no, agregarla
+      const otherAssignments = assignments.filter((a) => a.type !== "nota")
+      const updatedAssignments = [...otherAssignments, notaAssignment]
+
+      onAssignmentUpdate(notaData.date, notaData.employeeId, updatedAssignments, { scheduleId })
+    }
+
+    setNotaDialogOpen(false)
+    setNotaData(null)
+  }
+
+  const handleDeleteNota = () => {
+    if (!onAssignmentUpdate || !notaData) return
+
+    const assignments = getEmployeeAssignments(notaData.employeeId, notaData.date)
+    const updatedAssignments = assignments.filter((a) => a.type !== "nota")
+    onAssignmentUpdate(notaData.date, notaData.employeeId, updatedAssignments, { scheduleId })
+    setNotaDialogOpen(false)
+    setNotaData(null)
+  }
+
   return (
     <div className="space-y-4">
       {employees.map((employee) => {
@@ -177,6 +247,20 @@ export function ScheduleGridMobile({
                       {/* Actions */}
                       {!readonly && (
                         <div className="flex items-center gap-1 shrink-0">
+                          {onAssignmentUpdate && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleOpenNotaDialog(dateStr, employee.id)
+                              }}
+                              title={assignments.find((a) => a.type === "nota") ? "Editar nota" : "Agregar nota"}
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                           {hasCellHistory && (
                             <Button
                               variant="ghost"
@@ -219,6 +303,48 @@ export function ScheduleGridMobile({
           </Card>
         )
       })}
+      
+      {/* Diálogo para agregar/editar nota */}
+      <Dialog open={notaDialogOpen} onOpenChange={setNotaDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {notaData && getEmployeeAssignments(notaData.employeeId, notaData.date).find((a) => a.type === "nota")
+                ? "Editar nota"
+                : "Agregar nota"}
+            </DialogTitle>
+            <DialogDescription>
+              Ingresa un texto personalizado para esta celda (ej: enfermedad, viaje, vacaciones)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              value={notaData?.texto || ""}
+              onChange={(e) => setNotaData((prev) => (prev ? { ...prev, texto: e.target.value } : null))}
+              placeholder="Ej: Enfermedad / Viaje / Vacaciones"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSaveNota()
+                }
+              }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            {notaData &&
+              getEmployeeAssignments(notaData.employeeId, notaData.date).find((a) => a.type === "nota") && (
+                <Button variant="destructive" onClick={handleDeleteNota}>
+                  Eliminar nota
+                </Button>
+              )}
+            <Button variant="outline" onClick={() => setNotaDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveNota}>Guardar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

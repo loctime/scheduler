@@ -50,6 +50,14 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
   return (
     <>
       {orderedAssignments.map((assignment, idx) => {
+        if (assignment.type === "nota") {
+          return (
+            <span key={`nota-${idx}`} className="text-center text-xs sm:text-sm md:text-base font-medium italic text-muted-foreground block">
+              {assignment.texto || "Nota"}
+            </span>
+          )
+        }
+
         if (assignment.type === "franco") {
           return (
             <span key={`franco-${idx}`} className="text-center text-xs sm:text-sm md:text-base font-bold block">

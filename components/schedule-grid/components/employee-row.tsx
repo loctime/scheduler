@@ -253,6 +253,8 @@ export function EmployeeRow({
                 ? (assignments) => onQuickAssignments(dateStr, employee.id, assignments)
                 : undefined
             }
+            onAssignmentUpdate={onAssignmentUpdate}
+            scheduleId={scheduleId}
             readonly={readonly}
             hasCellHistory={hasCellHistory}
             onCellUndo={() => handleCellUndo(dateStr, employee.id)}
