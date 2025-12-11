@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -44,6 +44,7 @@ export function EnlacePublicoForm({
       return initial
     }
   )
+  const ultimoProductoMarcadoRef = useRef<string | null>(null)
 
   useEffect(() => {
     const productos = enlacePublico?.productosDisponibles
@@ -59,6 +60,48 @@ export function EnlacePublicoForm({
       setObservacionesHabilitadas(habilitadas)
     }
   }, [enlacePublico])
+
+  // Función para hacer scroll al siguiente producto incompleto
+  const scrollToNextIncomplete = (currentProductoId: string, estadoActualizado?: typeof productosDisponibles) => {
+    // Esperar un poco para que el DOM se actualice
+    setTimeout(() => {
+      const productosFiltrados = productos.filter((p) => {
+        const cantidadPedida = (p as any).cantidadPedida ?? 0
+        return cantidadPedida > 0
+      })
+
+      // Encontrar el índice del producto actual
+      const currentIndex = productosFiltrados.findIndex((p) => p.id === currentProductoId)
+      if (currentIndex === -1) return
+
+      // Usar el estado actualizado si se proporciona, sino usar el estado actual
+      const estadoAUsar = estadoActualizado || productosDisponibles
+
+      // Buscar el siguiente producto que no esté completo/listo
+      for (let i = currentIndex + 1; i < productosFiltrados.length; i++) {
+        const producto = productosFiltrados[i]
+        const productoData = estadoAUsar[producto.id] || {}
+        const completado = productoData.completo || productoData.listo
+
+        if (!completado) {
+          // Encontrar el elemento en el DOM y hacer scroll
+          const element = document.getElementById(`producto-${producto.id}`)
+          if (element) {
+            element.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            })
+            // Resaltar brevemente el elemento
+            element.classList.add("ring-4", "ring-blue-400", "ring-opacity-50")
+            setTimeout(() => {
+              element.classList.remove("ring-4", "ring-blue-400", "ring-opacity-50")
+            }, 1000)
+            break
+          }
+        }
+      }
+    }, 150)
+  }
 
   // Detectar si hay cambios cuando el pedido está confirmado
   const hayCambios = pedidoConfirmado && JSON.stringify(productosDisponibles) !== JSON.stringify(productosDisponiblesOriginales)
@@ -102,29 +145,51 @@ export function EnlacePublicoForm({
   }
 
   const toggleCompleto = (productoId: string, cantidadPedida: number, current?: { cantidadEnviada?: number }) => {
-    setProductosDisponibles((prev) => ({
-      ...prev,
-      [productoId]: {
-        ...prev[productoId],
-        disponible: true,
-        completo: !prev[productoId]?.completo,
-        // Al marcar completo, lo consideramos listo y seteamos cantidad pedida
-        listo: !prev[productoId]?.completo ? true : prev[productoId]?.listo,
-        cantidadEnviada: !prev[productoId]?.completo ? cantidadPedida : current?.cantidadEnviada,
-      },
-    }))
+    const estabaCompleto = productosDisponibles[productoId]?.completo
+    setProductosDisponibles((prev) => {
+      const nuevoEstado = {
+        ...prev,
+        [productoId]: {
+          ...prev[productoId],
+          disponible: true,
+          completo: !prev[productoId]?.completo,
+          // Al marcar completo, lo consideramos listo y seteamos cantidad pedida
+          listo: !prev[productoId]?.completo ? true : prev[productoId]?.listo,
+          cantidadEnviada: !prev[productoId]?.completo ? cantidadPedida : current?.cantidadEnviada,
+        },
+      }
+      
+      // Si se marcó como completo (no se desmarcó), hacer scroll al siguiente
+      if (!estabaCompleto) {
+        ultimoProductoMarcadoRef.current = productoId
+        scrollToNextIncomplete(productoId, nuevoEstado)
+      }
+      
+      return nuevoEstado
+    })
   }
 
   const toggleListo = (productoId: string) => {
-    setProductosDisponibles((prev) => ({
-      ...prev,
-      [productoId]: {
-        ...prev[productoId],
-        disponible: true,
-        listo: !prev[productoId]?.listo,
-        completo: prev[productoId]?.listo ? prev[productoId]?.completo : undefined,
-      },
-    }))
+    const estabaListo = productosDisponibles[productoId]?.listo
+    setProductosDisponibles((prev) => {
+      const nuevoEstado = {
+        ...prev,
+        [productoId]: {
+          ...prev[productoId],
+          disponible: true,
+          listo: !prev[productoId]?.listo,
+          completo: prev[productoId]?.listo ? prev[productoId]?.completo : undefined,
+        },
+      }
+      
+      // Si se marcó como listo (no se desmarcó), hacer scroll al siguiente
+      if (!estabaListo) {
+        ultimoProductoMarcadoRef.current = productoId
+        scrollToNextIncomplete(productoId, nuevoEstado)
+      }
+      
+      return nuevoEstado
+    })
   }
 
   const incrementarCantidad = (productoId: string) => {
@@ -179,16 +244,7 @@ export function EnlacePublicoForm({
               const cantidadPedida = (producto as any).cantidadPedida ?? 0
               return cantidadPedida > 0
             })
-            .map((producto, index) => ({ producto, index }))
-            .sort((a, b) => {
-              const aData = productosDisponibles[a.producto.id] || {}
-              const bData = productosDisponibles[b.producto.id] || {}
-              const aDone = aData.completo || aData.listo
-              const bDone = bData.completo || bData.listo
-              if (aDone === bDone) return a.index - b.index
-              return aDone ? 1 : -1
-            })
-            .map(({ producto }) => {
+            .map((producto) => {
             const productoData = productosDisponibles[producto.id] || { disponible: false }
             const cantidadPedida = (producto as any).cantidadPedida ?? 0
             const completado = productoData.completo || productoData.listo
@@ -210,33 +266,40 @@ export function EnlacePublicoForm({
 
             return (
               <div
+                id={`producto-${producto.id}`}
                 key={producto.id}
                 className={cardClassName}
               >
-                {/* Línea superior: Producto >>> Pedida >>> Botón Listo */}
+                {/* Línea superior: Producto >>> Pedida >>> Completo (derecha) */}
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
                     <span className="text-base font-semibold text-foreground truncate">
                       {producto.nombre}
                     </span>
-                    <span className="text-muted-foreground">•</span>
-                    <span className="text-sm text-muted-foreground whitespace-nowrap">
-                      Pedida: <span className="font-medium text-foreground">{cantidadPedida}</span> {producto.unidad || "unid"}
-                    </span>
+                    <span className="text-muted-foreground hidden sm:inline">•</span>
+                    <div className="flex items-center gap-1.5 whitespace-nowrap bg-muted/50 dark:bg-muted/30 px-2.5 py-1 rounded-md border border-border">
+                      <span className="text-sm font-medium text-muted-foreground">Pedida:</span>
+                      <span className="text-lg font-bold text-foreground">{cantidadPedida}</span>
+                      <span className="text-sm font-medium text-muted-foreground">{producto.unidad || "U"}</span>
+                    </div>
                   </div>
                   <Button
                     type="button"
-                    variant={productoData.listo ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => toggleListo(producto.id)}
-                    className={`shrink-0 ${productoData.listo ? "bg-green-600 hover:bg-green-700" : ""}`}
+                    variant={productoData.completo ? "default" : "outline"}
+                    size="icon"
+                    className={`h-14 w-14 shrink-0 border-2 ${
+                      productoData.completo 
+                        ? "bg-green-600 hover:bg-green-700 border-green-600" 
+                        : "hover:bg-muted"
+                    }`}
+                    onClick={() => toggleCompleto(producto.id, cantidadPedida, productoData)}
+                    title="Marcar como completo"
                   >
-                    <Check className="h-4 w-4 mr-1.5" />
-                    Listo
+                    <CheckCircle2 className="h-7 w-7" />
                   </Button>
                 </div>
 
-                {/* Campo numérico con botones + Botón TILDE (Completo) */}
+                {/* Campo numérico con botones + Botón Listo */}
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2 flex-1">
                     <Button
@@ -272,20 +335,15 @@ export function EnlacePublicoForm({
                       <Plus className="h-5 w-5" />
                     </Button>
                   </div>
-                  
                   <Button
                     type="button"
-                    variant={productoData.completo ? "default" : "outline"}
-                    size="icon"
-                    className={`h-12 w-12 shrink-0 border-2 ${
-                      productoData.completo 
-                        ? "bg-green-600 hover:bg-green-700 border-green-600" 
-                        : "hover:bg-muted"
-                    }`}
-                    onClick={() => toggleCompleto(producto.id, cantidadPedida, productoData)}
-                    title="Marcar como completo"
+                    variant={productoData.listo ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => toggleListo(producto.id)}
+                    className={`shrink-0 h-12 ${productoData.listo ? "bg-green-600 hover:bg-green-700" : ""}`}
                   >
-                    <CheckCircle2 className="h-6 w-6" />
+                    <Check className="h-4 w-4 mr-1.5" />
+                    Listo
                   </Button>
                 </div>
 

@@ -296,13 +296,19 @@ match /apps/horarios/remitos/{remitoId} {
       && get(/databases/$(db)/documents/apps/horarios/pedidos/$(resource.data.pedidoId)).data.userId == uid())
   );
   // Crear: 
-  // - Si está autenticado: verificar que userId sea correcto
+  // - Si está autenticado: verificar que userId sea correcto (permite usuarios invitados crear con ownerId)
   // - Si NO está autenticado: permitir solo si el pedido existe y el userId coincide
   //   (la aplicación controla que el pedido esté en estado válido antes de crear el remito)
-  allow create: if (isAuth() && request.resource.data.userId == uid())
+  allow create: if (isAuth() && (
+    request.resource.data.userId == uid()
+    || (exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+      && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'invited'
+      && request.resource.data.userId == get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId)
+  ))
     || (!isAuth() 
       && request.resource.data.pedidoId != null
       && exists(/databases/$(db)/documents/apps/horarios/pedidos/$(request.resource.data.pedidoId))
+      && request.resource.data.userId != null
       && request.resource.data.userId == get(/databases/$(db)/documents/apps/horarios/pedidos/$(request.resource.data.pedidoId)).data.userId);
   // Actualizar: verificar propiedad y proteger userId
   allow update: if isAuth() && resource.data.userId == uid()
