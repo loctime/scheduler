@@ -218,8 +218,13 @@ match /apps/horarios/stock_movimientos/{movimientoId} {
       && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'invited'
       && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId == resource.data.userId)
   );
-  // Crear: verificar que userId sea correcto
-  allow create: if isAuth() && request.resource.data.userId == uid();
+  // Crear: verificar que userId sea correcto (permite usuarios invitados crear con ownerId)
+  allow create: if isAuth() && (
+    request.resource.data.userId == uid()
+    || (exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+      && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'invited'
+      && request.resource.data.userId == get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId)
+  );
   // Actualizar: verificar propiedad y proteger userId (los movimientos generalmente son inmutables)
   allow update: if isAuth() && resource.data.userId == uid()
     && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId);
@@ -251,11 +256,14 @@ match /apps/horarios/stock_actual/{stockId} {
   );
   
   // Crear: verificar que userId sea correcto (permite usuarios invitados crear con ownerId)
+  // Simplificado para permitir creación si el userId en el documento coincide con uid o ownerId
   allow create: if isAuth() && (
-    request.resource.data.userId == uid()
-    || stockId.matches(uid() + '_.*')
-    || (isInvitedUser() && getOwnerId() != null && request.resource.data.userId == getOwnerId())
-    || (isInvitedUser() && getOwnerId() != null && stockId.matches(getOwnerId() + '_.*'))
+    // Usuario normal: userId debe coincidir con su uid
+    (request.resource.data.userId == uid() || stockId.matches(uid() + '_.*'))
+    // Usuario invitado: userId debe coincidir con su ownerId
+    || (isInvitedUser() 
+      && getOwnerId() != null 
+      && (request.resource.data.userId == getOwnerId() || stockId.matches(getOwnerId() + '_.*')))
   );
   
   // Actualizar: verificar propiedad y proteger userId (permite usuarios invitados actualizar con ownerId)

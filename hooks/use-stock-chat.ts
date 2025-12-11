@@ -408,20 +408,64 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       ...(producto.pedidoId && { pedidoId: producto.pedidoId }),
     }
 
-    await addDoc(collection(db, COLLECTIONS.STOCK_MOVIMIENTOS), movimiento)
+    console.log(`[STOCK] Intentando crear movimiento:`, {
+      userIdToQuery,
+      userUid: user?.uid,
+      userDataRole: userData?.role,
+      userDataOwnerId: userData?.ownerId,
+      movimiento: { ...movimiento, createdAt: '[serverTimestamp]' }
+    })
+
+    try {
+      await addDoc(collection(db, COLLECTIONS.STOCK_MOVIMIENTOS), movimiento)
+      console.log(`[STOCK] Movimiento creado exitosamente`)
+    } catch (error: any) {
+      console.error(`[STOCK] Error al crear movimiento:`, {
+        error,
+        code: error?.code,
+        message: error?.message,
+        userIdToQuery,
+        userUid: user?.uid
+      })
+      throw error
+    }
 
     // Actualizar stock actual
     const stockDocId = `${userIdToQuery}_${productoId}`
     const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
     
-    await setDoc(stockDocRef, {
+    const stockData = {
       productoId,
       cantidad: nuevoStock,
       ultimaActualizacion: serverTimestamp(),
       userId: userIdToQuery,
       // Solo incluir pedidoId si tiene valor
       ...(producto.pedidoId && { pedidoId: producto.pedidoId }),
+    }
+    
+    console.log(`[STOCK] Intentando crear/actualizar stock:`, {
+      stockDocId,
+      userIdToQuery,
+      userUid: user?.uid,
+      userDataRole: userData?.role,
+      userDataOwnerId: userData?.ownerId,
+      stockData
     })
+    
+    try {
+      await setDoc(stockDocRef, stockData)
+      console.log(`[STOCK] Stock actualizado exitosamente`)
+    } catch (error: any) {
+      console.error(`[STOCK] Error al actualizar stock:`, {
+        error,
+        code: error?.code,
+        message: error?.message,
+        stockDocId,
+        userIdToQuery,
+        userUid: user?.uid
+      })
+      throw error
+    }
 
     return { stockAnterior, nuevoStock, producto }
   }, [db, userIdToQuery, userName, productos, stockActual])
