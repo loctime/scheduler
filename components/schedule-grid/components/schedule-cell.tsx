@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Check, RotateCcw, Undo2, Lock, FileText } from "lucide-react"
+import { Check, RotateCcw, Undo2, Lock, FileText, X } from "lucide-react"
 import { ShiftAssignment, Turno, MedioTurno, Configuracion } from "@/lib/types"
 import { CellAssignments } from "./cell-assignments"
 import { QuickShiftSelector } from "./quick-shift-selector"
@@ -155,6 +155,13 @@ export function ScheduleCell({
     onAssignmentUpdate(date, employeeId, updatedAssignments, { scheduleId })
     setNotaDialogOpen(false)
     setNotaTexto("")
+  }
+
+  const handleClearCell = () => {
+    if (!onAssignmentUpdate) return
+    
+    // Limpiar todas las asignaciones de la celda
+    onAssignmentUpdate(date, employeeId, [], { scheduleId })
   }
 
   return (
@@ -298,6 +305,15 @@ export function ScheduleCell({
                 <FileText className="mr-2 h-4 w-4" />
                 {existingNota ? "Editar nota" : "Agregar nota"}
               </ContextMenuItem>
+              {assignments.length > 0 && (
+                <>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem onClick={handleClearCell}>
+                    <X className="mr-2 h-4 w-4" />
+                    Limpiar
+                  </ContextMenuItem>
+                </>
+              )}
               {hasCellHistory && (
                 <>
                   <ContextMenuSeparator />
