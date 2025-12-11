@@ -382,6 +382,42 @@ service cloud.firestore {
       allow delete: if isAuth() && resource.data.userId == uid();
     }
     
+    // Colección: apps/horarios/stock_actual
+    match /apps/horarios/stock_actual/{stockId} {
+      // Permitir lectura si es el dueño O si es un usuario invitado del dueño
+      allow read: if isAuth() && (
+        resource.data.userId == uid()
+        || (exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+          && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'invited'
+          && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId == resource.data.userId)
+      );
+      // Crear: verificar que userId sea correcto
+      allow create: if isAuth() && request.resource.data.userId == uid();
+      // Actualizar: verificar propiedad y proteger userId
+      allow update: if isAuth() && resource.data.userId == uid()
+        && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId);
+      // Eliminar: solo el dueño
+      allow delete: if isAuth() && resource.data.userId == uid();
+    }
+    
+    // Colección: apps/horarios/stock_movimientos
+    match /apps/horarios/stock_movimientos/{movimientoId} {
+      // Permitir lectura si es el dueño O si es un usuario invitado del dueño
+      allow read: if isAuth() && (
+        resource.data.userId == uid()
+        || (exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+          && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'invited'
+          && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId == resource.data.userId)
+      );
+      // Crear: verificar que userId sea correcto
+      allow create: if isAuth() && request.resource.data.userId == uid();
+      // Actualizar: verificar propiedad y proteger userId (los movimientos generalmente son inmutables)
+      allow update: if isAuth() && resource.data.userId == uid()
+        && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId);
+      // Eliminar: solo el dueño
+      allow delete: if isAuth() && resource.data.userId == uid();
+    }
+    
 
     /* ========= DENY POR DEFECTO ========= */
 

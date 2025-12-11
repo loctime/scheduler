@@ -141,13 +141,24 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     const pedidosRef = collection(db, COLLECTIONS.PEDIDOS)
     const q = query(pedidosRef, where("userId", "==", userIdToQuery))
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const pedidosData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Pedido[]
-      setPedidos(pedidosData)
-    })
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const pedidosData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Pedido[]
+        setPedidos(pedidosData)
+      },
+      (error) => {
+        // Manejar errores de permisos silenciosamente
+        if (error.code === 'permission-denied') {
+          console.warn("Error de permisos al cargar pedidos:", error)
+        } else {
+          console.error("Error al cargar pedidos:", error)
+        }
+      }
+    )
 
     return () => unsubscribe()
   }, [userIdToQuery])
@@ -162,35 +173,47 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     const productosRef = collection(db, COLLECTIONS.PRODUCTS)
     const q = query(productosRef, where("userId", "==", userIdToQuery))
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const productosData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Producto[]
-      
-      // Filtrar productos que tengan pedidoId válido (solo cuando ya tenemos pedidos cargados)
-      // Si no hay pedidos cargados aún, esperamos a que se carguen
-      const productosFiltrados = pedidos.length > 0
-        ? productosData.filter(p => {
-            // Solo incluir productos que tengan pedidoId y que ese pedido exista
-            if (!p.pedidoId) return false
-            return pedidos.some(ped => ped.id === p.pedidoId)
-          })
-        : productosData
-      
-      // Ordenar por orden, y si tienen el mismo orden, alfabéticamente (igual que en pedidos)
-      productosFiltrados.sort((a, b) => {
-        const ordenA = a.orden ?? 0
-        const ordenB = b.orden ?? 0
-        if (ordenA !== ordenB) {
-          return ordenA - ordenB
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const productosData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Producto[]
+        
+        // Filtrar productos que tengan pedidoId válido (solo cuando ya tenemos pedidos cargados)
+        // Si no hay pedidos cargados aún, esperamos a que se carguen
+        const productosFiltrados = pedidos.length > 0
+          ? productosData.filter(p => {
+              // Solo incluir productos que tengan pedidoId y que ese pedido exista
+              if (!p.pedidoId) return false
+              return pedidos.some(ped => ped.id === p.pedidoId)
+            })
+          : productosData
+        
+        // Ordenar por orden, y si tienen el mismo orden, alfabéticamente (igual que en pedidos)
+        productosFiltrados.sort((a, b) => {
+          const ordenA = a.orden ?? 0
+          const ordenB = b.orden ?? 0
+          if (ordenA !== ordenB) {
+            return ordenA - ordenB
+          }
+          return a.nombre.localeCompare(b.nombre)
+        })
+        
+        setProductos(productosFiltrados)
+        setLoadingStock(false)
+      },
+      (error) => {
+        // Manejar errores de permisos silenciosamente
+        if (error.code === 'permission-denied') {
+          console.warn("Error de permisos al cargar productos:", error)
+        } else {
+          console.error("Error al cargar productos:", error)
         }
-        return a.nombre.localeCompare(b.nombre)
-      })
-      
-      setProductos(productosFiltrados)
-      setLoadingStock(false)
-    })
+        setLoadingStock(false)
+      }
+    )
 
     return () => unsubscribe()
   }, [userIdToQuery, pedidos])
@@ -202,14 +225,25 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     const stockRef = collection(db, COLLECTIONS.STOCK_ACTUAL)
     const q = query(stockRef, where("userId", "==", userIdToQuery))
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const stockData: Record<string, number> = {}
-      snapshot.docs.forEach(doc => {
-        const data = doc.data() as StockActual
-        stockData[data.productoId] = data.cantidad
-      })
-      setStockActual(stockData)
-    })
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const stockData: Record<string, number> = {}
+        snapshot.docs.forEach(doc => {
+          const data = doc.data() as StockActual
+          stockData[data.productoId] = data.cantidad
+        })
+        setStockActual(stockData)
+      },
+      (error) => {
+        // Manejar errores de permisos silenciosamente
+        if (error.code === 'permission-denied') {
+          console.warn("Error de permisos al cargar stock actual:", error)
+        } else {
+          console.error("Error al cargar stock actual:", error)
+        }
+      }
+    )
 
     return () => unsubscribe()
   }, [userIdToQuery])
