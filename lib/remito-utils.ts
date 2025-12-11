@@ -475,6 +475,47 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
   pdf.line(margin, yPos, pdfWidth - margin, yPos)
   yPos += 5
 
+  // Parsear observaciones por producto separando envío y recepción
+  const observacionesEnvioPorProducto = new Map<string, string>()
+  const observacionesRecepcionPorProducto = new Map<string, string>()
+  let observacionesGenerales = ""
+  
+  if (remito.observaciones && remito.observaciones.trim()) {
+    const partes = remito.observaciones.split('\n\n')
+    partes.forEach(parte => {
+      if (parte.startsWith('ENVÍO:')) {
+        // Parsear observaciones de envío (formato "Producto: observación")
+        const contenidoEnvio = parte.replace('ENVÍO:\n', '').trim()
+        const lineasEnvio = contenidoEnvio.split('\n')
+        lineasEnvio.forEach(linea => {
+          const match = linea.match(/^(.+?):\s*(.+)$/)
+          if (match) {
+            const nombreProducto = match[1].trim()
+            const observacion = match[2].trim()
+            observacionesEnvioPorProducto.set(nombreProducto, observacion)
+          }
+        })
+      } else if (parte.startsWith('RECEPCIÓN:')) {
+        // Parsear observaciones de recepción (formato "Producto: observación")
+        const contenidoRecepcion = parte.replace('RECEPCIÓN:\n', '').trim()
+        const lineasRecepcion = contenidoRecepcion.split('\n')
+        lineasRecepcion.forEach(linea => {
+          const match = linea.match(/^(.+?):\s*(.+)$/)
+          if (match) {
+            const nombreProducto = match[1].trim()
+            const observacion = match[2].trim()
+            observacionesRecepcionPorProducto.set(nombreProducto, observacion)
+          }
+        })
+      } else if (parte.startsWith('OBSERVACIONES GENERALES:')) {
+        observacionesGenerales = parte.replace('OBSERVACIONES GENERALES:\n', '').trim()
+      }
+    })
+  }
+  
+  // Verificar si hay comentarios (de cualquier tipo)
+  const tieneComentarios = observacionesEnvioPorProducto.size > 0 || observacionesRecepcionPorProducto.size > 0
+
   // Tabla de productos
   pdf.setFontSize(10)
   pdf.setFont("helvetica", "bold")
@@ -485,70 +526,129 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
   // Verificar si hay devoluciones para determinar el número de columnas (solo para remitos finales)
   const tieneDevoluciones = esRemitoFinal && remito.productos.some((p: any) => p.esDevolucion && p.cantidadDevolucion && p.cantidadDevolucion > 0)
   
+  // Calcular dimensiones de la tabla
+  let productoWidth: number
+  let numColumnas: number
+  let colWidth: number
+  let pedidaX: number
+  let enviadaX: number
+  let recibidaX: number
+  let devolucionX: number | null
+  let comentariosX: number | null
+  let tableEndX: number
+  
   if (esRemitoFinal) {
+    // Calcular anchos de columnas (sin columna separada de comentarios)
+    productoWidth = tieneDevoluciones ? (pdfWidth - margin * 2) * 0.45 : (pdfWidth - margin * 2) * 0.5
+    numColumnas = tieneDevoluciones ? 4 : 3
+    colWidth = (pdfWidth - margin * 2 - productoWidth) / numColumnas
     
+    pedidaX = margin + productoWidth
+    enviadaX = pedidaX + colWidth
+    recibidaX = enviadaX + colWidth
+    devolucionX = tieneDevoluciones ? recibidaX + colWidth : null
+    tableEndX = devolucionX ? devolucionX + colWidth : recibidaX + colWidth
+    
+    // Dibujar borde superior de la tabla con mejor diseño
+    pdf.setDrawColor(0, 0, 0)
+    pdf.setLineWidth(0.8)
+    const headerHeight = 9
+    pdf.rect(margin, yPos - 6, tableEndX - margin, headerHeight)
+    
+    // Fondo gris más oscuro para el encabezado (más profesional)
+    pdf.setFillColor(230, 230, 230)
+    pdf.rect(margin, yPos - 6, tableEndX - margin, headerHeight, 'F')
+    
+    // Restaurar color de texto y usar fuente más bold
+    pdf.setTextColor(0, 0, 0)
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "bold")
+    
+    pdf.text("PRODUCTO", margin + 4, yPos)
+    pdf.text("PEDIDA", pedidaX + colWidth / 2, yPos, { align: "center" })
+    pdf.text("ENVIADA", enviadaX + colWidth / 2, yPos, { align: "center" })
+    pdf.text("RECIBIDA", recibidaX + colWidth / 2, yPos, { align: "center" })
     if (tieneDevoluciones) {
-      // Encabezado con 4 columnas
-      const productoWidth = (pdfWidth - margin * 2) * 0.45
-      const colWidth = (pdfWidth - margin * 2 - productoWidth) / 4
-      const pedidaX = margin + productoWidth
-      const enviadaX = pedidaX + colWidth
-      const recibidaX = enviadaX + colWidth
-      const devolucionX = recibidaX + colWidth
-      
-      pdf.text("PRODUCTO", margin, yPos)
-      pdf.text("PEDIDA", pedidaX + colWidth / 2, yPos, { align: "center" })
-      pdf.text("ENVIADA", enviadaX + colWidth / 2, yPos, { align: "center" })
-      pdf.text("RECIBIDA", recibidaX + colWidth / 2, yPos, { align: "center" })
-      pdf.text("DEV.", devolucionX + colWidth / 2, yPos, { align: "center" })
-    } else {
-      // Encabezado con 3 columnas
-      const productoWidth = (pdfWidth - margin * 2) * 0.5
-      const colWidth = (pdfWidth - margin * 2 - productoWidth) / 3
-      const pedidaX = margin + productoWidth
-      const enviadaX = pedidaX + colWidth
-      const recibidaX = enviadaX + colWidth
-      
-      pdf.text("PRODUCTO", margin, yPos)
-      pdf.text("PEDIDA", pedidaX + colWidth / 2, yPos, { align: "center" })
-      pdf.text("ENVIADA", enviadaX + colWidth / 2, yPos, { align: "center" })
-      pdf.text("RECIBIDA", recibidaX + colWidth / 2, yPos, { align: "center" })
+      pdf.text("DEV.", devolucionX! + colWidth / 2, yPos, { align: "center" })
     }
   } else {
-    // Encabezado con 1 columna
-    pdf.text("PRODUCTO", margin, yPos)
-    pdf.text("CANTIDAD", pdfWidth - margin - 30, yPos, { align: "right" })
+    // Encabezado con 1 columna (comentarios aparecen debajo de la cantidad)
+    productoWidth = (pdfWidth - margin * 2) * 0.6
+    colWidth = (pdfWidth - margin * 2 - productoWidth)
+    tableEndX = pdfWidth - margin
+    
+    // Dibujar borde superior de la tabla
+    pdf.setDrawColor(0, 0, 0)
+    pdf.setLineWidth(0.5)
+    pdf.rect(margin, yPos - 5, tableEndX - margin, 7)
+    
+    // Fondo gris para el encabezado
+    pdf.setFillColor(240, 240, 240)
+    pdf.rect(margin, yPos - 5, tableEndX - margin, 7, 'F')
+    
+    pdf.text("PRODUCTO", margin + 3, yPos)
+    pdf.text("CANTIDAD", margin + productoWidth + colWidth / 2, yPos, { align: "center" })
   }
-  yPos += 5
-
-  // Línea debajo del encabezado
-  pdf.line(margin, yPos, pdfWidth - margin, yPos)
-  yPos += 3
+  yPos += 10 // Más espacio después del encabezado para separación clara
 
   // Productos
   pdf.setFont("helvetica", "normal")
+  pdf.setFontSize(10)
+  let filaIndex = 0
+  const alturaFilaBase = 10 // Altura base más generosa para mejor legibilidad
+  
   remito.productos.forEach((producto) => {
     if (yPos > pdfHeight - 60) {
       pdf.addPage()
       yPos = margin + 10
     }
 
+    // Obtener comentarios del producto (separados por tipo)
+    const comentarioEnvio = observacionesEnvioPorProducto.get(producto.productoNombre) || ""
+    const comentarioRecepcion = observacionesRecepcionPorProducto.get(producto.productoNombre) || ""
+
     if (esRemitoFinal) {
+      // Calcular anchos de columnas (ya calculados arriba)
+      const productoX = margin + 3
+      
+      // Calcular altura de fila según comentarios (en cualquier columna) - mejor cálculo
+      let lineasComentarioEnvio = comentarioEnvio ? pdf.splitTextToSize(comentarioEnvio, colWidth - 8).length : 0
+      let lineasComentarioRecepcion = comentarioRecepcion ? pdf.splitTextToSize(comentarioRecepcion, colWidth - 8).length : 0
+      const maxLineasComentario = Math.max(lineasComentarioEnvio, lineasComentarioRecepcion)
+      let alturaFila = Math.max(alturaFilaBase, maxLineasComentario * 4 + 8) // Más espacio para comentarios
+      
       // Mostrar 3 o 4 columnas según si hay devoluciones
       if (tieneDevoluciones) {
         // Mostrar 4 columnas: Pedida, Enviada, Recibida, Devolución
-        const productoWidth = (pdfWidth - margin * 2) * 0.45
-        const colWidth = (pdfWidth - margin * 2 - productoWidth) / 4
-        const productoX = margin + 2
-        const pedidaX = margin + productoWidth
-        const enviadaX = pedidaX + colWidth
-        const recibidaX = enviadaX + colWidth
-        const devolucionX = recibidaX + colWidth
+        
+        // Fondo alternado para filas (zebra striping)
+        if (filaIndex % 2 === 0) {
+          pdf.setFillColor(250, 250, 250)
+          pdf.rect(margin, yPos - 4, tableEndX - margin, alturaFila, 'F')
+        }
+        
+        // Dibujar bordes de la fila
+        pdf.setDrawColor(200, 200, 200)
+        pdf.setLineWidth(0.3)
+        // Borde izquierdo
+        pdf.line(margin, yPos - 4, margin, yPos - 4 + alturaFila)
+        // Borde derecho
+        pdf.line(tableEndX, yPos - 4, tableEndX, yPos - 4 + alturaFila)
+        // Borde inferior
+        pdf.line(margin, yPos - 4 + alturaFila, tableEndX, yPos - 4 + alturaFila)
+        // Bordes verticales entre columnas
+        pdf.line(pedidaX, yPos - 4, pedidaX, yPos - 4 + alturaFila)
+        pdf.line(enviadaX, yPos - 4, enviadaX, yPos - 4 + alturaFila)
+        pdf.line(recibidaX, yPos - 4, recibidaX, yPos - 4 + alturaFila)
+        if (devolucionX) {
+          pdf.line(devolucionX, yPos - 4, devolucionX, yPos - 4 + alturaFila)
+        }
         
         // Nombre del producto (con truncamiento si es muy largo)
         const nombreProducto = producto.productoNombre || "Producto sin nombre"
         const maxWidth = productoWidth - 4
         pdf.setFontSize(10)
+        pdf.setTextColor(0, 0, 0)
         const nombreTruncado = pdf.splitTextToSize(nombreProducto, maxWidth)[0] || nombreProducto.substring(0, 30)
         pdf.text(nombreTruncado, productoX, yPos)
         
@@ -559,12 +659,29 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
           yPos,
           { align: "center" }
         )
+        
+        // Cantidad enviada con comentario debajo
         pdf.text(
           (producto.cantidadEnviada || 0).toString(),
           enviadaX + colWidth / 2,
           yPos,
           { align: "center" }
         )
+        // Comentario de envío debajo del número - diseño mejorado
+        if (comentarioEnvio) {
+          pdf.setFontSize(8)
+          pdf.setFont("helvetica", "italic")
+          pdf.setTextColor(70, 70, 70) // Color más oscuro para mejor legibilidad
+          const maxComentarioWidth = colWidth - 8
+          const comentarioTruncado = pdf.splitTextToSize(comentarioEnvio, maxComentarioWidth)
+          let yComentarioEnvio = yPos + 6 // Más espacio del número
+          comentarioTruncado.forEach((linea: string, idx: number) => {
+            pdf.text(linea, enviadaX + colWidth / 2, yComentarioEnvio + (idx * 4), { align: "center", maxWidth: maxComentarioWidth })
+          })
+          pdf.setFontSize(10)
+          pdf.setFont("helvetica", "normal")
+          pdf.setTextColor(0, 0, 0)
+        }
         
         // Calcular indicador visual para cantidad recibida
         const cantidadPedida = producto.cantidadPedida || 0
@@ -611,6 +728,22 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
           pdf.setFontSize(10)
           pdf.setFont("helvetica", "normal")
           pdf.setTextColor(0, 0, 0) // Restaurar color negro
+        }
+        
+        // Comentario de recepción debajo del número
+        if (comentarioRecepcion) {
+          pdf.setFontSize(8)
+          pdf.setFont("helvetica", "italic")
+          pdf.setTextColor(80, 80, 80)
+          const maxComentarioWidth = colWidth - 6
+          const comentarioTruncado = pdf.splitTextToSize(comentarioRecepcion, maxComentarioWidth)
+          let yComentarioRecepcion = yPos + 5
+          comentarioTruncado.forEach((linea: string, idx: number) => {
+            pdf.text(linea, recibidaX + colWidth / 2, yComentarioRecepcion + (idx * 3.5), { align: "center", maxWidth: maxComentarioWidth })
+          })
+          pdf.setFontSize(10)
+          pdf.setFont("helvetica", "normal")
+          pdf.setTextColor(0, 0, 0)
         }
         
         // Cantidad de devolución (si aplica)
@@ -619,24 +752,48 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
         pdf.setTextColor(cantidadDevolucion > 0 ? 200 : 0, 0, 0)
         pdf.text(
           cantidadDevolucion > 0 ? cantidadDevolucion.toString() : "-",
-          devolucionX + colWidth / 2,
+          devolucionX! + colWidth / 2,
           yPos,
           { align: "center" }
         )
         pdf.setTextColor(0, 0, 0) // Restaurar color negro
+        
+        yPos += alturaFila
+        filaIndex++
       } else {
         // Mostrar 3 columnas estándar: Pedida, Enviada, Recibida
-        const productoWidth = (pdfWidth - margin * 2) * 0.5
-        const colWidth = (pdfWidth - margin * 2 - productoWidth) / 3
-        const productoX = margin + 2
-        const pedidaX = margin + productoWidth
-        const enviadaX = pedidaX + colWidth
-        const recibidaX = enviadaX + colWidth
+        
+        // Calcular altura de fila según comentarios (en cualquier columna) - mejor cálculo
+        let lineasComentarioEnvio = comentarioEnvio ? pdf.splitTextToSize(comentarioEnvio, colWidth - 8).length : 0
+        let lineasComentarioRecepcion = comentarioRecepcion ? pdf.splitTextToSize(comentarioRecepcion, colWidth - 8).length : 0
+        const maxLineasComentario = Math.max(lineasComentarioEnvio, lineasComentarioRecepcion)
+        alturaFila = Math.max(alturaFilaBase, maxLineasComentario * 4 + 8) // Más espacio para comentarios
+        
+        // Fondo alternado para filas (zebra striping) - más sutil
+        if (filaIndex % 2 === 0) {
+          pdf.setFillColor(252, 252, 252)
+          pdf.rect(margin, yPos - 4, tableEndX - margin, alturaFila, 'F')
+        }
+        
+        // Dibujar bordes de la fila - más sutiles y profesionales
+        pdf.setDrawColor(220, 220, 220)
+        pdf.setLineWidth(0.2)
+        // Borde izquierdo
+        pdf.line(margin, yPos - 4, margin, yPos - 4 + alturaFila)
+        // Borde derecho
+        pdf.line(tableEndX, yPos - 4, tableEndX, yPos - 4 + alturaFila)
+        // Borde inferior
+        pdf.line(margin, yPos - 4 + alturaFila, tableEndX, yPos - 4 + alturaFila)
+        // Bordes verticales entre columnas
+        pdf.line(pedidaX, yPos - 4, pedidaX, yPos - 4 + alturaFila)
+        pdf.line(enviadaX, yPos - 4, enviadaX, yPos - 4 + alturaFila)
+        pdf.line(recibidaX, yPos - 4, recibidaX, yPos - 4 + alturaFila)
         
         // Nombre del producto (con truncamiento si es muy largo)
         const nombreProducto = producto.productoNombre || "Producto sin nombre"
         const maxWidth = productoWidth - 4
         pdf.setFontSize(10)
+        pdf.setTextColor(0, 0, 0)
         const nombreTruncado = pdf.splitTextToSize(nombreProducto, maxWidth)[0] || nombreProducto.substring(0, 30)
         pdf.text(nombreTruncado, productoX, yPos)
         
@@ -647,12 +804,31 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
           yPos,
           { align: "center" }
         )
+        
+        // Cantidad enviada con comentario debajo - mejor presentación
+        pdf.setFont("helvetica", "bold")
         pdf.text(
           (producto.cantidadEnviada || 0).toString(),
           enviadaX + colWidth / 2,
           yPos,
           { align: "center" }
         )
+        pdf.setFont("helvetica", "normal")
+        // Comentario de envío debajo del número - diseño mejorado
+        if (comentarioEnvio) {
+          pdf.setFontSize(8)
+          pdf.setFont("helvetica", "italic")
+          pdf.setTextColor(70, 70, 70) // Color más oscuro para mejor legibilidad
+          const maxComentarioWidth = colWidth - 8
+          const comentarioTruncado = pdf.splitTextToSize(comentarioEnvio, maxComentarioWidth)
+          let yComentarioEnvio = yPos + 6 // Más espacio del número
+          comentarioTruncado.forEach((linea: string, idx: number) => {
+            pdf.text(linea, enviadaX + colWidth / 2, yComentarioEnvio + (idx * 4), { align: "center", maxWidth: maxComentarioWidth })
+          })
+          pdf.setFontSize(10)
+          pdf.setFont("helvetica", "normal")
+          pdf.setTextColor(0, 0, 0)
+        }
         
         // Calcular indicador visual para cantidad recibida
         const cantidadPedida = producto.cantidadPedida || 0
@@ -676,7 +852,8 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
           colorIndicador = [200, 0, 0] // Rojo
         }
         
-        // Mostrar cantidad recibida con indicador
+        // Mostrar cantidad recibida con indicador - mejor presentación
+        pdf.setFont("helvetica", "bold")
         const textoRecibida = cantidadRecibida.toString()
         pdf.text(
           textoRecibida,
@@ -684,6 +861,7 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
           yPos,
           { align: "center" }
         )
+        pdf.setFont("helvetica", "normal")
         
         // Mostrar indicador visual si existe
         if (indicador) {
@@ -700,20 +878,121 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
           pdf.setFont("helvetica", "normal")
           pdf.setTextColor(0, 0, 0) // Restaurar color negro
         }
+        
+        // Comentario de recepción debajo del número - diseño mejorado
+        if (comentarioRecepcion) {
+          pdf.setFontSize(8)
+          pdf.setFont("helvetica", "italic")
+          pdf.setTextColor(70, 70, 70) // Color más oscuro para mejor legibilidad
+          const maxComentarioWidth = colWidth - 8
+          const comentarioTruncado = pdf.splitTextToSize(comentarioRecepcion, maxComentarioWidth)
+          let yComentarioRecepcion = yPos + 6 // Más espacio del número
+          comentarioTruncado.forEach((linea: string, idx: number) => {
+            pdf.text(linea, recibidaX + colWidth / 2, yComentarioRecepcion + (idx * 4), { align: "center", maxWidth: maxComentarioWidth })
+          })
+          pdf.setFontSize(10)
+          pdf.setFont("helvetica", "normal")
+          pdf.setTextColor(0, 0, 0)
+        }
+        
+        yPos += alturaFila
+        filaIndex++
       }
     } else {
-      // Mostrar 1 columna para remitos intermedios
+      // Mostrar 1 o 2 columnas para remitos intermedios
       const cantidad = remito.tipo === "recepcion" && producto.cantidadRecibida !== undefined
         ? producto.cantidadRecibida.toString()
         : producto.cantidadEnviada !== undefined
         ? producto.cantidadEnviada.toString()
         : producto.cantidadPedida.toString()
 
-      pdf.text(producto.productoNombre, margin + 2, yPos)
-      pdf.text(cantidad, pdfWidth - margin - 30, yPos, { align: "right" })
+      // Para remitos intermedios, mostrar comentario debajo de la cantidad
+      // Si es remito de envío, mostrar comentario de envío; si es recepción, mostrar comentario de recepción
+      const comentarioIntermedio = remito.tipo === "envio" ? comentarioEnvio : comentarioRecepcion
+      
+      if (tieneComentarios) {
+        const productoWidthIntermedio = (pdfWidth - margin * 2) * 0.6
+        const colWidthIntermedio = (pdfWidth - margin * 2 - productoWidthIntermedio)
+        const tableEndXIntermedio = pdfWidth - margin
+        
+        // Calcular altura de fila según comentarios
+        let lineasComentario = 1
+        if (comentarioIntermedio) {
+          const maxComentarioWidth = colWidthIntermedio - 6
+          const comentarioTruncado = pdf.splitTextToSize(comentarioIntermedio, maxComentarioWidth)
+          lineasComentario = comentarioTruncado.length
+        }
+        const alturaFilaIntermedio = Math.max(alturaFilaBase, lineasComentario * 3.5 + 7)
+        
+        // Fondo alternado para filas (zebra striping)
+        if (filaIndex % 2 === 0) {
+          pdf.setFillColor(250, 250, 250)
+          pdf.rect(margin, yPos - 4, tableEndXIntermedio - margin, alturaFilaIntermedio, 'F')
+        }
+        
+        // Dibujar bordes de la fila
+        pdf.setDrawColor(200, 200, 200)
+        pdf.setLineWidth(0.3)
+        pdf.line(margin, yPos - 4, margin, yPos - 4 + alturaFilaIntermedio) // Izquierdo
+        pdf.line(tableEndXIntermedio, yPos - 4, tableEndXIntermedio, yPos - 4 + alturaFilaIntermedio) // Derecho
+        pdf.line(margin, yPos - 4 + alturaFilaIntermedio, tableEndXIntermedio, yPos - 4 + alturaFilaIntermedio) // Inferior
+        pdf.line(margin + productoWidthIntermedio, yPos - 4, margin + productoWidthIntermedio, yPos - 4 + alturaFilaIntermedio) // Entre producto y cantidad
+        
+        pdf.setFontSize(10)
+        pdf.setTextColor(0, 0, 0)
+        pdf.text(producto.productoNombre, margin + 3, yPos)
+        pdf.text(cantidad, margin + productoWidthIntermedio + colWidthIntermedio / 2, yPos, { align: "center" })
+        
+        // Comentario debajo de la cantidad
+        if (comentarioIntermedio) {
+          pdf.setFontSize(8)
+          pdf.setFont("helvetica", "italic")
+          pdf.setTextColor(80, 80, 80)
+          const maxComentarioWidth = colWidthIntermedio - 6
+          const comentarioTruncado = pdf.splitTextToSize(comentarioIntermedio, maxComentarioWidth)
+          let yComentario = yPos + 5
+          comentarioTruncado.forEach((linea: string, idx: number) => {
+            pdf.text(linea, margin + productoWidthIntermedio + colWidthIntermedio / 2, yComentario + (idx * 3.5), { align: "center", maxWidth: maxComentarioWidth })
+          })
+          pdf.setFontSize(10)
+          pdf.setFont("helvetica", "normal")
+          pdf.setTextColor(0, 0, 0)
+        }
+        
+        yPos += alturaFilaIntermedio
+      } else {
+        const tableEndXIntermedio = pdfWidth - margin
+        
+        // Fondo alternado para filas (zebra striping)
+        if (filaIndex % 2 === 0) {
+          pdf.setFillColor(250, 250, 250)
+          pdf.rect(margin, yPos - 4, tableEndXIntermedio - margin, alturaFilaBase, 'F')
+        }
+        
+        // Dibujar bordes de la fila
+        pdf.setDrawColor(200, 200, 200)
+        pdf.setLineWidth(0.3)
+        pdf.line(margin, yPos - 4, margin, yPos - 4 + alturaFilaBase) // Izquierdo
+        pdf.line(tableEndXIntermedio, yPos - 4, tableEndXIntermedio, yPos - 4 + alturaFilaBase) // Derecho
+        pdf.line(margin, yPos - 4 + alturaFilaBase, tableEndXIntermedio, yPos - 4 + alturaFilaBase) // Inferior
+        
+        pdf.setFontSize(10)
+        pdf.setTextColor(0, 0, 0)
+        pdf.text(producto.productoNombre, margin + 3, yPos)
+        pdf.text(cantidad, pdfWidth - margin - 15, yPos, { align: "right" })
+        
+        yPos += alturaFilaBase
+      }
+      filaIndex++
     }
-    yPos += 6
   })
+
+  // Dibujar borde inferior final de la tabla
+  if (remito.productos.length > 0) {
+    pdf.setDrawColor(0, 0, 0)
+    pdf.setLineWidth(0.5)
+    pdf.line(margin, yPos - 4, tableEndX, yPos - 4)
+  }
 
   // Espacio para firmas
   // Calcular espacio disponible para firmas (reservando espacio para footer)
@@ -733,20 +1012,39 @@ export async function generarPDFRemito(remito: Remito): Promise<void> {
   yPos += 8
 
   // Procesar observaciones para separarlas por tipo (ENVÍO y RECEPCIÓN)
+  // Nota: Las observaciones por producto ya se mostraron en la tabla
+  // Aquí solo procesamos observaciones generales que no están asociadas a productos específicos
   let observacionesEnvio = ""
   let observacionesRecepcion = ""
   if (remito.observaciones && remito.observaciones.trim()) {
     const partes = remito.observaciones.split('\n\n')
     partes.forEach(parte => {
       if (parte.startsWith('ENVÍO:')) {
-        observacionesEnvio = parte.replace('ENVÍO:\n', '').trim()
+        const contenidoEnvio = parte.replace('ENVÍO:\n', '').trim()
+        // Solo incluir si no tiene formato "Producto: observación" (ya está en la tabla)
+        const lineasEnvio = contenidoEnvio.split('\n')
+        const observacionesGeneralesEnvio = lineasEnvio.filter(linea => !linea.match(/^(.+?):\s*(.+)$/))
+        if (observacionesGeneralesEnvio.length > 0) {
+          observacionesEnvio = observacionesGeneralesEnvio.join('\n')
+        }
       } else if (parte.startsWith('RECEPCIÓN:')) {
-        observacionesRecepcion = parte.replace('RECEPCIÓN:\n', '').trim()
+        const contenidoRecepcion = parte.replace('RECEPCIÓN:\n', '').trim()
+        // Solo incluir si no tiene formato "Producto: observación" (ya está en la tabla)
+        const lineasRecepcion = contenidoRecepcion.split('\n')
+        const observacionesGeneralesRecepcion = lineasRecepcion.filter(linea => !linea.match(/^(.+?):\s*(.+)$/))
+        if (observacionesGeneralesRecepcion.length > 0) {
+          observacionesRecepcion = observacionesGeneralesRecepcion.join('\n')
+        }
       } else if (parte.startsWith('OBSERVACIONES GENERALES:')) {
         // Si hay observaciones generales, agregarlas a recepción
         observacionesRecepcion = (observacionesRecepcion ? observacionesRecepcion + '\n' : '') + parte.replace('OBSERVACIONES GENERALES:\n', '').trim()
       }
     })
+  }
+  
+  // Agregar observaciones generales si existen
+  if (observacionesGenerales) {
+    observacionesRecepcion = (observacionesRecepcion ? observacionesRecepcion + '\n' : '') + observacionesGenerales
   }
 
   // Retiro de Fábrica (solo para remitos de recepción)

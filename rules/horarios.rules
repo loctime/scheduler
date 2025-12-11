@@ -1,5 +1,21 @@
 // ========= HORARIOS SCHEDULER =========
 
+// Helper para verificar si un pedido puede ser actualizado sin autenticación
+function pedidoPuedeActualizarseSinAuth() {
+  return !('estado' in resource.data) 
+    || resource.data.estado == null
+    || (resource.data.estado != "enviado" 
+        && resource.data.estado != "recibido" 
+        && resource.data.estado != "completado");
+}
+
+// Helper para verificar si se puede actualizar el estado del pedido desde "enviado" a "recibido" o "completado"
+function puedeActualizarEstadoRecepcion() {
+  return resource.data.estado == "enviado" 
+    && request.resource.data.estado != null
+    && (request.resource.data.estado == "recibido" || request.resource.data.estado == "completado");
+}
+
 // Colección: apps/horarios/users
 match /apps/horarios/users/{userId} {
   // Permitir lectura:
@@ -134,11 +150,9 @@ match /apps/horarios/pedidos/{pedidoId} {
   // Actualizar: 
   // - Si está autenticado como dueño: verificar propiedad y proteger userId
   // - Si está autenticado como invitado: permitir actualizar si el pedido pertenece a su ownerId
-  // - Si NO está autenticado: permitir actualizar desde enlace público
-  //   - Permitir cambiar de "creado" o "completado" a "enviado" (confirmación desde enlace público)
-  //   - NO permitir cambiar si ya está "enviado" o "recibido" (solo el dueño puede hacerlo)
-  //   - Solo se actualizan campos específicos (estado, remitoEnvioId, fechaEnvio, updatedAt)
-  //   - sin modificar userId ni otros campos sensibles
+  // - Si NO está autenticado: 
+  //   a) Permitir si el pedido NO está en estado "enviado", "recibido" o "completado" (pedidoPuedeActualizarseSinAuth)
+  //   b) O permitir actualizar desde "enviado" a "recibido" o "completado" (puedeActualizarEstadoRecepcion)
   allow update: if (isAuth() && resource.data.userId == uid()
     && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId))
     || (isAuth() 
@@ -155,23 +169,15 @@ match /apps/horarios/pedidos/{pedidoId} {
       )
       && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId))
     || (!isAuth() 
-      && (
-        // Permitir si el estado actual es "creado", "completado", null o undefined
-        // (NO permitir si ya está "enviado" o "recibido")
-        (!('estado' in resource.data)
-        || resource.data.estado == null
-        || resource.data.estado == "creado"
-        || resource.data.estado == "completado")
-      )
+      && (pedidoPuedeActualizarseSinAuth() || puedeActualizarEstadoRecepcion())
       && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
-      // Solo permitir actualizar campos específicos: estado, remitoEnvioId, fechaEnvio, updatedAt
+      // Solo permitir actualizar campos específicos: estado, remitoEnvioId, fechaEnvio, fechaRecepcion, updatedAt
       && (!('nombre' in request.resource.data) || request.resource.data.nombre == resource.data.nombre)
       && (!('stockMinimoDefault' in request.resource.data) || request.resource.data.stockMinimoDefault == resource.data.stockMinimoDefault)
       && (!('formatoSalida' in request.resource.data) || request.resource.data.formatoSalida == resource.data.formatoSalida)
       && (!('mensajePrevio' in request.resource.data) || request.resource.data.mensajePrevio == resource.data.mensajePrevio)
       && (!('origenDefault' in request.resource.data) || request.resource.data.origenDefault == resource.data.origenDefault)
       && (!('destinoDefault' in request.resource.data) || request.resource.data.destinoDefault == resource.data.destinoDefault)
-      && (!('fechaRecepcion' in request.resource.data) || request.resource.data.fechaRecepcion == resource.data.fechaRecepcion)
       && (!('createdAt' in request.resource.data) || request.resource.data.createdAt == resource.data.createdAt));
   // Eliminar: solo el dueño (no invitados)
   allow delete: if isAuth() && resource.data.userId == uid()
@@ -313,13 +319,23 @@ match /apps/horarios/remitos/{remitoId} {
   // Actualizar: verificar propiedad y proteger userId
   allow update: if isAuth() && resource.data.userId == uid()
     && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId);
-  // Eliminar: solo el dueño (por userId o por pedido asociado)
+  // Eliminar: 
+  // - Si está autenticado: solo el dueño (por userId o por pedido asociado)
+  // - Si NO está autenticado: permitir eliminar remitos de tipo "pedido" o "envio" que pertenezcan a un pedido válido
+  //   (esto permite limpiar remitos anteriores cuando se crea una recepción desde enlace público)
   allow delete: if isAuth() && (
     resource.data.userId == uid()
     || (resource.data.pedidoId != null
       && exists(/databases/$(db)/documents/apps/horarios/pedidos/$(resource.data.pedidoId))
       && get(/databases/$(db)/documents/apps/horarios/pedidos/$(resource.data.pedidoId)).data.userId == uid())
-  );
+  )
+    || (!isAuth() 
+      && resource.data.pedidoId != null
+      && exists(/databases/$(db)/documents/apps/horarios/pedidos/$(resource.data.pedidoId))
+      && resource.data.userId != null
+      && resource.data.userId == get(/databases/$(db)/documents/apps/horarios/pedidos/$(resource.data.pedidoId)).data.userId
+      && (resource.data.tipo == "pedido" || resource.data.tipo == "envio")
+      && !resource.data.final);
 }
 
 // Colección: apps/horarios/recepciones
