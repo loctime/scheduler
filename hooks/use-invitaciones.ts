@@ -17,18 +17,30 @@ export function useInvitaciones(user: any) {
   }
 
   // Crear nuevo link de invitación
-  const crearLinkInvitacion = async () => {
+  const crearLinkInvitacion = async (role?: "branch" | "factory" | "admin" | "invited" | "manager", grupoId?: string) => {
     if (!user || !db) return null
 
     try {
       const token = generateToken()
-      const linkRef = await addDoc(collection(db, COLLECTIONS.INVITACIONES), {
+      const linkData: any = {
         token,
         ownerId: user.uid,
         activo: true,
         usado: false,
         createdAt: serverTimestamp(),
-      })
+      }
+
+      // Si se especifica un rol, agregarlo al link
+      if (role) {
+        linkData.role = role
+      }
+
+      // Si se especifica un grupoId, agregarlo al link (para links creados por manager)
+      if (grupoId) {
+        linkData.grupoId = grupoId
+      }
+
+      const linkRef = await addDoc(collection(db, COLLECTIONS.INVITACIONES), linkData)
 
       const newLink: InvitacionLink = {
         id: linkRef.id,
@@ -36,6 +48,8 @@ export function useInvitaciones(user: any) {
         ownerId: user.uid,
         activo: true,
         usado: false,
+        role: role,
+        grupoId: grupoId,
       }
 
       await cargarLinks()

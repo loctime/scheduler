@@ -21,7 +21,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Factory } from "lucide-react"
+import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Factory, Shield, UserCog } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -39,6 +39,8 @@ const navItems = [
   { href: "/dashboard/empleados", label: "Empleados", icon: Users },
   { href: "/dashboard/pedidos", label: "Pedidos", icon: ShoppingCart },
   { href: "/dashboard/fabrica", label: "Fábrica", icon: Factory, role: "factory" },
+  { href: "/dashboard/gerente", label: "Gerente", icon: UserCog, role: "manager" },
+  { href: "/dashboard/admin", label: "Administración", icon: Shield, role: "admin" },
   { href: "/dashboard/configuracion", label: "Configuración", icon: Settings },
 ]
 

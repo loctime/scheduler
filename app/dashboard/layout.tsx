@@ -14,6 +14,8 @@ const ALLOWED_PAGES_FOR_INVITED = ["/dashboard/pedidos"]
 
 // Páginas que requieren rol específico
 const FACTORY_PAGES = ["/dashboard/fabrica", "/dashboard/fabrica/historial"]
+const MANAGER_PAGES = ["/dashboard/gerente"]
+const ADMIN_PAGES = ["/dashboard/admin"]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -87,6 +89,14 @@ function ProtectedRoute({
       // Si el usuario intenta acceder a páginas de fábrica sin ser factory
       if (FACTORY_PAGES.some(page => pathname.startsWith(page)) && userData.role !== "factory") {
         router.push("/dashboard/pedidos")
+      }
+      // Si el usuario intenta acceder a páginas de gerente sin ser manager
+      if (MANAGER_PAGES.some(page => pathname.startsWith(page)) && userData.role !== "manager") {
+        router.push("/dashboard")
+      }
+      // Si el usuario intenta acceder a páginas de admin sin ser admin
+      if (ADMIN_PAGES.some(page => pathname.startsWith(page)) && userData.role !== "admin") {
+        router.push("/dashboard")
       }
       setChecking(false)
     }

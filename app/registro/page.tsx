@@ -48,7 +48,13 @@ function RegistroContent() {
         } else {
           setTokenValid(true)
           const linkData = snapshot.docs[0].data()
-          setOwnerId(linkData.ownerId)
+          // ownerId solo es necesario para links de invitados
+          // Si el link tiene un rol específico (admin, factory, branch), no requiere ownerId
+          if (linkData.role && (linkData.role === "admin" || linkData.role === "factory" || linkData.role === "branch")) {
+            setOwnerId(null) // No requiere ownerId para estos roles
+          } else {
+            setOwnerId(linkData.ownerId) // Para invitados, requiere ownerId
+          }
         }
       } catch (error) {
         console.error("Error validating token:", error)
@@ -62,7 +68,7 @@ function RegistroContent() {
   }, [token, toast])
 
   const handleGoogleSignIn = async () => {
-    if (!token || !tokenValid || !ownerId) {
+    if (!token || !tokenValid) {
       toast({
         title: "Error",
         description: "Token de invitación inválido",
@@ -70,6 +76,8 @@ function RegistroContent() {
       })
       return
     }
+    
+    // ownerId solo es requerido para links de invitados, no para otros roles
 
     if (!auth || !db) {
       toast({
@@ -103,6 +111,9 @@ function RegistroContent() {
       }
 
       const linkDoc = snapshot.docs[0]
+      const linkData = linkDoc.data()
+      const roleDelLink = linkData.role // Rol especificado en el link (puede ser undefined)
+      const grupoIdDelLink = linkData.grupoId // ID del grupo del link (puede ser undefined)
 
       // Autenticar con Google
       const provider = new GoogleAuthProvider()
@@ -119,7 +130,26 @@ function RegistroContent() {
       if (userDoc.exists()) {
         const userData = userDoc.data()
         // Si el usuario ya existe pero no es invitado, o es invitado de otro owner, mostrar error
-        if (userData.role !== "invited" || (userData.ownerId && userData.ownerId !== ownerId)) {
+        // EXCEPCIÓN: Si el link tiene un rol específico (admin, factory, branch), permitir actualizar el rol
+        if (roleDelLink && (roleDelLink === "admin" || roleDelLink === "factory" || roleDelLink === "branch")) {
+          // Si el link tiene un rol específico, actualizar el rol del usuario
+          console.log("🔄 Actualizando usuario existente con nuevo rol:", roleDelLink)
+          const updateData: any = {
+            email: user.email,
+            displayName: user.displayName || user.email?.split("@")[0] || "Usuario",
+            photoURL: user.photoURL || null,
+            role: roleDelLink,
+            updatedAt: serverTimestamp(),
+          }
+          // Si el nuevo rol no es "invited", eliminar ownerId
+          if (roleDelLink !== "invited") {
+            updateData.ownerId = null
+          } else if (ownerId) {
+            updateData.ownerId = ownerId
+          }
+          await updateDoc(userRef, updateData)
+          console.log("✅ Usuario actualizado con nuevo rol exitosamente")
+        } else if (userData.role !== "invited" || (userData.ownerId && userData.ownerId !== ownerId)) {
           toast({
             title: "Cuenta existente",
             description: "Esta cuenta ya está registrada. Por favor inicia sesión normalmente.",
@@ -128,19 +158,19 @@ function RegistroContent() {
           // Cerrar sesión para que pueda iniciar sesión normalmente
           await signOut(auth)
           return
+        } else {
+          // Si ya es invitado del mismo owner, actualizar información usando updateDoc
+          console.log("🔄 Actualizando usuario existente...")
+          await updateDoc(userRef, {
+            email: user.email,
+            displayName: user.displayName || user.email?.split("@")[0] || "Usuario",
+            photoURL: user.photoURL || null,
+            updatedAt: serverTimestamp(),
+          })
+          console.log("✅ Usuario actualizado exitosamente")
         }
-        // Si ya es invitado del mismo owner, actualizar información usando updateDoc
-        console.log("🔄 Actualizando usuario existente...")
-        await updateDoc(userRef, {
-          email: user.email,
-          displayName: user.displayName || user.email?.split("@")[0] || "Usuario",
-          photoURL: user.photoURL || null,
-          updatedAt: serverTimestamp(),
-        })
-        console.log("✅ Usuario actualizado exitosamente")
 
         // Marcar link como usado si no estaba ya usado
-        const linkData = linkDoc.data()
         if (!linkData.usado) {
           console.log("🔗 Marcando invitación como usada (usuario existente), linkDoc.id:", linkDoc.id)
           await updateDoc(doc(db, COLLECTIONS.INVITACIONES, linkDoc.id), {
@@ -151,26 +181,62 @@ function RegistroContent() {
           console.log("✅ Invitación marcada como usada")
         }
       } else {
-        // Crear nuevo documento de usuario con role 'invited' y ownerId
-        console.log("➕ Creando nuevo usuario con role 'invited' y ownerId:", ownerId)
+        // Determinar el rol a asignar
+        // Si el link tiene un rol específico, usarlo; si no, usar "invited" si hay ownerId, o "branch" por defecto
+        const rolAAsignar = roleDelLink || (ownerId ? "invited" : "branch")
+        
+        // Crear nuevo documento de usuario
+        console.log("➕ Creando nuevo usuario con role:", rolAAsignar, "y ownerId:", ownerId || "ninguno")
         console.log("📝 Datos del usuario:", {
           uid: user.uid,
           email: user.email,
           displayName: user.displayName,
           photoURL: user.photoURL,
-          role: "invited",
-          ownerId: ownerId
+          role: rolAAsignar,
+          ownerId: ownerId || null
         })
-        await setDoc(userRef, {
+        
+        const userData: any = {
           uid: user.uid,
           email: user.email,
           displayName: user.displayName || user.email?.split("@")[0] || "Usuario",
           photoURL: user.photoURL || null,
-          role: "invited",
-          ownerId: ownerId, // ID del usuario principal
+          role: rolAAsignar,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-        })
+        }
+        
+        // Solo agregar ownerId si el rol es "invited"
+        if (rolAAsignar === "invited" && ownerId) {
+          userData.ownerId = ownerId
+        }
+        
+        // Si el link tiene grupoId, agregar el usuario al grupo
+        if (grupoIdDelLink) {
+          userData.grupoIds = [grupoIdDelLink]
+          
+          // Actualizar el grupo para agregar el userId
+          try {
+            const grupoRef = doc(db, COLLECTIONS.GROUPS, grupoIdDelLink)
+            const grupoDoc = await getDoc(grupoRef)
+            if (grupoDoc.exists()) {
+              const grupoData = grupoDoc.data()
+              const userIds = grupoData.userIds || []
+              if (!userIds.includes(user.uid)) {
+                await updateDoc(grupoRef, {
+                  userIds: [...userIds, user.uid],
+                  updatedAt: serverTimestamp(),
+                })
+                console.log("✅ Usuario agregado al grupo:", grupoIdDelLink)
+              }
+            }
+          } catch (error) {
+            console.error("Error al agregar usuario al grupo:", error)
+            // Continuar de todas formas, el usuario se creará sin grupo
+          }
+        }
+        
+        await setDoc(userRef, userData)
         console.log("✅ Usuario creado exitosamente")
 
         // Marcar link como usado solo si es un nuevo usuario
