@@ -27,13 +27,13 @@ export function LoginForm() {
     const userDoc = await getDoc(userRef)
 
     if (!userDoc.exists()) {
-      // Si el usuario no existe en nuestra colección, crear el documento con role 'user' por defecto
+      // Si el usuario no existe en nuestra colección, crear el documento con role 'branch' por defecto
       await setDoc(userRef, {
         uid: user.uid,
         email: user.email,
         displayName: user.displayName || user.email?.split("@")[0] || "Usuario",
         photoURL: user.photoURL || null,
-        role: 'user', // Role por defecto para nuevos usuarios
+        role: 'branch', // Role por defecto para nuevos usuarios
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
@@ -48,9 +48,9 @@ export function LoginForm() {
         updatedAt: serverTimestamp(),
       }
       
-      // Si no tiene role, asignar 'user' por defecto
+      // Si no tiene role, asignar 'branch' por defecto
       if (!userData?.role) {
-        updateData.role = 'user'
+        updateData.role = 'branch'
       }
       
       await setDoc(userRef, updateData, { merge: true })

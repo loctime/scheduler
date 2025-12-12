@@ -69,6 +69,17 @@ export function useEnlacePublico(user: any) {
         throw new Error("No se puede generar un enlace para un pedido que está en proceso de envío o recepción")
       }
 
+      // Verificar si hay un pedido en "processing" y mostrar warning (no bloquear)
+      if (pedidoData.estado === "processing" && pedidoData.assignedTo) {
+        const assignedToNombre = pedidoData.assignedToNombre || "otro usuario"
+        toast({
+          title: "Pedido en proceso",
+          description: `Tenés un pedido en proceso tomado por: ${assignedToNombre}. ¿Deseas crear un nuevo enlace?`,
+          variant: "default",
+        })
+        // No bloquear, solo advertir - continuar con la creación del enlace
+      }
+
       // Desactivar todos los enlaces activos anteriores para este pedido
       const enlacesActivosQuery = query(
         collection(db, COLLECTIONS.ENLACES_PUBLICOS),

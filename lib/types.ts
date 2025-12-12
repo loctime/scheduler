@@ -115,13 +115,15 @@ export interface Pedido {
   stockMinimoDefault: number // Stock mínimo por defecto para nuevos productos
   formatoSalida: string // Formato personalizable con placeholders: {nombre}, {cantidad}, {unidad}
   mensajePrevio?: string // Mensaje que aparece al inicio del pedido (ej: "Pedido de insumos para fábrica:")
-  estado?: "creado" | "enviado" | "recibido" | "completado" // Estado del pedido
+  estado?: "creado" | "processing" | "enviado" | "recibido" | "completado" // Estado del pedido
   remitoEnvioId?: string // ID del remito de envío
   enlacePublicoId?: string // ID para el enlace público
   origenDefault?: string // Origen por defecto (ej: "FABRICA")
   destinoDefault?: string // Destino por defecto (ej: "LOCAL")
   fechaEnvio?: any // Fecha de envío
   fechaRecepcion?: any // Fecha de recepción
+  assignedTo?: string // userId del usuario de fábrica que está procesando el pedido
+  assignedToNombre?: string // Nombre del usuario que tomó el pedido
   userId: string
   createdAt?: any
   updatedAt?: any

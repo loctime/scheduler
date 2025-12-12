@@ -12,6 +12,9 @@ import { Loader2 } from "lucide-react"
 // Páginas permitidas para usuarios invitados
 const ALLOWED_PAGES_FOR_INVITED = ["/dashboard/pedidos"]
 
+// Páginas que requieren rol específico
+const FACTORY_PAGES = ["/dashboard/fabrica", "/dashboard/fabrica/historial"]
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -79,6 +82,10 @@ function ProtectedRoute({
     if (userData) {
       // Si el usuario es invitado y está intentando acceder a una página no permitida
       if (userData.role === "invited" && !ALLOWED_PAGES_FOR_INVITED.includes(pathname)) {
+        router.push("/dashboard/pedidos")
+      }
+      // Si el usuario intenta acceder a páginas de fábrica sin ser factory
+      if (FACTORY_PAGES.some(page => pathname.startsWith(page)) && userData.role !== "factory") {
         router.push("/dashboard/pedidos")
       }
       setChecking(false)

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { 
   Plus, Trash2, Copy, MessageCircle, RotateCcw, Upload, Package, 
   Construction, Pencil, Check, X, Cog, ExternalLink, Link as LinkIcon,
-  FileText, Download, Bell, Loader2, CheckCircle
+  FileText, Download, Bell, Loader2, CheckCircle, AlertTriangle
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
@@ -34,6 +34,7 @@ import {
   DEFAULT_FORMAT 
 } from "@/components/pedidos/pedido-dialogs"
 import { cn } from "@/lib/utils"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 const FORMAT_EXAMPLES = [
   { format: "{nombre} ({cantidad})", example: "Leche (8)" },
@@ -518,8 +519,27 @@ export default function PedidosPage() {
   }
 
   // Función para ejecutar la generación del enlace
+  // Verificar si el pedido está en processing antes de generar enlace
+  const verificarPedidoEnProceso = () => {
+    if (selectedPedido?.estado === "processing" && selectedPedido.assignedTo) {
+      const assignedToNombre = selectedPedido.assignedToNombre || "otro usuario"
+      toast({
+        title: "Pedido en proceso",
+        description: `Este pedido está siendo procesado por: ${assignedToNombre} - Fábrica. ¿Deseas crear un nuevo enlace?`,
+        variant: "default",
+      })
+      return true
+    }
+    return false
+  }
+
   const ejecutarGenerarEnlace = async () => {
     if (!selectedPedido) return
+
+    // Verificar si el pedido está en processing y mostrar warning
+    if (verificarPedidoEnProceso()) {
+      // El warning ya se mostró, continuar con la creación del enlace
+    }
 
     try {
       // Calcular cantidades a pedir solo para productos que realmente necesitan ser pedidos
@@ -967,6 +987,17 @@ export default function PedidosPage() {
                       </Button>
                     </div>
                   </div>
+
+                  {/* Mostrar información si el pedido está asignado */}
+                  {selectedPedido?.estado === "processing" && selectedPedido.assignedTo && (
+                    <Alert className="mt-3">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Pedido en proceso</AlertTitle>
+                      <AlertDescription>
+                        Este pedido está siendo procesado por: <strong>{selectedPedido.assignedToNombre || "Usuario de fábrica"}</strong> - Fábrica
+                      </AlertDescription>
+                    </Alert>
+                  )}
 
                   {/* Fila 2: Tabs - Compactas en móvil */}
                   <div className="flex gap-0.5 sm:gap-1 border-t sm:border-t-0 border-l sm:border-l sm:border-r border-border">

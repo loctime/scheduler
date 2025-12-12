@@ -21,7 +21,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart } from "lucide-react"
+import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Factory } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -38,6 +38,7 @@ const navItems = [
   { href: "/dashboard/horarios-mensuales", label: "Vista Mensual", icon: CalendarDays },
   { href: "/dashboard/empleados", label: "Empleados", icon: Users },
   { href: "/dashboard/pedidos", label: "Pedidos", icon: ShoppingCart },
+  { href: "/dashboard/fabrica", label: "Fábrica", icon: Factory, role: "factory" },
   { href: "/dashboard/configuracion", label: "Configuración", icon: Settings },
 ]
 
@@ -66,7 +67,11 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     if (userData?.role === "invited") {
       return item.href === "/dashboard/pedidos"
     }
-    // Usuarios normales ven todas las páginas
+    // Si el item requiere un rol específico, verificar que el usuario lo tenga
+    if ((item as any).role && userData?.role !== (item as any).role) {
+      return false
+    }
+    // Usuarios normales ven todas las páginas (excepto las que requieren roles específicos)
     return true
   })
 

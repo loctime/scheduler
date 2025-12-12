@@ -1,5 +1,12 @@
 // ========= HORARIOS SCHEDULER =========
 
+// Helper para verificar si el usuario es factory
+function isFactory() {
+  return isAuth() 
+    && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+    && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'factory';
+}
+
 // Helper para verificar si un pedido puede ser actualizado sin autenticación
 function pedidoPuedeActualizarseSinAuth() {
   return !('estado' in resource.data) 
@@ -137,11 +144,12 @@ match /apps/horarios/invitaciones/{invitacionId} {
 
 // Colección: apps/horarios/pedidos
 match /apps/horarios/pedidos/{pedidoId} {
-  // Permitir lectura si es el dueño O si es un usuario invitado del dueño O si no hay autenticación
+  // Permitir lectura si es el dueño O si es un usuario invitado del dueño O si es factory O si no hay autenticación
   allow read: if (isAuth() && resource.data.userId == uid()) 
     || (isAuth() && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
       && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'invited'
       && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId == resource.data.userId)
+    || isFactory()
     || !isAuth();
   // Crear: verificar que userId sea correcto (solo dueños pueden crear)
   allow create: if isAuth() && request.resource.data.userId == uid()
@@ -150,6 +158,7 @@ match /apps/horarios/pedidos/{pedidoId} {
   // Actualizar: 
   // - Si está autenticado como dueño: verificar propiedad y proteger userId
   // - Si está autenticado como invitado: permitir actualizar si el pedido pertenece a su ownerId
+  // - Si es factory: permitir actualizar estado a "processing" o "enviado" y asignar assignedTo
   // - Si NO está autenticado: 
   //   a) Permitir si el pedido NO está en estado "enviado", "recibido" o "completado" (pedidoPuedeActualizarseSinAuth)
   //   b) O permitir actualizar desde "enviado" a "recibido" o "completado" (puedeActualizarEstadoRecepcion)
@@ -168,6 +177,19 @@ match /apps/horarios/pedidos/{pedidoId} {
         || resource.data.estado == "completado")
       )
       && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId))
+    || (isFactory()
+      && (
+        // Factory puede cambiar estado a "processing" o "enviado"
+        (request.resource.data.estado == "processing" || request.resource.data.estado == "enviado")
+        // Y puede asignar assignedTo
+        || ('assignedTo' in request.resource.data)
+        || ('assignedToNombre' in request.resource.data)
+      )
+      // Proteger userId del pedido
+      && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
+      // Permitir actualizar campos relacionados con el flujo de fábrica
+      && (!('remitoEnvioId' in request.resource.data) || request.resource.data.remitoEnvioId != null)
+      && (!('fechaEnvio' in request.resource.data) || request.resource.data.fechaEnvio != null))
     || (!isAuth() 
       && (pedidoPuedeActualizarseSinAuth() || puedeActualizarEstadoRecepcion())
       && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
@@ -291,7 +313,7 @@ match /apps/horarios/stock_actual/{stockId} {
 
 // Colección: apps/horarios/remitos
 match /apps/horarios/remitos/{remitoId} {
-  // Permitir lectura si es el dueño O si es un usuario invitado del dueño O si pertenece a un pedido del usuario
+  // Permitir lectura si es el dueño O si es un usuario invitado del dueño O si pertenece a un pedido del usuario O si es factory
   allow read: if isAuth() && (
     resource.data.userId == uid()
     || (exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
@@ -300,9 +322,11 @@ match /apps/horarios/remitos/{remitoId} {
     || (resource.data.pedidoId != null
       && exists(/databases/$(db)/documents/apps/horarios/pedidos/$(resource.data.pedidoId))
       && get(/databases/$(db)/documents/apps/horarios/pedidos/$(resource.data.pedidoId)).data.userId == uid())
+    || isFactory()
   );
   // Crear: 
   // - Si está autenticado: verificar que userId sea correcto (permite usuarios invitados crear con ownerId)
+  // - Si es factory: permitir crear remitos para pedidos que puede ver (el userId del remito debe ser el del pedido)
   // - Si NO está autenticado: permitir solo si el pedido existe y el userId coincide
   //   (la aplicación controla que el pedido esté en estado válido antes de crear el remito)
   allow create: if (isAuth() && (
@@ -310,6 +334,11 @@ match /apps/horarios/remitos/{remitoId} {
     || (exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
       && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'invited'
       && request.resource.data.userId == get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId)
+    || (isFactory()
+      && request.resource.data.pedidoId != null
+      && exists(/databases/$(db)/documents/apps/horarios/pedidos/$(request.resource.data.pedidoId))
+      && request.resource.data.userId != null
+      && request.resource.data.userId == get(/databases/$(db)/documents/apps/horarios/pedidos/$(request.resource.data.pedidoId)).data.userId)
   ))
     || (!isAuth() 
       && request.resource.data.pedidoId != null
