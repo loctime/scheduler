@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Trash2, Upload, Package, Minus, Plus, GripVertical } from "lucide-react"
+import { Trash2, Upload, Package, Minus, Plus, GripVertical, PlusCircle, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Producto } from "@/lib/types"
 
@@ -15,12 +15,14 @@ interface ProductosTableProps {
   onStockChange: (productId: string, value: number) => void
   onUpdateProduct: (productId: string, field: string, value: string) => Promise<boolean>
   onDeleteProduct: (productId: string) => void
+  onCreateProduct?: (nombre: string, stockMinimo?: number, unidad?: string) => Promise<string | null> // Función para crear producto
   onImport: () => void
   onProductsOrderUpdate?: (newOrder: string[]) => Promise<boolean>
   calcularPedido: (stockMinimo: number, stockActualValue: number | undefined) => number
   ajustesPedido?: Record<string, number> // Ajustes manuales a la cantidad a pedir
   onAjustePedidoChange?: (productId: string, ajuste: number) => void // Función para cambiar el ajuste
   configMode?: boolean
+  stockMinimoDefault?: number // Stock mínimo por defecto para nuevos productos
 }
 
 export function ProductosTable({
@@ -29,12 +31,14 @@ export function ProductosTable({
   onStockChange,
   onUpdateProduct,
   onDeleteProduct,
+  onCreateProduct,
   onImport,
   onProductsOrderUpdate,
   calcularPedido,
   ajustesPedido = {},
   onAjustePedidoChange,
   configMode = false,
+  stockMinimoDefault = 0,
 }: ProductosTableProps) {
   // Sincronizar el modo con configMode del padre
   const mode: TableMode = configMode ? "config" : "pedido"
@@ -42,8 +46,13 @@ export function ProductosTable({
   const [inlineValue, setInlineValue] = useState("")
   const [draggedProductId, setDraggedProductId] = useState<string | null>(null)
   const [dragOverProductId, setDragOverProductId] = useState<string | null>(null)
+  const [isCreatingProduct, setIsCreatingProduct] = useState(false)
+  const [newProductNombre, setNewProductNombre] = useState("")
+  const [newProductStockMinimo, setNewProductStockMinimo] = useState(stockMinimoDefault.toString())
+  const [newProductUnidad, setNewProductUnidad] = useState("U")
   const isNavigatingRef = useRef(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const newProductInputRef = useRef<HTMLInputElement | null>(null)
 
   // Seleccionar texto cuando cambia el campo editado o al navegar
   useEffect(() => {
@@ -179,6 +188,31 @@ export function ProductosTable({
     await onProductsOrderUpdate(newOrder)
   }, [onProductsOrderUpdate, draggedProductId, orderedProductIds])
 
+  // Manejar creación de nuevo producto
+  const handleCreateProduct = useCallback(async () => {
+    if (!onCreateProduct || !newProductNombre.trim()) return
+
+    const stockMinimo = parseInt(newProductStockMinimo, 10) || stockMinimoDefault
+    const unidad = newProductUnidad.trim() || "U"
+
+    const productId = await onCreateProduct(newProductNombre.trim(), stockMinimo, unidad)
+    
+    if (productId) {
+      // Limpiar formulario
+      setNewProductNombre("")
+      setNewProductStockMinimo(stockMinimoDefault.toString())
+      setNewProductUnidad("U")
+      setIsCreatingProduct(false)
+    }
+  }, [onCreateProduct, newProductNombre, newProductStockMinimo, newProductUnidad, stockMinimoDefault])
+
+  // Focus en el input cuando se activa la creación
+  useEffect(() => {
+    if (isCreatingProduct && newProductInputRef.current) {
+      newProductInputRef.current.focus()
+    }
+  }, [isCreatingProduct])
+
   // Empty state
   if (products.length === 0) {
     return (
@@ -209,6 +243,17 @@ export function ProductosTable({
           <h3 className="text-sm font-semibold">Productos</h3>
           <p className="text-[10px] text-muted-foreground">{products.length} productos</p>
         </div>
+        {onCreateProduct && configMode && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsCreatingProduct(true)}
+            className="h-7 text-xs px-2"
+          >
+            <PlusCircle className="h-3.5 w-3.5 mr-1" />
+            Agregar
+          </Button>
+        )}
       </div>
 
       {/* Lista de productos - mobile first */}
@@ -364,6 +409,16 @@ export function ProductosTable({
                         </Button>
                       </div>
                     </div>
+                    
+                    {/* Eliminar en modo pedido */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onDeleteProduct(product.id)}
+                      className="h-7 w-7 shrink-0 opacity-60 hover:opacity-100"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
                   </div>
                 ) : (
                   // MODO CONFIG - Layout compacto
@@ -490,6 +545,77 @@ export function ProductosTable({
               </div>
             )
           })}
+          
+          {/* Formulario para agregar nuevo producto */}
+          {isCreatingProduct && onCreateProduct && configMode && (
+            <div className="px-2 py-2 flex items-center gap-2 border-t border-border bg-muted/30">
+              <div className="flex-1 min-w-0">
+                <Input
+                  ref={newProductInputRef}
+                  value={newProductNombre}
+                  onChange={(e) => setNewProductNombre(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleCreateProduct()
+                    } else if (e.key === "Escape") {
+                      setIsCreatingProduct(false)
+                      setNewProductNombre("")
+                      setNewProductStockMinimo(stockMinimoDefault.toString())
+                      setNewProductUnidad("U")
+                    }
+                  }}
+                  placeholder="Nombre del producto"
+                  className="h-7 text-xs"
+                />
+              </div>
+              
+              <div className="flex flex-col items-center shrink-0">
+                <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Mín</span>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  value={newProductStockMinimo}
+                  onChange={(e) => setNewProductStockMinimo(e.target.value)}
+                  className="h-10 w-16 text-center text-sm font-medium"
+                />
+              </div>
+              
+              <div className="flex flex-col items-center shrink-0">
+                <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Unid</span>
+                <Input
+                  value={newProductUnidad}
+                  onChange={(e) => setNewProductUnidad(e.target.value)}
+                  placeholder="U"
+                  className="h-10 w-16 text-center text-sm font-medium"
+                />
+              </div>
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleCreateProduct}
+                disabled={!newProductNombre.trim()}
+                className="h-7 w-7 shrink-0"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setIsCreatingProduct(false)
+                  setNewProductNombre("")
+                  setNewProductStockMinimo(stockMinimoDefault.toString())
+                  setNewProductUnidad("U")
+                }}
+                className="h-7 w-7 shrink-0"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
       </div>
     </div>
   )

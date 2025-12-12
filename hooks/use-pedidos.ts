@@ -438,6 +438,56 @@ export function usePedidos(user: any) {
     }
   }, [loadProducts, toast])
 
+  // Crear producto individual
+  const createProduct = useCallback(async (nombre: string, stockMinimo?: number, unidad?: string) => {
+    if (!db || !user || !selectedPedido) return null
+
+    if (!nombre.trim()) {
+      toast({ title: "Error", description: "El nombre es requerido", variant: "destructive" })
+      return null
+    }
+
+    try {
+      // Verificar que no exista un producto con el mismo nombre (case-insensitive)
+      const existingNames = products.map(p => p.nombre.toLowerCase())
+      if (existingNames.includes(nombre.trim().toLowerCase())) {
+        toast({ title: "Error", description: "Ya existe un producto con ese nombre", variant: "destructive" })
+        return null
+      }
+
+      // Calcular el orden: máximo orden existente + 1, o 0 si no hay productos
+      const maxOrden = products.length > 0 
+        ? Math.max(...products.map(p => p.orden ?? 0), -1) + 1
+        : 0
+
+      // Si el usuario es invitado, usar ownerId para crear productos
+      const userIdToUse = userData?.role === "invited" && userData?.ownerId 
+        ? userData.ownerId 
+        : user.uid
+
+      const docRef = await addDoc(collection(db, COLLECTIONS.PRODUCTS), {
+        pedidoId: selectedPedido.id,
+        nombre: nombre.trim(),
+        stockMinimo: stockMinimo ?? selectedPedido.stockMinimoDefault,
+        unidad: unidad?.trim() || "U",
+        orden: maxOrden,
+        userId: userIdToUse,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+
+      await loadProducts()
+      
+      toast({ title: "Producto creado", description: `Se ha agregado "${nombre.trim()}"` })
+      
+      return docRef.id
+    } catch (error: any) {
+      logger.error("Error al crear producto:", error)
+      toast({ title: "Error", description: "No se pudo crear el producto", variant: "destructive" })
+      return null
+    }
+  }, [user, userData, selectedPedido, products, loadProducts, toast])
+
   // Eliminar producto
   const deleteProduct = useCallback(async (productId: string) => {
     if (!db) return false
@@ -643,6 +693,7 @@ export function usePedidos(user: any) {
     updatePedido,
     deletePedido,
     importProducts,
+    createProduct,
     updateProduct,
     deleteProduct,
     clearStock,

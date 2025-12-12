@@ -63,6 +63,7 @@ export default function PedidosPage() {
     updatePedido,
     deletePedido,
     importProducts,
+    createProduct,
     updateProduct,
     deleteProduct,
     clearStock,
@@ -1176,12 +1177,14 @@ export default function PedidosPage() {
                   onStockChange={handleStockChange}
                   onUpdateProduct={updateProduct}
                   onDeleteProduct={deleteProduct}
+                  onCreateProduct={createProduct}
                   onImport={() => setImportDialogOpen(true)}
                   onProductsOrderUpdate={updateProductsOrder}
                   calcularPedido={calcularPedido}
                   ajustesPedido={ajustesPedido}
                   onAjustePedidoChange={handleAjustePedidoChange}
                   configMode={showConfig}
+                  stockMinimoDefault={selectedPedido?.stockMinimoDefault ?? 0}
                 />
               ) : activeTab === "recepcion" ? (
                 <div className="space-y-3 md:space-y-4">
