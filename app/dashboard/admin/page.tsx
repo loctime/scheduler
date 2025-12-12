@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,7 +26,7 @@ import { useData } from "@/contexts/data-context"
 import { useAdminUsers, UserRole, UserData } from "@/hooks/use-admin-users"
 import { useGroups } from "@/hooks/use-groups"
 import { useInvitaciones } from "@/hooks/use-invitaciones"
-import { Shield, Loader2, Search, UserPlus, Copy, Check, Users, Link as LinkIcon, Mail, FolderTree, Plus, Trash2 } from "lucide-react"
+import { Shield, Loader2, Search, UserPlus, Copy, Check, Users, Link as LinkIcon, Mail, FolderTree, Plus, Trash2, X } from "lucide-react"
 import { Group } from "@/lib/types"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -54,6 +54,23 @@ export default function AdminPage() {
   const [nombreGrupo, setNombreGrupo] = useState("")
   const [managerIdGrupo, setManagerIdGrupo] = useState<string>("")
   const [creandoGrupo, setCreandoGrupo] = useState(false)
+  
+  // Estados para selector múltiple de usuarios
+  const [usuariosSeleccionados, setUsuariosSeleccionados] = useState<Record<string, string[]>>({}) // grupoId -> userIds[]
+  const [agregandoUsuarios, setAgregandoUsuarios] = useState<Record<string, boolean>>({}) // grupoId -> boolean
+  
+  // Estado local para grupos (para actualizaciones reactivas)
+  const [gruposLocales, setGruposLocales] = useState<Group[]>(groups)
+  
+  // Sincronizar grupos locales con grupos del hook
+  useEffect(() => {
+    setGruposLocales(groups)
+  }, [groups])
+  
+  // Función helper para obtener grupos de un usuario
+  const obtenerGruposDeUsuario = useCallback((userId: string) => {
+    return gruposLocales.filter(grupo => grupo.userIds.includes(userId))
+  }, [gruposLocales])
 
   const usuariosFiltrados = useMemo(() => {
     let filtrados = users
@@ -148,6 +165,8 @@ export default function AdminPage() {
     switch (role) {
       case "admin":
         return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+      case "manager":
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
       case "factory":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
       case "branch":
@@ -219,7 +238,8 @@ export default function AdminPage() {
                     <SelectContent>
                       <SelectItem value="branch">Sucursal</SelectItem>
                       <SelectItem value="factory">Fábrica</SelectItem>
-                      <SelectItem value="admin">Administrador</SelectItem>
+                      <SelectItem value="manager">Gerente</SelectItem>
+                      <SelectItem value="admin">Administrador (Developer)</SelectItem>
                       <SelectItem value="invited">Invitado</SelectItem>
                     </SelectContent>
                   </Select>
@@ -291,6 +311,7 @@ export default function AdminPage() {
                 <SelectContent>
                   <SelectItem value="todos">Todos los roles</SelectItem>
                   <SelectItem value="admin">Administrador</SelectItem>
+                  <SelectItem value="manager">Gerente</SelectItem>
                   <SelectItem value="factory">Fábrica</SelectItem>
                   <SelectItem value="branch">Sucursal</SelectItem>
                   <SelectItem value="invited">Invitado</SelectItem>
@@ -337,6 +358,24 @@ export default function AdminPage() {
                           Invitado por: {usuario.ownerId.substring(0, 8)}...
                         </p>
                       )}
+                      {(() => {
+                        const gruposUsuario = obtenerGruposDeUsuario(usuario.id)
+                        if (gruposUsuario.length > 0) {
+                          return (
+                            <div className="mt-2">
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Grupos:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {gruposUsuario.map(grupo => (
+                                  <Badge key={grupo.id} variant="outline" className="text-xs">
+                                    {grupo.nombre}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        }
+                        return null
+                      })()}
                       <div className="pt-2 border-t">
                         <label className="text-xs font-medium mb-2 block">Cambiar rol:</label>
                         <Select
@@ -347,10 +386,11 @@ export default function AdminPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="branch">Sucursal</SelectItem>
-                            <SelectItem value="factory">Fábrica</SelectItem>
-                            <SelectItem value="admin">Administrador</SelectItem>
-                            <SelectItem value="invited">Invitado</SelectItem>
+                  <SelectItem value="branch">Sucursal</SelectItem>
+                  <SelectItem value="factory">Fábrica</SelectItem>
+                  <SelectItem value="manager">Gerente</SelectItem>
+                  <SelectItem value="admin">Administrador</SelectItem>
+                  <SelectItem value="invited">Invitado</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -469,7 +509,7 @@ export default function AdminPage() {
               </Card>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {groups.map((grupo) => {
+                {gruposLocales.map((grupo) => {
                   const manager = users.find(u => u.id === grupo.managerId)
                   const usuariosGrupo = users.filter(u => grupo.userIds.includes(u.id))
                   return (
@@ -481,7 +521,15 @@ export default function AdminPage() {
                           size="icon"
                           onClick={async () => {
                             if (confirm(`¿Eliminar el grupo "${grupo.nombre}"?`)) {
-                              await eliminarGrupo(grupo.id)
+                              // Actualización optimista
+                              setGruposLocales((prev: Group[]) => prev.filter((g: Group) => g.id !== grupo.id))
+                              try {
+                                await eliminarGrupo(grupo.id)
+                                // Los grupos se sincronizarán automáticamente
+                              } catch (error) {
+                                // Revertir en caso de error
+                                await recargarGrupos()
+                              }
                             }
                           }}
                         >
@@ -496,27 +544,135 @@ export default function AdminPage() {
                           <strong>Usuarios:</strong> {usuariosGrupo.length}
                         </p>
                         <div className="space-y-2">
-                          <label className="text-xs font-medium">Agregar usuario al grupo:</label>
-                          <Select
-                            onValueChange={async (userId) => {
-                              await agregarUsuarioAGrupo(grupo.id, userId)
-                              await recargarUsuarios()
-                            }}
-                          >
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue placeholder="Seleccionar usuario" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {users
-                                .filter(u => u.role === "branch" || u.role === "factory")
-                                .filter(u => !grupo.userIds.includes(u.id))
-                                .map(user => (
-                                  <SelectItem key={user.id} value={user.id}>
-                                    {user.displayName || user.email}
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
+                          <label className="text-xs font-medium">Agregar usuarios al grupo:</label>
+                          {(() => {
+                            const usuariosDisponibles = users
+                              .filter(u => (u.role === "branch" || u.role === "factory" || !u.role))
+                              .filter(u => !grupo.userIds.includes(u.id))
+                              .filter(u => u.id !== grupo.managerId) // Excluir al manager del grupo
+                            
+                            const seleccionados = usuariosSeleccionados[grupo.id] || []
+                            
+                            if (usuariosDisponibles.length === 0) {
+                              return (
+                                <p className="text-xs text-muted-foreground">
+                                  No hay usuarios disponibles para agregar
+                                </p>
+                              )
+                            }
+                            
+                            return (
+                              <div className="space-y-2">
+                                <Select
+                                  onValueChange={(userId) => {
+                                    if (!seleccionados.includes(userId)) {
+                                      setUsuariosSeleccionados(prev => ({
+                                        ...prev,
+                                        [grupo.id]: [...seleccionados, userId]
+                                      }))
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue placeholder="Seleccionar usuarios..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {usuariosDisponibles
+                                      .filter(u => !seleccionados.includes(u.id))
+                                      .map(user => (
+                                        <SelectItem key={user.id} value={user.id}>
+                                          {user.displayName || user.email} {user.role && `(${getRoleLabel(user.role)})`}
+                                        </SelectItem>
+                                      ))}
+                                  </SelectContent>
+                                </Select>
+                                
+                                {seleccionados.length > 0 && (
+                                  <div className="space-y-2">
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {seleccionados.map(userId => {
+                                        const user = users.find(u => u.id === userId)
+                                        if (!user) return null
+                                        return (
+                                          <Badge key={userId} variant="secondary" className="text-xs flex items-center gap-1">
+                                            {user.displayName || user.email}
+                                            <button
+                                              onClick={() => {
+                                                setUsuariosSeleccionados(prev => ({
+                                                  ...prev,
+                                                  [grupo.id]: seleccionados.filter(id => id !== userId)
+                                                }))
+                                              }}
+                                              className="ml-1 hover:bg-destructive/20 rounded-full p-0.5"
+                                            >
+                                              <X className="h-3 w-3" />
+                                            </button>
+                                          </Badge>
+                                        )
+                                      })}
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      className="w-full h-7 text-xs"
+                                      onClick={async () => {
+                                        if (seleccionados.length === 0) return
+                                        
+                                        setAgregandoUsuarios((prev: Record<string, boolean>) => ({ ...prev, [grupo.id]: true }))
+                                        
+                                        try {
+                                          // Actualización optimista: actualizar estado local primero
+                                          setGruposLocales((prev: Group[]) => prev.map((g: Group) => 
+                                            g.id === grupo.id 
+                                              ? { ...g, userIds: [...g.userIds, ...seleccionados] }
+                                              : g
+                                          ))
+                                          
+                                          // Agregar todos los usuarios seleccionados
+                                          await Promise.all(
+                                            seleccionados.map((userId: string) => agregarUsuarioAGrupo(grupo.id, userId))
+                                          )
+                                          
+                                          // Limpiar selección
+                                          setUsuariosSeleccionados((prev: Record<string, string[]>) => {
+                                            const newState = { ...prev }
+                                            delete newState[grupo.id]
+                                            return newState
+                                          })
+                                          
+                                          // Sincronizar con el servidor (sin recargar toda la página)
+                                          await recargarGrupos()
+                                        } catch (error) {
+                                          console.error("Error al agregar usuarios:", error)
+                                          // Revertir actualización optimista en caso de error
+                                          await recargarGrupos()
+                                          toast({
+                                            title: "Error",
+                                            description: "No se pudieron agregar todos los usuarios. Revirtiendo cambios...",
+                                            variant: "destructive",
+                                          })
+                                        } finally {
+                                          setAgregandoUsuarios((prev: Record<string, boolean>) => ({ ...prev, [grupo.id]: false }))
+                                        }
+                                      }}
+                                      disabled={agregandoUsuarios[grupo.id] || seleccionados.length === 0}
+                                    >
+                                      {agregandoUsuarios[grupo.id] ? (
+                                        <>
+                                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                          Agregando...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Plus className="h-3 w-3 mr-1" />
+                                          Agregar {seleccionados.length} usuario{seleccionados.length > 1 ? 's' : ''}
+                                        </>
+                                      )}
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })()}
                         </div>
                         {usuariosGrupo.length > 0 && (
                           <div className="pt-2 border-t">
@@ -530,8 +686,27 @@ export default function AdminPage() {
                                     size="sm"
                                     className="h-6 px-2"
                                     onClick={async () => {
-                                      await removerUsuarioDeGrupo(grupo.id, user.id)
-                                      await recargarUsuarios()
+                                      // Actualización optimista: actualizar estado local primero
+                                      setGruposLocales((prev: Group[]) => prev.map((g: Group) => 
+                                        g.id === grupo.id 
+                                          ? { ...g, userIds: g.userIds.filter((id: string) => id !== user.id) }
+                                          : g
+                                      ))
+                                      
+                                      try {
+                                        await removerUsuarioDeGrupo(grupo.id, user.id)
+                                        // Sincronizar con el servidor (sin recargar toda la página)
+                                        await recargarGrupos()
+                                      } catch (error) {
+                                        console.error("Error al remover usuario:", error)
+                                        // Revertir actualización optimista en caso de error
+                                        await recargarGrupos()
+                                        toast({
+                                          title: "Error",
+                                          description: "No se pudo remover el usuario. Revirtiendo cambios...",
+                                          variant: "destructive",
+                                        })
+                                      }
                                     }}
                                   >
                                     <Trash2 className="h-3 w-3" />
@@ -614,10 +789,11 @@ export default function AdminPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="branch">Sucursal</SelectItem>
-                            <SelectItem value="factory">Fábrica</SelectItem>
-                            <SelectItem value="admin">Administrador</SelectItem>
-                            <SelectItem value="invited">Invitado</SelectItem>
+                  <SelectItem value="branch">Sucursal</SelectItem>
+                  <SelectItem value="factory">Fábrica</SelectItem>
+                  <SelectItem value="manager">Gerente</SelectItem>
+                  <SelectItem value="admin">Administrador</SelectItem>
+                  <SelectItem value="invited">Invitado</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

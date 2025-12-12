@@ -64,6 +64,13 @@ function esManagerDelGrupoDelUsuario(userId: string) {
     && get(/databases/$(db)/documents/apps/horarios/users/$(userId)).data.grupoIds.size() > 0;
 }
 
+// Helper para verificar si el manager es manager de un grupo específico
+function esManagerDelGrupo(grupoId: string) {
+  if (!isManager()) return false;
+  return exists(/databases/$(db)/documents/apps/horarios/groups/$(grupoId))
+    && get(/databases/$(db)/documents/apps/horarios/groups/$(grupoId)).data.managerId == uid();
+}
+
 // Helper para verificar si un pedido puede ser actualizado sin autenticación
 function pedidoPuedeActualizarseSinAuth() {
   return !('estado' in resource.data) 
@@ -86,14 +93,14 @@ match /apps/horarios/users/{userId} {
   // - El usuario puede leer su propio documento
   // - El dueño puede leer documentos de usuarios invitados vinculados a sus invitaciones
   // - Admin puede leer todos los usuarios
-  // - Manager puede leer usuarios de sus grupos
+  // - Manager puede leer todos los usuarios (la aplicación filtrará por grupos)
   allow read: if isAuth() && (
     userId == uid()
     || (exists(/databases/$(db)/documents/apps/horarios/users/$(userId))
       && get(/databases/$(db)/documents/apps/horarios/users/$(userId)).data.role == 'invited'
       && get(/databases/$(db)/documents/apps/horarios/users/$(userId)).data.ownerId == uid())
     || isAdmin()
-    || (isManager() && esManagerDelGrupoDelUsuario(userId))
+    || isManager() // Manager puede leer todos los usuarios para filtrar en la aplicación
   );
   // Crear: el usuario puede crear su propio documento
   allow create: if isAuth() && userId == uid();
@@ -146,12 +153,11 @@ match /apps/horarios/users/{userId} {
 match /apps/horarios/groups/{groupId} {
   // Permitir lectura:
   // - Admin puede leer todos los grupos
-  // - Manager puede leer grupos donde es manager
+  // - Manager puede leer todos los grupos (la aplicación filtrará por grupos donde es manager)
   // - Usuarios pueden leer grupos a los que pertenecen
   allow read: if isAuth() && (
     isAdmin()
-    || (isManager() && exists(/databases/$(db)/documents/apps/horarios/groups/$(groupId))
-      && get(/databases/$(db)/documents/apps/horarios/groups/$(groupId)).data.managerId == uid())
+    || isManager() // Manager puede leer todos los grupos para filtrar en la aplicación
     || (exists(/databases/$(db)/documents/apps/horarios/groups/$(groupId))
       && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
       && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.grupoIds != null
