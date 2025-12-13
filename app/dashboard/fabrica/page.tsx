@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -8,18 +8,41 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useData } from "@/contexts/data-context"
 import { useFabricaPedidos } from "@/hooks/use-fabrica-pedidos"
-import { Package, Loader2, ExternalLink, Clock, CheckCircle2, FileText } from "lucide-react"
+import { Package, Loader2, Clock, CheckCircle2, FileText, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { db, COLLECTIONS } from "@/lib/firebase"
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, serverTimestamp, addDoc } from "firebase/firestore"
+import type { Pedido, Producto, EnlacePublico, Configuracion, Remito } from "@/lib/types"
+import { FabricaPedidoForm } from "@/components/fabrica/pedido-form"
+import { FirmaRemitoDialog } from "@/components/fabrica/firma-remito-dialog"
+import { generarNumeroRemito, crearRemitoEnvioDesdeDisponibles } from "@/lib/remito-utils"
+import { useRemitos } from "@/hooks/use-remitos"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { logger } from "@/lib/logger"
 
 type FiltroEstado = "todos" | "pendientes" | "en-proceso"
+
+interface PedidoExpandido {
+  pedidoId: string
+  productos: Producto[]
+  enlacePublico?: EnlacePublico
+  nombreEmpresa: string
+  loading: boolean
+}
 
 export default function FabricaPage() {
   const { user } = useData()
   const router = useRouter()
-  const { pedidos, loading, obtenerUsuarioAsignado, usuariosMap, tieneGrupos, userIdsDelGrupo, sucursalesDelGrupo } = useFabricaPedidos(user)
+  const { pedidos, loading, obtenerUsuarioAsignado, usuariosMap, tieneGrupos, userIdsDelGrupo, sucursalesDelGrupo, aceptarPedido } = useFabricaPedidos(user)
+  const { crearRemito } = useRemitos(user)
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("todos")
+  const [pedidoExpandido, setPedidoExpandido] = useState<string | null>(null)
+  const [pedidosExpandidos, setPedidosExpandidos] = useState<Record<string, PedidoExpandido>>({})
+  const [mostrarFirmaDialog, setMostrarFirmaDialog] = useState(false)
+  const [productosDisponiblesPendientes, setProductosDisponiblesPendientes] = useState<EnlacePublico["productosDisponibles"] | null>(null)
+  const [aceptandoPedido, setAceptandoPedido] = useState<string | null>(null)
 
   // Filtrar pedidos según el filtro seleccionado
   const pedidosFiltrados = useMemo(() => {
@@ -50,6 +73,214 @@ export default function FabricaPage() {
     }
   }
 
+  // Cargar datos del pedido cuando se expande
+  const cargarDatosPedido = async (pedido: Pedido) => {
+    if (!db || pedidosExpandidos[pedido.id]) return
+
+    setPedidosExpandidos(prev => ({
+      ...prev,
+      [pedido.id]: {
+        pedidoId: pedido.id,
+        productos: [],
+        nombreEmpresa: "",
+        loading: true,
+      }
+    }))
+
+    try {
+      // Obtener configuración para nombre de empresa
+      let nombreEmpresa = "Empresa"
+      if (pedido.userId) {
+        try {
+          const configDoc = await getDoc(doc(db, COLLECTIONS.CONFIG, pedido.userId))
+          if (configDoc.exists()) {
+            const config = configDoc.data() as Configuracion
+            nombreEmpresa = config.nombreEmpresa || "Empresa"
+          }
+        } catch (err) {
+          logger.error("Error al cargar configuración:", err)
+        }
+      }
+
+      // Buscar enlace público activo
+      const enlacesQuery = query(
+        collection(db, COLLECTIONS.ENLACES_PUBLICOS),
+        where("pedidoId", "==", pedido.id),
+        where("activo", "==", true)
+      )
+      const enlacesSnapshot = await getDocs(enlacesQuery)
+      
+      let productos: Producto[] = []
+      let enlacePublico: EnlacePublico | undefined
+
+      if (!enlacesSnapshot.empty) {
+        enlacePublico = { id: enlacesSnapshot.docs[0].id, ...enlacesSnapshot.docs[0].data() } as EnlacePublico
+
+        // Usar snapshot de productos si existe
+        if (enlacePublico.productosSnapshot && enlacePublico.productosSnapshot.length > 0) {
+          productos = enlacePublico.productosSnapshot
+            .filter(p => (p.cantidadPedida ?? 0) > 0)
+            .map(p => ({
+              id: p.id,
+              pedidoId: pedido.id,
+              nombre: p.nombre,
+              stockMinimo: p.stockMinimo,
+              cantidadPedida: p.cantidadPedida ?? 0,
+              unidad: p.unidad,
+              orden: p.orden,
+              userId: pedido.userId,
+            })) as Producto[]
+        } else {
+          // Fallback: leer productos dinámicamente
+          const productosQuery = query(
+            collection(db, COLLECTIONS.PRODUCTS),
+            where("pedidoId", "==", pedido.id),
+            where("userId", "==", pedido.userId)
+          )
+          const productosSnapshot = await getDocs(productosQuery)
+          productos = productosSnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as Producto[]
+          productos.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+        }
+      } else {
+        // No hay enlace público, leer productos directamente
+        const productosQuery = query(
+          collection(db, COLLECTIONS.PRODUCTS),
+          where("pedidoId", "==", pedido.id),
+          where("userId", "==", pedido.userId)
+        )
+        const productosSnapshot = await getDocs(productosQuery)
+        productos = productosSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Producto[]
+        productos.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+      }
+
+      setPedidosExpandidos(prev => ({
+        ...prev,
+        [pedido.id]: {
+          pedidoId: pedido.id,
+          productos,
+          enlacePublico,
+          nombreEmpresa,
+          loading: false,
+        }
+      }))
+    } catch (err: any) {
+      logger.error("Error al cargar datos del pedido:", err)
+      setPedidosExpandidos(prev => ({
+        ...prev,
+        [pedido.id]: {
+          pedidoId: pedido.id,
+          productos: [],
+          nombreEmpresa: "Empresa",
+          loading: false,
+        }
+      }))
+    }
+  }
+
+  // Toggle expandir/colapsar pedido
+  const togglePedido = (pedido: Pedido) => {
+    if (pedidoExpandido === pedido.id) {
+      setPedidoExpandido(null)
+    } else {
+      setPedidoExpandido(pedido.id)
+      cargarDatosPedido(pedido)
+    }
+  }
+
+  // Manejar aceptar pedido
+  const handleAceptarPedido = async (pedido: Pedido) => {
+    setAceptandoPedido(pedido.id)
+    const exito = await aceptarPedido(pedido.id)
+    setAceptandoPedido(null)
+    
+    if (exito) {
+      // Recargar datos del pedido
+      await cargarDatosPedido(pedido)
+    }
+  }
+
+  // Manejar generar remito
+  const handleGenerarRemito = async (
+    pedido: Pedido,
+    productosDisponibles: EnlacePublico["productosDisponibles"]
+  ) => {
+    setProductosDisponiblesPendientes(productosDisponibles)
+    setMostrarFirmaDialog(true)
+  }
+
+  // Confirmar firma y generar remito
+  const handleConfirmarFirma = async (firma: { nombre: string; firma?: string }) => {
+    if (!pedidoExpandido || !productosDisponiblesPendientes || !db) return
+
+    const pedido = pedidos.find(p => p.id === pedidoExpandido)
+    if (!pedido) return
+
+    const datosExpandidos = pedidosExpandidos[pedidoExpandido]
+    if (!datosExpandidos) return
+
+    try {
+      // Convertir array a Record
+      const productosDisponiblesRecord = productosDisponiblesPendientes.reduce((acc, item) => {
+        acc[item.productoId] = {
+          disponible: item.disponible,
+          cantidadEnviada: item.cantidadEnviar,
+        }
+        return acc
+      }, {} as Record<string, { disponible: boolean; cantidadEnviada?: number }>)
+
+      // Crear datos del remito
+      const remitoData = crearRemitoEnvioDesdeDisponibles(
+        pedido,
+        datosExpandidos.productos,
+        productosDisponiblesRecord
+      )
+
+      if (!remitoData.productos || remitoData.productos.length === 0) {
+        throw new Error("No hay productos para enviar")
+      }
+
+      // Generar número de remito
+      const numeroRemito = await generarNumeroRemito(db, COLLECTIONS, pedido.nombre)
+
+      // Crear remito con firma
+      const remitoParaGuardar = {
+        ...remitoData,
+        numero: numeroRemito,
+        firmaEnvio: firma,
+        createdAt: serverTimestamp(),
+      }
+
+      const remitoRef = await addDoc(collection(db, COLLECTIONS.REMITOS), remitoParaGuardar)
+
+      // Actualizar pedido: estado "enviado", fechaEnvio, y vincular remito
+      await updateDoc(doc(db, COLLECTIONS.PEDIDOS, pedido.id), {
+        estado: "enviado",
+        remitoEnvioId: remitoRef.id,
+        fechaEnvio: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+
+      // Desactivar enlace público si existe
+      if (datosExpandidos.enlacePublico) {
+        await updateDoc(doc(db, COLLECTIONS.ENLACES_PUBLICOS, datosExpandidos.enlacePublico.id), {
+          activo: false,
+        })
+      }
+
+      setMostrarFirmaDialog(false)
+      setPedidoExpandido(null)
+    } catch (error: any) {
+      logger.error("Error al generar remito:", error)
+      alert(`Error al generar el remito: ${error?.message || "Error desconocido"}`)
+    }
+  }
+
   if (loading) {
     return (
       <DashboardLayout user={user}>
@@ -62,35 +293,36 @@ export default function FabricaPage() {
 
   return (
     <DashboardLayout user={user}>
-      <div className="space-y-4 sm:space-y-6 px-1 sm:px-0">
+      <div className="space-y-2 sm:space-y-3 px-1 sm:px-0">
         {/* Header - Mobile-first */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex-1 min-w-0">
+        <div className="flex flex-col gap-2 sm:gap-0">
+          <div className="flex items-center justify-between gap-2 sm:gap-3">
             <h1 className="text-2xl sm:text-3xl font-bold">Panel de Fábrica</h1>
-            <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
-              Gestiona los pedidos pendientes de las sucursales de tu grupo
-            </p>
-            {sucursalesDelGrupo.length > 0 && (
-              <div className="mt-2 sm:mt-3 flex flex-wrap gap-1.5 sm:gap-2">
-                <span className="text-xs text-muted-foreground">Sucursales:</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={() => router.push("/dashboard/fabrica/historial")}
+            >
+              <FileText className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Historial de Remitos</span>
+              <span className="sm:hidden">Historial</span>
+            </Button>
+          </div>
+          <div className="text-sm sm:text-base text-muted-foreground">
+            <span>Gestiona los pedidos de: </span>
+            {sucursalesDelGrupo.length > 0 ? (
+              <span className="inline-flex flex-wrap gap-1.5 sm:gap-2 items-center">
                 {sucursalesDelGrupo.map((sucursal) => (
                   <Badge key={sucursal.userId} variant="outline" className="text-xs">
                     {sucursal.nombreEmpresa}
                   </Badge>
                 ))}
-              </div>
+              </span>
+            ) : (
+              <span>las sucursales de tu grupo</span>
             )}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full sm:w-auto shrink-0"
-            onClick={() => router.push("/dashboard/fabrica/historial")}
-          >
-            <FileText className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Historial de Remitos</span>
-            <span className="sm:hidden">Historial</span>
-          </Button>
         </div>
 
         {/* Tabs - Scrollable en móvil */}
@@ -111,7 +343,7 @@ export default function FabricaPage() {
             </div>
           </div>
 
-          <TabsContent value={filtroEstado} className="mt-4 sm:mt-6">
+          <TabsContent value={filtroEstado} className="mt-1 sm:mt-2">
             {pedidosFiltrados.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-8 sm:py-12 px-4">
@@ -140,63 +372,144 @@ export default function FabricaPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="space-y-2 sm:space-y-3">
                 {pedidosFiltrados.map((pedido) => {
                   const usuarioAsignado = obtenerUsuarioAsignado(pedido)
                   const nombreSucursal = obtenerNombreSucursal(pedido)
-                  const estaAsignado = pedido.estado === "processing" && pedido.assignedTo
+                  const estaAsignado = !!(pedido.estado === "processing" && pedido.assignedTo)
+                  const esMiPedido = pedido.assignedTo === user?.uid
+                  const puedeGenerarRemito = pedido.estado === "processing" && esMiPedido
+                  const estaExpandido = pedidoExpandido === pedido.id
+                  const datosExpandidos = pedidosExpandidos[pedido.id]
+                  const estaAceptando = aceptandoPedido === pedido.id
+
+                  const cantidadProductos = datosExpandidos?.productos?.length || null
+                  const nombreEmpresaExpandida = datosExpandidos?.nombreEmpresa || nombreSucursal
 
                   return (
-                    <Card key={pedido.id} className="hover:shadow-md transition-shadow">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between gap-2">
+                    <Card key={pedido.id} className="hover:shadow-md transition-shadow p-0 gap-0">
+                      <CardHeader 
+                        className="pb-2 cursor-pointer px-0 pt-0 gap-0"
+                        onClick={() => togglePedido(pedido)}
+                      >
+                        <div className="flex items-center justify-between gap-2 px-3 sm:px-4 pt-3 sm:pt-4">
                           <div className="flex-1 min-w-0">
-                            <CardTitle className="text-base sm:text-lg truncate">{pedido.nombre}</CardTitle>
-                            <CardDescription className="mt-1 text-xs sm:text-sm truncate">
-                              {nombreSucursal}
-                            </CardDescription>
+                            <div className="flex items-center gap-2 mb-1">
+                              <CardTitle className="text-sm sm:text-base font-semibold truncate">{pedido.nombre}</CardTitle>
+                              {estaExpandido ? (
+                                <ChevronUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
+                              ) : (
+                                <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                              <span className="truncate">{nombreEmpresaExpandida}</span>
+                              {cantidadProductos !== null && (
+                                <>
+                                  <span>•</span>
+                                  <span>{cantidadProductos} {cantidadProductos === 1 ? 'artículo' : 'artículos'}</span>
+                                </>
+                              )}
+                              {estaAsignado && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-primary font-medium">
+                                    {pedido.assignedToNombre || usuarioAsignado?.displayName || "Usuario"}
+                                  </span>
+                                </>
+                              )}
+                            </div>
                           </div>
-                          <Badge
-                            variant={
-                              pedido.estado === "processing"
-                                ? "default"
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            <Badge
+                              variant={
+                                pedido.estado === "processing"
+                                  ? "default"
+                                  : pedido.estado === "creado" || !pedido.estado
+                                  ? "secondary"
+                                  : "outline"
+                              }
+                              className="text-xs"
+                            >
+                              {pedido.estado === "processing"
+                                ? "En proceso"
                                 : pedido.estado === "creado" || !pedido.estado
-                                ? "secondary"
-                                : "outline"
-                            }
-                            className="shrink-0 text-xs"
-                          >
-                            {pedido.estado === "processing"
-                              ? "En proceso"
-                              : pedido.estado === "creado" || !pedido.estado
-                              ? "Pendiente"
-                              : pedido.estado || "Sin estado"}
-                          </Badge>
+                                ? "Pendiente"
+                                : pedido.estado || "Sin estado"}
+                            </Badge>
+                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                              <Clock className="h-3 w-3 shrink-0" />
+                              <span>{formatearFecha(pedido.createdAt).split(' ')[0]}</span>
+                            </div>
+                          </div>
                         </div>
                       </CardHeader>
-                      <CardContent className="space-y-3 sm:space-y-4 pt-0">
-                        <div className="text-xs sm:text-sm text-muted-foreground space-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-                            <span className="truncate">{formatearFecha(pedido.createdAt)}</span>
+                      <CardContent className="pt-0 pb-0 px-0">
+
+                        {/* Contenido expandido */}
+                        {estaExpandido && (
+                          <div className="pt-2 border-t space-y-3 px-3 sm:px-4 pb-3 sm:pb-4">
+                            {datosExpandidos?.loading ? (
+                              <div className="flex items-center justify-center py-8">
+                                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                              </div>
+                            ) : datosExpandidos ? (
+                              <>
+                                {estaAsignado && !esMiPedido && (
+                                  <Alert variant="destructive" className="text-sm">
+                                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                                    <AlertTitle className="text-sm">Pedido ya asignado</AlertTitle>
+                                    <AlertDescription className="text-xs sm:text-sm">
+                                      Este pedido ya fue tomado por: <strong>{pedido.assignedToNombre || "otro usuario"}</strong> - Fábrica
+                                    </AlertDescription>
+                                  </Alert>
+                                )}
+
+                                {estaAsignado && esMiPedido && (
+                                  <Alert className="text-sm">
+                                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                                    <AlertTitle className="text-sm">Pedido en proceso</AlertTitle>
+                                    <AlertDescription className="text-xs sm:text-sm">
+                                      Este pedido está siendo procesado por ti. Puedes generar el remito cuando esté listo.
+                                    </AlertDescription>
+                                  </Alert>
+                                )}
+
+                                <div>
+                                  <h4 className="text-sm font-semibold mb-2">Productos solicitados</h4>
+                                  <FabricaPedidoForm
+                                    productos={datosExpandidos.productos}
+                                    enlacePublico={datosExpandidos.enlacePublico}
+                                    onGenerarRemito={(productosDisponibles) => handleGenerarRemito(pedido, productosDisponibles)}
+                                    pedido={pedido}
+                                    puedeGenerarRemito={puedeGenerarRemito}
+                                  />
+                                </div>
+
+                                {pedido.estado === "creado" || !pedido.estado ? (
+                                  <Button
+                                    onClick={() => handleAceptarPedido(pedido)}
+                                    disabled={!!estaAceptando || estaAsignado}
+                                    className="w-full"
+                                    size="lg"
+                                  >
+                                    {estaAceptando ? (
+                                      <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Aceptando...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                                        Aceptar pedido
+                                      </>
+                                    )}
+                                  </Button>
+                                ) : null}
+                              </>
+                            ) : null}
                           </div>
-                          {estaAsignado && (
-                            <div className="flex items-start gap-2">
-                              <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0 mt-0.5" />
-                              <span className="text-primary font-medium text-xs sm:text-sm break-words">
-                                Tomado por: {pedido.assignedToNombre || usuarioAsignado?.displayName || "Usuario"}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <Button
-                          className="w-full text-sm"
-                          size="sm"
-                          onClick={() => router.push(`/dashboard/fabrica/${pedido.id}`)}
-                        >
-                          <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
-                          Abrir pedido
-                        </Button>
+                        )}
                       </CardContent>
                     </Card>
                   )
@@ -206,6 +519,18 @@ export default function FabricaPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Dialog de firma de remito */}
+      {mostrarFirmaDialog && productosDisponiblesPendientes && pedidoExpandido && (
+        <FirmaRemitoDialog
+          open={!!mostrarFirmaDialog}
+          onOpenChange={(open) => setMostrarFirmaDialog(open)}
+          onConfirm={handleConfirmarFirma}
+          nombrePedido={pedidos.find(p => p.id === pedidoExpandido)?.nombre || "Pedido"}
+          productos={pedidosExpandidos[pedidoExpandido]?.productos || []}
+          productosDisponibles={productosDisponiblesPendientes}
+        />
+      )}
     </DashboardLayout>
   )
 }

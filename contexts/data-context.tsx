@@ -14,6 +14,7 @@ interface UserData {
   photoURL?: string
   role?: string
   ownerId?: string
+  grupoIds?: string[]
 }
 
 interface DataContextType {
@@ -108,6 +109,7 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
           photoURL: data.photoURL || user.photoURL,
           role: data.role || "user",
           ownerId: data.ownerId,
+          grupoIds: data.grupoIds || [],
         })
       } else {
         // Si no existe el documento, crear uno por defecto
@@ -117,6 +119,7 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
           displayName: user.displayName,
           photoURL: user.photoURL,
           role: "user",
+          grupoIds: [],
         })
       }
     } catch (err: any) {
@@ -128,6 +131,7 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
         displayName: user.displayName,
         photoURL: user.photoURL,
         role: "user",
+        grupoIds: [],
       })
     }
   }, [user])
