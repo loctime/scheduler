@@ -511,8 +511,10 @@ export function useScheduleUpdates({
             const userData = userDoc.data()
             const userRole = userData?.role
             
-            if (!userRole || (userRole !== 'user' && userRole !== 'admin' && userRole !== 'maxdev')) {
-              throw new Error(`El usuario no tiene un rol válido. Rol actual: ${userRole || 'ninguno'}. Se requiere: 'user', 'admin' o 'maxdev'`)
+            // Validar que el usuario tenga un rol válido (incluyendo los nuevos roles)
+            const rolesValidos = ['user', 'admin', 'maxdev', 'branch', 'factory', 'manager']
+            if (!userRole || !rolesValidos.includes(userRole)) {
+              throw new Error(`El usuario no tiene un rol válido. Rol actual: ${userRole || 'ninguno'}. Se requiere uno de: ${rolesValidos.join(', ')}`)
             }
           } catch (roleError: any) {
             logger.error('[ScheduleCalendar] Error verificando rol:', roleError)
