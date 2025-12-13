@@ -164,8 +164,8 @@ export function FabricaPedidoForm({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-4">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="space-y-3 sm:space-y-4">
         {productosFiltrados.map((producto) => {
           const cantidadPedida = (producto as any).cantidadPedida ?? 0
           const productoData = productosDisponibles[producto.id] || { disponible: false }
@@ -176,58 +176,59 @@ export function FabricaPedidoForm({
             <div
               key={producto.id}
               id={`producto-${producto.id}`}
-              className="border rounded-lg p-4 space-y-3"
+              className="border rounded-lg p-3 sm:p-4 space-y-2 sm:space-y-3"
             >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <Checkbox
                       checked={disponible}
                       onCheckedChange={() => toggleDisponible(producto.id)}
                       disabled={!puedeGenerarRemito}
+                      className="shrink-0"
                     />
-                    <Label className="text-base font-medium cursor-pointer">
+                    <Label className="text-sm sm:text-base font-medium cursor-pointer break-words">
                       {producto.nombre}
                     </Label>
                   </div>
-                  <div className="ml-7 mt-1 text-sm text-muted-foreground">
+                  <div className="ml-6 sm:ml-7 mt-1 text-xs sm:text-sm text-muted-foreground">
                     Pedido: {cantidadPedida} {producto.unidad || "U"}
                   </div>
                 </div>
               </div>
 
               {disponible && (
-                <div className="ml-7 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Label className="text-sm">Cantidad a enviar:</Label>
-                    <div className="flex items-center gap-2">
+                <div className="ml-6 sm:ml-7 space-y-2 sm:space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <Label className="text-xs sm:text-sm shrink-0">Cantidad a enviar:</Label>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
                       <Button
                         variant="outline"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-7 w-7 sm:h-8 sm:w-8 shrink-0"
                         onClick={() => updateCantidad(producto.id, cantidadEnviada - 1)}
                         disabled={cantidadEnviada <= 0 || !puedeGenerarRemito}
                       >
-                        <Minus className="h-4 w-4" />
+                        <Minus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </Button>
                       <Input
                         type="number"
                         min="0"
                         value={cantidadEnviada}
                         onChange={(e) => updateCantidad(producto.id, parseInt(e.target.value) || 0)}
-                        className="w-20 text-center"
+                        className="w-16 sm:w-20 text-center text-sm h-7 sm:h-8"
                         disabled={!puedeGenerarRemito}
                       />
                       <Button
                         variant="outline"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-7 w-7 sm:h-8 sm:w-8 shrink-0"
                         onClick={() => updateCantidad(producto.id, cantidadEnviada + 1)}
                         disabled={!puedeGenerarRemito}
                       >
-                        <Plus className="h-4 w-4" />
+                        <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </Button>
-                      <span className="text-sm text-muted-foreground">
+                      <span className="text-xs sm:text-sm text-muted-foreground shrink-0">
                         {producto.unidad || "U"}
                       </span>
                     </div>
@@ -237,6 +238,7 @@ export function FabricaPedidoForm({
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3"
                       onClick={() => toggleObservaciones(producto.id)}
                       disabled={!puedeGenerarRemito}
                     >
@@ -249,7 +251,7 @@ export function FabricaPedidoForm({
                       placeholder="Observaciones sobre este producto..."
                       value={productoData.observaciones || ""}
                       onChange={(e) => updateObservaciones(producto.id, e.target.value)}
-                      className="min-h-[80px]"
+                      className="min-h-[60px] sm:min-h-[80px] text-sm"
                       disabled={!puedeGenerarRemito}
                     />
                   )}
@@ -261,8 +263,8 @@ export function FabricaPedidoForm({
       </div>
 
       {puedeGenerarRemito && (
-        <div className="flex justify-end pt-4 border-t">
-          <Button onClick={handleConfirmar} size="lg">
+        <div className="flex justify-end pt-3 sm:pt-4 border-t">
+          <Button onClick={handleConfirmar} size="lg" className="w-full sm:w-auto">
             <Check className="h-4 w-4 mr-2" />
             Generar remito
           </Button>
@@ -270,7 +272,7 @@ export function FabricaPedidoForm({
       )}
 
       {!puedeGenerarRemito && pedido.estado !== "processing" && (
-        <div className="text-center py-4 text-sm text-muted-foreground">
+        <div className="text-center py-3 sm:py-4 text-xs sm:text-sm text-muted-foreground">
           Acepta el pedido primero para poder generar el remito
         </div>
       )}

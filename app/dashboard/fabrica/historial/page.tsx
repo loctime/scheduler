@@ -100,38 +100,39 @@ export default function FabricaHistorialPage() {
 
   return (
     <DashboardLayout user={user}>
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6 px-1 sm:px-0">
+        {/* Header - Mobile-first */}
         <div>
-          <h1 className="text-3xl font-bold">Historial de Remitos</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold">Historial de Remitos</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
             Remitos finales generados y recibidos
           </p>
         </div>
 
-        {/* Filtros */}
+        {/* Filtros - Mobile-first */}
         <Card>
-          <CardHeader>
-            <CardTitle>Filtros</CardTitle>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base sm:text-lg">Filtros</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
+          <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
+              <div className="flex-1 min-w-0">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Buscar por número de remito o pedido..."
+                    placeholder="Buscar por número o pedido..."
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
-                    className="pl-9"
+                    className="pl-9 text-sm h-9 sm:h-10"
                   />
                 </div>
               </div>
               {sucursales.length > 0 && (
-                <div className="sm:w-64">
+                <div className="w-full sm:w-64 shrink-0">
                   <select
                     value={filtroSucursal}
                     onChange={(e) => setFiltroSucursal(e.target.value)}
-                    className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="w-full h-9 sm:h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
                   >
                     <option value="">Todas las sucursales</option>
                     {sucursales.map((sucursal) => (
@@ -146,12 +147,12 @@ export default function FabricaHistorialPage() {
           </CardContent>
         </Card>
 
-        {/* Lista de remitos */}
+        {/* Lista de remitos - Mobile-first */}
         {remitosFiltrados.length === 0 ? (
           <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground text-center">
+            <CardContent className="flex flex-col items-center justify-center py-8 sm:py-12 px-4">
+              <FileText className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-3 sm:mb-4" />
+              <p className="text-sm sm:text-base text-muted-foreground text-center">
                 {busqueda || filtroSucursal
                   ? "No se encontraron remitos con los filtros aplicados"
                   : "No hay remitos finales registrados"}
@@ -159,7 +160,7 @@ export default function FabricaHistorialPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {remitosFiltrados.map((remito) => {
               const nombrePedido = obtenerNombrePedido(remito)
               const nombreSucursal = obtenerNombreSucursal(remito)
@@ -167,15 +168,15 @@ export default function FabricaHistorialPage() {
 
               return (
                 <Card key={remito.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg">Remito {remito.numero}</CardTitle>
-                        <CardDescription className="mt-1">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base sm:text-lg truncate">Remito {remito.numero}</CardTitle>
+                        <CardDescription className="mt-1 text-xs sm:text-sm line-clamp-2">
                           {nombrePedido} • {nombreSucursal}
                         </CardDescription>
                       </div>
-                      <Badge variant={tieneFirmaCompleta ? "default" : "secondary"}>
+                      <Badge variant={tieneFirmaCompleta ? "default" : "secondary"} className="shrink-0 text-xs">
                         {tieneFirmaCompleta ? (
                           <>
                             <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -190,32 +191,36 @@ export default function FabricaHistorialPage() {
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="text-sm text-muted-foreground space-y-1">
-                      <div>Fecha: {formatearFecha(remito.fecha)}</div>
+                  <CardContent className="space-y-3 sm:space-y-4 pt-0 px-3 sm:px-6">
+                    <div className="text-xs sm:text-sm text-muted-foreground space-y-1">
+                      <div className="break-words">Fecha: {formatearFecha(remito.fecha)}</div>
                       {remito.firmaEnvio && (
-                        <div>Firma envío: {remito.firmaEnvio.nombre}</div>
+                        <div className="break-words">Firma envío: {remito.firmaEnvio.nombre}</div>
                       )}
                       {remito.firmaRecepcion && (
-                        <div>Firma recepción: {remito.firmaRecepcion.nombre}</div>
+                        <div className="break-words">Firma recepción: {remito.firmaRecepcion.nombre}</div>
                       )}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <Button
                         variant="outline"
                         size="sm"
+                        className="w-full sm:w-auto flex-1 sm:flex-initial"
                         onClick={() => setRemitoSeleccionado(remito)}
                       >
-                        <FileText className="h-4 w-4 mr-2" />
-                        Ver
+                        <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
+                        <span className="hidden sm:inline">Ver</span>
+                        <span className="sm:hidden">Ver detalles</span>
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
+                        className="w-full sm:w-auto flex-1 sm:flex-initial"
                         onClick={() => descargarPDFRemito(remito)}
                       >
-                        <Download className="h-4 w-4 mr-2" />
-                        Descargar PDF
+                        <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
+                        <span className="hidden sm:inline">Descargar PDF</span>
+                        <span className="sm:hidden">PDF</span>
                       </Button>
                     </div>
                   </CardContent>
@@ -225,19 +230,19 @@ export default function FabricaHistorialPage() {
           </div>
         )}
 
-        {/* Dialog para ver remito */}
+        {/* Dialog para ver remito - Mobile-first */}
         {remitoSeleccionado && (
           <Dialog open={!!remitoSeleccionado} onOpenChange={() => setRemitoSeleccionado(null)}>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
               <DialogHeader>
-                <DialogTitle>Remito {remitoSeleccionado.numero}</DialogTitle>
-                <DialogDescription>
+                <DialogTitle className="text-base sm:text-lg">Remito {remitoSeleccionado.numero}</DialogTitle>
+                <DialogDescription className="text-xs sm:text-sm">
                   {obtenerNombrePedido(remitoSeleccionado)} • {obtenerNombreSucursal(remitoSeleccionado)}
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-4 py-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="space-y-3 sm:space-y-4 py-2 sm:py-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
                   <div>
                     <span className="font-semibold">Fecha:</span> {formatearFecha(remitoSeleccionado.fecha)}
                   </div>
@@ -260,27 +265,27 @@ export default function FabricaHistorialPage() {
                 </div>
 
                 {remitoSeleccionado.observaciones && (
-                  <div className="border rounded-lg p-4">
-                    <h3 className="font-semibold mb-2">Observaciones:</h3>
-                    <p className="text-sm whitespace-pre-wrap">{remitoSeleccionado.observaciones}</p>
+                  <div className="border rounded-lg p-3 sm:p-4">
+                    <h3 className="font-semibold mb-2 text-sm sm:text-base">Observaciones:</h3>
+                    <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">{remitoSeleccionado.observaciones}</p>
                   </div>
                 )}
 
-                <div className="border rounded-lg">
-                  <div className="p-3 border-b bg-muted/50">
-                    <h3 className="font-semibold">Productos</h3>
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="p-2 sm:p-3 border-b bg-muted/50">
+                    <h3 className="font-semibold text-sm sm:text-base">Productos</h3>
                   </div>
                   <div className="divide-y">
                     {remitoSeleccionado.productos.map((producto, idx) => (
-                      <div key={idx} className="p-3 grid grid-cols-4 gap-4 text-sm">
-                        <div className="col-span-2 font-medium">{producto.productoNombre}</div>
-                        <div>Pedida: {producto.cantidadPedida || 0}</div>
-                        <div>Enviada: {producto.cantidadEnviada || 0}</div>
+                      <div key={idx} className="p-2 sm:p-3 grid grid-cols-1 sm:grid-cols-4 gap-2 sm:gap-4 text-xs sm:text-sm">
+                        <div className="col-span-1 sm:col-span-2 font-medium break-words">{producto.productoNombre}</div>
+                        <div className="sm:col-span-1">Pedida: {producto.cantidadPedida || 0}</div>
+                        <div className="sm:col-span-1">Enviada: {producto.cantidadEnviada || 0}</div>
                         {producto.cantidadRecibida !== undefined && (
-                          <div className="col-span-4">Recibida: {producto.cantidadRecibida}</div>
+                          <div className="col-span-1 sm:col-span-4">Recibida: {producto.cantidadRecibida}</div>
                         )}
                         {(producto as any).cantidadDevolucion && (
-                          <div className="col-span-4 text-destructive">
+                          <div className="col-span-1 sm:col-span-4 text-destructive">
                             Devolución: {(producto as any).cantidadDevolucion}
                           </div>
                         )}
@@ -290,9 +295,9 @@ export default function FabricaHistorialPage() {
                 </div>
 
                 {(remitoSeleccionado.firmaEnvio || remitoSeleccionado.firmaRecepcion) && (
-                  <div className="border rounded-lg p-4">
-                    <h3 className="font-semibold mb-2">Firmas:</h3>
-                    <div className="space-y-2 text-sm">
+                  <div className="border rounded-lg p-3 sm:p-4">
+                    <h3 className="font-semibold mb-2 text-sm sm:text-base">Firmas:</h3>
+                    <div className="space-y-2 text-xs sm:text-sm">
                       {remitoSeleccionado.firmaEnvio && (
                         <div>
                           <span className="font-medium">Envío:</span> {remitoSeleccionado.firmaEnvio.nombre}
@@ -300,7 +305,7 @@ export default function FabricaHistorialPage() {
                             <img
                               src={remitoSeleccionado.firmaEnvio.firma}
                               alt="Firma envío"
-                              className="mt-2 border rounded"
+                              className="mt-2 border rounded w-full max-w-[200px] sm:max-w-none"
                               style={{ maxHeight: "100px" }}
                             />
                           )}
@@ -313,7 +318,7 @@ export default function FabricaHistorialPage() {
                             <img
                               src={remitoSeleccionado.firmaRecepcion.firma}
                               alt="Firma recepción"
-                              className="mt-2 border rounded"
+                              className="mt-2 border rounded w-full max-w-[200px] sm:max-w-none"
                               style={{ maxHeight: "100px" }}
                             />
                           )}
@@ -324,11 +329,11 @@ export default function FabricaHistorialPage() {
                 )}
               </div>
 
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setRemitoSeleccionado(null)}>
+              <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+                <Button variant="outline" className="w-full sm:w-auto" onClick={() => setRemitoSeleccionado(null)}>
                   Cerrar
                 </Button>
-                <Button onClick={() => descargarPDFRemito(remitoSeleccionado)}>
+                <Button className="w-full sm:w-auto" onClick={() => descargarPDFRemito(remitoSeleccionado)}>
                   <Download className="h-4 w-4 mr-2" />
                   Descargar PDF
                 </Button>

@@ -264,47 +264,55 @@ export default function FabricaPedidoDetailPage() {
 
   return (
     <DashboardLayout user={user}>
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push("/dashboard/fabrica")}>
+      <div className="space-y-4 sm:space-y-6 px-1 sm:px-0">
+        {/* Header - Mobile-first */}
+        <div className="flex items-start gap-2 sm:gap-4">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 sm:h-10 sm:w-10 shrink-0"
+            onClick={() => router.push("/dashboard/fabrica")}
+          >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold">{pedido.nombre}</h1>
-            <p className="text-muted-foreground mt-1">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold break-words">{pedido.nombre}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
               {nombreEmpresa || "Empresa"}
             </p>
           </div>
         </div>
 
+        {/* Alerts - Mobile-first */}
         {estaAsignado && !esMiPedido && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Pedido ya asignado</AlertTitle>
-            <AlertDescription>
+          <Alert variant="destructive" className="text-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <AlertTitle className="text-sm">Pedido ya asignado</AlertTitle>
+            <AlertDescription className="text-xs sm:text-sm">
               Este pedido ya fue tomado por: <strong>{pedido.assignedToNombre || "otro usuario"}</strong> - Fábrica
             </AlertDescription>
           </Alert>
         )}
 
         {estaAsignado && esMiPedido && (
-          <Alert>
-            <CheckCircle2 className="h-4 w-4" />
-            <AlertTitle>Pedido en proceso</AlertTitle>
-            <AlertDescription>
+          <Alert className="text-sm">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <AlertTitle className="text-sm">Pedido en proceso</AlertTitle>
+            <AlertDescription className="text-xs sm:text-sm">
               Este pedido está siendo procesado por ti. Puedes generar el remito cuando esté listo.
             </AlertDescription>
           </Alert>
         )}
 
+        {/* Productos - Mobile-first */}
         <Card>
-          <CardHeader>
-            <CardTitle>Productos solicitados</CardTitle>
-            <CardDescription>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base sm:text-lg">Productos solicitados</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               Marca los productos disponibles y especifica las cantidades a enviar
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3 sm:px-6">
             <FabricaPedidoForm
               productos={productos}
               enlacePublico={enlacePublico ?? undefined}
@@ -315,9 +323,10 @@ export default function FabricaPedidoDetailPage() {
           </CardContent>
         </Card>
 
+        {/* Botón aceptar - Mobile-first */}
         {pedido.estado === "creado" || !pedido.estado ? (
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
               <Button
                 onClick={handleAceptarPedido}
                 disabled={aceptandoPedido || estaAsignado}
@@ -337,7 +346,7 @@ export default function FabricaPedidoDetailPage() {
                 )}
               </Button>
               {estaAsignado && (
-                <p className="text-sm text-muted-foreground mt-2 text-center">
+                <p className="text-xs sm:text-sm text-muted-foreground mt-2 text-center">
                   Este pedido ya fue tomado por otro usuario
                 </p>
               )}

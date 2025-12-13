@@ -920,35 +920,36 @@ export default function PedidosPage() {
 
   return (
     <DashboardLayout user={user}>
-      {/* Banner de desarrollo - compacto en móvil */}
-      <div className="mb-4 lg:mb-6 rounded-lg border-2 border-dashed border-amber-500/50 bg-amber-500/10 p-3">
-        <div className="flex items-center gap-2">
-          <Construction className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
-          <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
-            🚧 En desarrollo
-          </p>
+      <div className="px-1 sm:px-0">
+        {/* Banner de desarrollo - compacto en móvil */}
+        <div className="mb-3 sm:mb-4 lg:mb-6 rounded-lg border-2 border-dashed border-amber-500/50 bg-amber-500/10 p-2 sm:p-3">
+          <div className="flex items-center gap-2">
+            <Construction className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <p className="text-xs sm:text-sm font-medium text-amber-700 dark:text-amber-300">
+              🚧 En desarrollo
+            </p>
+          </div>
         </div>
-      </div>
 
-      <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
-        {/* Sidebar / Selector de pedidos */}
-        <PedidosSidebar
-          pedidos={pedidos}
-          selectedPedido={selectedPedido}
-          onSelectPedido={setSelectedPedido}
-          onCreatePedido={handleOpenCreate}
-        />
+        <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 lg:gap-6">
+          {/* Sidebar / Selector de pedidos */}
+          <PedidosSidebar
+            pedidos={pedidos}
+            selectedPedido={selectedPedido}
+            onSelectPedido={setSelectedPedido}
+            onCreatePedido={handleOpenCreate}
+          />
 
-        {/* Contenido principal */}
-        <div className="flex-1 space-y-4 lg:space-y-6 min-w-0">
+          {/* Contenido principal - Mobile-first */}
+          <div className="flex-1 space-y-3 sm:space-y-4 lg:space-y-6 min-w-0 overflow-x-hidden">
           {!selectedPedido ? (
-            <div className="rounded-lg border border-border bg-card p-6 text-center">
-              <Package className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-              <h3 className="text-base font-semibold mb-1">Selecciona o crea un pedido</h3>
-              <p className="text-muted-foreground text-sm mb-3">
+            <div className="rounded-lg border border-border bg-card p-4 sm:p-6 text-center">
+              <Package className="h-8 w-8 sm:h-10 sm:w-10 mx-auto text-muted-foreground mb-2 sm:mb-3" />
+              <h3 className="text-sm sm:text-base font-semibold mb-1">Selecciona o crea un pedido</h3>
+              <p className="text-muted-foreground text-xs sm:text-sm mb-3">
                 Crea pedidos para organizar productos
               </p>
-              <Button onClick={handleOpenCreate} size="sm">
+              <Button onClick={handleOpenCreate} size="sm" className="w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-1" />
                 Crear Pedido
               </Button>
@@ -956,31 +957,31 @@ export default function PedidosPage() {
           ) : (
             <>
               {/* Header del pedido - Mobile first */}
-              <div className="rounded-lg border border-border bg-card p-1.5 space-y-1.5">
-                  {/* Fila 1: Nombre + acciones principales */}
-                  <div className="flex items-center gap-2 flex-wrap">
+              <div className="rounded-lg border border-border bg-card p-1.5 sm:p-2 space-y-1.5 sm:space-y-2 overflow-x-hidden">
+                  {/* Fila 1: Nombre + acciones principales - Mobile-first */}
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                     {isEditingName ? (
-                      <div className="flex items-center gap-1 min-w-0 flex-1 sm:flex-initial">
+                      <div className="flex items-center gap-1 min-w-0 flex-1 sm:flex-initial w-full sm:w-auto">
                         <Input
                           ref={nameInputRef}
                           value={editingName}
                           onChange={(e) => setEditingName(e.target.value)}
                           onKeyDown={handleNameKeyDown}
-                          className="text-sm sm:text-base font-bold h-8 flex-1"
+                          className="text-sm sm:text-base font-bold h-7 sm:h-8 flex-1 min-w-0"
                           placeholder="Nombre del pedido"
                         />
-                        <Button variant="ghost" size="icon" onClick={handleSaveName} className="h-8 w-8 shrink-0 text-green-600">
-                          <Check className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" onClick={handleSaveName} className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 text-green-600">
+                          <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={handleCancelEditName} className="h-8 w-8 shrink-0">
-                          <X className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" onClick={handleCancelEditName} className="h-7 w-7 sm:h-8 sm:w-8 shrink-0">
+                          <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </Button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1 min-w-0 flex-1 sm:flex-initial">
                         <h2 className="text-sm sm:text-base font-bold text-foreground truncate">{selectedPedido.nombre}</h2>
-                        <Button variant="ghost" size="icon" onClick={handleStartEditName} className="h-6 w-6 shrink-0 text-muted-foreground">
-                          <Pencil className="h-3 w-3" />
+                        <Button variant="ghost" size="icon" onClick={handleStartEditName} className="h-6 w-6 sm:h-7 sm:w-7 shrink-0 text-muted-foreground">
+                          <Pencil className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                         </Button>
                       </div>
                     )}
@@ -1020,19 +1021,19 @@ export default function PedidosPage() {
                     </div>
                   </div>
 
-                  {/* Mostrar información si el pedido está asignado */}
+                  {/* Mostrar información si el pedido está asignado - Mobile-first */}
                   {selectedPedido?.estado === "processing" && selectedPedido.assignedTo && (
-                    <Alert className="mt-3">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Pedido en proceso</AlertTitle>
-                      <AlertDescription>
+                    <Alert className="mt-2 sm:mt-3 text-sm">
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                      <AlertTitle className="text-xs sm:text-sm">Pedido en proceso</AlertTitle>
+                      <AlertDescription className="text-xs sm:text-sm">
                         Este pedido está siendo procesado por: <strong>{selectedPedido.assignedToNombre || "Usuario de fábrica"}</strong> - Fábrica
                       </AlertDescription>
                     </Alert>
                   )}
 
-                  {/* Fila 2: Tabs - Compactas en móvil */}
-                  <div className="flex gap-0.5 sm:gap-1 border-t sm:border-t-0 border-l sm:border-l sm:border-r border-border">
+                  {/* Fila 2: Tabs - Compactas en móvil, sin scroll horizontal */}
+                  <div className="flex gap-0.5 sm:gap-1 border-t sm:border-t-0 border-l sm:border-l sm:border-r border-border overflow-x-hidden">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1112,12 +1113,12 @@ export default function PedidosPage() {
                         </div>
                       </div>
 
-                      {/* Formato de salida */}
+                      {/* Formato de salida - Mobile-first con scroll horizontal controlado */}
                       <div>
                         <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
                           Formato
                         </label>
-                        <div className="flex gap-1 overflow-x-auto mt-0.5 scrollbar-none">
+                        <div className="flex gap-1 overflow-x-auto mt-0.5 scrollbar-none -mx-1 px-1">
                           {FORMAT_EXAMPLES.map((ex, i) => (
                             <button
                               key={i}
@@ -1457,6 +1458,7 @@ export default function PedidosPage() {
               )}
             </>
           )}
+        </div>
         </div>
       </div>
 
