@@ -102,12 +102,17 @@ export default function FabricaPage() {
         }
       }
 
-      // Buscar enlace público activo
-      const enlacesQuery = query(
-        collection(db, COLLECTIONS.ENLACES_PUBLICOS),
-        where("pedidoId", "==", pedido.id),
-        where("activo", "==", true)
-      )
+      // Buscar enlace público (activo o inactivo si el pedido está en proceso)
+      const enlacesQuery = pedido.estado === "processing"
+        ? query(
+            collection(db, COLLECTIONS.ENLACES_PUBLICOS),
+            where("pedidoId", "==", pedido.id)
+          )
+        : query(
+            collection(db, COLLECTIONS.ENLACES_PUBLICOS),
+            where("pedidoId", "==", pedido.id),
+            where("activo", "==", true)
+          )
       const enlacesSnapshot = await getDocs(enlacesQuery)
       
       let productos: Producto[] = []
@@ -200,8 +205,15 @@ export default function FabricaPage() {
     setAceptandoPedido(null)
     
     if (exito) {
-      // Recargar datos del pedido
-      await cargarDatosPedido(pedido)
+      // Limpiar datos expandidos para forzar recarga con nuevo estado
+      setPedidosExpandidos(prev => {
+        const nuevo = { ...prev }
+        delete nuevo[pedido.id]
+        return nuevo
+      })
+      // Recargar datos del pedido con nuevo estado
+      const pedidoActualizado = { ...pedido, estado: "processing" as const, assignedTo: user?.uid }
+      await cargarDatosPedido(pedidoActualizado)
     }
   }
 
