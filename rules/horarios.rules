@@ -154,10 +154,12 @@ match /apps/horarios/groups/{groupId} {
   // Permitir lectura:
   // - Admin puede leer todos los grupos
   // - Manager puede leer todos los grupos (la aplicación filtrará por grupos donde es manager)
+  // - Factory puede leer todos los grupos (la aplicación filtrará por grupos donde está)
   // - Usuarios pueden leer grupos a los que pertenecen
   allow read: if isAuth() && (
     isAdmin()
     || isManager() // Manager puede leer todos los grupos para filtrar en la aplicación
+    || isFactory() // Factory puede leer todos los grupos para filtrar en la aplicación
     || (exists(/databases/$(db)/documents/apps/horarios/groups/$(groupId))
       && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
       && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.grupoIds != null

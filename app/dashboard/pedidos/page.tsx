@@ -486,10 +486,26 @@ export default function PedidosPage() {
   }
 
   const handleGenerarEnlace = async () => {
-    if (!selectedPedido) return
+    // Si no hay pedido seleccionado, crear uno nuevo primero
+    let pedidoAUsar = selectedPedido
+    if (!pedidoAUsar) {
+      // Crear un nuevo pedido con nombre por defecto
+      const nombrePedido = `Pedido ${new Date().toLocaleDateString('es-AR')}`
+      const nuevoPedido = await createPedido(nombrePedido, 1, DEFAULT_FORMAT)
+      if (!nuevoPedido) {
+        toast({
+          title: "Error",
+          description: "No se pudo crear el pedido",
+          variant: "destructive",
+        })
+        return
+      }
+      setSelectedPedido(nuevoPedido)
+      pedidoAUsar = nuevoPedido
+    }
 
     // Verificar si el pedido está esperando recepción
-    if (selectedPedido.estado === "enviado") {
+    if (pedidoAUsar.estado === "enviado") {
       toast({
         title: "No se puede generar enlace",
         description: "Este pedido está esperando recepción. Completa la recepción antes de generar un nuevo enlace.",
@@ -499,7 +515,7 @@ export default function PedidosPage() {
     }
 
     // Verificar si el pedido está recibido (pero no completado, ya que completado permite nuevo link)
-    if (selectedPedido.estado === "recibido") {
+    if (pedidoAUsar.estado === "recibido") {
       toast({
         title: "No se puede generar enlace",
         description: "Este pedido está en proceso de recepción. Completa la recepción antes de generar un nuevo enlace.",
@@ -534,7 +550,23 @@ export default function PedidosPage() {
   }
 
   const ejecutarGenerarEnlace = async () => {
-    if (!selectedPedido) return
+    // Si no hay pedido seleccionado, crear uno nuevo primero
+    let pedidoAUsar = selectedPedido
+    if (!pedidoAUsar) {
+      // Crear un nuevo pedido con nombre por defecto
+      const nombrePedido = `Pedido ${new Date().toLocaleDateString('es-AR')}`
+      const nuevoPedido = await createPedido(nombrePedido, 1, DEFAULT_FORMAT)
+      if (!nuevoPedido) {
+        toast({
+          title: "Error",
+          description: "No se pudo crear el pedido",
+          variant: "destructive",
+        })
+        return
+      }
+      setSelectedPedido(nuevoPedido)
+      pedidoAUsar = nuevoPedido
+    }
 
     // Verificar si el pedido está en processing y mostrar warning
     if (verificarPedidoEnProceso()) {
@@ -553,7 +585,7 @@ export default function PedidosPage() {
       })
       console.log("Cantidades a pedir calculadas (solo > 0):", cantidadesPedidas)
       
-      const nuevoEnlace = await crearEnlacePublico(selectedPedido.id, cantidadesPedidas)
+      const nuevoEnlace = await crearEnlacePublico(pedidoAUsar.id, cantidadesPedidas)
       if (nuevoEnlace) {
         setEnlaceActivo({ id: nuevoEnlace.id })
         const url = `${window.location.origin}/pedido-publico/${nuevoEnlace.id}`
@@ -1147,7 +1179,9 @@ export default function PedidosPage() {
                           ) : (
                             <>
                               <LinkIcon className="h-3.5 w-3.5 sm:mr-1" />
-                              <span className="hidden sm:inline text-xs">Generar link</span>
+                              <span className="hidden sm:inline text-xs">
+                                {selectedPedido ? "Generar link" : "Crear y generar link"}
+                              </span>
                             </>
                           )}
                         </Button>
