@@ -215,10 +215,19 @@ export default function PedidoPublicoPage() {
         console.log(`  - Producto ${productoId}: disponible=${data.disponible}, cantidadEnviada=${data.cantidadEnviada}`)
       })
       
+      // Convertir array a Record
+      const productosDisponiblesRecord = (productosDisponiblesPendientes || []).reduce((acc, item) => {
+        acc[item.productoId] = {
+          disponible: item.disponible,
+          cantidadEnviada: item.cantidadEnviar,
+        }
+        return acc
+      }, {} as Record<string, { disponible: boolean; cantidadEnviada?: number }>)
+
       const remitoData = crearRemitoEnvioDesdeDisponibles(
         pedido,
         productos,
-        productosDisponiblesPendientes || {}
+        productosDisponiblesRecord
       )
       console.log("Datos del remito:", JSON.stringify(remitoData, null, 2))
       console.log("Productos en remitoData:", remitoData.productos)
@@ -397,10 +406,16 @@ export default function PedidoPublicoPage() {
             day: 'numeric' 
           })}
           productos={(() => {
+            // Convertir array a Record para acceso rápido
+            const productosDisponiblesMap = (productosDisponiblesPendientes || []).reduce((acc, item) => {
+              acc[item.productoId] = item
+              return acc
+            }, {} as Record<string, { productoId: string; disponible: boolean; cantidadEnviar?: number }>)
+
             const productosFiltrados = productos
               .map(p => {
-                const productoData = productosDisponiblesPendientes[p.id]
-                const cantidadEnviada = productoData?.cantidadEnviada ?? 0
+                const productoData = productosDisponiblesMap[p.id]
+                const cantidadEnviada = productoData?.cantidadEnviar ?? 0
                 const cantidadPedida = (p as any).cantidadPedida ?? 0
                 
                 // Incluir si tiene cantidad enviada > 0 o está marcado como disponible
@@ -410,7 +425,7 @@ export default function PedidoPublicoPage() {
                     cantidadPedida: cantidadPedida,
                     cantidadEnviada: cantidadEnviada,
                     unidad: p.unidad || "U",
-                    observaciones: productoData?.observaciones
+                    observaciones: undefined
                   }
                 }
                 return null

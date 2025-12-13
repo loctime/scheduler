@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { db, COLLECTIONS } from "@/lib/firebase"
-import { doc, getDoc, collection, query, where, getDocs, updateDoc, serverTimestamp } from "firebase/firestore"
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, serverTimestamp, addDoc } from "firebase/firestore"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,7 +17,6 @@ import { FabricaPedidoForm } from "@/components/fabrica/pedido-form"
 import { FirmaRemitoDialog } from "@/components/fabrica/firma-remito-dialog"
 import { generarNumeroRemito, crearRemitoEnvioDesdeDisponibles } from "@/lib/remito-utils"
 import { useRemitos } from "@/hooks/use-remitos"
-import { addDoc, collection } from "firebase/firestore"
 
 export default function FabricaPedidoDetailPage() {
   const params = useParams()
@@ -144,7 +143,7 @@ export default function FabricaPedidoDetailPage() {
   }, [pedidoId])
 
   const handleAceptarPedido = async () => {
-    if (!pedido) return
+    if (!pedido || !db) return
     
     setAceptandoPedido(true)
     const exito = await aceptarPedido(pedido.id)
@@ -172,11 +171,20 @@ export default function FabricaPedidoDetailPage() {
     if (!pedido || !productosDisponiblesPendientes || !db) return
 
     try {
+      // Convertir array a Record
+      const productosDisponiblesRecord = productosDisponiblesPendientes.reduce((acc, item) => {
+        acc[item.productoId] = {
+          disponible: item.disponible,
+          cantidadEnviada: item.cantidadEnviar,
+        }
+        return acc
+      }, {} as Record<string, { disponible: boolean; cantidadEnviada?: number }>)
+
       // Crear datos del remito
       const remitoData = crearRemitoEnvioDesdeDisponibles(
         pedido,
         productos,
-        productosDisponiblesPendientes
+        productosDisponiblesRecord
       )
 
       if (!remitoData.productos || remitoData.productos.length === 0) {
@@ -250,7 +258,7 @@ export default function FabricaPedidoDetailPage() {
     )
   }
 
-  const estaAsignado = pedido.estado === "processing" && pedido.assignedTo
+  const estaAsignado = !!(pedido.estado === "processing" && pedido.assignedTo)
   const esMiPedido = pedido.assignedTo === user?.uid
   const puedeGenerarRemito = pedido.estado === "processing" && esMiPedido
 

@@ -42,16 +42,23 @@ export function FirmaRemitoDialog({
   }
 
   // Calcular resumen de productos
+  // Convertir array a Record para acceso rápido
+  const productosDisponiblesMap = (productosDisponibles || []).reduce((acc, item) => {
+    acc[item.productoId] = item
+    return acc
+  }, {} as Record<string, { productoId: string; disponible: boolean; cantidadEnviar?: number }>)
+
   const productosResumen = productos
     .filter((p) => {
-      const data = productosDisponibles[p.id]
-      return data?.disponible && (data.cantidadEnviada ?? 0) > 0
+      if (!productosDisponibles) return false
+      const data = productosDisponiblesMap[p.id]
+      return data?.disponible && (data.cantidadEnviar ?? 0) > 0
     })
     .map((p) => {
-      const data = productosDisponibles[p.id]
+      const data = productosDisponiblesMap[p.id]
       return {
         nombre: p.nombre,
-        cantidad: data?.cantidadEnviada ?? 0,
+        cantidad: data?.cantidadEnviar ?? 0,
         unidad: p.unidad || "U",
       }
     })

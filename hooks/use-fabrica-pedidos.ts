@@ -32,6 +32,7 @@ export function useFabricaPedidos(user: any) {
     try {
       const promesas = userIds.map(async (userId) => {
         try {
+          if (!db) return
           const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, userId))
           if (userDoc.exists()) {
             const data = userDoc.data()

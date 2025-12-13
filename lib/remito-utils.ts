@@ -83,6 +83,7 @@ export function crearRemitoPedido(
     .map(({ producto: p, cantidadFinal }) => ({
       productoId: p.id,
       productoNombre: p.nombre,
+      cantidad: cantidadFinal,
       cantidadPedida: cantidadFinal,
     }))
 
@@ -109,11 +110,15 @@ export function crearRemitoEnvio(
 ): Omit<Remito, "id" | "numero" | "createdAt"> {
   const productosAPedir = productos
     .filter(p => calcularPedido(p.stockMinimo, stockActual[p.id]) > 0)
-    .map(p => ({
-      productoId: p.id,
-      productoNombre: p.nombre,
-      cantidadPedida: calcularPedido(p.stockMinimo, stockActual[p.id]),
-    }))
+    .map(p => {
+      const cantidadPedida = calcularPedido(p.stockMinimo, stockActual[p.id])
+      return {
+        productoId: p.id,
+        productoNombre: p.nombre,
+        cantidad: cantidadPedida,
+        cantidadPedida: cantidadPedida,
+      }
+    })
 
   return {
     pedidoId: pedido.id,
@@ -942,7 +947,7 @@ export async function generarPDFRemito(remito: Remito, nombreEmpresa?: string, n
         ? producto.cantidadRecibida.toString()
         : producto.cantidadEnviada !== undefined
         ? producto.cantidadEnviada.toString()
-        : producto.cantidadPedida.toString()
+        : (producto.cantidadPedida ?? producto.cantidad ?? 0).toString()
 
       // Para remitos intermedios, mostrar comentario debajo de la cantidad
       // Si es remito de envío, mostrar comentario de envío; si es recepción, mostrar comentario de recepción

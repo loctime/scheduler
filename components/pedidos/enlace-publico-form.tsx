@@ -24,19 +24,38 @@ export function EnlacePublicoForm({
   loading = false,
   pedidoConfirmado = false,
 }: EnlacePublicoFormProps) {
-  const [productosDisponibles, setProductosDisponibles] = useState<
-    Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string; completo?: boolean; listo?: boolean }>
-  >(enlacePublico?.productosDisponibles || {})
-  const [productosDisponiblesOriginales, setProductosDisponiblesOriginales] = useState<
-    Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string; completo?: boolean; listo?: boolean }>
-  >(enlacePublico?.productosDisponibles || {})
+  // Convertir array a Record si es necesario
+  const productosDisponiblesInicial = enlacePublico?.productosDisponibles
+    ? Array.isArray(enlacePublico.productosDisponibles)
+      ? enlacePublico.productosDisponibles.reduce((acc, item) => {
+          acc[item.productoId] = {
+            disponible: item.disponible,
+            cantidadEnviada: item.cantidadEnviar,
+          }
+          return acc
+        }, {} as Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string; completo?: boolean; listo?: boolean }>)
+      : enlacePublico.productosDisponibles
+    : {}
+
+  const [productosDisponibles, setProductosDisponibles] = useState<      
+    Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string; completo?: boolean; listo?: boolean }>                       
+  >(productosDisponiblesInicial)
+  const [productosDisponiblesOriginales, setProductosDisponiblesOriginales] = useState<                                                                  
+    Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string; completo?: boolean; listo?: boolean }>                       
+  >(productosDisponiblesInicial)
   const [observacionesHabilitadas, setObservacionesHabilitadas] = useState<Record<string, boolean>>(
     () => {
       const initial: Record<string, boolean> = {}
       const productos = enlacePublico?.productosDisponibles
       if (productos) {
-        Object.keys(productos).forEach((key) => {
-          if (productos[key]?.observaciones) {
+        const productosRecord = Array.isArray(productos)
+          ? productos.reduce((acc, item) => {
+              acc[item.productoId] = item
+              return acc
+            }, {} as Record<string, any>)
+          : productos
+        Object.keys(productosRecord).forEach((key) => {
+          if (productosRecord[key]?.observaciones) {
             initial[key] = true
           }
         })
@@ -49,15 +68,28 @@ export function EnlacePublicoForm({
   useEffect(() => {
     const productos = enlacePublico?.productosDisponibles
     if (productos) {
-      setProductosDisponibles(productos)
-      setProductosDisponiblesOriginales(productos)
+      const productosRecord = Array.isArray(productos)
+        ? productos.reduce((acc, item) => {
+            acc[item.productoId] = {
+              disponible: item.disponible,
+              cantidadEnviada: item.cantidadEnviar,
+            }
+            return acc
+          }, {} as Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string; completo?: boolean; listo?: boolean }>)
+        : productos
+      setProductosDisponibles(productosRecord)
+      setProductosDisponiblesOriginales(productosRecord)
       const habilitadas: Record<string, boolean> = {}
-      Object.keys(productos).forEach((key) => {
-        if (productos[key]?.observaciones) {
+      Object.keys(productosRecord).forEach((key) => {
+        if (productosRecord[key]?.observaciones) {
           habilitadas[key] = true
         }
       })
       setObservacionesHabilitadas(habilitadas)
+    } else {
+      setProductosDisponibles({})
+      setProductosDisponiblesOriginales({})
+      setObservacionesHabilitadas({})
     }
   }, [enlacePublico])
 
@@ -393,7 +425,13 @@ export function EnlacePublicoForm({
               return acc
             }, {} as Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string }>)
             
-            onConfirmar(productosDisponiblesLimpios)
+            // Convertir Record a array
+            const productosDisponiblesArray = Object.entries(productosDisponiblesLimpios).map(([productoId, data]) => ({
+              productoId,
+              disponible: data.disponible,
+              cantidadEnviar: data.cantidadEnviada,
+            }))
+            onConfirmar(productosDisponiblesArray)
           }}
           disabled={loading}
           className="w-full h-12 text-base font-semibold shadow-lg"

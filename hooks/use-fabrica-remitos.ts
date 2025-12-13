@@ -35,6 +35,7 @@ export function useFabricaRemitos(user: any) {
       const promesasPedidos = remitosData.map(async (remito) => {
         if (remito.pedidoId && !pedidos[remito.pedidoId]) {
           try {
+            if (!db) return
             const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, remito.pedidoId))
             if (pedidoDoc.exists()) {
               const pedidoData = { id: pedidoDoc.id, ...pedidoDoc.data() } as Pedido
@@ -54,6 +55,7 @@ export function useFabricaRemitos(user: any) {
       // Cargar usuarios
       const promesasUsuarios = Array.from(userIdsUnicos).map(async (userId) => {
         try {
+          if (!db) return
           const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, userId))
           if (userDoc.exists()) {
             const data = userDoc.data()
@@ -92,11 +94,11 @@ export function useFabricaRemitos(user: any) {
       )
 
       const snapshot = await getDocs(remitosQuery)
-      const remitosData = snapshot.docs
+      const remitosData = (snapshot.docs
         .map((doc) => ({
           id: doc.id,
           ...doc.data(),
-        })) as Remito[]
+        })) as Remito[])
         .filter((r) => r.final === true) // Filtrar remitos finales en cliente
         .sort((a, b) => {
           // Ordenar por fecha descendente
@@ -134,11 +136,11 @@ export function useFabricaRemitos(user: any) {
     const unsubscribe = onSnapshot(
       remitosQuery,
       async (snapshot) => {
-        const remitosData = snapshot.docs
+        const remitosData = (snapshot.docs
           .map((doc) => ({
             id: doc.id,
             ...doc.data(),
-          })) as Remito[]
+          })) as Remito[])
           .filter((r) => r.final === true) // Filtrar remitos finales en cliente
           .sort((a, b) => {
             // Ordenar por fecha descendente

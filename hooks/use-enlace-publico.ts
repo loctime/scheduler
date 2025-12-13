@@ -130,6 +130,7 @@ export function useEnlacePublico(user: any) {
 
       const enlaceData: Omit<EnlacePublico, "id"> = {
         pedidoId,
+        token: idSimple, // Usar el mismo ID como token
         activo: true,
         userId: userIdToQuery, // Incluir userId para las reglas de seguridad (puede ser ownerId si es invitado)
         productosSnapshot: productosSnapshotData, // Guardar snapshot
@@ -197,11 +198,12 @@ export function useEnlacePublico(user: any) {
             }
             
             // Solo incluir campos que no sean undefined
-            if (value.cantidadEnviada !== undefined) {
-              cleanedValue.cantidadEnviada = value.cantidadEnviada
+            if (value.cantidadEnviar !== undefined) {
+              cleanedValue.cantidadEnviar = value.cantidadEnviar
             }
-            if (value.observaciones !== undefined && value.observaciones !== null && value.observaciones !== "") {
-              cleanedValue.observaciones = value.observaciones
+            const valueAny = value as any
+            if (valueAny.observaciones !== undefined && valueAny.observaciones !== null && valueAny.observaciones !== "") {
+              cleanedValue.observaciones = valueAny.observaciones
             }
             
             acc[key] = cleanedValue

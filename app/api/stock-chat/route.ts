@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server"
-import type { StockAccionParsed } from "@/lib/types"
 
 interface ProductoInfo {
   id: string

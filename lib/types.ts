@@ -24,3 +24,315 @@ export interface Group {
   createdAt?: any
   updatedAt?: any
 }
+
+export type TipoAccion = 
+  | "entrada" 
+  | "salida" 
+  | "actualizar_stock" 
+  | "crear_producto" 
+  | "editar_producto" 
+  | "eliminar_producto" 
+  | "consulta_stock" 
+  | "listar_productos"
+  | "listar_pedidos"
+  | "ver_pedido"
+  | "importar_productos"
+  | "inicializar_stock"
+  | "stock_bajo"
+  | "generar_pedido"
+  | "ayuda"
+  | "consulta_general"
+  | "conversacion"
+
+export interface StockAccionParsed {
+  accion: TipoAccion
+  productoId?: string
+  producto?: string
+  cantidad?: number
+  unidad?: string
+  confianza?: number
+  mensaje?: string
+  comandoSugerido?: StockAccionParsed
+  stockMinimo?: number
+  pedidoId?: string
+  requiereConfirmacion?: boolean
+}
+
+export interface ChatMessage {
+  id: string
+  timestamp: Date
+  tipo: "usuario" | "sistema" | "error" | "confirmacion"
+  contenido: string
+  accion?: StockAccionParsed
+  requiereConfirmacion?: boolean
+}
+
+export interface StockMovimiento {
+  id: string
+  productoId: string
+  productoNombre: string
+  tipo: "entrada" | "salida"
+  cantidad: number
+  unidad?: string
+  userId: string
+  userName?: string
+  motivo?: string
+  fecha?: any
+  createdAt?: any
+  pedidoId?: string
+}
+
+export interface StockActual {
+  productoId: string
+  cantidad: number
+  ultimaActualizacion: any
+  userId: string
+  pedidoId?: string
+}
+
+export interface MedioTurno {
+  id: string
+  nombre: string
+  startTime: string
+  endTime: string
+  color: string
+}
+
+export interface Configuracion {
+  nombreEmpresa: string
+  colorEmpresa?: string
+  mesInicioDia: number
+  horasMaximasPorDia: number
+  semanaInicioDia: number
+  mostrarFinesDeSemana: boolean
+  formatoHora24: boolean
+  minutosDescanso: number
+  horasMinimasParaDescanso: number
+  mediosTurnos: MedioTurno[]
+  separadores?: Separador[]
+  ordenEmpleados?: string[]
+  fixedSchedules?: Array<{
+    employeeId: string
+    dayOfWeek: number
+    assignments?: ShiftAssignment[]
+  }>
+  formatoSalida?: string
+  mensajePrevio?: string
+}
+
+export interface Empleado {
+  id: string
+  name: string
+  email?: string
+  phone?: string
+  userId: string
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface Turno {
+  id: string
+  name: string
+  startTime?: string
+  endTime?: string
+  startTime2?: string
+  endTime2?: string
+  color: string
+  userId: string
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface ShiftAssignment {
+  shiftId?: string
+  type?: "shift" | "franco" | "medio_franco" | "nota"
+  startTime?: string
+  endTime?: string
+  startTime2?: string
+  endTime2?: string
+  texto?: string
+}
+
+export type ShiftAssignmentValue = ShiftAssignment | ShiftAssignment[] | string[]
+
+export interface ShiftOverlap {
+  employeeId: string
+  date: string
+  shifts: string[]
+  message?: string
+}
+
+export interface Horario {
+  id: string
+  nombre: string
+  weekStart: string
+  semanaInicio: string
+  semanaFin: string
+  assignments: {
+    [date: string]: {
+      [empleadoId: string]: ShiftAssignment[] | string[]
+    }
+  }
+  completada?: boolean
+  completadaPor?: string
+  completadaPorNombre?: string
+  completadaEn?: any
+  empleadosSnapshot?: Array<{
+    id: string
+    name: string
+    email?: string
+    phone?: string
+  }>
+  ordenEmpleadosSnapshot?: string[]
+  createdAt?: any
+  updatedAt?: any
+  createdBy?: string
+  createdByName?: string
+  modifiedBy?: string
+  modifiedByName?: string
+}
+
+export interface Separador {
+  id: string
+  nombre: string
+  tipo: "puesto" | "personalizado"
+  color?: string
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface HistorialItem {
+  id: string
+  horarioId: string
+  version: number
+  nombre: string
+  weekStart: string
+  semanaInicio: string
+  semanaFin: string
+  assignments: {
+    [date: string]: {
+      [empleadoId: string]: ShiftAssignment[] | string[]
+    }
+  }
+  empleadosSnapshot?: Array<{
+    id: string
+    name: string
+    email?: string
+    phone?: string
+  }>
+  ordenEmpleadosSnapshot?: string[]
+  accion?: string
+  versionAnterior?: boolean
+  createdAt?: any
+  createdBy?: string
+  createdByName?: string
+}
+
+export interface Pedido {
+  id: string
+  nombre: string
+  stockMinimoDefault: number
+  formatoSalida: string
+  mensajePrevio?: string
+  userId: string
+  estado?: string
+  assignedTo?: string
+  assignedToNombre?: string
+  remitoEnvioId?: string
+  fechaEnvio?: any
+  enlacePublicoId?: string
+  origenDefault?: string
+  destinoDefault?: string
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface Producto {
+  id: string
+  pedidoId: string
+  nombre: string
+  stockMinimo: number
+  unidad?: string
+  orden?: number
+  cantidadPedida?: number
+  userId: string
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface EnlacePublico {
+  id: string
+  pedidoId: string
+  token: string
+  activo: boolean
+  userId?: string
+  productosSnapshot?: Array<{
+    id: string
+    nombre: string
+    stockMinimo: number
+    unidad?: string
+    cantidadPedida?: number
+    orden?: number
+  }>
+  productosDisponibles?: Array<{
+    productoId: string
+    disponible: boolean
+    cantidadEnviar?: number
+  }>
+  createdAt?: any
+  expiresAt?: any
+}
+
+export interface Remito {
+  id: string
+  pedidoId: string
+  numero: string
+  tipo: "envio" | "recepcion" | "pedido"
+  productos: Array<{
+    productoId: string
+    productoNombre: string
+    cantidad: number
+    cantidadPedida?: number
+    cantidadEnviada?: number
+    cantidadRecibida?: number
+    unidad?: string
+  }>
+  fecha?: any
+  desde?: string
+  hacia?: string
+  horaRetiroFabrica?: string
+  horaRecepcionLocal?: string
+  observaciones?: string
+  firmaEnvio?: {
+    nombre: string
+    firma?: string
+  }
+  firmaRecepcion?: {
+    nombre: string
+    firma?: string
+  }
+  final?: boolean
+  userId?: string
+  createdAt?: any
+}
+
+export interface Recepcion {
+  id: string
+  pedidoId: string
+  fecha: any
+  productos: Array<{
+    productoId: string
+    productoNombre: string
+    cantidadEnviada: number
+    cantidadRecibida: number
+    estado?: string
+    esDevolucion?: boolean
+    cantidadDevolucion?: number
+    observaciones?: string
+  }>
+  esParcial?: boolean
+  completada?: boolean
+  observaciones?: string
+  userId: string
+  createdAt?: any
+}

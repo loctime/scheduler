@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { collection, getDocs, doc, updateDoc, query, where, serverTimestamp, getDoc } from "firebase/firestore"
+import { collection, getDocs, doc, updateDoc, query, where, serverTimestamp, getDoc, deleteDoc } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"

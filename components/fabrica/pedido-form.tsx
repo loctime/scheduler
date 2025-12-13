@@ -24,18 +24,41 @@ export function FabricaPedidoForm({
   pedido,
   puedeGenerarRemito,
 }: FabricaPedidoFormProps) {
-  const [productosDisponibles, setProductosDisponibles] = useState<
-    Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string }>
-  >(enlacePublico?.productosDisponibles || {})
+  // Convertir array a Record si es necesario
+  const productosDisponiblesInicial = enlacePublico?.productosDisponibles
+    ? Array.isArray(enlacePublico.productosDisponibles)
+      ? enlacePublico.productosDisponibles.reduce((acc, item) => {
+          acc[item.productoId] = {
+            disponible: item.disponible,
+            cantidadEnviada: item.cantidadEnviar,
+          }
+          return acc
+        }, {} as Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string }>)
+      : enlacePublico.productosDisponibles
+    : {}
+
+  const [productosDisponibles, setProductosDisponibles] = useState<      
+    Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string }>                                                            
+  >(productosDisponiblesInicial)
   const [observacionesHabilitadas, setObservacionesHabilitadas] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     const productos = enlacePublico?.productosDisponibles
     if (productos) {
-      setProductosDisponibles(productos)
+      // Convertir array a Record si es necesario
+      const productosRecord = Array.isArray(productos)
+        ? productos.reduce((acc, item) => {
+            acc[item.productoId] = {
+              disponible: item.disponible,
+              cantidadEnviada: item.cantidadEnviar,
+            }
+            return acc
+          }, {} as Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string }>)
+        : productos
+      setProductosDisponibles(productosRecord)
       const habilitadas: Record<string, boolean> = {}
-      Object.keys(productos).forEach((key) => {
-        if (productos[key]?.observaciones) {
+      Object.keys(productosRecord).forEach((key) => {
+        if (productosRecord[key]?.observaciones) {
           habilitadas[key] = true
         }
       })
@@ -116,7 +139,13 @@ export function FabricaPedidoForm({
       return
     }
 
-    onGenerarRemito(productosDisponibles)
+    // Convertir Record a array
+    const productosDisponiblesArray = Object.entries(productosDisponibles).map(([productoId, data]) => ({
+      productoId,
+      disponible: data.disponible,
+      cantidadEnviar: data.cantidadEnviada,
+    }))
+    onGenerarRemito(productosDisponiblesArray)
   }
 
   // Filtrar productos que tienen cantidadPedida > 0
