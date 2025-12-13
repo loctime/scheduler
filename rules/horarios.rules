@@ -94,6 +94,7 @@ match /apps/horarios/users/{userId} {
   // - El dueño puede leer documentos de usuarios invitados vinculados a sus invitaciones
   // - Admin puede leer todos los usuarios
   // - Manager puede leer todos los usuarios (la aplicación filtrará por grupos)
+  // - Factory puede leer todos los usuarios (la aplicación filtrará por grupos)
   allow read: if isAuth() && (
     userId == uid()
     || (exists(/databases/$(db)/documents/apps/horarios/users/$(userId))
@@ -101,6 +102,7 @@ match /apps/horarios/users/{userId} {
       && get(/databases/$(db)/documents/apps/horarios/users/$(userId)).data.ownerId == uid())
     || isAdmin()
     || isManager() // Manager puede leer todos los usuarios para filtrar en la aplicación
+    || isFactory() // Factory puede leer todos los usuarios para filtrar en la aplicación
   );
   // Crear: el usuario puede crear su propio documento
   allow create: if isAuth() && userId == uid();

@@ -12,6 +12,7 @@ import {
   serverTimestamp,
   onSnapshot,
 } from "firebase/firestore"
+import { Configuracion } from "@/lib/types"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
@@ -26,28 +27,84 @@ export function useFabricaPedidos(user: any) {
   const [pedidos, setPedidos] = useState<Pedido[]>([])
   const [loading, setLoading] = useState(true)
   const [usuariosMap, setUsuariosMap] = useState<Record<string, { displayName?: string; email?: string }>>({})
+  const [sucursalesDelGrupo, setSucursalesDelGrupo] = useState<Array<{ userId: string; nombreEmpresa: string; displayName?: string; email?: string }>>([])
   
+  // Sincronizar grupoIds del usuario si está en grupos pero no tiene grupoIds
+  useEffect(() => {
+    if (!db || !user || !userData || loadingGroups) return
+    
+    // Buscar grupos donde el usuario está en userIds pero no tiene grupoIds actualizado
+    const gruposDondeEstaElUsuario = groups.filter(grupo => 
+      grupo.userIds.includes(user.uid)
+    )
+    
+    if (gruposDondeEstaElUsuario.length > 0) {
+      const grupoIdsActuales = userData.grupoIds || []
+      const grupoIdsDelGrupo = gruposDondeEstaElUsuario.map(g => g.id)
+      const grupoIdsFaltantes = grupoIdsDelGrupo.filter(id => !grupoIdsActuales.includes(id))
+      
+      if (grupoIdsFaltantes.length > 0) {
+        // Sincronizar: actualizar grupoIds del usuario
+        logger.info("[FABRICA] Sincronizando grupoIds del usuario", { 
+          grupoIdsActuales, 
+          grupoIdsFaltantes,
+          grupoIdsNuevos: [...grupoIdsActuales, ...grupoIdsFaltantes]
+        })
+        
+        const userRef = doc(db, COLLECTIONS.USERS, user.uid)
+        updateDoc(userRef, {
+          grupoIds: [...grupoIdsActuales, ...grupoIdsFaltantes],
+          updatedAt: serverTimestamp(),
+        }).catch(error => {
+          logger.error("[FABRICA] Error al sincronizar grupoIds:", error)
+        })
+      }
+    }
+  }, [db, user, userData, groups, loadingGroups])
+
   // Obtener los grupos del usuario factory y extraer userIds de sucursales del mismo grupo
   const userIdsDelGrupo = useMemo(() => {
-    if (!userData?.grupoIds || userData.grupoIds.length === 0) {
+    // Primero buscar grupos donde el usuario está (ya sea por grupoIds o por userIds en el grupo)
+    const gruposDelUsuario = groups.filter(grupo => {
+      // Si tiene grupoIds, usar eso
+      if (userData?.grupoIds?.includes(grupo.id)) {
+        return true
+      }
+      // Si no tiene grupoIds pero está en userIds del grupo, también incluirlo
+      if (grupo.userIds.includes(user?.uid || "")) {
+        return true
+      }
+      return false
+    })
+    
+    if (gruposDelUsuario.length === 0) {
+      logger.warn("[FABRICA] Usuario factory no está en ningún grupo", { 
+        userData,
+        gruposDisponibles: groups.map(g => ({ id: g.id, nombre: g.nombre, userIds: g.userIds }))
+      })
       return []
     }
     
-    // Obtener todos los grupos donde el usuario factory está
-    const gruposDelUsuario = groups.filter(grupo => 
-      userData.grupoIds?.includes(grupo.id)
-    )
+    logger.info("[FABRICA] Grupos del usuario factory:", { 
+      grupoIds: userData?.grupoIds,
+      gruposEncontrados: gruposDelUsuario.map(g => ({ id: g.id, nombre: g.nombre, userIds: g.userIds }))
+    })
     
     // Extraer todos los userIds de esos grupos (sucursales del mismo grupo)
     const userIds = new Set<string>()
     gruposDelUsuario.forEach(grupo => {
       grupo.userIds.forEach(userId => {
-        userIds.add(userId)
+        // No incluir al usuario factory mismo
+        if (userId !== user?.uid) {
+          userIds.add(userId)
+        }
       })
     })
     
+    logger.info("[FABRICA] UserIds de sucursales del mismo grupo:", Array.from(userIds))
+    
     return Array.from(userIds)
-  }, [groups, userData?.grupoIds])
+  }, [groups, userData?.grupoIds, user?.uid])
 
   // Cargar información de usuarios para mostrar nombres de sucursales
   const cargarUsuarios = useCallback(async (userIds: string[]) => {
@@ -80,6 +137,50 @@ export function useFabricaPedidos(user: any) {
     return usuarios
   }, [])
 
+  // Cargar información de sucursales del grupo con sus nombres de empresa
+  const cargarSucursalesDelGrupo = useCallback(async (userIds: string[]) => {
+    if (!db || userIds.length === 0) {
+      setSucursalesDelGrupo([])
+      return
+    }
+
+    try {
+      const promesas = userIds.map(async (userId) => {
+        try {
+          if (!db) return null
+          
+          // Cargar usuario
+          const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, userId))
+          if (!userDoc.exists()) return null
+          
+          const userData = userDoc.data()
+          
+          // Cargar configuración (nombreEmpresa)
+          const configDoc = await getDoc(doc(db, COLLECTIONS.CONFIG, userId))
+          const configData = configDoc.exists() ? configDoc.data() as Configuracion : null
+          const nombreEmpresa = configData?.nombreEmpresa || userData.displayName || userData.email?.split("@")[0] || "Sin nombre"
+          
+          return {
+            userId,
+            nombreEmpresa,
+            displayName: userData.displayName || userData.email?.split("@")[0] || "Usuario",
+            email: userData.email,
+          }
+        } catch (error) {
+          logger.warn(`Error al cargar sucursal ${userId}:`, error)
+          return null
+        }
+      })
+      
+      const resultados = await Promise.all(promesas)
+      const sucursales = resultados.filter((s): s is NonNullable<typeof s> => s !== null)
+      setSucursalesDelGrupo(sucursales)
+    } catch (error) {
+      logger.error("Error al cargar sucursales del grupo:", error)
+      setSucursalesDelGrupo([])
+    }
+  }, [])
+
   // Cargar todos los pedidos pendientes (sin filtrar por userId)
   const loadPedidos = useCallback(async () => {
     if (!db || !user) return
@@ -101,12 +202,22 @@ export function useFabricaPedidos(user: any) {
 
       // Filtrar pedidos por grupo: solo mostrar pedidos de sucursales del mismo grupo
       let pedidosFiltrados = pedidosData
+      logger.info("[FABRICA] Pedidos antes de filtrar:", { 
+        total: pedidosData.length,
+        pedidos: pedidosData.map(p => ({ id: p.id, nombre: p.nombre, userId: p.userId, estado: p.estado }))
+      })
+      
       if (userIdsDelGrupo.length > 0) {
         pedidosFiltrados = pedidosData.filter(pedido => 
           pedido.userId && userIdsDelGrupo.includes(pedido.userId)
         )
+        logger.info("[FABRICA] Pedidos después de filtrar por grupo:", { 
+          total: pedidosFiltrados.length,
+          pedidos: pedidosFiltrados.map(p => ({ id: p.id, nombre: p.nombre, userId: p.userId }))
+        })
       } else if (userData?.role === "factory") {
         // Si el usuario factory no tiene grupos asignados, no mostrar ningún pedido
+        logger.warn("[FABRICA] Usuario factory sin grupos asignados, no se mostrarán pedidos")
         pedidosFiltrados = []
       }
 
@@ -191,6 +302,15 @@ export function useFabricaPedidos(user: any) {
     return () => unsubscribe()
   }, [user, loadPedidos, cargarUsuarios, userIdsDelGrupo, userData?.role, loadingGroups])
 
+  // Cargar sucursales del grupo cuando cambien los userIds
+  useEffect(() => {
+    if (userIdsDelGrupo.length > 0) {
+      cargarSucursalesDelGrupo(userIdsDelGrupo)
+    } else {
+      setSucursalesDelGrupo([])
+    }
+  }, [userIdsDelGrupo, cargarSucursalesDelGrupo])
+
   // Marcar pedido como "processing" y asignar a usuario actual
   const aceptarPedido = useCallback(async (pedidoId: string): Promise<boolean> => {
     if (!db || !user) return false
@@ -264,6 +384,9 @@ export function useFabricaPedidos(user: any) {
     obtenerUsuarioAsignado,
     usuariosMap,
     refreshPedidos: loadPedidos,
+    userIdsDelGrupo, // Exponer para debugging
+    tieneGrupos: (userData?.grupoIds?.length || 0) > 0, // Exponer para mostrar mensaje
+    sucursalesDelGrupo, // Lista de sucursales del grupo con nombres de empresa
   }
 }
 

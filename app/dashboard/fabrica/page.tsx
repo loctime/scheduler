@@ -18,7 +18,7 @@ type FiltroEstado = "todos" | "pendientes" | "en-proceso"
 export default function FabricaPage() {
   const { user } = useData()
   const router = useRouter()
-  const { pedidos, loading, obtenerUsuarioAsignado, usuariosMap } = useFabricaPedidos(user)
+  const { pedidos, loading, obtenerUsuarioAsignado, usuariosMap, tieneGrupos, userIdsDelGrupo, sucursalesDelGrupo } = useFabricaPedidos(user)
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("todos")
 
   // Filtrar pedidos según el filtro seleccionado
@@ -67,8 +67,18 @@ export default function FabricaPage() {
           <div>
             <h1 className="text-3xl font-bold">Panel de Fábrica</h1>
             <p className="text-muted-foreground mt-2">
-              Gestiona los pedidos pendientes de todas las sucursales
+              Gestiona los pedidos pendientes de las sucursales de tu grupo
             </p>
+            {sucursalesDelGrupo.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="text-xs text-muted-foreground">Sucursales del grupo:</span>
+                {sucursalesDelGrupo.map((sucursal) => (
+                  <Badge key={sucursal.userId} variant="outline" className="text-xs">
+                    {sucursal.nombreEmpresa}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
           <Button
             variant="outline"
@@ -97,9 +107,27 @@ export default function FabricaPage() {
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Package className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground text-center">
-                    No hay pedidos {filtroEstado === "pendientes" ? "pendientes" : filtroEstado === "en-proceso" ? "en proceso" : ""}
-                  </p>
+                  {!tieneGrupos ? (
+                    <>
+                      <p className="text-muted-foreground text-center font-medium mb-2">
+                        No tienes grupos asignados
+                      </p>
+                      <p className="text-muted-foreground text-center text-sm">
+                        Contacta al administrador para que te asigne a un grupo con sucursales.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-muted-foreground text-center">
+                        No hay pedidos {filtroEstado === "pendientes" ? "pendientes" : filtroEstado === "en-proceso" ? "en proceso" : ""}
+                      </p>
+                      {userIdsDelGrupo.length === 0 && (
+                        <p className="text-muted-foreground text-center text-sm mt-2">
+                          No hay sucursales en tus grupos asignados.
+                        </p>
+                      )}
+                    </>
+                  )}
                 </CardContent>
               </Card>
             ) : (

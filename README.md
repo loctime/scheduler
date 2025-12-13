@@ -27,6 +27,9 @@ Aplicación web completa para crear, modificar y gestionar horarios de empleados
 - **Importación de Productos**: Importa productos desde texto plano con formato personalizable
 - **Formato Personalizable**: Personaliza el formato de salida de los pedidos con placeholders
 - **Historial de Movimientos**: Registra todos los movimientos de stock con usuario y fecha
+- **Panel de Fábrica**: Sistema completo para que fábricas procesen pedidos de sucursales
+- **Sistema de Remitos**: Generación, firma digital y gestión de remitos
+- **Firmas Digitales**: Firma de remitos por fábrica y sucursal
 
 ### Chat de Stock con IA
 - **Asistente de IA**: Chat inteligente para gestionar stock usando lenguaje natural
@@ -35,6 +38,15 @@ Aplicación web completa para crear, modificar y gestionar horarios de empleados
 - **Consultas Inteligentes**: Pregunta sobre stock, productos, pedidos y más
 - **Generación Automática de Pedidos**: Genera pedidos automáticamente basados en stock bajo
 - **Modos de Operación**: Modos específicos para ingreso, egreso, consulta y stock general
+
+### Sistema de Roles y Grupos
+- **Control de Acceso Basado en Roles (RBAC)**: Sistema completo con roles `admin`, `manager`, `factory`, `branch`, e `invited`
+- **Gestión de Grupos**: Organiza usuarios en grupos para control granular de acceso
+- **Panel de Administración**: Gestión completa de usuarios y grupos para administradores
+- **Panel de Gerente**: Gestión de grupos y usuarios para managers
+- **Panel de Fábrica**: Procesamiento de pedidos y generación de remitos
+- **Links de Registro**: Genera links de registro con roles y grupos específicos
+- **Sincronización Automática**: Sincronización automática de grupos entre usuarios
 
 ### Configuración
 - **Configuración de Empresa**: Personaliza nombre y color de la empresa
@@ -390,10 +402,36 @@ Para exponer Ollama desde tu PC de forma segura usando Cloudflare Tunnel:
 
 #### Generar Pedido
 
-1. Haz clic en "Generar Pedido"
+1. Haz clic en "Generar Pedido" o "Crear y generar link"
 2. El sistema mostrará todos los productos con stock bajo
 3. Copia el texto generado con el formato configurado
-4. Envía el pedido a tu proveedor
+4. Si generaste un link público, también se copiará el link
+5. Envía el pedido a tu proveedor o comparte el link
+
+#### Panel de Fábrica (Rol Factory)
+
+1. Accede a `/dashboard/fabrica`
+2. Verás los pedidos pendientes de sucursales de tu grupo
+3. Haz clic en un pedido para ver detalles
+4. Usa "Marcar en proceso" para tomar el pedido
+5. Genera el remito cuando esté listo
+6. Firma digitalmente el remito
+7. La sucursal recibirá el remito y podrá firmar la recepción
+
+#### Panel de Administración (Rol Admin)
+
+1. Accede a `/dashboard/admin`
+2. **Pestaña Usuarios**: Gestiona todos los usuarios del sistema
+3. **Pestaña Grupos**: Crea y gestiona grupos
+4. **Pestaña Buscar por Email**: Busca usuarios y crea links de registro
+5. Asigna roles y grupos a usuarios
+
+#### Panel de Gerente (Rol Manager)
+
+1. Accede a `/dashboard/gerente`
+2. Gestiona los grupos donde eres manager
+3. Agrega o elimina usuarios de tus grupos
+4. Crea links de registro para `branch` o `factory` dentro de tus grupos
 
 ### Chat de Stock con IA
 
@@ -536,6 +574,13 @@ contexts/
 
 hooks/
 ├── use-pedidos.ts                      # Hook para gestión de pedidos
+├── use-fabrica-pedidos.ts              # Hook para panel de fábrica (pedidos y filtrado)
+├── use-fabrica-remitos.ts              # Hook para remitos de fábrica
+├── use-groups.ts                       # Hook para gestión de grupos
+├── use-admin-users.ts                  # Hook para administración de usuarios
+├── use-invitaciones.ts                 # Hook para links de registro
+├── use-remitos.ts                      # Hook para remitos
+├── use-recepciones.ts                  # Hook para recepciones de pedidos
 ├── use-stock-chat.ts                   # Hook para el chat de stock
 ├── use-config.ts                       # Hook para configuración
 ├── use-schedules-listener.ts           # Hook para escuchar horarios
@@ -703,6 +748,9 @@ firestore/
 │       ├── stockMinimoDefault: number
 │       ├── formatoSalida: string
 │       ├── mensajePrevio?: string
+│       ├── estado?: "creado" | "processing" | "enviado" | "recibido" | "completado"
+│       ├── assignedTo?: string          // ID de fábrica que procesa
+│       ├── assignedToNombre?: string    // Nombre de fábrica
 │       └── userId: string
 │
 ├── productos/                     # Productos de los pedidos
@@ -735,6 +783,43 @@ firestore/
 │       ├── horasMaximasPorDia: number
 │       ├── mediosTurnos?: array
 │       ├── separadores?: array
+│       └── ...
+│
+├── users/                         # Usuarios del sistema (apps/horarios/users)
+│   └── {userId}/
+│       ├── uid: string
+│       ├── email: string
+│       ├── displayName?: string
+│       ├── photoURL?: string
+│       ├── role?: "admin" | "manager" | "factory" | "branch" | "invited" | "user"
+│       ├── grupoIds?: string[]         // IDs de grupos a los que pertenece
+│       └── ...
+│
+├── groups/                        # Grupos de usuarios
+│   └── {groupId}/
+│       ├── nombre: string
+│       ├── managerId: string
+│       ├── managerEmail?: string
+│       ├── userIds: string[]            // IDs de usuarios del grupo
+│       └── ...
+│
+├── invitaciones/                   # Links de registro
+│   └── {invitacionId}/
+│       ├── token: string
+│       ├── ownerId: string
+│       ├── activo: boolean
+│       ├── usado: boolean
+│       ├── role?: "branch" | "factory" | "admin" | "invited" | "manager"
+│       ├── grupoId?: string
+│       └── ...
+│
+├── remitos/                       # Remitos generados
+│   └── {remitoId}/
+│       ├── pedidoId: string
+│       ├── sucursalId: string
+│       ├── productos: array
+│       ├── firmaEnvio?: string         // Firma digital de fábrica
+│       ├── firmaRecepcion?: string     // Firma digital de sucursal
 │       └── ...
 │
 └── chatMessages/                  # Mensajes del chat (opcional)
