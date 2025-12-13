@@ -249,13 +249,14 @@ service cloud.firestore {
 
     // Colección: apps/horarios/pedidos
     match /apps/horarios/pedidos/{pedidoId} {
-      // Permitir lectura si es el dueño O si es un usuario invitado del dueño O si no hay autenticación (para enlaces públicos)
+      // Permitir lectura si es el dueño O si es un usuario invitado del dueño O si es factory O si no hay autenticación (para enlaces públicos)
       allow read: if (isAuth() && resource.data.userId == uid()) 
         || (isAuth() && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
           && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'invited'
           && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId == resource.data.userId)
-        || !isAuth() // Permitir lectura sin autenticación para enlaces públicos
-        || !isAuth();
+        || (isAuth() && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+          && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'factory')
+        || !isAuth(); // Permitir lectura sin autenticación para enlaces públicos
       // Crear: verificar que userId sea correcto (solo dueños pueden crear)
       allow create: if isAuth() && request.resource.data.userId == uid()
         && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
@@ -263,6 +264,7 @@ service cloud.firestore {
       // Actualizar: 
       // - Si está autenticado como dueño: verificar propiedad y proteger userId
       // - Si está autenticado como invitado: permitir actualizar si el pedido pertenece a su ownerId
+      // - Si es factory: permitir actualizar estado a "enviado" y campos relacionados (remitoEnvioId, fechaEnvio)
       // - Si NO está autenticado: 
       //   a) Permitir si el pedido NO está en estado "enviado", "recibido" o "completado" (pedidoPuedeActualizarseSinAuth)
       //   b) O permitir actualizar desde "enviado" a "recibido" o "completado" (puedeActualizarEstadoRecepcion)
@@ -274,6 +276,17 @@ service cloud.firestore {
           && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId == resource.data.userId
           && pedidoPuedeActualizarseSinAuth()
           && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId))
+        || (isAuth() 
+          && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+          && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'factory'
+          && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
+          && (!('nombre' in request.resource.data) || request.resource.data.nombre == resource.data.nombre)
+          && (!('stockMinimoDefault' in request.resource.data) || request.resource.data.stockMinimoDefault == resource.data.stockMinimoDefault)
+          && (!('formatoSalida' in request.resource.data) || request.resource.data.formatoSalida == resource.data.formatoSalida)
+          && (!('mensajePrevio' in request.resource.data) || request.resource.data.mensajePrevio == resource.data.mensajePrevio)
+          && (!('origenDefault' in request.resource.data) || request.resource.data.origenDefault == resource.data.origenDefault)
+          && (!('destinoDefault' in request.resource.data) || request.resource.data.destinoDefault == resource.data.destinoDefault)
+          && (!('createdAt' in request.resource.data) || request.resource.data.createdAt == resource.data.createdAt))
         || (!isAuth() 
           && (pedidoPuedeActualizarseSinAuth() || puedeActualizarEstadoRecepcion())
           && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
@@ -323,15 +336,18 @@ service cloud.firestore {
     
     // Colección: apps/horarios/remitos
     match /apps/horarios/remitos/{remitoId} {
-      // Permitir lectura si es el dueño O si es un usuario invitado del dueño
+      // Permitir lectura si es el dueño O si es un usuario invitado del dueño O si es factory
       allow read: if isAuth() && (
         resource.data.userId == uid()
         || (exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
           && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'invited'
           && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId == resource.data.userId)
+        || (exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+          && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'factory')
       );
       // Crear: 
       // - Si está autenticado: verificar que userId sea correcto (permite usuarios invitados crear con ownerId)
+      // - Si es factory: permitir crear remitos para pedidos de otras sucursales (verificando que el pedido existe)
       // - Si NO está autenticado: permitir solo si el pedido existe y el userId coincide
       //   (la aplicación controla que el pedido esté en estado válido antes de crear el remito)
       allow create: if (isAuth() && (
@@ -339,6 +355,12 @@ service cloud.firestore {
         || (exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
           && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'invited'
           && request.resource.data.userId == get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId)
+        || (exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+          && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'factory'
+          && request.resource.data.pedidoId != null
+          && exists(/databases/$(db)/documents/apps/horarios/pedidos/$(request.resource.data.pedidoId))
+          && request.resource.data.userId != null
+          && request.resource.data.userId == get(/databases/$(db)/documents/apps/horarios/pedidos/$(request.resource.data.pedidoId)).data.userId)
       ))
         || (!isAuth() 
           && request.resource.data.pedidoId != null
@@ -399,6 +421,7 @@ service cloud.firestore {
       );
       // Actualizar: 
       // - Si está autenticado: verificar propiedad y proteger userId (permite usuarios invitados actualizar con ownerId)
+      // - Si es factory: permitir desactivar enlaces públicos cuando el pedido está enviado
       // - Si NO está autenticado: permitir actualizar cuando está activo
       //   - Proteger campos sensibles (userId, pedidoId, createdAt)
       //   - Permitir actualizar productosDisponibles, fechaAcceso
@@ -407,6 +430,18 @@ service cloud.firestore {
         resource.data.userId == uid()
         || (isInvitedUser() && getOwnerId() != null && resource.data.userId == getOwnerId())
       ) && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId))
+        || (isAuth() 
+          && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+          && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'factory'
+          && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
+          && (!('pedidoId' in request.resource.data) || request.resource.data.pedidoId == resource.data.pedidoId)
+          && (!('createdAt' in request.resource.data) || request.resource.data.createdAt == resource.data.createdAt)
+          && (
+            // Permitir desactivar solo si el pedido está enviado
+            request.resource.data.activo == false
+            && exists(/databases/$(db)/documents/apps/horarios/pedidos/$(resource.data.pedidoId))
+            && get(/databases/$(db)/documents/apps/horarios/pedidos/$(resource.data.pedidoId)).data.estado == "enviado"
+          ))
         || (!isAuth() 
           && resource.data.activo == true
           // Proteger campos sensibles

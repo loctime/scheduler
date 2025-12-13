@@ -118,6 +118,8 @@ export interface Configuracion {
   }>
   formatoSalida?: string
   mensajePrevio?: string
+  nombreFirma?: string
+  firmaDigital?: string
 }
 
 export interface Empleado {

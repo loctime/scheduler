@@ -42,6 +42,7 @@ export function FabricaPedidoForm({
   >(productosDisponiblesInicial)
   const [observacionesHabilitadas, setObservacionesHabilitadas] = useState<Record<string, boolean>>({})
   const ultimoProductoMarcadoRef = useRef<string | null>(null)
+  const textareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({})
   
   // Determinar si estamos en modo "en proceso" (similar a enlace público)
   const modoEnProceso = pedido.estado === "processing" && puedeGenerarRemito
@@ -165,6 +166,10 @@ export function FabricaPedidoForm({
 
   const toggleListo = (productoId: string) => {
     const estabaListo = productosDisponibles[productoId]?.listo
+    const producto = productos.find(p => p.id === productoId)
+    const cantidadPedida = (producto as any)?.cantidadPedida ?? 0
+    const cantidadActual = productosDisponibles[productoId]?.cantidadEnviada ?? 0
+    
     setProductosDisponibles((prev) => {
       const nuevoEstado = {
         ...prev,
@@ -174,6 +179,25 @@ export function FabricaPedidoForm({
           listo: !prev[productoId]?.listo,
           completo: prev[productoId]?.listo ? prev[productoId]?.completo : undefined,
         },
+      }
+      
+      // Si se marca como listo y la cantidad es menor, activar comentarios automáticamente
+      if (!estabaListo && !prev[productoId]?.listo && cantidadActual < cantidadPedida) {
+        setObservacionesHabilitadas((prevObs) => ({
+          ...prevObs,
+          [productoId]: true,
+        }))
+        // Inicializar observaciones si no existe
+        if (!prev[productoId]?.observaciones) {
+          nuevoEstado[productoId].observaciones = ""
+        }
+        // Hacer focus en el textarea después de activar automáticamente
+        setTimeout(() => {
+          const textarea = textareaRefs.current[productoId]
+          if (textarea) {
+            textarea.focus()
+          }
+        }, 100)
       }
       
       if (!estabaListo && modoEnProceso) {
@@ -219,8 +243,16 @@ export function FabricaPedidoForm({
           observaciones: "",
         },
       }))
+      // Hacer focus en el textarea después de activar
+      setTimeout(() => {
+        const textarea = textareaRefs.current[productoId]
+        if (textarea) {
+          textarea.focus()
+        }
+      }, 0)
     }
   }
+
 
   const updateObservaciones = (productoId: string, observaciones: string) => {
     setProductosDisponibles((prev) => ({
@@ -315,7 +347,13 @@ export function FabricaPedidoForm({
                     <span className="text-muted-foreground hidden sm:inline">•</span>
                     <div className="flex items-center gap-1.5 whitespace-nowrap bg-muted/50 dark:bg-muted/30 px-2.5 py-1 rounded-md border border-border">
                       <span className="text-sm font-medium text-muted-foreground">Pedida:</span>
-                      <span className="text-lg font-bold text-foreground">{cantidadPedida}</span>
+                      <span className={`text-lg font-bold ${
+                        productoData.listo && cantidadActual < cantidadPedida 
+                          ? "text-red-600 dark:text-red-400" 
+                          : "text-foreground"
+                      }`}>
+                        {cantidadPedida}
+                      </span>
                       <span className="text-sm font-medium text-muted-foreground">{producto.unidad || "U"}</span>
                     </div>
                   </div>
@@ -399,6 +437,9 @@ export function FabricaPedidoForm({
                   </div>
                   {observacionesHabilitadas[producto.id] && (
                     <Textarea
+                      ref={(el) => {
+                        textareaRefs.current[producto.id] = el
+                      }}
                       id={`obs-${producto.id}`}
                       value={productoData.observaciones ?? ""}
                       onChange={(e) => updateObservaciones(producto.id, e.target.value)}

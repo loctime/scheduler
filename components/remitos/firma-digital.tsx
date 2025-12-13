@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,10 +18,25 @@ export function FirmaDigital({ nombre: nombreInicial = "", firma: firmaInicial, 
   const [firmaCanvas, setFirmaCanvas] = useState<string | null>(firmaInicial || null)
   const [isDrawing, setIsDrawing] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const isInitialMount = useRef(true)
+  const lastOnFirmaChangeRef = useRef(onFirmaChange)
+  const prevPropsRef = useRef({ nombreInicial, firmaInicial })
+
+  // Mantener referencia actualizada de onFirmaChange
+  useEffect(() => {
+    lastOnFirmaChangeRef.current = onFirmaChange
+  }, [onFirmaChange])
 
   useEffect(() => {
-    if (nombreInicial) setNombre(nombreInicial)
-    if (firmaInicial) setFirmaCanvas(firmaInicial)
+    // Solo actualizar si los valores iniciales realmente cambiaron desde fuera (comparar con props anteriores)
+    if (nombreInicial !== prevPropsRef.current.nombreInicial) {
+      setNombre(nombreInicial)
+      prevPropsRef.current.nombreInicial = nombreInicial
+    }
+    if (firmaInicial !== prevPropsRef.current.firmaInicial) {
+      setFirmaCanvas(firmaInicial || null)
+      prevPropsRef.current.firmaInicial = firmaInicial
+    }
   }, [nombreInicial, firmaInicial])
 
   useEffect(() => {
@@ -38,11 +53,16 @@ export function FirmaDigital({ nombre: nombreInicial = "", firma: firmaInicial, 
     }
   }, [])
 
+  // Solo llamar a onFirmaChange cuando el usuario hace cambios, no en el montaje inicial
   useEffect(() => {
-    if (nombre || firmaCanvas) {
-      onFirmaChange({ nombre, firma: firmaCanvas || undefined })
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
     }
-  }, [nombre, firmaCanvas, onFirmaChange])
+    if (nombre || firmaCanvas) {
+      lastOnFirmaChangeRef.current({ nombre, firma: firmaCanvas || undefined })
+    }
+  }, [nombre, firmaCanvas])
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current

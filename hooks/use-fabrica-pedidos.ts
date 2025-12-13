@@ -200,18 +200,42 @@ export function useFabricaPedidos(user: any) {
         ...doc.data(),
       })) as Pedido[]
 
-      // Filtrar pedidos por grupo: solo mostrar pedidos de sucursales del mismo grupo
+      // Cargar enlaces públicos activos para filtrar pedidos que tienen enlace generado
+      const enlacesActivosQuery = query(
+        collection(db, COLLECTIONS.ENLACES_PUBLICOS),
+        where("activo", "==", true)
+      )
+      const enlacesActivosSnapshot = await getDocs(enlacesActivosQuery)
+      const enlacesActivosIds = new Set(enlacesActivosSnapshot.docs.map(doc => doc.data().pedidoId))
+      
+      // Filtrar pedidos por grupo Y que tengan enlace público activo
       let pedidosFiltrados = pedidosData
       logger.info("[FABRICA] Pedidos antes de filtrar:", { 
         total: pedidosData.length,
-        pedidos: pedidosData.map(p => ({ id: p.id, nombre: p.nombre, userId: p.userId, estado: p.estado }))
+        pedidos: pedidosData.map(p => ({ id: p.id, nombre: p.nombre, userId: p.userId, estado: p.estado, enlacePublicoId: p.enlacePublicoId })),
+        userIdsDelGrupo,
+        enlacesActivosCount: enlacesActivosIds.size
       })
       
       if (userIdsDelGrupo.length > 0) {
-        pedidosFiltrados = pedidosData.filter(pedido => 
-          pedido.userId && userIdsDelGrupo.includes(pedido.userId)
-        )
-        logger.info("[FABRICA] Pedidos después de filtrar por grupo:", { 
+        pedidosFiltrados = pedidosData.filter(pedido => {
+          const enGrupo = pedido.userId && userIdsDelGrupo.includes(pedido.userId)
+          const tieneEnlaceActivo = enlacesActivosIds.has(pedido.id)
+          const coincide = enGrupo && tieneEnlaceActivo
+          
+          if (!coincide && pedido.userId && enGrupo) {
+            logger.info("[FABRICA] Pedido excluido del filtro (sin enlace activo):", {
+              pedidoId: pedido.id,
+              pedidoNombre: pedido.nombre,
+              pedidoUserId: pedido.userId,
+              enGrupo,
+              tieneEnlaceActivo,
+              enlacePublicoId: pedido.enlacePublicoId
+            })
+          }
+          return coincide
+        })
+        logger.info("[FABRICA] Pedidos después de filtrar por grupo y enlace activo:", { 
           total: pedidosFiltrados.length,
           pedidos: pedidosFiltrados.map(p => ({ id: p.id, nombre: p.nombre, userId: p.userId }))
         })
@@ -263,17 +287,29 @@ export function useFabricaPedidos(user: any) {
     const unsubscribe = onSnapshot(
       pedidosQuery,
       async (snapshot) => {
+        if (!db) return
+        
         const pedidosData = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         })) as Pedido[]
 
-        // Filtrar pedidos por grupo: solo mostrar pedidos de sucursales del mismo grupo
+        // Cargar enlaces públicos activos para filtrar pedidos que tienen enlace generado
+        const enlacesActivosQuery = query(
+          collection(db, COLLECTIONS.ENLACES_PUBLICOS),
+          where("activo", "==", true)
+        )
+        const enlacesActivosSnapshot = await getDocs(enlacesActivosQuery)
+        const enlacesActivosIds = new Set(enlacesActivosSnapshot.docs.map(doc => doc.data().pedidoId))
+        
+        // Filtrar pedidos por grupo Y que tengan enlace público activo
         let pedidosFiltrados = pedidosData
         if (userIdsDelGrupo.length > 0) {
-          pedidosFiltrados = pedidosData.filter(pedido => 
-            pedido.userId && userIdsDelGrupo.includes(pedido.userId)
-          )
+          pedidosFiltrados = pedidosData.filter(pedido => {
+            const enGrupo = pedido.userId && userIdsDelGrupo.includes(pedido.userId)
+            const tieneEnlaceActivo = enlacesActivosIds.has(pedido.id)
+            return enGrupo && tieneEnlaceActivo
+          })
         } else if (userData?.role === "factory") {
           // Si el usuario factory no tiene grupos asignados, no mostrar ningún pedido
           pedidosFiltrados = []

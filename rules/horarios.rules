@@ -313,12 +313,19 @@ match /apps/horarios/pedidos/{pedidoId} {
         // Y puede asignar assignedTo
         || ('assignedTo' in request.resource.data)
         || ('assignedToNombre' in request.resource.data)
+        // O actualizar campos relacionados con el envío
+        || ('remitoEnvioId' in request.resource.data)
+        || ('fechaEnvio' in request.resource.data)
       )
-      // Proteger userId del pedido
+      // Proteger userId del pedido y campos que no debe modificar
       && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
-      // Permitir actualizar campos relacionados con el flujo de fábrica
-      && (!('remitoEnvioId' in request.resource.data) || request.resource.data.remitoEnvioId != null)
-      && (!('fechaEnvio' in request.resource.data) || request.resource.data.fechaEnvio != null))
+      && (!('nombre' in request.resource.data) || request.resource.data.nombre == resource.data.nombre)
+      && (!('stockMinimoDefault' in request.resource.data) || request.resource.data.stockMinimoDefault == resource.data.stockMinimoDefault)
+      && (!('formatoSalida' in request.resource.data) || request.resource.data.formatoSalida == resource.data.formatoSalida)
+      && (!('mensajePrevio' in request.resource.data) || request.resource.data.mensajePrevio == resource.data.mensajePrevio)
+      && (!('origenDefault' in request.resource.data) || request.resource.data.origenDefault == resource.data.origenDefault)
+      && (!('destinoDefault' in request.resource.data) || request.resource.data.destinoDefault == resource.data.destinoDefault)
+      && (!('createdAt' in request.resource.data) || request.resource.data.createdAt == resource.data.createdAt))
     || (!isAuth() 
       && (pedidoPuedeActualizarseSinAuth() || puedeActualizarEstadoRecepcion())
       && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
@@ -533,6 +540,7 @@ match /apps/horarios/enlaces_publicos/{enlaceId} {
   );
   // Actualizar: 
   // - Si está autenticado: verificar propiedad y proteger userId (permite usuarios invitados actualizar con ownerId)
+  // - Si es factory: permitir desactivar enlaces públicos cuando el pedido está enviado
   // - Si NO está autenticado: permitir actualizar cuando está activo
   //   - Proteger campos sensibles (userId, pedidoId, createdAt)
   //   - Permitir actualizar productosDisponibles, fechaAcceso
@@ -541,6 +549,16 @@ match /apps/horarios/enlaces_publicos/{enlaceId} {
     resource.data.userId == uid()
     || (isInvitedUser() && getOwnerId() != null && resource.data.userId == getOwnerId())
   ) && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId))
+    || (isFactory()
+      && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
+      && (!('pedidoId' in request.resource.data) || request.resource.data.pedidoId == resource.data.pedidoId)
+      && (!('createdAt' in request.resource.data) || request.resource.data.createdAt == resource.data.createdAt)
+      && (
+        // Permitir desactivar solo si el pedido está enviado
+        request.resource.data.activo == false
+        && exists(/databases/$(db)/documents/apps/horarios/pedidos/$(resource.data.pedidoId))
+        && get(/databases/$(db)/documents/apps/horarios/pedidos/$(resource.data.pedidoId)).data.estado == "enviado"
+      ))
     || (!isAuth() 
       && resource.data.activo == true
       // Proteger campos sensibles
