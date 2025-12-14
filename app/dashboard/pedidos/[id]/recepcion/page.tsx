@@ -28,7 +28,7 @@ export default function RecepcionPage() {
   const { pedidos, stockActual, calcularPedido, updatePedidoEstado } = usePedidos(user)
   const { crearRecepcion } = useRecepciones(user)
   const { crearRemito, descargarPDFRemito, obtenerRemitosPorPedido, obtenerRemito } = useRemitos(user)
-  const { obtenerEnlacePublico } = useEnlacePublico(user)
+  const { obtenerEnlacePublico, desactivarEnlacesPorPedido } = useEnlacePublico(user)
 
   const [pedido, setPedido] = useState<Pedido | null>(null)
   const [enlacePublico, setEnlacePublico] = useState<any>(null)
@@ -257,6 +257,11 @@ export default function RecepcionPage() {
         // Si la recepción no es parcial, marcar como completado automáticamente
         const nuevoEstado = recepcionData.esParcial ? "recibido" : "completado"
         await updatePedidoEstado(pedido.id, nuevoEstado, undefined, new Date())
+
+        // Desactivar enlaces públicos del pedido cuando se completa
+        if (nuevoEstado === "completado") {
+          await desactivarEnlacesPorPedido(pedido.id)
+        }
 
         // Descargar PDF del remito
         await descargarPDFRemito(remito)

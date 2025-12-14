@@ -17,7 +17,7 @@ import { useEnlacePublico } from "@/hooks/use-enlace-publico"
 import { useRemitos } from "@/hooks/use-remitos"
 import { useRecepciones } from "@/hooks/use-recepciones"
 import { db, COLLECTIONS } from "@/lib/firebase"
-import { doc, setDoc, serverTimestamp, getDoc, updateDoc, deleteDoc } from "firebase/firestore"
+import { doc, setDoc, serverTimestamp, getDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where } from "firebase/firestore"
 import type { Remito, Recepcion } from "@/lib/types"
 import { PedidoTimeline } from "@/components/pedidos/pedido-timeline"
 import { crearRemitoPedido, crearRemitoRecepcion } from "@/lib/remito-utils"
@@ -45,7 +45,7 @@ const FORMAT_EXAMPLES = [
 ]
 
 export default function PedidosPage() {
-  const { user } = useData()
+  const { user, userData } = useData()
   const { toast } = useToast()
   
   // Obtener stockActual del contexto global del chat
@@ -76,7 +76,7 @@ export default function PedidosPage() {
     updateEnlacePublico,
   } = usePedidos(user)
 
-  const { crearEnlacePublico, buscarEnlacesActivosPorPedido, obtenerEnlacePublico, loading: loadingEnlace } = useEnlacePublico(user)
+  const { crearEnlacePublico, buscarEnlacesActivosPorPedido, obtenerEnlacePublico, desactivarEnlacesPorPedido, loading: loadingEnlace } = useEnlacePublico(user)
   const { crearRemito, obtenerRemitosPorPedido, descargarPDFRemito, obtenerRemito } = useRemitos(user)
   const { obtenerRecepcionesPorPedido, crearRecepcion } = useRecepciones(user)
   
@@ -409,6 +409,53 @@ export default function PedidosPage() {
     cargarDatos()
   }, [selectedPedido?.id, obtenerRemitosPorPedido, obtenerRecepcionesPorPedido, buscarEnlacesActivosPorPedido])
 
+  // Listener en tiempo real para enlaces públicos del pedido seleccionado
+  useEffect(() => {
+    if (!selectedPedido?.id || !db || !user) {
+      setEnlaceActivo(null)
+      return
+    }
+
+    // Determinar userId a usar (puede ser ownerId si es invitado)
+    const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
+      ? userData.ownerId 
+      : user.uid
+
+    const enlacesQuery = query(
+      collection(db, COLLECTIONS.ENLACES_PUBLICOS),
+      where("pedidoId", "==", selectedPedido.id),
+      where("activo", "==", true),
+      where("userId", "==", userIdToQuery)
+    )
+
+    const unsubscribe = onSnapshot(
+      enlacesQuery,
+      (snapshot) => {
+        const enlacesActivos = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        
+        if (enlacesActivos.length > 0) {
+          // Usar el enlace más reciente
+          const enlaceMasReciente = enlacesActivos.sort((a, b) => {
+            const aTime = a.createdAt?.toMillis?.() || 0
+            const bTime = b.createdAt?.toMillis?.() || 0
+            return bTime - aTime
+          })[0]
+          setEnlaceActivo({ id: enlaceMasReciente.id })
+        } else {
+          setEnlaceActivo(null)
+        }
+      },
+      (error) => {
+        console.error("Error en listener de enlaces:", error)
+      }
+    )
+
+    return () => unsubscribe()
+  }, [selectedPedido?.id, db, user, userData])
+
   // Handlers
   const handleOpenCreate = () => {
     setFormName("")
@@ -716,6 +763,13 @@ export default function PedidosPage() {
         // Si la recepción no es parcial, marcar como completado automáticamente
         const nuevoEstado = recepcionData.esParcial ? "recibido" : "completado"
         await updatePedidoEstado(selectedPedido.id, nuevoEstado, undefined, new Date())
+
+        // Desactivar enlaces públicos del pedido cuando se completa
+        if (nuevoEstado === "completado") {
+          await desactivarEnlacesPorPedido(selectedPedido.id)
+          // Actualizar estado local inmediatamente (el listener también lo hará, pero esto es más rápido)
+          setEnlaceActivo(null)
+        }
 
         // Descargar PDF del remito
         await descargarPDFRemito(remito)

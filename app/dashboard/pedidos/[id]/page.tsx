@@ -27,7 +27,7 @@ export default function PedidoDetallePage() {
 
   const { pedidos, products, stockActual, calcularPedido, updatePedidoEstado, updateRemitoEnvio, updateEnlacePublico } = usePedidos(user)
   const { crearRemito, obtenerRemitosPorPedido, descargarPDFRemito } = useRemitos(user)
-  const { crearEnlacePublico, obtenerEnlacePublico } = useEnlacePublico(user)
+  const { crearEnlacePublico, obtenerEnlacePublico, desactivarEnlacesPorPedido } = useEnlacePublico(user)
   const { obtenerRecepcionesPorPedido } = useRecepciones(user)
 
   const [pedido, setPedido] = useState<any>(null)
@@ -116,9 +116,14 @@ export default function PedidoDetallePage() {
     if (!pedido || !db) return
     await updatePedidoEstado(pedido.id, "completado")
     
+    // Desactivar enlaces públicos del pedido cuando se completa
+    await desactivarEnlacesPorPedido(pedido.id)
+    
+    // Actualizar estado local del pedido
     const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId))
     if (pedidoDoc.exists()) {
-      setPedido({ id: pedidoDoc.id, ...pedidoDoc.data() })
+      const pedidoActualizado = { id: pedidoDoc.id, ...pedidoDoc.data() } as Pedido
+      setPedido(pedidoActualizado)
     }
   }
 

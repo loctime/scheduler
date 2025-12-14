@@ -277,6 +277,44 @@ export function useEnlacePublico(user: any) {
     }
   }, [])
 
+  // Desactivar todos los enlaces activos de un pedido
+  const desactivarEnlacesPorPedido = useCallback(async (
+    pedidoId: string
+  ): Promise<boolean> => {
+    if (!db || !user) return false
+
+    try {
+      // Determinar el userId a usar: si es invitado, usar ownerId, sino usar su propio uid
+      const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
+        ? userData.ownerId 
+        : user?.uid
+
+      // Buscar todos los enlaces activos del pedido
+      const enlacesQuery = query(
+        collection(db, COLLECTIONS.ENLACES_PUBLICOS),
+        where("pedidoId", "==", pedidoId),
+        where("activo", "==", true),
+        where("userId", "==", userIdToQuery)
+      )
+      const enlacesSnapshot = await getDocs(enlacesQuery)
+      
+      // Desactivar todos los enlaces encontrados
+      const desactivarPromesas = enlacesSnapshot.docs.map((doc) =>
+        setDoc(doc.ref, { activo: false }, { merge: true })
+      )
+      await Promise.all(desactivarPromesas)
+      
+      if (enlacesSnapshot.docs.length > 0) {
+        logger.info(`Desactivados ${enlacesSnapshot.docs.length} enlaces del pedido ${pedidoId}`)
+      }
+      
+      return true
+    } catch (error: any) {
+      logger.error("Error al desactivar enlaces del pedido:", error)
+      return false
+    }
+  }, [user])
+
   // Buscar enlaces públicos activos por pedidoId
   const buscarEnlacesActivosPorPedido = useCallback(async (
     pedidoId: string
@@ -312,6 +350,7 @@ export function useEnlacePublico(user: any) {
     obtenerEnlacePublico,
     actualizarProductosDisponibles,
     desactivarEnlace,
+    desactivarEnlacesPorPedido,
     buscarEnlacesActivosPorPedido,
   }
 }
