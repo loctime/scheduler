@@ -626,8 +626,13 @@ export function useExportSchedule() {
         // Verificar si es un separador
         if (separadorMap.has(id)) {
           const separator = separadorMap.get(id)!
+          // Para separadores, solo poner contenido en la primera celda
+          // Las demás celdas deben estar vacías para que el merge funcione correctamente
           const row: any[] = [separator.nombre]
-          weekDays.forEach(() => row.push(""))
+          // Agregar celdas vacías para el resto de columnas (días)
+          for (let i = 0; i < weekDays.length; i++) {
+            row.push(null) // Usar null en lugar de "" para celdas vacías
+          }
           data.push(row)
           currentRow++
         }
@@ -715,12 +720,24 @@ export function useExportSchedule() {
           const separatorColor = hexToRgb(softenedSeparatorColor)
           const separatorTextColor = getTextColor(softenedSeparatorColor)
           
+          // IMPORTANTE: Eliminar las otras celdas de la fila ANTES de aplicar el merge
+          // Esto previene que el contenido se duplique cuando se combinan las celdas
+          for (let col = 1; col <= range.e.c; col++) {
+            const cellRef = XLSX.utils.encode_cell({ r: currentRow, c: col })
+            if (ws[cellRef]) {
+              delete ws[cellRef]
+            }
+          }
+          
           // Combinar celdas de la fila del separador (desde columna 0 hasta la última)
           merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: range.e.c } })
           
           // Aplicar estilo solo a la primera celda (las demás se combinarán)
           const cellRef = XLSX.utils.encode_cell({ r: currentRow, c: 0 })
           if (!ws[cellRef]) ws[cellRef] = {}
+          // Asegurar que el contenido esté solo en la primera celda
+          ws[cellRef].v = separator.nombre
+          ws[cellRef].t = "s" // Tipo string
           ws[cellRef].s = {
             fill: { fgColor: { rgb: separatorColor } },
             font: { bold: true, color: { rgb: separatorTextColor }, sz: 12 },
@@ -730,14 +747,6 @@ export function useExportSchedule() {
               bottom: { style: "thin", color: { rgb: "000000" } },
               left: { style: "thin", color: { rgb: "000000" } },
               right: { style: "thin", color: { rgb: "000000" } },
-            }
-          }
-          
-          // Limpiar las otras celdas de la fila (se combinarán)
-          for (let col = 1; col <= range.e.c; col++) {
-            const cellRef = XLSX.utils.encode_cell({ r: currentRow, c: col })
-            if (ws[cellRef]) {
-              delete ws[cellRef]
             }
           }
           

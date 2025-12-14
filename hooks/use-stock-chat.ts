@@ -287,6 +287,9 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     checkOllamaConnection()
   }, [checkOllamaConnection])
 
+  // Estado para rastrear pedidos ya notificados
+  const pedidosNotificadosRef = useRef<Set<string>>(new Set())
+
   // Mensaje de bienvenida
   useEffect(() => {
     if (messages.length === 0 && ollamaStatus.status === "ok" && !loadingStock) {
@@ -308,6 +311,48 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       })
     }
   }, [ollamaStatus.status, productos, pedidos, loadingStock, addMessage, messages.length])
+
+  // Detectar pedidos pendientes de recibir y notificar
+  useEffect(() => {
+    if (!pedidos.length || loadingStock || messages.length === 0) return
+
+    // Buscar pedidos pendientes de recibir (estado "enviado" o "recibido")
+    const pedidosPendientes = pedidos.filter(pedido => 
+      pedido.estado === "enviado" || pedido.estado === "recibido"
+    )
+
+    // Notificar solo los pedidos que aún no han sido notificados
+    pedidosPendientes.forEach(pedido => {
+      if (!pedidosNotificadosRef.current.has(pedido.id)) {
+        pedidosNotificadosRef.current.add(pedido.id)
+        
+        // Agregar mensaje de notificación con botón de acción
+        addMessage({
+          tipo: "sistema",
+          contenido: `📦 Pedido "${pedido.nombre}" pendiente a recibir`,
+          accionesRapidas: [
+            {
+              texto: "Recibir",
+              accion: () => {
+                // Navegar a la página de recepción
+                if (typeof window !== "undefined") {
+                  window.location.href = `/dashboard/pedidos/${pedido.id}/recepcion`
+                }
+              }
+            }
+          ]
+        })
+      }
+    })
+
+    // Limpiar pedidos que ya no están pendientes del set de notificados
+    const pedidosCompletados = pedidos.filter(pedido => 
+      pedido.estado === "completado" && pedidosNotificadosRef.current.has(pedido.id)
+    )
+    pedidosCompletados.forEach(pedido => {
+      pedidosNotificadosRef.current.delete(pedido.id)
+    })
+  }, [pedidos, loadingStock, addMessage, messages.length])
 
   // ==================== ACCIONES DE BASE DE DATOS ====================
 

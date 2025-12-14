@@ -65,6 +65,10 @@ export interface ChatMessage {
   contenido: string
   accion?: StockAccionParsed
   requiereConfirmacion?: boolean
+  accionesRapidas?: Array<{
+    texto: string
+    accion: () => void
+  }>
 }
 
 export interface StockMovimiento {

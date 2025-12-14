@@ -514,6 +514,23 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         
         <p className="whitespace-pre-wrap">{message.contenido}</p>
         
+        {/* Botones de acción rápida */}
+        {message.accionesRapidas && message.accionesRapidas.length > 0 && (
+          <div className="mt-3 flex gap-2 flex-wrap">
+            {message.accionesRapidas.map((accion, index) => (
+              <Button
+                key={index}
+                size="sm"
+                variant="default"
+                onClick={accion.accion}
+                className="text-xs h-7 px-3"
+              >
+                {accion.texto}
+              </Button>
+            ))}
+          </div>
+        )}
+        
         {/* Botón copiar inferior - solo para mensajes del sistema */}
         {isSistema && (
           <div className="absolute bottom-1 right-1">
