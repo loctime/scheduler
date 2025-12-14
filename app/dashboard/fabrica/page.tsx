@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -40,6 +40,7 @@ export default function FabricaPage() {
   const { crearRemito } = useRemitos(user)
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("todos")
   const [pedidoExpandido, setPedidoExpandido] = useState<string | null>(null)
+  const pedidoExpandidoRef = useRef<string | null>(null) // Ref para mantener el pedido expandido durante actualizaciones
   const [pedidosExpandidos, setPedidosExpandidos] = useState<Record<string, PedidoExpandido>>({})
   const [mostrarFirmaDialog, setMostrarFirmaDialog] = useState(false)
   const [productosDisponiblesPendientes, setProductosDisponiblesPendientes] = useState<EnlacePublico["productosDisponibles"] | null>(null)
@@ -58,6 +59,45 @@ export default function FabricaPage() {
         })
     }
   }, [])
+
+  // Sincronizar el ref con el estado
+  useEffect(() => {
+    pedidoExpandidoRef.current = pedidoExpandido
+  }, [pedidoExpandido])
+
+  // Mantener el desplegable abierto cuando los pedidos se actualizan desde el listener
+  useEffect(() => {
+    const pedidoIdExpandido = pedidoExpandidoRef.current
+    if (pedidoIdExpandido) {
+      // Verificar que el pedido expandido aún existe en la lista
+      const pedidoExiste = pedidos.some(p => p.id === pedidoIdExpandido)
+      if (!pedidoExiste && pedidos.length > 0) {
+        // Si el pedido ya no existe, cerrar el desplegable
+        setPedidoExpandido(null)
+        pedidoExpandidoRef.current = null
+      } else if (pedidoExiste) {
+        // SIEMPRE forzar la actualización del estado para mantener el desplegable abierto
+        // Esto es crítico cuando los pedidos se actualizan desde el listener
+        setPedidoExpandido(prev => {
+          // Si el estado actual no coincide con el ref, actualizarlo
+          if (prev !== pedidoIdExpandido) {
+            return pedidoIdExpandido
+          }
+          return prev
+        })
+        
+        // Si el pedido existe pero no tiene datos expandidos, cargarlos
+        const datosExpandidos = pedidosExpandidos[pedidoIdExpandido]
+        if (!datosExpandidos) {
+          const pedido = pedidos.find(p => p.id === pedidoIdExpandido)
+          if (pedido) {
+            cargarDatosPedido(pedido)
+          }
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidos])
 
   // Filtrar pedidos según el filtro seleccionado
   const pedidosFiltrados = useMemo(() => {
@@ -118,6 +158,7 @@ export default function FabricaPage() {
       }
 
       // Buscar enlace público (activo o inactivo si el pedido está en proceso)
+      // Solo para mostrar información del enlace, no para productos
       const enlacesQuery = pedido.estado === "processing"
         ? query(
             collection(db, COLLECTIONS.ENLACES_PUBLICOS),
@@ -130,54 +171,24 @@ export default function FabricaPage() {
           )
       const enlacesSnapshot = await getDocs(enlacesQuery)
       
-      let productos: Producto[] = []
       let enlacePublico: EnlacePublico | undefined
-
       if (!enlacesSnapshot.empty) {
         enlacePublico = { id: enlacesSnapshot.docs[0].id, ...enlacesSnapshot.docs[0].data() } as EnlacePublico
-
-        // Usar snapshot de productos si existe
-        if (enlacePublico.productosSnapshot && enlacePublico.productosSnapshot.length > 0) {
-          productos = enlacePublico.productosSnapshot
-            .filter(p => (p.cantidadPedida ?? 0) > 0)
-            .map(p => ({
-              id: p.id,
-              pedidoId: pedido.id,
-              nombre: p.nombre,
-              stockMinimo: p.stockMinimo,
-              cantidadPedida: p.cantidadPedida ?? 0,
-              unidad: p.unidad,
-              orden: p.orden,
-              userId: pedido.userId,
-            })) as Producto[]
-        } else {
-          // Fallback: leer productos dinámicamente
-          const productosQuery = query(
-            collection(db, COLLECTIONS.PRODUCTS),
-            where("pedidoId", "==", pedido.id),
-            where("userId", "==", pedido.userId)
-          )
-          const productosSnapshot = await getDocs(productosQuery)
-          productos = productosSnapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          })) as Producto[]
-          productos.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
-        }
-      } else {
-        // No hay enlace público, leer productos directamente
-        const productosQuery = query(
-          collection(db, COLLECTIONS.PRODUCTS),
-          where("pedidoId", "==", pedido.id),
-          where("userId", "==", pedido.userId)
-        )
-        const productosSnapshot = await getDocs(productosQuery)
-        productos = productosSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Producto[]
-        productos.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
       }
+
+      // SIEMPRE leer productos dinámicamente para tener la versión más actualizada
+      // El snapshot puede estar desactualizado si se agregaron productos después de crear el enlace
+      const productosQuery = query(
+        collection(db, COLLECTIONS.PRODUCTS),
+        where("pedidoId", "==", pedido.id),
+        where("userId", "==", pedido.userId)
+      )
+      const productosSnapshot = await getDocs(productosQuery)
+      const productos = productosSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Producto[]
+      productos.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
 
       setPedidosExpandidos(prev => ({
         ...prev,
@@ -207,28 +218,44 @@ export default function FabricaPage() {
   const togglePedido = (pedido: Pedido) => {
     if (pedidoExpandido === pedido.id) {
       setPedidoExpandido(null)
+      pedidoExpandidoRef.current = null
     } else {
       setPedidoExpandido(pedido.id)
+      pedidoExpandidoRef.current = pedido.id
       cargarDatosPedido(pedido)
     }
   }
 
   // Manejar aceptar pedido
-  const handleAceptarPedido = async (pedido: Pedido) => {
-    setAceptandoPedido(pedido.id)
-    const exito = await aceptarPedido(pedido.id)
+  const handleAceptarPedido = async (pedido: Pedido, e?: React.MouseEvent) => {
+    // Prevenir que el evento se propague y cierre el desplegable
+    e?.stopPropagation()
+    e?.preventDefault()
+    
+    const pedidoId = pedido.id
+    setAceptandoPedido(pedidoId)
+    
+    // Asegurarse de que el desplegable permanezca abierto ANTES de aceptar
+    setPedidoExpandido(pedidoId)
+    pedidoExpandidoRef.current = pedidoId
+    
+    const exito = await aceptarPedido(pedidoId)
     setAceptandoPedido(null)
     
     if (exito) {
+      // Mantener el desplegable abierto explícitamente después de aceptar
+      setPedidoExpandido(pedidoId)
+      pedidoExpandidoRef.current = pedidoId
+      
       // Limpiar datos expandidos para forzar recarga con nuevo estado
       setPedidosExpandidos(prev => {
         const nuevo = { ...prev }
-        delete nuevo[pedido.id]
+        delete nuevo[pedidoId]
         return nuevo
       })
-      // Recargar datos del pedido con nuevo estado
-      const pedidoActualizado = { ...pedido, estado: "processing" as const, assignedTo: user?.uid }
-      await cargarDatosPedido(pedidoActualizado)
+      
+      // El useEffect se encargará de recargar los datos cuando los pedidos se actualicen
+      // Solo necesitamos asegurarnos de que el desplegable permanezca abierto
     }
   }
 
@@ -516,7 +543,7 @@ export default function FabricaPage() {
 
                                 {pedido.estado === "creado" || !pedido.estado ? (
                                   <Button
-                                    onClick={() => handleAceptarPedido(pedido)}
+                                    onClick={(e) => handleAceptarPedido(pedido, e)}
                                     disabled={!!estaAceptando || estaAsignado}
                                     className="w-full"
                                     size="lg"

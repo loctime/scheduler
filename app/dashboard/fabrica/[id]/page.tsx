@@ -72,7 +72,7 @@ export default function FabricaPedidoDetailPage() {
           }
         }
 
-        // Buscar enlace público activo para obtener snapshot de productos
+        // Buscar enlace público activo (solo para mostrar información, no para productos)
         const enlacesQuery = query(
           collection(db, COLLECTIONS.ENLACES_PUBLICOS),
           where("pedidoId", "==", pedidoId),
@@ -83,52 +83,22 @@ export default function FabricaPedidoDetailPage() {
         if (!enlacesSnapshot.empty) {
           const enlaceData = { id: enlacesSnapshot.docs[0].id, ...enlacesSnapshot.docs[0].data() } as EnlacePublico
           setEnlacePublico(enlaceData)
-
-          // Usar snapshot de productos si existe
-          if (enlaceData.productosSnapshot && enlaceData.productosSnapshot.length > 0) {
-            const productosFromSnapshot = enlaceData.productosSnapshot
-              .filter(p => (p.cantidadPedida ?? 0) > 0)
-              .map(p => ({
-                id: p.id,
-                pedidoId: pedidoId,
-                nombre: p.nombre,
-                stockMinimo: p.stockMinimo,
-                cantidadPedida: p.cantidadPedida ?? 0,
-                unidad: p.unidad,
-                orden: p.orden,
-                userId: pedidoData.userId,
-              })) as Producto[]
-            setProductos(productosFromSnapshot)
-          } else {
-            // Fallback: leer productos dinámicamente
-            const productosQuery = query(
-              collection(db, COLLECTIONS.PRODUCTS),
-              where("pedidoId", "==", pedidoId),
-              where("userId", "==", pedidoData.userId)
-            )
-            const productosSnapshot = await getDocs(productosQuery)
-            const productosData = productosSnapshot.docs.map((doc) => ({
-              id: doc.id,
-              ...doc.data(),
-            })) as Producto[]
-            productosData.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
-            setProductos(productosData)
-          }
-        } else {
-          // No hay enlace público, leer productos directamente
-          const productosQuery = query(
-            collection(db, COLLECTIONS.PRODUCTS),
-            where("pedidoId", "==", pedidoId),
-            where("userId", "==", pedidoData.userId)
-          )
-          const productosSnapshot = await getDocs(productosQuery)
-          const productosData = productosSnapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          })) as Producto[]
-          productosData.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
-          setProductos(productosData)
         }
+
+        // SIEMPRE leer productos dinámicamente para tener la versión más actualizada
+        // El snapshot puede estar desactualizado si se agregaron productos después de crear el enlace
+        const productosQuery = query(
+          collection(db, COLLECTIONS.PRODUCTS),
+          where("pedidoId", "==", pedidoId),
+          where("userId", "==", pedidoData.userId)
+        )
+        const productosSnapshot = await getDocs(productosQuery)
+        const productosData = productosSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Producto[]
+        productosData.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+        setProductos(productosData)
       } catch (err: any) {
         logger.error("Error al cargar datos:", err)
         setError("Error al cargar el pedido")

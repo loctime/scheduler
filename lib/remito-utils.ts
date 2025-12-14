@@ -395,6 +395,16 @@ export function crearRemitoRecepcion(
     horaRecepcionLocal: horaActual,
   }
 
+  // Preservar firma de envío del remito de envío
+  if (remitoEnvio?.firmaEnvio) {
+    remitoData.firmaEnvio = remitoEnvio.firmaEnvio
+  }
+
+  // Incluir firma de recepción si existe en la recepción
+  if (recepcion.firmaRecepcion) {
+    remitoData.firmaRecepcion = recepcion.firmaRecepcion
+  }
+
   // Incluir observaciones consolidadas si hay contenido
   if (observacionesArray.length > 0) {
     remitoData.observaciones = observacionesArray.join("\n\n")
@@ -1058,49 +1068,34 @@ export async function generarPDFRemito(remito: Remito, nombreEmpresa?: string, n
     pdf.line(margin, yPos - 4, tableEndX, yPos - 4)
   }
 
-  // Espacio para firmas
-  // Calcular espacio disponible para firmas (reservando espacio para footer)
-  const footerHeight = 15
-  const espacioFirmas = pdfHeight - footerHeight
-  
-  // Si quedó muy poco espacio, ir a nueva página
-  if (yPos > espacioFirmas - 40) {
-    pdf.addPage()
-    yPos = margin + 10
-  } else {
-    yPos = Math.max(yPos + 10, espacioFirmas - 50)
-  }
+  // Espacio después de la tabla
+  yPos += 10
 
-  // Línea separadora antes de firmas
-  pdf.line(margin, yPos, pdfWidth - margin, yPos)
-  yPos += 8
+  // Definir altura del footer (se usa en todo el código)
+  const footerHeight = 15
 
   // Procesar observaciones para separarlas por tipo (ENVÍO y RECEPCIÓN)
-  // Nota: Las observaciones por producto ya se mostraron en la tabla
-  // Aquí solo procesamos observaciones generales que no están asociadas a productos específicos
+  // Mostrar TODAS las observaciones de envío (comentarios del armado)
   let observacionesEnvio = ""
   let observacionesRecepcion = ""
   if (remito.observaciones && remito.observaciones.trim()) {
     const partes = remito.observaciones.split('\n\n')
     partes.forEach(parte => {
       if (parte.startsWith('ENVÍO:')) {
+        // Mostrar TODAS las observaciones de envío (comentarios del armado)
         const contenidoEnvio = parte.replace('ENVÍO:\n', '').trim()
-        // Solo incluir si no tiene formato "Producto: observación" (ya está en la tabla)
-        const lineasEnvio = contenidoEnvio.split('\n')
-        const observacionesGeneralesEnvio = lineasEnvio.filter(linea => !linea.match(/^(.+?):\s*(.+)$/))
-        if (observacionesGeneralesEnvio.length > 0) {
-          observacionesEnvio = observacionesGeneralesEnvio.join('\n')
+        if (contenidoEnvio) {
+          observacionesEnvio = contenidoEnvio
         }
       } else if (parte.startsWith('RECEPCIÓN:')) {
+        // Para recepción, solo mostrar las que no tienen formato "Producto: observación" (ya están en la tabla)
         const contenidoRecepcion = parte.replace('RECEPCIÓN:\n', '').trim()
-        // Solo incluir si no tiene formato "Producto: observación" (ya está en la tabla)
         const lineasRecepcion = contenidoRecepcion.split('\n')
         const observacionesGeneralesRecepcion = lineasRecepcion.filter(linea => !linea.match(/^(.+?):\s*(.+)$/))
         if (observacionesGeneralesRecepcion.length > 0) {
           observacionesRecepcion = observacionesGeneralesRecepcion.join('\n')
         }
       } else if (parte.startsWith('OBSERVACIONES GENERALES:')) {
-        // Si hay observaciones generales, agregarlas a recepción
         observacionesRecepcion = (observacionesRecepcion ? observacionesRecepcion + '\n' : '') + parte.replace('OBSERVACIONES GENERALES:\n', '').trim()
       }
     })
@@ -1111,74 +1106,149 @@ export async function generarPDFRemito(remito: Remito, nombreEmpresa?: string, n
     observacionesRecepcion = (observacionesRecepcion ? observacionesRecepcion + '\n' : '') + observacionesGenerales
   }
 
-  // Retiro de Fábrica (solo para remitos de recepción)
+  // Sección de información y firmas (solo para remitos de recepción)
   if (remito.tipo === "recepcion") {
-    pdf.setFontSize(9)
-    pdf.setFont("helvetica", "normal")
-    // Usar hora del remito o hora actual como fallback
-    const horaRetiro = remito.horaRetiroFabrica || format(new Date(), "HH:mm", { locale: es })
+    // Verificar si hay espacio suficiente, si no, nueva página
+    const espacioNecesario = 120 // Espacio aproximado necesario para toda la sección
+    if (yPos > pdfHeight - footerHeight - espacioNecesario) {
+      pdf.addPage()
+      yPos = margin + 10
+    }
+
+    // Línea separadora
+    pdf.setDrawColor(200, 200, 200)
+    pdf.setLineWidth(0.5)
+    pdf.line(margin, yPos, pdfWidth - margin, yPos)
+    yPos += 10
+
+    // Sección de información en dos columnas
+    const columnaAncho = (pdfWidth - margin * 2 - 10) / 2
+    const tieneFirmaEnvio = remito.firmaEnvio
+    const tieneFirmaRecepcion = remito.firmaRecepcion
     
-    // Texto de retiro
-    const textoRetiro = `Retiro de Fabrica: ${horaRetiro} Hs`
-    pdf.text(textoRetiro, margin, yPos)
+    // Columna izquierda: Retiro de Fábrica
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "bold")
+    const horaRetiro = remito.horaRetiroFabrica || format(new Date(), "HH:mm", { locale: es })
+    pdf.text("RETIRO DE FÁBRICA", margin, yPos)
+    yPos += 6
+    pdf.setFont("helvetica", "normal")
+    pdf.setFontSize(9)
+    pdf.text(`Hora: ${horaRetiro} Hs`, margin, yPos)
     yPos += 5
     
-    // Observaciones de envío debajo del texto de retiro si existen
+    // Observaciones de envío (comentarios del armado)
     if (observacionesEnvio && observacionesEnvio.trim()) {
       pdf.setFontSize(8)
       pdf.setFont("helvetica", "italic")
-      const maxWidth = pdfWidth - margin * 2
+      pdf.setTextColor(80, 80, 80)
+      const maxWidth = columnaAncho - 5
       const observacionesTexto = pdf.splitTextToSize(observacionesEnvio.trim(), maxWidth)
       observacionesTexto.forEach((linea: string, idx: number) => {
-        pdf.text(linea, margin + 5, yPos + (idx * 4))
+        pdf.text(linea, margin + 2, yPos + (idx * 3.5))
       })
-      yPos += observacionesTexto.length * 4 + 3
+      yPos += observacionesTexto.length * 3.5 + 5
+      pdf.setTextColor(0, 0, 0)
     }
     
-    // Firma repartidor
+    const yInicioColumnaIzq = yPos
+    
+    // Columna derecha: Recepción en Local
+    const xColumnaDer = margin + columnaAncho + 10
     pdf.setFontSize(9)
-    pdf.setFont("helvetica", "normal")
-    if (remito.firmaEnvio) {
-      pdf.text(`Firma repartidor: ${remito.firmaEnvio.nombre}`, margin, yPos)
-    } else {
-      pdf.text("Firma repartidor:", margin, yPos)
-    }
-    yPos += 8
-  }
-
-  // Recepción en Local (solo para remitos de recepción)
-  if (remito.tipo === "recepcion") {
-    pdf.setFontSize(9)
-    pdf.setFont("helvetica", "normal")
-    // Usar hora del remito o hora actual como fallback
+    pdf.setFont("helvetica", "bold")
     const horaRecepcion = remito.horaRecepcionLocal || format(new Date(), "HH:mm", { locale: es })
+    pdf.text("RECEPCIÓN EN LOCAL", xColumnaDer, yPos - (observacionesEnvio ? (observacionesEnvio.split('\n').length * 3.5 + 5) : 0))
+    let yColumnaDer = yPos - (observacionesEnvio ? (observacionesEnvio.split('\n').length * 3.5 + 5) : 0) + 6
+    pdf.setFont("helvetica", "normal")
+    pdf.setFontSize(9)
+    pdf.text(`Hora: ${horaRecepcion} Hs`, xColumnaDer, yColumnaDer)
+    yColumnaDer += 5
     
-    // Texto de recepción
-    const textoRecepcion = `Recepcion en Local: ${horaRecepcion} Hs`
-    pdf.text(textoRecepcion, margin, yPos)
-    yPos += 5
-    
-    // Observaciones de recepción debajo del texto de recepción si existen
+    // Observaciones de recepción
     if (observacionesRecepcion && observacionesRecepcion.trim()) {
       pdf.setFontSize(8)
       pdf.setFont("helvetica", "italic")
-      const maxWidth = pdfWidth - margin * 2
+      pdf.setTextColor(80, 80, 80)
+      const maxWidth = columnaAncho - 5
       const observacionesTexto = pdf.splitTextToSize(observacionesRecepcion.trim(), maxWidth)
       observacionesTexto.forEach((linea: string, idx: number) => {
-        pdf.text(linea, margin + 5, yPos + (idx * 4))
+        pdf.text(linea, xColumnaDer + 2, yColumnaDer + (idx * 3.5))
       })
-      yPos += observacionesTexto.length * 4 + 3
+      yColumnaDer += observacionesTexto.length * 3.5 + 5
+      pdf.setTextColor(0, 0, 0)
     }
     
-    // Firma en recepción
-    pdf.setFontSize(9)
-    pdf.setFont("helvetica", "normal")
-    if (remito.firmaRecepcion) {
-      pdf.text(`Firma en recepcion: ${remito.firmaRecepcion.nombre}`, margin, yPos)
-    } else {
-      pdf.text("Firma en recepcion:", margin, yPos)
+    // Ajustar yPos al máximo de ambas columnas
+    yPos = Math.max(yInicioColumnaIzq, yColumnaDer) + 10
+    
+    // Firmas una al lado de la otra
+    if (tieneFirmaEnvio || tieneFirmaRecepcion) {
+      // Línea separadora antes de firmas
+      pdf.setDrawColor(200, 200, 200)
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPos, pdfWidth - margin, yPos)
+      yPos += 10
+      
+      // Calcular ancho disponible para cada firma
+      const espacioEntreFirmas = 10
+      const anchoFirma = (pdfWidth - margin * 2 - espacioEntreFirmas) / 2
+      const alturaFirma = 35
+      const yInicioFirmas = yPos
+      
+      // Firma de envío (izquierda)
+      if (tieneFirmaEnvio) {
+        pdf.setFontSize(9)
+        pdf.setFont("helvetica", "bold")
+        pdf.text("FIRMA REPARTIDOR", margin, yInicioFirmas)
+        pdf.setFont("helvetica", "normal")
+        pdf.setFontSize(8)
+        pdf.text(remito.firmaEnvio.nombre, margin, yInicioFirmas + 5)
+        const yImagenEnvio = yInicioFirmas + 10
+        
+        // Agregar imagen de firma si existe
+        if (remito.firmaEnvio.firma) {
+          try {
+            pdf.addImage(remito.firmaEnvio.firma, "PNG", margin, yImagenEnvio, anchoFirma, alturaFirma)
+          } catch (error) {
+            console.error("Error al agregar imagen de firma de envío:", error)
+          }
+        } else {
+          // Línea para firma manual
+          pdf.setDrawColor(0, 0, 0)
+          pdf.setLineWidth(0.5)
+          pdf.line(margin, yImagenEnvio + alturaFirma - 5, margin + anchoFirma, yImagenEnvio + alturaFirma - 5)
+        }
+      }
+      
+      // Firma de recepción (derecha)
+      if (tieneFirmaRecepcion) {
+        const xFirmaRecepcion = tieneFirmaEnvio ? margin + anchoFirma + espacioEntreFirmas : margin
+        pdf.setFontSize(9)
+        pdf.setFont("helvetica", "bold")
+        pdf.text("FIRMA EN RECEPCIÓN", xFirmaRecepcion, yInicioFirmas)
+        pdf.setFont("helvetica", "normal")
+        pdf.setFontSize(8)
+        pdf.text(remito.firmaRecepcion.nombre, xFirmaRecepcion, yInicioFirmas + 5)
+        const yImagenRecepcion = yInicioFirmas + 10
+        
+        // Agregar imagen de firma si existe
+        if (remito.firmaRecepcion.firma) {
+          try {
+            pdf.addImage(remito.firmaRecepcion.firma, "PNG", xFirmaRecepcion, yImagenRecepcion, anchoFirma, alturaFirma)
+          } catch (error) {
+            console.error("Error al agregar imagen de firma de recepción:", error)
+          }
+        } else {
+          // Línea para firma manual
+          pdf.setDrawColor(0, 0, 0)
+          pdf.setLineWidth(0.5)
+          pdf.line(xFirmaRecepcion, yImagenRecepcion + alturaFirma - 5, xFirmaRecepcion + anchoFirma, yImagenRecepcion + alturaFirma - 5)
+        }
+      }
+      
+      yPos = yInicioFirmas + alturaFirma + 5
     }
-    yPos += 8
   }
 
   // Para remitos que no sean de recepción, mostrar observaciones normalmente
