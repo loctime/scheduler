@@ -16,7 +16,7 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import { doc, getDoc } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
-import type { Remito, Recepcion } from "@/lib/types"
+import type { Remito, Recepcion, Pedido } from "@/lib/types"
 
 export default function PedidoDetallePage() {
   const params = useParams()
