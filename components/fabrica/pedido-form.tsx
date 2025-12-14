@@ -24,18 +24,19 @@ export function FabricaPedidoForm({
   pedido,
   puedeGenerarRemito,
 }: FabricaPedidoFormProps) {
-  // Convertir array a Record si es necesario
-  const productosDisponiblesInicial = enlacePublico?.productosDisponibles
-    ? Array.isArray(enlacePublico.productosDisponibles)
-      ? enlacePublico.productosDisponibles.reduce((acc, item) => {
-          acc[item.productoId] = {
-            disponible: item.disponible,
-            cantidadEnviada: item.cantidadEnviar,
-          }
-          return acc
-        }, {} as Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string }>)
-      : enlacePublico.productosDisponibles
-    : {}
+      // Convertir array a Record si es necesario (incluir observaciones)
+      const productosDisponiblesInicial = enlacePublico?.productosDisponibles
+        ? Array.isArray(enlacePublico.productosDisponibles)
+          ? enlacePublico.productosDisponibles.reduce((acc, item) => {
+              acc[item.productoId] = {
+                disponible: item.disponible,
+                cantidadEnviada: item.cantidadEnviar,
+                observaciones: item.observaciones,
+              }
+              return acc
+            }, {} as Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string }>)
+          : enlacePublico.productosDisponibles
+        : {}
 
   const [productosDisponibles, setProductosDisponibles] = useState<      
     Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string; completo?: boolean; listo?: boolean }>                                                            
@@ -50,12 +51,13 @@ export function FabricaPedidoForm({
   useEffect(() => {
     const productos = enlacePublico?.productosDisponibles
     if (productos) {
-      // Convertir array a Record si es necesario
+      // Convertir array a Record si es necesario (incluir observaciones)
       const productosRecord = Array.isArray(productos)
         ? productos.reduce((acc, item) => {
             acc[item.productoId] = {
               disponible: item.disponible,
               cantidadEnviada: item.cantidadEnviar,
+              observaciones: item.observaciones,
             }
             return acc
           }, {} as Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string }>)
@@ -275,21 +277,22 @@ export function FabricaPedidoForm({
       return acc
     }, {} as Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string }>)
     
-    // Validar que haya al menos un producto disponible con cantidad > 0
-    const productosConCantidad = Object.entries(productosDisponiblesLimpios).filter(
-      ([_, data]) => data.disponible && (data.cantidadEnviada ?? 0) > 0
-    )
+    // Validar que haya al menos un producto disponible (puede tener cantidad 0 si tiene observaciones)
+    const productosDisponiblesCount = Object.entries(productosDisponiblesLimpios).filter(
+      ([_, data]) => data.disponible === true
+    ).length
 
-    if (productosConCantidad.length === 0) {
-      alert("Debes marcar al menos un producto como disponible y especificar la cantidad a enviar")
+    if (productosDisponiblesCount === 0) {
+      alert("Debes marcar al menos un producto como disponible")
       return
     }
 
-    // Convertir Record a array
+    // Convertir Record a array (incluir observaciones)
     const productosDisponiblesArray = Object.entries(productosDisponiblesLimpios).map(([productoId, data]) => ({
       productoId,
       disponible: data.disponible,
       cantidadEnviar: data.cantidadEnviada,
+      observaciones: data.observaciones,
     }))
     onGenerarRemito(productosDisponiblesArray)
   }

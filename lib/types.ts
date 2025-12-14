@@ -280,6 +280,7 @@ export interface EnlacePublico {
     productoId: string
     disponible: boolean
     cantidadEnviar?: number
+    observaciones?: string
   }>
   createdAt?: any
   expiresAt?: any
@@ -298,6 +299,7 @@ export interface Remito {
     cantidadEnviada?: number
     cantidadRecibida?: number
     unidad?: string
+    observaciones?: string
   }>
   fecha?: any
   desde?: string

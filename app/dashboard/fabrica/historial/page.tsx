@@ -111,9 +111,7 @@ export default function FabricaHistorialPage() {
 
         {/* Filtros - Mobile-first */}
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base sm:text-lg">Filtros</CardTitle>
-          </CardHeader>
+          
           <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
               <div className="flex-1 min-w-0">

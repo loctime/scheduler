@@ -206,7 +206,25 @@ export function useFabricaPedidos(user: any) {
         where("activo", "==", true)
       )
       const enlacesActivosSnapshot = await getDocs(enlacesActivosQuery)
-      const enlacesActivosIds = new Set(enlacesActivosSnapshot.docs.map(doc => doc.data().pedidoId))
+      // Extraer solo los pedidoIds válidos (filtrar undefined/null)
+      const enlacesActivosIds = new Set(
+        enlacesActivosSnapshot.docs
+          .map(doc => {
+            const data = doc.data()
+            return data.pedidoId
+          })
+          .filter((pedidoId): pedidoId is string => !!pedidoId)
+      )
+      
+      // Log para debug
+      logger.info("[FABRICA] Enlaces activos raw:", {
+        total: enlacesActivosSnapshot.docs.length,
+        enlaces: enlacesActivosSnapshot.docs.map(doc => ({
+          enlaceId: doc.id,
+          pedidoId: doc.data().pedidoId,
+          activo: doc.data().activo
+        }))
+      })
       
       // Filtrar pedidos por grupo Y que tengan enlace público activo
       let pedidosFiltrados = pedidosData
@@ -218,19 +236,44 @@ export function useFabricaPedidos(user: any) {
       })
       
       if (userIdsDelGrupo.length > 0) {
+      // Log detallado para debug
+      const pedidosIds = pedidosData.map(p => p.id)
+      const enlacesActivosArray = Array.from(enlacesActivosIds)
+      const coincidencias = pedidosIds.filter(id => enlacesActivosArray.includes(id))
+      const pedidosSinEnlace = pedidosIds.filter(id => !enlacesActivosArray.includes(id))
+      const enlacesSinPedido = enlacesActivosArray.filter(id => !pedidosIds.includes(id))
+      
+      logger.info("[FABRICA] Debug filtrado - IDs de pedidos:", pedidosIds)
+      logger.info("[FABRICA] Debug filtrado - IDs de enlaces activos:", enlacesActivosArray)
+      logger.info("[FABRICA] Debug filtrado - Coincidencias:", coincidencias)
+      logger.info("[FABRICA] Debug filtrado - Pedidos sin enlace:", pedidosSinEnlace)
+      logger.info("[FABRICA] Debug filtrado - Enlaces sin pedido:", enlacesSinPedido)
+      
+      logger.info("[FABRICA] Debug filtrado:", {
+        totalPedidos: pedidosData.length,
+        totalEnlacesActivos: enlacesActivosIds.size,
+        coincidencias: coincidencias.length,
+        pedidosSinEnlace: pedidosSinEnlace.length,
+        enlacesSinPedido: enlacesSinPedido.length,
+        userIdsDelGrupo
+      })
+        
         pedidosFiltrados = pedidosData.filter(pedido => {
           const enGrupo = pedido.userId && userIdsDelGrupo.includes(pedido.userId)
           const tieneEnlaceActivo = enlacesActivosIds.has(pedido.id)
           const coincide = enGrupo && tieneEnlaceActivo
           
           if (!coincide && pedido.userId && enGrupo) {
-            logger.info("[FABRICA] Pedido excluido del filtro (sin enlace activo):", {
+            logger.info("[FABRICA] Pedido excluido del filtro:", {
               pedidoId: pedido.id,
               pedidoNombre: pedido.nombre,
               pedidoUserId: pedido.userId,
+              pedidoEstado: pedido.estado,
               enGrupo,
               tieneEnlaceActivo,
-              enlacePublicoId: pedido.enlacePublicoId
+              enlacePublicoId: pedido.enlacePublicoId,
+              estaEnEnlacesActivos: enlacesActivosIds.has(pedido.id),
+              todosEnlacesActivos: Array.from(enlacesActivosIds)
             })
           }
           return coincide
@@ -272,70 +315,183 @@ export function useFabricaPedidos(user: any) {
     }
   }, [user, toast, cargarUsuarios, userIdsDelGrupo, userData?.role])
 
-  // Cargar pedidos al montar y configurar listener
+  // Cargar pedidos al montar y configurar listeners
   useEffect(() => {
     if (!db || !user || loadingGroups) return
 
     loadPedidos()
 
-    // Configurar listener en tiempo real
+    // Función para aplicar filtros a los pedidos
+    const aplicarFiltros = async (pedidosData: Pedido[]) => {
+      if (!db) return pedidosData
+      
+      // Obtener IDs de pedidos válidos (en estado creado o processing)
+      const pedidosIdsValidos = new Set(pedidosData.map(p => p.id))
+      
+      // Cargar enlaces públicos activos para filtrar pedidos que tienen enlace generado
+      // Solo incluir enlaces cuyo pedidoId corresponde a un pedido válido
+      const enlacesActivosQuery = query(
+        collection(db, COLLECTIONS.ENLACES_PUBLICOS),
+        where("activo", "==", true)
+      )
+      const enlacesActivosSnapshot = await getDocs(enlacesActivosQuery)
+      // Extraer solo los pedidoIds válidos que corresponden a pedidos en estado creado/processing
+      const enlacesActivosIds = new Set(
+        enlacesActivosSnapshot.docs
+          .map(doc => {
+            const data = doc.data()
+            return data.pedidoId
+          })
+          .filter((pedidoId): pedidoId is string => !!pedidoId && pedidosIdsValidos.has(pedidoId))
+      )
+      
+      // Log para debug
+      logger.info("[FABRICA] Enlaces activos raw:", {
+        total: enlacesActivosSnapshot.docs.length,
+        enlaces: enlacesActivosSnapshot.docs.map(doc => ({
+          enlaceId: doc.id,
+          pedidoId: doc.data().pedidoId,
+          activo: doc.data().activo
+        }))
+      })
+      
+      // Filtrar pedidos por grupo Y que tengan enlace público activo
+      let pedidosFiltrados = pedidosData
+      
+      // Log detallado para debug
+      const pedidosIds = pedidosData.map(p => p.id)
+      const enlacesActivosArray = Array.from(enlacesActivosIds)
+      const coincidencias = pedidosIds.filter(id => enlacesActivosArray.includes(id))
+      const pedidosSinEnlace = pedidosIds.filter(id => !enlacesActivosArray.includes(id))
+      const enlacesSinPedido = enlacesActivosArray.filter(id => !pedidosIds.includes(id))
+      
+      logger.info("[FABRICA] Debug filtrado (listener) - IDs de pedidos:", pedidosIds)
+      logger.info("[FABRICA] Debug filtrado (listener) - IDs de enlaces activos:", enlacesActivosArray)
+      logger.info("[FABRICA] Debug filtrado (listener) - Coincidencias:", coincidencias)
+      logger.info("[FABRICA] Debug filtrado (listener) - Pedidos sin enlace:", pedidosSinEnlace)
+      logger.info("[FABRICA] Debug filtrado (listener) - Enlaces sin pedido:", enlacesSinPedido)
+      
+      logger.info("[FABRICA] Debug filtrado (listener):", {
+        totalPedidos: pedidosData.length,
+        totalEnlacesActivos: enlacesActivosIds.size,
+        coincidencias: coincidencias.length,
+        pedidosSinEnlace: pedidosSinEnlace.length,
+        enlacesSinPedido: enlacesSinPedido.length,
+        userIdsDelGrupo
+      })
+      
+      if (userIdsDelGrupo.length > 0) {
+        pedidosFiltrados = pedidosData.filter(pedido => {
+          const enGrupo = pedido.userId && userIdsDelGrupo.includes(pedido.userId)
+          const tieneEnlaceActivo = enlacesActivosIds.has(pedido.id)
+          const coincide = enGrupo && tieneEnlaceActivo
+          
+          // Log detallado para cada pedido
+          logger.info("[FABRICA] Evaluando pedido:", {
+            pedidoId: pedido.id,
+            pedidoNombre: pedido.nombre,
+            pedidoUserId: pedido.userId,
+            pedidoEstado: pedido.estado,
+            enGrupo,
+            tieneEnlaceActivo,
+            coincide,
+            userIdsDelGrupo
+          })
+          
+          if (!coincide && pedido.userId && enGrupo) {
+            logger.info("[FABRICA] Pedido excluido del filtro (listener):", {
+              pedidoId: pedido.id,
+              pedidoNombre: pedido.nombre,
+              pedidoUserId: pedido.userId,
+              pedidoEstado: pedido.estado,
+              enGrupo,
+              tieneEnlaceActivo,
+              enlacePublicoId: pedido.enlacePublicoId,
+              estaEnEnlacesActivos: enlacesActivosIds.has(pedido.id)
+            })
+          }
+          return coincide
+        })
+      } else if (userData?.role === "factory") {
+        // Si el usuario factory no tiene grupos asignados, no mostrar ningún pedido
+        pedidosFiltrados = []
+      }
+
+      pedidosFiltrados.sort((a, b) => {
+        const fechaA = a.createdAt?.toDate?.() || new Date(0)
+        const fechaB = b.createdAt?.toDate?.() || new Date(0)
+        return fechaB.getTime() - fechaA.getTime()
+      })
+
+      setPedidos(pedidosFiltrados)
+
+      // Actualizar usuarios si hay nuevos (solo de los pedidos filtrados)
+      const userIdsUnicos = [...new Set(pedidosFiltrados.map(p => p.userId).filter(Boolean))]
+      if (userIdsUnicos.length > 0) {
+        const usuarios = await cargarUsuarios(userIdsUnicos)
+        setUsuariosMap(prev => ({ ...prev, ...usuarios }))
+      }
+    }
+
+    // Configurar listener en tiempo real para pedidos
     const pedidosQuery = query(
       collection(db, COLLECTIONS.PEDIDOS),
       where("estado", "in", ["creado", "processing"])
     )
 
-    const unsubscribe = onSnapshot(
+    const unsubscribePedidos = onSnapshot(
       pedidosQuery,
       async (snapshot) => {
-        if (!db) return
-        
         const pedidosData = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         })) as Pedido[]
-
-        // Cargar enlaces públicos activos para filtrar pedidos que tienen enlace generado
-        const enlacesActivosQuery = query(
-          collection(db, COLLECTIONS.ENLACES_PUBLICOS),
-          where("activo", "==", true)
-        )
-        const enlacesActivosSnapshot = await getDocs(enlacesActivosQuery)
-        const enlacesActivosIds = new Set(enlacesActivosSnapshot.docs.map(doc => doc.data().pedidoId))
-        
-        // Filtrar pedidos por grupo Y que tengan enlace público activo
-        let pedidosFiltrados = pedidosData
-        if (userIdsDelGrupo.length > 0) {
-          pedidosFiltrados = pedidosData.filter(pedido => {
-            const enGrupo = pedido.userId && userIdsDelGrupo.includes(pedido.userId)
-            const tieneEnlaceActivo = enlacesActivosIds.has(pedido.id)
-            return enGrupo && tieneEnlaceActivo
-          })
-        } else if (userData?.role === "factory") {
-          // Si el usuario factory no tiene grupos asignados, no mostrar ningún pedido
-          pedidosFiltrados = []
-        }
-
-        pedidosFiltrados.sort((a, b) => {
-          const fechaA = a.createdAt?.toDate?.() || new Date(0)
-          const fechaB = b.createdAt?.toDate?.() || new Date(0)
-          return fechaB.getTime() - fechaA.getTime()
-        })
-
-        setPedidos(pedidosFiltrados)
-
-        // Actualizar usuarios si hay nuevos (solo de los pedidos filtrados)
-        const userIdsUnicos = [...new Set(pedidosFiltrados.map(p => p.userId).filter(Boolean))]
-        if (userIdsUnicos.length > 0) {
-          const usuarios = await cargarUsuarios(userIdsUnicos)
-          setUsuariosMap(prev => ({ ...prev, ...usuarios }))
-        }
+        await aplicarFiltros(pedidosData)
       },
       (error) => {
         logger.error("Error en listener de pedidos:", error)
       }
     )
 
-    return () => unsubscribe()
+    // Configurar listener en tiempo real para enlaces activos
+    const enlacesActivosQuery = query(
+      collection(db, COLLECTIONS.ENLACES_PUBLICOS),
+      where("activo", "==", true)
+    )
+
+    const unsubscribeEnlaces = onSnapshot(
+      enlacesActivosQuery,
+      async (snapshot) => {
+        logger.info("[FABRICA] Listener de enlaces activos detectó cambio:", {
+          totalEnlaces: snapshot.docs.length,
+          enlaces: snapshot.docs.map(doc => ({
+            enlaceId: doc.id,
+            pedidoId: doc.data().pedidoId,
+            activo: doc.data().activo
+          }))
+        })
+        // Cuando cambian los enlaces, recargar pedidos y aplicar filtros
+        const pedidosSnapshot = await getDocs(pedidosQuery)
+        const pedidosData = pedidosSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Pedido[]
+        logger.info("[FABRICA] Recargando pedidos después de cambio en enlaces:", {
+          totalPedidos: pedidosData.length,
+          pedidosIds: pedidosData.map(p => p.id)
+        })
+        await aplicarFiltros(pedidosData)
+      },
+      (error) => {
+        logger.error("Error en listener de enlaces:", error)
+      }
+    )
+
+    // Cleanup
+    return () => {
+      unsubscribePedidos()
+      unsubscribeEnlaces()
+    }
   }, [user, loadPedidos, cargarUsuarios, userIdsDelGrupo, userData?.role, loadingGroups])
 
   // Cargar sucursales del grupo cuando cambien los userIds

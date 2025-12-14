@@ -5,6 +5,7 @@ import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
   serverTimestamp,
   collection,
   query,
@@ -67,6 +68,35 @@ export function useEnlacePublico(user: any) {
       // Verificar si el pedido está en proceso (enviado o recibido, pero permitir completado para nuevo pedido)
       if (pedidoData.estado === "enviado" || pedidoData.estado === "recibido") {
         throw new Error("No se puede generar un enlace para un pedido que está en proceso de envío o recepción")
+      }
+
+      // Si el pedido está completado, actualizar su estado a "creado" para que aparezca en el panel de la fábrica
+      if (pedidoData.estado === "completado") {
+        await updateDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId), {
+          estado: "creado",
+          updatedAt: serverTimestamp(),
+        })
+        logger.info("Pedido completado actualizado a 'creado' para regenerar enlace", { pedidoId })
+      }
+
+      // Verificar si hay otro pedido en estado "creado" o "processing" para este usuario
+      const pedidosActivosQuery = query(
+        collection(db, COLLECTIONS.PEDIDOS),
+        where("userId", "==", userIdToQuery),
+        where("estado", "in", ["creado", "processing"])
+      )
+      const pedidosActivosSnapshot = await getDocs(pedidosActivosQuery)
+      const pedidosActivos = pedidosActivosSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as { id: string; nombre?: string; estado?: string; assignedToNombre?: string }))
+        .filter(p => p.id !== pedidoId) // Excluir el pedido actual
+      
+      if (pedidosActivos.length > 0) {
+        const pedidoActivo = pedidosActivos[0]
+        const nombrePedido = pedidoActivo.nombre || "otro pedido"
+        const estadoPedido = pedidoActivo.estado === "processing" 
+          ? `en proceso (tomado por: ${pedidoActivo.assignedToNombre || "otro usuario"})`
+          : "creado"
+        throw new Error(`Ya tenés un pedido "${nombrePedido}" en estado "${estadoPedido}". Completá o cancelá ese pedido antes de crear un nuevo enlace.`)
       }
 
       // Verificar si hay un pedido en "processing" y mostrar warning (no bloquear)

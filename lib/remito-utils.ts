@@ -143,30 +143,51 @@ export function crearRemitoEnvioDesdeDisponibles(
     observaciones?: string
   }>
 ): Omit<Remito, "id" | "numero" | "createdAt"> {
-  // Obtener solo los productos que están disponibles y tienen cantidad a enviar
+  // Incluir productos que están disponibles (incluso con cantidad 0) para tener registro completo
+  // También incluir productos que tienen observaciones aunque cantidad sea 0
   const productosRemito = productos
     .filter(p => {
       const disponible = productosDisponibles[p.id]
-      return disponible?.disponible && (disponible.cantidadEnviada ?? 0) > 0
+      // Incluir si está marcado como disponible (incluso con cantidad 0) o tiene observaciones
+      return disponible?.disponible === true || (disponible?.observaciones && disponible.observaciones.trim().length > 0)
     })
     .map(p => {
       const disponible = productosDisponibles[p.id]
       // Usar cantidadPedida del snapshot si existe (en productos del enlace público), sino stockMinimo
       const cantidadPedida = (p as any).cantidadPedida || p.stockMinimo || 0
-      return {
+      const productoRemito: {
+        productoId: string
+        productoNombre: string
+        cantidad: number
+        cantidadPedida: number
+        cantidadEnviada: number
+        observaciones?: string
+      } = {
         productoId: p.id,
         productoNombre: p.nombre,
+        cantidad: disponible?.cantidadEnviada || 0, // Campo requerido "cantidad" que representa la cantidad enviada
         cantidadPedida: cantidadPedida,
         cantidadEnviada: disponible?.cantidadEnviada || 0,
       }
+      // Incluir observaciones del producto si existen
+      if (disponible?.observaciones && disponible.observaciones.trim().length > 0) {
+        productoRemito.observaciones = disponible.observaciones.trim()
+      }
+      return productoRemito
     })
 
-  // Recolectar observaciones de todos los productos
-  const observaciones = productos
+  // Recolectar observaciones de todos los productos (para el campo observaciones general del remito)
+  // Solo las que no están incluidas ya en los productos individuales
+  const observacionesGenerales = productos
     .map(p => {
       const disponible = productosDisponibles[p.id]
-      if (disponible?.observaciones) {
-        return `${p.nombre}: ${disponible.observaciones}`
+      // Solo incluir si tiene observaciones y el producto NO está en productosRemito (ya que tiene su propia observación)
+      if (disponible?.observaciones && disponible.observaciones.trim().length > 0) {
+        const productoEnRemito = productosRemito.find(pr => pr.productoId === p.id)
+        // Si el producto ya tiene observaciones en su objeto, no duplicar en general
+        if (!productoEnRemito || !productoEnRemito.observaciones) {
+          return `${p.nombre}: ${disponible.observaciones}`
+        }
       }
       return null
     })
@@ -184,9 +205,9 @@ export function crearRemitoEnvioDesdeDisponibles(
     userId: pedido.userId,
   }
 
-  // Solo incluir observaciones si hay contenido
-  if (observaciones && observaciones.trim().length > 0) {
-    remitoData.observaciones = observaciones
+  // Solo incluir observaciones generales si hay contenido
+  if (observacionesGenerales && observacionesGenerales.trim().length > 0) {
+    remitoData.observaciones = observacionesGenerales
   }
 
   return remitoData

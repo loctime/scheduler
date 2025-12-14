@@ -237,14 +237,15 @@ export default function FabricaPage() {
     if (!datosExpandidos) return
 
     try {
-      // Convertir array a Record
+      // Convertir array a Record (incluir observaciones)
       const productosDisponiblesRecord = productosDisponiblesPendientes.reduce((acc, item) => {
         acc[item.productoId] = {
           disponible: item.disponible,
           cantidadEnviada: item.cantidadEnviar,
+          observaciones: item.observaciones,
         }
         return acc
-      }, {} as Record<string, { disponible: boolean; cantidadEnviada?: number }>)
+      }, {} as Record<string, { disponible: boolean; cantidadEnviada?: number; observaciones?: string }>)
 
       // Crear datos del remito
       const remitoData = crearRemitoEnvioDesdeDisponibles(
