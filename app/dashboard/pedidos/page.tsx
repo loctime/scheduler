@@ -276,81 +276,124 @@ export default function PedidosPage() {
             }
           }
           
-          if (remitoEnvio && remitoEnvio.productos && remitoEnvio.productos.length > 0) {
-            // Guardar observaciones del remito si existen
-            if (remitoEnvio.observaciones) {
-              setObservacionesRemito(remitoEnvio.observaciones)
-            }
-            
-            // Filtrar y mapear productos con cantidadEnviada > 0
-            // Extraer observaciones del remito que tienen formato "Producto: observación"
-            const observacionesPorProducto = new Map<string, string>()
-            if (remitoEnvio.observaciones) {
-              const lineas = remitoEnvio.observaciones.split('\n')
-              lineas.forEach(linea => {
-                if (linea.includes(':')) {
-                  const [nombreProducto, ...resto] = linea.split(':')
-                  const observacion = resto.join(':').trim()
-                  if (observacion) {
-                    observacionesPorProducto.set(nombreProducto.trim(), observacion)
-                  }
-                }
-              })
-            }
-            
-            const productos = remitoEnvio.productos
-              .filter((p: any) => {
-                const cantidadEnviada = p.cantidadEnviada || 0
-                return cantidadEnviada > 0
-              })
-              .map((p: any) => ({
-                productoId: p.productoId,
-                productoNombre: p.productoNombre,
-                cantidadPedida: p.cantidadPedida || 0,
-                cantidadEnviada: p.cantidadEnviada || 0,
-                observacionesEnvio: observacionesPorProducto.get(p.productoNombre) || undefined,
-              }))
-            
-            setProductosEnviados(productos)
+          // Cargar TODOS los productos del pedido primero
+          const { collection: col, query: q, where: w, getDocs: getDocsProducts } = await import("firebase/firestore")
+          const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
+            ? userData.ownerId 
+            : user.uid
+          
+          const productosQuery = q(
+            col(db, COLLECTIONS.PRODUCTS),
+            w("pedidoId", "==", selectedPedido.id),
+            w("userId", "==", userIdToQuery)
+          )
+          const productosSnapshot = await getDocsProducts(productosQuery)
+          const todosLosProductos = productosSnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as any[]
+          
+          // Guardar observaciones del remito si existen
+          if (remitoEnvio?.observaciones) {
+            setObservacionesRemito(remitoEnvio.observaciones)
           }
+          
+          // Extraer observaciones del remito que tienen formato "Producto: observación"
+          const observacionesPorProducto = new Map<string, string>()
+          if (remitoEnvio?.observaciones) {
+            const lineas = remitoEnvio.observaciones.split('\n')
+            lineas.forEach(linea => {
+              if (linea.includes(':')) {
+                const [nombreProducto, ...resto] = linea.split(':')
+                const observacion = resto.join(':').trim()
+                if (observacion) {
+                  observacionesPorProducto.set(nombreProducto.trim(), observacion)
+                }
+              }
+            })
+          }
+          
+          // Crear mapa de productos enviados desde el remito (por productoId)
+          const productosEnviadosMap = new Map<string, { cantidadEnviada: number; cantidadPedida: number; observaciones?: string }>()
+          if (remitoEnvio?.productos) {
+            remitoEnvio.productos.forEach((p: any) => {
+              productosEnviadosMap.set(p.productoId, {
+                cantidadEnviada: p.cantidadEnviada || 0,
+                cantidadPedida: p.cantidadPedida || 0,
+                observaciones: p.observaciones || undefined, // Observaciones del producto individual
+              })
+            })
+          }
+          
+          // Combinar todos los productos del pedido con la información del remito
+          const productos = todosLosProductos.map((producto) => {
+            const infoEnvio = productosEnviadosMap.get(producto.id)
+            const cantidadEnviada = infoEnvio?.cantidadEnviada ?? 0
+            const cantidadPedida = infoEnvio?.cantidadPedida ?? (producto.stockMinimo || 0)
+            // Priorizar observaciones del producto individual, luego las del campo general
+            const observacion = infoEnvio?.observaciones || observacionesPorProducto.get(producto.nombre) || undefined
+            
+            return {
+              productoId: producto.id,
+              productoNombre: producto.nombre,
+              cantidadPedida: cantidadPedida,
+              cantidadEnviada: cantidadEnviada,
+              observacionesEnvio: observacion,
+            }
+          })
+          
+          setProductosEnviados(productos)
         } else {
           // Fallback: buscar en enlace público si existe (para pedidos antiguos)
           if (selectedPedido.enlacePublicoId) {
             const enlace = await obtenerEnlacePublico(selectedPedido.enlacePublicoId)
             
+            // Cargar TODOS los productos del pedido
+            const { collection: col, query: q, where: w, getDocs: getDocsProducts } = await import("firebase/firestore")
+            const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
+              ? userData.ownerId 
+              : user.uid
+            
+            const productosQuery = q(
+              col(db, COLLECTIONS.PRODUCTS),
+              w("pedidoId", "==", selectedPedido.id),
+              w("userId", "==", userIdToQuery)
+            )
+            const productosSnapshot = await getDocsProducts(productosQuery)
+            const todosLosProductos = productosSnapshot.docs.map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+            })) as any[]
+            
+            // Crear mapa de productos disponibles desde el enlace
+            const productosEnviadosMap = new Map<string, { cantidadEnviada: number; observaciones?: string }>()
             if (enlace?.productosDisponibles) {
-              const productos: typeof productosEnviados = []
-              
-              // Necesitamos obtener los productos del pedido para tener los nombres
-              const { collection, query, where, getDocs } = await import("firebase/firestore")
-              const productosQuery = query(
-                collection(db, COLLECTIONS.PRODUCTS),
-                where("pedidoId", "==", selectedPedido.id)
-              )
-              const productosSnapshot = await getDocs(productosQuery)
-              const productosData = productosSnapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data(),
-              })) as any[]
-
-              // Construir lista de productos enviados
               Object.entries(enlace.productosDisponibles).forEach(([productoId, data]: [string, any]) => {
-                if (data.disponible && data.cantidadEnviada) {
-                  const producto = productosData.find(p => p.id === productoId)
-                  if (producto) {
-                    productos.push({
-                      productoId: producto.id,
-                      productoNombre: producto.nombre,
-                      cantidadPedida: producto.stockMinimo || 0,
-                      cantidadEnviada: data.cantidadEnviada,
-                      observacionesEnvio: data.observaciones || undefined,
-                    })
-                  }
+                if (data.disponible !== false) {
+                  productosEnviadosMap.set(productoId, {
+                    cantidadEnviada: data.cantidadEnviada || 0,
+                    observaciones: data.observaciones || undefined,
+                  })
                 }
               })
-
-              setProductosEnviados(productos)
             }
+            
+            // Combinar todos los productos del pedido con la información del enlace
+            const productos = todosLosProductos.map((producto) => {
+              const infoEnvio = productosEnviadosMap.get(producto.id)
+              const cantidadEnviada = infoEnvio?.cantidadEnviada ?? 0
+              const cantidadPedida = producto.stockMinimo || 0
+              
+              return {
+                productoId: producto.id,
+                productoNombre: producto.nombre,
+                cantidadPedida: cantidadPedida,
+                cantidadEnviada: cantidadEnviada,
+                observacionesEnvio: infoEnvio?.observaciones || undefined,
+              }
+            })
+
+            setProductosEnviados(productos)
           }
         }
       } catch (error) {
@@ -438,7 +481,7 @@ export default function PedidosPage() {
         
         if (enlacesActivos.length > 0) {
           // Usar el enlace más reciente
-          const enlaceMasReciente = enlacesActivos.sort((a, b) => {
+          const enlaceMasReciente = enlacesActivos.sort((a: any, b: any) => {
             const aTime = a.createdAt?.toMillis?.() || 0
             const bTime = b.createdAt?.toMillis?.() || 0
             return bTime - aTime
