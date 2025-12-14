@@ -35,6 +35,7 @@ import {
 } from "@/components/pedidos/pedido-dialogs"
 import { cn } from "@/lib/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 
 const FORMAT_EXAMPLES = [
   { format: "{nombre} ({cantidad})", example: "Leche (8)" },
@@ -50,6 +51,20 @@ export default function PedidosPage() {
   
   // Obtener stockActual del contexto global del chat
   const { stockActual: stockActualGlobal } = useStockChatContext()
+
+  // Registrar Service Worker para PWA
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker
+        .register('/sw-pedidos.js')
+        .then((registration) => {
+          console.log('Service Worker Pedidos registrado:', registration.scope)
+        })
+        .catch((error) => {
+          console.error('Error al registrar Service Worker Pedidos:', error)
+        })
+    }
+  }, [])
   
   const {
     pedidos,
@@ -1602,6 +1617,7 @@ export default function PedidosPage() {
           await ejecutarGenerarEnlace()
         }}
       />
+      <PWAInstallPrompt />
     </DashboardLayout>
   )
 }

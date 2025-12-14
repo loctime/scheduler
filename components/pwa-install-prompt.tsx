@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { X, Download } from "lucide-react"
 
@@ -10,6 +11,23 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export function PWAInstallPrompt() {
+  const pathname = usePathname()
+  
+  // Determinar el nombre de la app según la ruta
+  const getAppName = () => {
+    if (pathname?.startsWith('/dashboard/pedidos')) {
+      return 'Pedidos'
+    }
+    if (pathname?.startsWith('/dashboard/fabrica')) {
+      return 'Fábrica'
+    }
+    if (pathname?.startsWith('/chat')) {
+      return 'Chat'
+    }
+    return 'app'
+  }
+  
+  const appName = getAppName()
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [showPrompt, setShowPrompt] = useState(false)
 
@@ -69,27 +87,27 @@ export function PWAInstallPrompt() {
   }
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 z-50 animate-in slide-in-from-bottom-5">
-      <div className="bg-card border border-border rounded-lg shadow-lg p-4 flex items-center gap-3">
-        <div className="flex-1">
+    <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 z-50 animate-in slide-in-from-bottom-5">
+      <div className="bg-card border border-border rounded-lg shadow-lg p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="flex-1 min-w-0">
           <p className="text-sm font-medium">Instalar como app</p>
           <p className="text-xs text-muted-foreground">
-            Instalá el chat para acceder rápido desde tu pantalla de inicio
+            Instalá {appName} para acceder rápido desde tu pantalla de inicio
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Button
             size="sm"
             onClick={handleInstall}
-            className="gap-2"
+            className="gap-2 flex-1 sm:flex-initial"
           >
             <Download className="h-4 w-4" />
-            Instalar
+            <span className="text-xs sm:text-sm">Instalar</span>
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-8 w-8 shrink-0"
             onClick={handleDismiss}
           >
             <X className="h-4 w-4" />

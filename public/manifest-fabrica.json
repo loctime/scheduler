@@ -1,0 +1,53 @@
+{
+  "name": "Panel de Fábrica - Stock",
+  "short_name": "Fábrica",
+  "description": "Panel de gestión de pedidos para fábrica",
+  "start_url": "/dashboard/fabrica",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "scope": "/dashboard/fabrica",
+  "icons": [
+    {
+      "src": "/icon-light-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-dark-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["productivity", "business"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Abrir Fábrica",
+      "short_name": "Fábrica",
+      "description": "Abrir el panel de fábrica",
+      "url": "/dashboard/fabrica",
+      "icons": [
+        {
+          "src": "/icon-light-32x32.png",
+          "sizes": "32x32"
+        }
+      ]
+    }
+  ]
+}

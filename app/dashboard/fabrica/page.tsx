@@ -21,6 +21,7 @@ import { generarNumeroRemito, crearRemitoEnvioDesdeDisponibles } from "@/lib/rem
 import { useRemitos } from "@/hooks/use-remitos"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { logger } from "@/lib/logger"
+import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 
 type FiltroEstado = "todos" | "pendientes" | "en-proceso"
 
@@ -43,6 +44,20 @@ export default function FabricaPage() {
   const [mostrarFirmaDialog, setMostrarFirmaDialog] = useState(false)
   const [productosDisponiblesPendientes, setProductosDisponiblesPendientes] = useState<EnlacePublico["productosDisponibles"] | null>(null)
   const [aceptandoPedido, setAceptandoPedido] = useState<string | null>(null)
+
+  // Registrar Service Worker para PWA
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker
+        .register('/sw-fabrica.js')
+        .then((registration) => {
+          console.log('Service Worker Fábrica registrado:', registration.scope)
+        })
+        .catch((error) => {
+          console.error('Error al registrar Service Worker Fábrica:', error)
+        })
+    }
+  }, [])
 
   // Filtrar pedidos según el filtro seleccionado
   const pedidosFiltrados = useMemo(() => {
@@ -544,6 +559,7 @@ export default function FabricaPage() {
           productosDisponibles={productosDisponiblesPendientes}
         />
       )}
+      <PWAInstallPrompt />
     </DashboardLayout>
   )
 }
