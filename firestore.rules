@@ -548,6 +548,95 @@ service cloud.firestore {
       );
     }
     
+    // Colección: apps/horarios/groups
+    match /apps/horarios/groups/{groupId} {
+      // Permitir lectura a usuarios autenticados
+      allow read: if isAuth();
+      // Crear: solo usuarios autenticados
+      allow create: if isAuth();
+      // Actualizar: solo el manager del grupo
+      allow update: if isAuth() && resource.data.managerId == uid();
+      // Eliminar: solo el manager del grupo
+      allow delete: if isAuth() && resource.data.managerId == uid();
+    }
+    
+    // Colección: apps/horarios/conversaciones
+    match /apps/horarios/conversaciones/{conversacionId} {
+      // Helper para obtener el primer grupoId del usuario
+      function getUserFirstGroupId() {
+        return isAuth() && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+          && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.grupoIds is list
+          && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.grupoIds.size() > 0
+          ? get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.grupoIds[0]
+          : null;
+      }
+      
+      // Permitir lectura si el usuario es participante (por grupoId o userId)
+      allow read: if isAuth() && (
+        uid() in resource.data.participantes
+        || (getUserFirstGroupId() != null && getUserFirstGroupId() in resource.data.participantes)
+      );
+      
+      // Crear: solo usuarios autenticados, y deben ser participantes
+      allow create: if isAuth() && (
+        uid() in request.resource.data.participantes
+        || (getUserFirstGroupId() != null && getUserFirstGroupId() in request.resource.data.participantes)
+      );
+      
+      // Actualizar: solo participantes pueden actualizar
+      allow update: if isAuth() && (
+        uid() in resource.data.participantes
+        || (getUserFirstGroupId() != null && getUserFirstGroupId() in resource.data.participantes)
+      );
+      
+      // Eliminar: solo participantes pueden eliminar (marcar como inactiva)
+      allow delete: if isAuth() && (
+        uid() in resource.data.participantes
+        || (getUserFirstGroupId() != null && getUserFirstGroupId() in resource.data.participantes)
+      );
+    }
+    
+    // Colección: apps/horarios/mensajes
+    match /apps/horarios/mensajes/{mensajeId} {
+      // Helper para obtener el primer grupoId del usuario
+      function getUserFirstGroupId() {
+        return isAuth() && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+          && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.grupoIds is list
+          && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.grupoIds.size() > 0
+          ? get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.grupoIds[0]
+          : null;
+      }
+      
+      // Helper para verificar si el usuario puede acceder a la conversación
+      function canAccessConversation(conversacionId) {
+        return exists(/databases/$(db)/documents/apps/horarios/conversaciones/$(conversacionId))
+          && (
+            uid() in get(/databases/$(db)/documents/apps/horarios/conversaciones/$(conversacionId)).data.participantes
+            || (getUserFirstGroupId() != null && getUserFirstGroupId() in get(/databases/$(db)/documents/apps/horarios/conversaciones/$(conversacionId)).data.participantes)
+          );
+      }
+      
+      // Permitir lectura si el usuario puede acceder a la conversación
+      allow read: if isAuth() && canAccessConversation(resource.data.conversacionId);
+      
+      // Crear: solo el remitente puede crear, y debe ser participante de la conversación
+      allow create: if isAuth() 
+        && request.resource.data.remitenteId == uid()
+        && canAccessConversation(request.resource.data.conversacionId);
+      
+      // Actualizar: solo el remitente puede actualizar (para marcar como leído)
+      allow update: if isAuth() && (
+        resource.data.remitenteId == uid()
+        || (canAccessConversation(resource.data.conversacionId) 
+            && !('remitenteId' in request.resource.data) 
+            && !('contenido' in request.resource.data)
+            && !('conversacionId' in request.resource.data))
+      );
+      
+      // Eliminar: solo el remitente puede eliminar
+      allow delete: if isAuth() && resource.data.remitenteId == uid();
+    }
+    
 
     /* ========= DENY POR DEFECTO ========= */
 

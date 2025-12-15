@@ -19,7 +19,6 @@ export function GroupChatInterface({ user, conversacionId, onClose }: GroupChatI
   const { mensajes, enviarMensaje } = useGroupMessaging(user)
   const [mensaje, setMensaje] = useState("")
   const [enviando, setEnviando] = useState(false)
-  const scrollRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const handleEnviar = async (e: React.FormEvent) => {
@@ -35,9 +34,14 @@ export function GroupChatInterface({ user, conversacionId, onClose }: GroupChatI
   }
 
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
-    }
+    // Usar setTimeout para evitar bucles infinitos
+    const timer = setTimeout(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
+      }
+    }, 100)
+    
+    return () => clearTimeout(timer)
   }, [mensajes])
 
   return (

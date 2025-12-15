@@ -158,13 +158,13 @@ export function useGroupMessaging(user: any) {
   }, [user, userData, toast])
 
   // Marcar mensajes como leídos
-  const marcarComoLeidos = useCallback(async (conversacionId: string) => {
+  const marcarComoLeidos = useCallback(async (conversacionId: string, mensajesActuales: MensajeGrupo[]) => {
     if (!db || !user || !userData) return
 
     try {
-      const mensajesNoLeidos = mensajes[conversacionId]?.filter(
+      const mensajesNoLeidos = mensajesActuales.filter(
         m => !m.leidoPor?.includes(user.uid) && m.remitenteId !== user.uid
-      ) || []
+      )
 
       if (mensajesNoLeidos.length === 0) return
 
@@ -196,7 +196,7 @@ export function useGroupMessaging(user: any) {
     } catch (error: any) {
       logger.error("Error al marcar como leídos:", error)
     }
-  }, [user, userData, mensajes])
+  }, [user, userData])
 
   // Cargar conversaciones del usuario
   useEffect(() => {
@@ -207,11 +207,23 @@ export function useGroupMessaging(user: any) {
 
     const miGrupoId = userData.grupoIds?.[0] || user.uid
     
+    // Crear queries para cada participante posible (grupoId y userId)
+    const participantes = [miGrupoId, user.uid]
+    
+    // Firestore no permite OR queries fácilmente, así que haremos múltiples queries
+    const conversacionesQueries = participantes.map(participanteId => 
+      query(
+        collection(db, COLLECTIONS.CONVERSACIONES),
+        where("participantes", "array-contains", participanteId),
+        where("activa", "==", true)
+      )
+    )
+    
+    // Usar solo la primera query por ahora (la del grupo principal)
     const conversacionesQuery = query(
       collection(db, COLLECTIONS.CONVERSACIONES),
       where("participantes", "array-contains", miGrupoId),
-      where("activa", "==", true),
-      orderBy("ultimoMensajeAt", "desc")
+      where("activa", "==", true)
     )
 
     const unsubscribe = onSnapshot(
@@ -241,6 +253,8 @@ export function useGroupMessaging(user: any) {
       return
     }
 
+    let hasMarkedAsRead = false
+
     const mensajesQuery = query(
       collection(db, COLLECTIONS.MENSAJES),
       where("conversacionId", "==", conversacionActiva),
@@ -265,9 +279,13 @@ export function useGroupMessaging(user: any) {
           [conversacionActiva]: mensajesData,
         }))
 
-        // Marcar como leídos cuando se cargan
-        if (mensajesData.length > 0) {
-          marcarComoLeidos(conversacionActiva)
+        // Marcar como leídos solo una vez cuando se carga la conversación
+        if (mensajesData.length > 0 && !hasMarkedAsRead) {
+          hasMarkedAsRead = true
+          // Usar setTimeout para evitar llamadas síncronas que causen bucles
+          setTimeout(() => {
+            marcarComoLeidos(conversacionActiva, mensajesData)
+          }, 500)
         }
       },
       (error) => {
@@ -275,7 +293,10 @@ export function useGroupMessaging(user: any) {
       }
     )
 
-    return () => unsubscribe()
+    return () => {
+      unsubscribe()
+      hasMarkedAsRead = false
+    }
   }, [conversacionActiva, marcarComoLeidos])
 
   return {
