@@ -869,7 +869,7 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      if (!cantidad || cantidad < 0) {
+      if (cantidad === null || cantidad === undefined || cantidad < 0) {
         return NextResponse.json({
           accion: {
             accion: "conversacion",
