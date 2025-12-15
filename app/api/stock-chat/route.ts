@@ -749,6 +749,52 @@ export async function POST(request: NextRequest) {
     
     // ==================== MODO STOCK ====================
     if (modo === "stock") {
+      // Detectar múltiples líneas con productos (cada línea: "producto cantidad" o "cantidad producto")
+      const lineas = mensaje.split(/\n/).map(l => l.trim()).filter(l => l.length > 0)
+      
+      // Si hay múltiples líneas, intentar procesarlas como múltiples productos
+      if (lineas.length > 1) {
+        const productosParaActualizar: Array<{ producto: string, cantidad: number }> = []
+        
+        for (const linea of lineas) {
+          // Formato 1: "producto cantidad"
+          const match1 = linea.match(/^(.+?)\s+(\d+)$/)
+          // Formato 2: "cantidad producto" o "cantidad de producto"
+          const match2 = linea.match(/^(\d+)\s+(?:de\s+)?(.+)$/)
+          
+          if (match1) {
+            const nombreProd = match1[1].trim()
+            const cantidadProd = parseInt(match1[2])
+            if (cantidadProd >= 0 && nombreProd.length > 1) {
+              productosParaActualizar.push({
+                producto: nombreProd,
+                cantidad: cantidadProd
+              })
+            }
+          } else if (match2) {
+            const cantidadProd = parseInt(match2[1])
+            const nombreProd = match2[2].trim()
+            if (cantidadProd >= 0 && nombreProd.length > 1) {
+              productosParaActualizar.push({
+                producto: nombreProd,
+                cantidad: cantidadProd
+              })
+            }
+          }
+        }
+        
+        if (productosParaActualizar.length > 0) {
+          return NextResponse.json({
+            accion: {
+              accion: "actualizar_stock_multiples",
+              productos: productosParaActualizar,
+              mensaje: `Actualizar stock de ${productosParaActualizar.length} productos`,
+              confianza: 0.9,
+            }
+          })
+        }
+      }
+      
       const msgNormalizado = mensaje.replace(/\n+/g, " ").replace(/\s+/g, " ").trim()
       const msgLower = msgNormalizado.toLowerCase()
       
@@ -812,7 +858,7 @@ export async function POST(request: NextRequest) {
         })
       }
       
-      // Múltiples productos en un mensaje: "papa 20 leche 15 tomate 10"
+      // Múltiples productos en un mensaje (misma línea): "papa 20 leche 15 tomate 10"
       const patronMultiples = /(\w+(?:\s+\w+)*)\s+(\d+)/g
       const matchesMultiples = [...msgNormalizado.matchAll(patronMultiples)]
       
@@ -1045,6 +1091,52 @@ export async function POST(request: NextRequest) {
     
     // ==================== COMANDOS ESPECIALES EN MODO INGRESO/EGRESO ====================
     if (modoActual === "ingreso" || modoActual === "egreso") {
+      // Detectar múltiples líneas con productos (cada línea: "producto cantidad" o "cantidad producto")
+      const lineas = mensaje.split(/\n/).map(l => l.trim()).filter(l => l.length > 0)
+      
+      // Si hay múltiples líneas, intentar procesarlas como múltiples productos
+      if (lineas.length > 1) {
+        const productosParaAgregar: Array<{ producto: string, cantidad: number }> = []
+        
+        for (const linea of lineas) {
+          // Formato 1: "producto cantidad"
+          const match1 = linea.match(/^(.+?)\s+(\d+)$/)
+          // Formato 2: "cantidad producto" o "cantidad de producto"
+          const match2 = linea.match(/^(\d+)\s+(?:de\s+)?(.+)$/)
+          
+          if (match1) {
+            const nombreProd = match1[1].trim()
+            const cantidadProd = parseInt(match1[2])
+            if (cantidadProd > 0 && nombreProd.length > 1) {
+              productosParaAgregar.push({
+                producto: nombreProd,
+                cantidad: cantidadProd
+              })
+            }
+          } else if (match2) {
+            const cantidadProd = parseInt(match2[1])
+            const nombreProd = match2[2].trim()
+            if (cantidadProd > 0 && nombreProd.length > 1) {
+              productosParaAgregar.push({
+                producto: nombreProd,
+                cantidad: cantidadProd
+              })
+            }
+          }
+        }
+        
+        if (productosParaAgregar.length > 0) {
+          return NextResponse.json({
+            accion: {
+              accion: "agregar_multiples",
+              productos: productosParaAgregar,
+              mensaje: `Agregar ${productosParaAgregar.length} productos a la lista`,
+              confianza: 0.9,
+            }
+          })
+        }
+      }
+      
       // Ver lista actual
       if (msgLower.match(/^(lista|ver lista|qué tengo|qué agregué|mostrar lista)$/i)) {
         return NextResponse.json({
@@ -1099,7 +1191,7 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      // Múltiples productos en un mensaje: "papa 10 leche 5 tomate 3"
+      // Múltiples productos en un mensaje (misma línea): "papa 10 leche 5 tomate 3"
       // Buscar patrones como "palabra número palabra número..."
       const patronMultiples = /(\w+(?:\s+\w+)*)\s+(\d+)/g
       const matchesMultiples = [...msgNormalizado.matchAll(patronMultiples)]
