@@ -30,6 +30,9 @@ Aplicación web completa para crear, modificar y gestionar horarios de empleados
 - **Panel de Fábrica**: Sistema completo para que fábricas procesen pedidos de sucursales
 - **Sistema de Remitos**: Generación, firma digital y gestión de remitos
 - **Firmas Digitales**: Firma de remitos por fábrica y sucursal
+- **Enlaces Públicos de Pedidos**: Comparte pedidos con fábricas mediante enlaces públicos sin necesidad de autenticación
+- **Sistema de Recepciones**: Registra recepciones de pedidos con productos recibidos, devoluciones y observaciones
+- **Estados de Pedidos**: Flujo completo de estados: creado → processing → enviado → recibido → completado
 
 ### Chat de Stock con IA
 - **Asistente de IA**: Chat inteligente para gestionar stock usando lenguaje natural
@@ -47,6 +50,7 @@ Aplicación web completa para crear, modificar y gestionar horarios de empleados
 - **Panel de Fábrica**: Procesamiento de pedidos y generación de remitos
 - **Links de Registro**: Genera links de registro con roles y grupos específicos
 - **Sincronización Automática**: Sincronización automática de grupos entre usuarios
+- **Mensajería entre Grupos**: Sistema de chat para comunicación entre grupos y usuarios del sistema
 
 ### Configuración
 - **Configuración de Empresa**: Personaliza nombre y color de la empresa
@@ -144,6 +148,14 @@ Aplicación web completa para crear, modificar y gestionar horarios de empleados
   stockMinimoDefault: number        // Stock mínimo por defecto
   formatoSalida: string            // Formato con placeholders: {nombre}, {cantidad}, {unidad}
   mensajePrevio?: string            // Mensaje que aparece al inicio del pedido
+  estado?: "creado" | "processing" | "enviado" | "recibido" | "completado"
+  assignedTo?: string              // ID de fábrica que procesa el pedido
+  assignedToNombre?: string         // Nombre de la fábrica
+  remitoEnvioId?: string           // ID del remito de envío generado
+  fechaEnvio?: Date                 // Fecha de envío del pedido
+  enlacePublicoId?: string          // ID del enlace público generado
+  origenDefault?: string            // Origen por defecto del pedido
+  destinoDefault?: string          // Destino por defecto del pedido
   userId: string
   createdAt?: Date
   updatedAt?: Date
@@ -240,6 +252,93 @@ Aplicación web completa para crear, modificar y gestionar horarios de empleados
   nombre: string                     // Nombre del separador (ej: "SALÓN", "COCINA")
   tipo: "puesto" | "personalizado"
   color?: string                     // código hex (opcional)
+  createdAt?: Date
+  updatedAt?: Date
+}
+\`\`\`
+
+### Enlace Público de Pedido
+\`\`\`typescript
+{
+  id: string                         // ID único del enlace (también usado como token)
+  pedidoId: string                   // ID del pedido asociado
+  token: string                      // Token único para acceder al enlace
+  activo: boolean                    // Si el enlace está activo
+  userId?: string                    // ID del usuario que creó el enlace
+  productosSnapshot?: Array<{        // Snapshot de productos al crear el enlace
+    id: string
+    nombre: string
+    stockMinimo: number
+    unidad?: string
+    cantidadPedida?: number
+    orden?: number
+  }>
+  productosDisponibles?: Array<{     // Productos marcados como disponibles por la fábrica
+    productoId: string
+    disponible: boolean
+    cantidadEnviar?: number
+    observaciones?: string
+  }>
+  fechaAcceso?: Date                 // Última fecha de acceso al enlace
+  createdAt?: Date
+  expiresAt?: Date                    // Fecha de expiración (opcional)
+}
+\`\`\`
+
+### Recepción
+\`\`\`typescript
+{
+  id: string
+  pedidoId: string                   // ID del pedido recibido
+  fecha: Date                         // Fecha de recepción
+  productos: Array<{
+    productoId: string
+    productoNombre: string
+    cantidadEnviada: number          // Cantidad que se envió
+    cantidadRecibida: number         // Cantidad que se recibió
+    estado?: "ok" | "faltante" | "sobrante" | "devolucion"
+    esDevolucion?: boolean            // Si es una devolución
+    cantidadDevolucion?: number       // Cantidad devuelta
+    observaciones?: string            // Observaciones sobre el producto
+  }>
+  esParcial?: boolean                 // Si la recepción es parcial
+  completada?: boolean                // Si la recepción está completada
+  observaciones?: string              // Observaciones generales
+  userId: string
+  createdAt?: Date
+}
+\`\`\`
+
+### Conversación de Grupo
+\`\`\`typescript
+{
+  id: string
+  tipo: "grupo" | "directo" | "rol"  // Tipo de conversación
+  participantes: string[]             // IDs de grupos o usuarios según el tipo
+  nombresParticipantes?: string[]     // Nombres para mostrar
+  ultimoMensaje?: string              // Último mensaje enviado
+  ultimoMensajeAt?: Date              // Fecha del último mensaje
+  ultimoMensajePor?: string           // ID del usuario que envió el último mensaje
+  noLeidos?: Record<string, number>   // Contador de mensajes no leídos por participante
+  activa: boolean                     // Si la conversación está activa
+  createdAt?: Date
+  updatedAt?: Date
+}
+\`\`\`
+
+### Mensaje de Grupo
+\`\`\`typescript
+{
+  id: string
+  conversacionId: string              // ID de la conversación
+  remitenteId: string                 // ID del usuario que envió el mensaje
+  remitenteNombre?: string            // Nombre del remitente
+  remitenteEmail?: string             // Email del remitente
+  remitenteRole?: string              // Rol del remitente
+  contenido: string                   // Contenido del mensaje
+  leido: boolean                      // Si el mensaje fue leído
+  leidoPor?: string[]                 // IDs de usuarios que leyeron el mensaje
+  timestamp?: Date                    // Fecha del mensaje
   createdAt?: Date
   updatedAt?: Date
 }
@@ -408,6 +507,52 @@ Para exponer Ollama desde tu PC de forma segura usando Cloudflare Tunnel:
 4. Si generaste un link público, también se copiará el link
 5. Envía el pedido a tu proveedor o comparte el link
 
+#### Enlaces Públicos de Pedidos
+
+Los enlaces públicos permiten compartir pedidos con fábricas sin necesidad de que estas tengan cuenta en el sistema:
+
+1. **Crear Enlace Público**:
+   - En la página de pedidos, haz clic en "Crear y generar link"
+   - El sistema generará un enlace único (ej: `/pedido-publico/[id]`)
+   - Copia y comparte el enlace con la fábrica
+
+2. **Usar Enlace Público (Fábrica)**:
+   - La fábrica accede al enlace sin necesidad de autenticación
+   - Ve los productos del pedido con cantidades solicitadas
+   - Marca qué productos están disponibles y las cantidades a enviar
+   - Puede agregar observaciones por producto
+   - Al confirmar, se genera automáticamente el remito de envío
+   - El pedido cambia a estado "enviado"
+
+3. **Características**:
+   - El enlace se desactiva automáticamente después de confirmar el envío
+   - Solo se puede crear un enlace activo por pedido
+   - El enlace incluye un snapshot de los productos al momento de crearlo
+   - La fábrica puede actualizar productos disponibles antes de confirmar
+
+#### Recepciones de Pedidos
+
+El sistema permite registrar recepciones detalladas de pedidos recibidos:
+
+1. **Registrar Recepción**:
+   - Desde el panel de pedidos, selecciona un pedido en estado "enviado"
+   - Haz clic en "Registrar Recepción"
+   - Ingresa las cantidades recibidas por producto
+   - Marca productos con faltantes, sobrantes o devoluciones
+   - Agrega observaciones por producto o generales
+   - Marca si la recepción es parcial o completa
+
+2. **Estados de Productos en Recepción**:
+   - **OK**: Producto recibido correctamente
+   - **Faltante**: Falta cantidad del producto
+   - **Sobrante**: Se recibió más cantidad de la enviada
+   - **Devolución**: Producto devuelto a la fábrica
+
+3. **Firmar Recepción**:
+   - Después de registrar la recepción, puedes firmar digitalmente
+   - La firma se guarda en el remito de recepción
+   - El pedido cambia a estado "recibido" o "completado"
+
 #### Panel de Fábrica (Rol Factory)
 
 1. Accede a `/dashboard/fabrica`
@@ -432,6 +577,33 @@ Para exponer Ollama desde tu PC de forma segura usando Cloudflare Tunnel:
 2. Gestiona los grupos donde eres manager
 3. Agrega o elimina usuarios de tus grupos
 4. Crea links de registro para `branch` o `factory` dentro de tus grupos
+
+### Mensajería entre Grupos
+
+El sistema incluye un sistema de mensajería para comunicación entre grupos y usuarios:
+
+1. **Acceder a Mensajería**:
+   - Ve a `/mensajeria` o usa el botón de mensajería en el dashboard
+   - Verás una lista de conversaciones activas
+
+2. **Crear Conversación**:
+   - Selecciona un grupo o usuario con quien quieres conversar
+   - El sistema crea automáticamente la conversación si no existe
+   - Puedes tener conversaciones entre grupos o directas entre usuarios
+
+3. **Enviar Mensajes**:
+   - Escribe tu mensaje y presiona Enter
+   - Los mensajes se sincronizan en tiempo real
+   - Verás quién ha leído tus mensajes
+
+4. **Tipos de Conversación**:
+   - **Grupo**: Conversación entre dos grupos (ej: Grupo Norte ↔ Grupo Sur)
+   - **Directo**: Conversación directa entre dos usuarios
+   - **Rol**: Conversación por rol (futuro)
+
+5. **Notificaciones**:
+   - El sistema muestra contadores de mensajes no leídos
+   - Los mensajes se marcan como leídos automáticamente al abrir la conversación
 
 ### Chat de Stock con IA
 
@@ -503,6 +675,11 @@ app/
 ├── page.tsx                           # Página de login
 ├── chat/
 │   └── page.tsx                       # Página del chat de stock
+├── mensajeria/
+│   └── page.tsx                       # Página de mensajería entre grupos
+├── pedido-publico/
+│   └── [id]/
+│       └── page.tsx                   # Página pública para fábricas (sin auth)
 ├── dashboard/
 │   ├── page.tsx                       # Vista principal de horarios semanales
 │   ├── horarios-mensuales/
@@ -513,6 +690,12 @@ app/
 │   │   └── page.tsx                   # Gestión de turnos
 │   ├── pedidos/
 │   │   └── page.tsx                   # Gestión de pedidos y stock
+│   ├── fabrica/
+│   │   └── page.tsx                   # Panel de fábrica
+│   ├── admin/
+│   │   └── page.tsx                   # Panel de administración
+│   ├── gerente/
+│   │   └── page.tsx                   # Panel de gerente
 │   ├── configuracion/
 │   │   └── page.tsx                   # Configuración del sistema
 │   └── historial/
@@ -581,6 +764,8 @@ hooks/
 ├── use-invitaciones.ts                 # Hook para links de registro
 ├── use-remitos.ts                      # Hook para remitos
 ├── use-recepciones.ts                  # Hook para recepciones de pedidos
+├── use-enlace-publico.ts               # Hook para enlaces públicos de pedidos
+├── use-group-messaging.ts              # Hook para mensajería entre grupos
 ├── use-stock-chat.ts                   # Hook para el chat de stock
 ├── use-config.ts                       # Hook para configuración
 ├── use-schedules-listener.ts           # Hook para escuchar horarios
@@ -816,17 +1001,64 @@ firestore/
 ├── remitos/                       # Remitos generados
 │   └── {remitoId}/
 │       ├── pedidoId: string
-│       ├── sucursalId: string
+│       ├── numero: string
+│       ├── tipo: "envio" | "recepcion" | "pedido"
 │       ├── productos: array
-│       ├── firmaEnvio?: string         // Firma digital de fábrica
-│       ├── firmaRecepcion?: string     // Firma digital de sucursal
+│       ├── firmaEnvio?: {              // Firma digital de fábrica
+│       │   nombre: string
+│       │   firma?: string
+│       │ }
+│       ├── firmaRecepcion?: {          // Firma digital de sucursal
+│       │   nombre: string
+│       │   firma?: string
+│       │ }
 │       └── ...
 │
-└── chatMessages/                  # Mensajes del chat (opcional)
-    └── {messageId}/
-        ├── tipo: "usuario" | "sistema"
+├── enlaces_publicos/              # Enlaces públicos de pedidos
+│   └── {enlaceId}/
+│       ├── pedidoId: string
+│       ├── token: string
+│       ├── activo: boolean
+│       ├── userId?: string
+│       ├── productosSnapshot?: array  // Snapshot de productos al crear
+│       ├── productosDisponibles?: array // Productos disponibles marcados por fábrica
+│       ├── fechaAcceso?: timestamp
+│       └── createdAt: timestamp
+│
+├── recepciones/                    # Recepciones de pedidos
+│   └── {recepcionId}/
+│       ├── pedidoId: string
+│       ├── fecha: timestamp
+│       ├── productos: array            // Productos recibidos con cantidades
+│       ├── esParcial?: boolean
+│       ├── completada?: boolean
+│       ├── observaciones?: string
+│       ├── userId: string
+│       └── createdAt: timestamp
+│
+├── conversaciones/                 # Conversaciones de mensajería
+│   └── {conversacionId}/
+│       ├── tipo: "grupo" | "directo" | "rol"
+│       ├── participantes: string[]     // IDs de grupos o usuarios
+│       ├── nombresParticipantes?: string[]
+│       ├── ultimoMensaje?: string
+│       ├── ultimoMensajeAt?: timestamp
+│       ├── ultimoMensajePor?: string
+│       ├── noLeidos?: object          // { userId: cantidad }
+│       ├── activa: boolean
+│       └── createdAt: timestamp
+│
+└── mensajes/                      # Mensajes de conversaciones
+    └── {mensajeId}/
+        ├── conversacionId: string
+        ├── remitenteId: string
+        ├── remitenteNombre?: string
+        ├── remitenteEmail?: string
+        ├── remitenteRole?: string
         ├── contenido: string
-        └── timestamp: timestamp
+        ├── leido: boolean
+        ├── leidoPor?: string[]         // IDs de usuarios que leyeron
+        └── createdAt: timestamp
 \`\`\`
 
 ## PWA (Progressive Web App)

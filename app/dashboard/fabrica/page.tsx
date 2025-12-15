@@ -22,6 +22,7 @@ import { useRemitos } from "@/hooks/use-remitos"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { logger } from "@/lib/logger"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
+import { PWAUpdateNotification } from "@/components/pwa-update-notification"
 
 type FiltroEstado = "todos" | "pendientes" | "en-proceso"
 
@@ -46,19 +47,7 @@ export default function FabricaPage() {
   const [productosDisponiblesPendientes, setProductosDisponiblesPendientes] = useState<EnlacePublico["productosDisponibles"] | null>(null)
   const [aceptandoPedido, setAceptandoPedido] = useState<string | null>(null)
 
-  // Registrar Service Worker para PWA
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      navigator.serviceWorker
-        .register('/sw-fabrica.js')
-        .then((registration) => {
-          console.log('Service Worker Fábrica registrado:', registration.scope)
-        })
-        .catch((error) => {
-          console.error('Error al registrar Service Worker Fábrica:', error)
-        })
-    }
-  }, [])
+  // El Service Worker se registra automáticamente mediante PWAUpdateNotification
 
   // Sincronizar el ref con el estado
   useEffect(() => {
@@ -587,6 +576,7 @@ export default function FabricaPage() {
         />
       )}
       <PWAInstallPrompt />
+      <PWAUpdateNotification swPath="/sw-fabrica.js" />
     </DashboardLayout>
   )
 }

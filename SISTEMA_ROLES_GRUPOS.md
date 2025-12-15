@@ -393,13 +393,108 @@ interface Remito {
 2. Verifica que el manager no esté en la lista (se excluye automáticamente)
 3. Verifica que el usuario no esté ya en el grupo
 
+## 💬 Sistema de Mensajería
+
+El sistema incluye un sistema de mensajería para comunicación entre grupos y usuarios.
+
+### Características
+
+- **Conversaciones entre Grupos**: Los grupos pueden comunicarse entre sí
+- **Conversaciones Directas**: Los usuarios pueden tener conversaciones directas
+- **Tiempo Real**: Los mensajes se sincronizan en tiempo real usando Firestore
+- **Contador de No Leídos**: Muestra cuántos mensajes no leídos tiene cada conversación
+- **Marcado de Lectura**: Los mensajes se marcan como leídos automáticamente
+
+### Tipos de Conversación
+
+1. **Grupo**: Conversación entre dos grupos
+   - Los participantes son `grupoIds`
+   - Todos los usuarios del grupo pueden ver y enviar mensajes
+   - Útil para comunicación entre sucursales y fábricas
+
+2. **Directo**: Conversación directa entre dos usuarios
+   - Los participantes son `userIds`
+   - Solo los dos usuarios pueden ver y enviar mensajes
+   - Útil para comunicación privada
+
+3. **Rol**: Conversación por rol (futuro)
+   - Permite conversaciones basadas en roles
+   - Ej: todas las fábricas, todas las sucursales
+
+### Uso
+
+1. **Acceder a Mensajería**:
+   - Ve a `/mensajeria` desde el dashboard
+   - O usa el botón de mensajería en la navegación
+
+2. **Crear Conversación**:
+   - Selecciona un grupo o usuario de la lista
+   - El sistema crea automáticamente la conversación si no existe
+   - Las conversaciones se crean bajo demanda
+
+3. **Enviar Mensajes**:
+   - Escribe tu mensaje en el campo de texto
+   - Presiona Enter o haz clic en el botón de enviar
+   - Los mensajes aparecen en tiempo real para todos los participantes
+
+4. **Ver Mensajes No Leídos**:
+   - El contador de no leídos aparece junto al nombre de la conversación
+   - Se actualiza automáticamente cuando recibes nuevos mensajes
+
+### Estructura de Datos
+
+#### Conversación
+```typescript
+{
+  id: string
+  tipo: "grupo" | "directo" | "rol"
+  participantes: string[]              // IDs de grupos o usuarios
+  nombresParticipantes?: string[]     // Nombres para mostrar
+  ultimoMensaje?: string
+  ultimoMensajeAt?: timestamp
+  ultimoMensajePor?: string
+  noLeidos?: Record<string, number>   // { userId: cantidad }
+  activa: boolean
+  createdAt?: timestamp
+  updatedAt?: timestamp
+}
+```
+
+#### Mensaje
+```typescript
+{
+  id: string
+  conversacionId: string
+  remitenteId: string
+  remitenteNombre?: string
+  remitenteEmail?: string
+  remitenteRole?: string
+  contenido: string
+  leido: boolean
+  leidoPor?: string[]                 // IDs de usuarios que leyeron
+  createdAt?: timestamp
+  updatedAt?: timestamp
+}
+```
+
+### Control de Acceso
+
+- **Lectura**: Solo los participantes de la conversación pueden leer los mensajes
+- **Escritura**: Solo los participantes pueden enviar mensajes
+- **Reglas de Firestore**: Las reglas verifican que el usuario sea participante antes de permitir lectura/escritura
+
 ## 📚 Referencias
 
 - **Reglas de Firestore**: `rules/horarios.rules`
 - **Tipos TypeScript**: `lib/types.ts`
 - **Hook de Fábrica**: `hooks/use-fabrica-pedidos.ts`
 - **Hook de Grupos**: `hooks/use-groups.ts`
+- **Hook de Mensajería**: `hooks/use-group-messaging.ts`
+- **Hook de Enlaces Públicos**: `hooks/use-enlace-publico.ts`
+- **Hook de Recepciones**: `hooks/use-recepciones.ts`
 - **Panel de Admin**: `app/dashboard/admin/page.tsx`
 - **Panel de Gerente**: `app/dashboard/gerente/page.tsx`
 - **Panel de Fábrica**: `app/dashboard/fabrica/page.tsx`
+- **Página de Mensajería**: `app/mensajeria/page.tsx`
+- **Página de Pedido Público**: `app/pedido-publico/[id]/page.tsx`
 

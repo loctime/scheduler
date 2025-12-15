@@ -1,5 +1,7 @@
 // Service Worker para PWA de Fábrica
-const CACHE_NAME = 'fabrica-pwa-v1'
+// Versión dinámica basada en timestamp - se actualiza automáticamente
+const APP_VERSION = '2025-12-14-2245' // Actualizar este valor cuando cambien los iconos o recursos estáticos
+const CACHE_NAME = `fabrica-pwa-${APP_VERSION}`
 const urlsToCache = [
   '/',
   '/dashboard/fabrica',

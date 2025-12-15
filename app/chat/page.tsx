@@ -11,6 +11,7 @@ import { useStockChatContext } from "@/contexts/stock-chat-context"
 import { Loader2, MessageCircle, RefreshCw, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
+import { PWAUpdateNotification } from "@/components/pwa-update-notification"
 
 function ChatContent() {
   const {
@@ -131,19 +132,7 @@ export default function ChatPage() {
     return () => unsubscribe()
   }, [router])
 
-  // Registrar Service Worker para PWA
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      navigator.serviceWorker
-        .register('/sw.js')
-        .then((registration) => {
-          console.log('Service Worker registrado:', registration.scope)
-        })
-        .catch((error) => {
-          console.error('Error al registrar Service Worker:', error)
-        })
-    }
-  }, [])
+  // El Service Worker se registra automáticamente mediante PWAUpdateNotification
 
   if (loading) {
     return (
@@ -162,6 +151,7 @@ export default function ChatPage() {
       <StockChatProvider user={user}>
         <ChatContent />
         <PWAInstallPrompt />
+        <PWAUpdateNotification swPath="/sw.js" />
       </StockChatProvider>
     </DataProvider>
   )
