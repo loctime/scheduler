@@ -611,7 +611,7 @@ export default function ConfiguracionPage() {
           </CardContent>
         </Card>
 
-        {userData?.role === "admin" || userData?.role === "manager" ? (
+        {(userData?.role === "admin" || userData?.role === "manager" || userData?.role === "branch" || userData?.role === "factory") ? (
           <InvitationsCard user={user} />
         ) : null}
 

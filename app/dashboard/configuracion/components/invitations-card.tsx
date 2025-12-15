@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -23,16 +23,67 @@ const PAGINAS_DISPONIBLES = [
   { id: "configuracion", label: "Configuración" },
 ]
 
+// Páginas disponibles según el rol del usuario que crea el link
+const getPaginasDisponiblesPorRol = (rolUsuario?: string) => {
+  if (rolUsuario === "manager" || rolUsuario === "admin") {
+    // Gerente/Admin: todas las páginas
+    return PAGINAS_DISPONIBLES
+  } else if (rolUsuario === "branch" || rolUsuario === "factory") {
+    // Sucursal/Fábrica: solo horarios, pedidos/fabrica, y configuracion
+    return PAGINAS_DISPONIBLES.filter(p => 
+      p.id === "horarios" || 
+      p.id === "pedidos" || 
+      p.id === "fabrica" || 
+      p.id === "configuracion"
+    )
+  }
+  // Por defecto, todas (aunque no debería llegar aquí)
+  return PAGINAS_DISPONIBLES
+}
+
 export function InvitationsCard({ user }: { user: any }) {
   const { toast } = useToast()
   const { userData } = useData()
   const { links, loading: loadingLinks, crearLinkInvitacion, eliminarLink } = useInvitaciones(user, userData)
   const [linkAEliminar, setLinkAEliminar] = useState<InvitacionLink | null>(null)
   const [dialogAbierto, setDialogAbierto] = useState(false)
-  const [rolSeleccionado, setRolSeleccionado] = useState<"branch" | "factory" | "admin" | "invited" | "manager">("invited")
+  
+  // Determinar roles disponibles según el rol del usuario
+  const getRolesDisponibles = (): readonly ("branch" | "factory" | "delivery" | "invited")[] => {
+    if (userData?.role === "manager") {
+      return ["branch", "factory", "delivery"] as const
+    } else if (userData?.role === "branch" || userData?.role === "factory") {
+      return ["invited"] as const
+    }
+    return [] as const
+  }
+  
+  const rolesDisponibles = getRolesDisponibles()
+  
+  // Si solo hay un rol disponible, usarlo directamente; si no, usar "invited" como fallback
+  const getRolPorDefecto = (): "branch" | "factory" | "admin" | "invited" | "manager" | "delivery" => {
+    return rolesDisponibles.length > 0 ? rolesDisponibles[0] : "invited"
+  }
+  
+  const [rolSeleccionado, setRolSeleccionado] = useState<"branch" | "factory" | "admin" | "invited" | "manager" | "delivery">(getRolPorDefecto())
   const [paginasSeleccionadas, setPaginasSeleccionadas] = useState<string[]>([])
-  const [crearLinks, setCrearLinks] = useState(false)
+  // Si el usuario es gerente, permitir crear links por defecto
+  const [crearLinks, setCrearLinks] = useState(userData?.role === "manager" || userData?.permisos?.crearLinks === true)
   const [creando, setCreando] = useState(false)
+
+  // Actualizar el estado cuando userData cambie
+  useEffect(() => {
+    if (userData?.role === "manager" || userData?.permisos?.crearLinks === true) {
+      setCrearLinks(true)
+    }
+    // Actualizar rol seleccionado cuando cambie userData
+    const nuevosRoles = getRolesDisponibles()
+    if (nuevosRoles.length > 0) {
+      setRolSeleccionado(nuevosRoles[0])
+    } else {
+      setRolSeleccionado("invited")
+    }
+  }, [userData])
 
   const copiarLink = (token: string) => {
     const url = `${typeof window !== "undefined" ? window.location.origin : ""}/registro?token=${token}`
@@ -58,9 +109,10 @@ export function InvitationsCard({ user }: { user: any }) {
         copiarLink(link.token)
         setDialogAbierto(false)
         // Resetear formulario
-        setRolSeleccionado("invited")
+        setRolSeleccionado(getRolPorDefecto())
         setPaginasSeleccionadas([])
-        setCrearLinks(false)
+        // Si el usuario es gerente, mantener crearLinks activado por defecto
+        setCrearLinks(userData?.role === "manager" || userData?.permisos?.crearLinks === true)
       }
     } finally {
       setCreando(false)
@@ -93,29 +145,53 @@ export function InvitationsCard({ user }: { user: any }) {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6 py-4">
-              <div className="space-y-2">
-                <Label>Rol del Usuario</Label>
-                <Select value={rolSeleccionado} onValueChange={(value) => setRolSeleccionado(value as any)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="invited">Invitado</SelectItem>
-                    <SelectItem value="branch">Sucursal</SelectItem>
-                    <SelectItem value="factory">Fábrica</SelectItem>
-                    <SelectItem value="manager">Gerente</SelectItem>
-                    <SelectItem value="admin">Administrador</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  El rol determina los permisos base del usuario
-                </p>
-              </div>
+              {/* Solo mostrar selector de rol si hay más de un rol disponible (gerente) */}
+              {rolesDisponibles.length > 1 ? (
+                <div className="space-y-2">
+                  <Label>Rol del Usuario</Label>
+                  <Select value={rolSeleccionado} onValueChange={(value) => setRolSeleccionado(value as any)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {rolesDisponibles.map((rol) => {
+                        const labels: Record<string, string> = {
+                          branch: "Sucursal",
+                          factory: "Fábrica",
+                          delivery: "Delivery",
+                          invited: "Invitado",
+                        }
+                        return (
+                          <SelectItem key={rol} value={rol}>
+                            {labels[rol] || rol}
+                          </SelectItem>
+                        )
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    El rol determina los permisos base del usuario
+                  </p>
+                </div>
+              ) : rolesDisponibles.length === 1 ? (
+                // Si solo hay un rol disponible, mostrarlo como información
+                <div className="space-y-2">
+                  <Label>Rol del Usuario</Label>
+                  <div className="p-3 border rounded-lg bg-muted/50">
+                    <p className="text-sm font-medium">
+                      {rolSeleccionado === "invited" ? "Invitado" : rolSeleccionado}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Se creará un link para usuarios con rol de {rolSeleccionado === "invited" ? "Invitado" : rolSeleccionado}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="space-y-3">
                 <Label>Páginas Accesibles</Label>
                 <div className="grid grid-cols-2 gap-3">
-                  {PAGINAS_DISPONIBLES.map((pagina) => (
+                  {getPaginasDisponiblesPorRol(userData?.role).map((pagina) => (
                     <div key={pagina.id} className="flex items-center space-x-2">
                       <Checkbox
                         id={`pagina-${pagina.id}`}
@@ -127,25 +203,33 @@ export function InvitationsCard({ user }: { user: any }) {
                         className="text-sm font-normal cursor-pointer"
                       >
                         {pagina.label}
+                        {pagina.id === "horarios" && (userData?.role === "branch" || userData?.role === "factory") && (
+                          <span className="text-xs text-muted-foreground ml-1">(Vista mensual)</span>
+                        )}
                       </Label>
                     </div>
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Selecciona las páginas que el usuario podrá ver y usar
+                  {userData?.role === "branch" || userData?.role === "factory" 
+                    ? "Solo puedes seleccionar las páginas permitidas para tu rol"
+                    : "Selecciona las páginas que el usuario podrá ver y usar"}
                 </p>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="crear-links"
-                  checked={crearLinks}
-                  onCheckedChange={(checked) => setCrearLinks(checked === true)}
-                />
-                <Label htmlFor="crear-links" className="text-sm font-normal cursor-pointer">
-                  Permitir crear links de colaborador
-                </Label>
-              </div>
+              {/* Solo mostrar opción de crear links si el usuario es gerente o tiene el permiso */}
+              {(userData?.role === "manager" || userData?.permisos?.crearLinks === true) && (
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="crear-links"
+                    checked={crearLinks}
+                    onCheckedChange={(checked) => setCrearLinks(checked === true)}
+                  />
+                  <Label htmlFor="crear-links" className="text-sm font-normal cursor-pointer">
+                    Permitir crear links de colaborador
+                  </Label>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDialogAbierto(false)}>

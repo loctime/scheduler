@@ -18,7 +18,7 @@ export function useInvitaciones(user: any, userData?: { grupoIds?: string[] } | 
 
   // Crear nuevo link de invitación
   const crearLinkInvitacion = async (
-    role?: "branch" | "factory" | "admin" | "invited" | "manager",
+    role?: "branch" | "factory" | "admin" | "invited" | "manager" | "delivery",
     grupoId?: string,
     permisos?: { paginas?: string[]; crearLinks?: boolean }
   ) => {
