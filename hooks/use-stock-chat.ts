@@ -92,6 +92,27 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     unidad?: string
     accion: "entrada" | "salida"
   }>>([])
+  
+  // Historial de cambios de stock para deshacer (modo stock)
+  const [ultimoCambioStock, setUltimoCambioStock] = useState<{
+    productoId: string
+    producto: string
+    stockAnterior: number
+    stockNuevo: number
+    unidad?: string
+  } | null>(null)
+  
+  // Lista acumulada de cambios de stock (modo batch)
+  const [cambiosStockAcumulados, setCambiosStockAcumulados] = useState<Array<{
+    productoId: string
+    producto: string
+    cantidad: number
+    stockAnterior: number
+    unidad?: string
+  }>>([])
+  
+  // Modo batch activo para stock
+  const [modoBatchStock, setModoBatchStock] = useState(false)
 
   // Verificar conexión con Ollama (opcional)
   const checkOllamaConnection = useCallback(async () => {
@@ -1333,25 +1354,362 @@ ${pedidos.map(p => `- ${p.nombre}`).join("\n")}`
         return
       }
 
-      // Si la acción es "actualizar_stock" (modo stock), ejecutarla directamente
-      if (accion.accion === "actualizar_stock") {
-        setIsProcessing(true)
-        try {
-          const resultado = await ejecutarAccion(accion)
+      // ==================== COMANDOS ESPECIALES EN MODO STOCK ====================
+      
+      // Ver último cambio de stock
+      if (accion.accion === "ver_ultimo_cambio_stock") {
+        if (!ultimoCambioStock) {
           addMessage({
             tipo: "sistema",
-            contenido: resultado,
+            contenido: "❌ No hay cambios recientes para mostrar.",
             accion,
           })
+        } else {
+          addMessage({
+            tipo: "sistema",
+            contenido: `📊 **Último cambio:**\n${ultimoCambioStock.producto}: ${ultimoCambioStock.stockAnterior} → ${ultimoCambioStock.stockNuevo} ${ultimoCambioStock.unidad || "unidades"}`,
+            accion,
+          })
+        }
+        setIsProcessing(false)
+        return
+      }
+      
+      // Deshacer último cambio de stock
+      if (accion.accion === "deshacer_ultimo_stock") {
+        if (!ultimoCambioStock) {
+          addMessage({
+            tipo: "sistema",
+            contenido: "❌ No hay cambios para deshacer.",
+            accion,
+          })
+        } else {
+          setIsProcessing(true)
+          try {
+            const resultado = await actualizarStockDirecto(
+              ultimoCambioStock.productoId,
+              ultimoCambioStock.stockAnterior,
+              `Deshacer: revertir a ${ultimoCambioStock.stockAnterior}`
+            )
+            addMessage({
+              tipo: "sistema",
+              contenido: `✅ Deshecho: ${ultimoCambioStock.producto}\nStock: ${ultimoCambioStock.stockNuevo} → ${ultimoCambioStock.stockAnterior} ${ultimoCambioStock.unidad || "unidades"}`,
+              accion,
+            })
+            setUltimoCambioStock(null)
+          } catch (error) {
+            addMessage({
+              tipo: "error",
+              contenido: error instanceof Error ? error.message : "Error deshaciendo cambio",
+              accion,
+            })
+          } finally {
+            setIsProcessing(false)
+          }
+        }
+        return
+      }
+      
+      // Toggle modo batch para stock
+      if (accion.accion === "toggle_batch_stock") {
+        const nuevoModo = !modoBatchStock
+        setModoBatchStock(nuevoModo)
+        if (nuevoModo && cambiosStockAcumulados.length > 0) {
+          setCambiosStockAcumulados([])
+        }
+        addMessage({
+          tipo: "sistema",
+          contenido: nuevoModo 
+            ? "✅ Modo batch activado. Los cambios se acumularán hasta que escribas 'confirmar'."
+            : "✅ Modo batch desactivado. Los cambios se aplicarán inmediatamente.",
+          accion,
+        })
+        setIsProcessing(false)
+        return
+      }
+      
+      // Ver lista de cambios pendientes (modo batch)
+      if (accion.accion === "ver_lista_cambios_stock") {
+        if (!modoBatchStock) {
+          addMessage({
+            tipo: "sistema",
+            contenido: "ℹ️ El modo batch no está activado. Escribí 'batch' para activarlo.",
+            accion,
+          })
+        } else if (cambiosStockAcumulados.length === 0) {
+          addMessage({
+            tipo: "sistema",
+            contenido: "📋 No hay cambios pendientes. Los cambios se acumularán cuando los hagas.",
+            accion,
+          })
+        } else {
+          const resumen = cambiosStockAcumulados.map(c => 
+            `• ${c.producto}: ${c.stockAnterior} → ${c.cantidad} ${c.unidad || "unidades"}`
+          ).join("\n")
+          addMessage({
+            tipo: "sistema",
+            contenido: `📋 **Cambios pendientes (${cambiosStockAcumulados.length}):**\n\n${resumen}\n\nEscribí "confirmar" para aplicar todos los cambios.`,
+            accion,
+          })
+        }
+        setIsProcessing(false)
+        return
+      }
+      
+      // Actualizar múltiples productos en modo stock
+      if (accion.accion === "actualizar_stock_multiples" && (accion as any).productos) {
+        const productosParaActualizar = (accion as any).productos as Array<{ producto: string, cantidad: number }>
+        const cambiosEncontrados: Array<{
+          productoId: string
+          producto: string
+          cantidad: number
+          stockAnterior: number
+          unidad?: string
+        }> = []
+        const productosNoEncontrados: string[] = []
+        
+        const productosFiltrados = pedidoSeleccionado
+          ? productos.filter(p => p.pedidoId === pedidoSeleccionado)
+          : productos
+        
+        for (const item of productosParaActualizar) {
+          const palabras = item.producto.split(/\s+/).filter((p: string) => p.length > 1)
+          if (palabras.length === 0) continue
+          
+          const textoBusqueda = palabras.join(" ").toLowerCase()
+          let productoEncontrado = productosFiltrados.find(p => 
+            p.nombre.toLowerCase() === textoBusqueda
+          )
+          
+          if (!productoEncontrado) {
+            const productosQueContienen = productosFiltrados.filter(p => {
+              const nombreLower = p.nombre.toLowerCase()
+              return palabras.every((pal: string) => 
+                nombreLower.includes(pal.toLowerCase())
+              )
+            })
+            
+            if (productosQueContienen.length === 1) {
+              productoEncontrado = productosQueContienen[0]
+            } else if (productosQueContienen.length > 1) {
+              productoEncontrado = productosQueContienen.reduce((prev, curr) => 
+                curr.nombre.length < prev.nombre.length ? curr : prev
+              )
+            }
+          }
+          
+          if (productoEncontrado) {
+            cambiosEncontrados.push({
+              productoId: productoEncontrado.id,
+              producto: productoEncontrado.nombre,
+              cantidad: item.cantidad,
+              stockAnterior: stockActual[productoEncontrado.id] ?? 0,
+              unidad: productoEncontrado.unidad,
+            })
+          } else {
+            productosNoEncontrados.push(item.producto)
+          }
+        }
+        
+        if (cambiosEncontrados.length > 0) {
+          if (modoBatchStock) {
+            // Acumular cambios
+            setCambiosStockAcumulados(prev => {
+              const nuevaLista = [...prev]
+              for (const cambio of cambiosEncontrados) {
+                const existe = nuevaLista.find(c => c.productoId === cambio.productoId)
+                if (existe) {
+                  const index = nuevaLista.indexOf(existe)
+                  nuevaLista[index] = cambio
+                } else {
+                  nuevaLista.push(cambio)
+                }
+              }
+              return nuevaLista
+            })
+            
+            const resumen = cambiosEncontrados.map(c => 
+              `• ${c.producto}: ${c.stockAnterior} → ${c.cantidad} ${c.unidad || "unidades"}`
+            ).join("\n")
+            
+            let mensaje = `✅ Agregados ${cambiosEncontrados.length} cambios:\n\n${resumen}`
+            if (productosNoEncontrados.length > 0) {
+              mensaje += `\n\n❌ No se encontraron: ${productosNoEncontrados.join(", ")}`
+            }
+            mensaje += `\n\nEscribí "confirmar" para aplicar todos los cambios.`
+            
+            addMessage({
+              tipo: "sistema",
+              contenido: mensaje,
+              accion,
+            })
+          } else {
+            // Aplicar inmediatamente
+            setIsProcessing(true)
+            try {
+              const resultados: string[] = []
+              for (const cambio of cambiosEncontrados) {
+                try {
+                  await actualizarStockDirecto(
+                    cambio.productoId,
+                    cambio.cantidad,
+                    `Actualización múltiple: ${cambio.stockAnterior} → ${cambio.cantidad}`
+                  )
+                  resultados.push(`✅ ${cambio.producto}: ${cambio.stockAnterior} → ${cambio.cantidad} ${cambio.unidad || "unidades"}`)
+                } catch (error) {
+                  resultados.push(`❌ ${cambio.producto}: ${error instanceof Error ? error.message : "Error"}`)
+                }
+              }
+              
+              const mensajeFinal = resultados.length === 1
+                ? resultados[0]
+                : `✅ **Cambios aplicados:**\n\n${resultados.join("\n")}`
+              
+              addMessage({
+                tipo: "sistema",
+                contenido: mensajeFinal,
+                accion,
+              })
+            } catch (error) {
+              addMessage({
+                tipo: "error",
+                contenido: error instanceof Error ? error.message : "Error actualizando stocks",
+                accion,
+              })
+            } finally {
+              setIsProcessing(false)
+            }
+          }
+        } else {
+          addMessage({
+            tipo: "sistema",
+            contenido: `❌ No se encontraron productos. Verificá los nombres: ${productosNoEncontrados.join(", ")}`,
+            accion,
+          })
+        }
+        setIsProcessing(false)
+        return
+      }
+      
+      // Si la acción es "actualizar_stock" (modo stock), ejecutarla directamente o acumularla
+      if (accion.accion === "actualizar_stock") {
+        const stockAnterior = (accion as any).stockAnterior ?? (stockActual[(accion as any).productoId] ?? 0)
+        
+        if (modoBatchStock) {
+          // Acumular cambio
+          setCambiosStockAcumulados(prev => {
+            const nuevaLista = prev.filter(c => c.productoId !== (accion as any).productoId)
+            nuevaLista.push({
+              productoId: (accion as any).productoId,
+              producto: (accion as any).producto || "",
+              cantidad: accion.cantidad || 0,
+              stockAnterior,
+              unidad: (accion as any).unidad,
+            })
+            return nuevaLista
+          })
+          
+          addMessage({
+            tipo: "sistema",
+            contenido: accion.mensaje || `✅ Cambio agregado a la lista. Escribí "confirmar" para aplicar todos los cambios.`,
+            accion,
+          })
+          setIsProcessing(false)
+          return
+        } else {
+          // Aplicar inmediatamente
+          setIsProcessing(true)
+          try {
+            const resultado = await ejecutarAccion(accion)
+            
+            // Guardar último cambio para poder deshacer
+            setUltimoCambioStock({
+              productoId: (accion as any).productoId,
+              producto: (accion as any).producto || "",
+              stockAnterior,
+              stockNuevo: accion.cantidad || 0,
+              unidad: (accion as any).unidad,
+            })
+            
+            addMessage({
+              tipo: "sistema",
+              contenido: resultado,
+              accion,
+            })
+          } catch (error) {
+            addMessage({
+              tipo: "error",
+              contenido: error instanceof Error ? error.message : "Error actualizando stock",
+              accion,
+            })
+          } finally {
+            setIsProcessing(false)
+          }
+          return
+        }
+      }
+      
+      // Confirmar cambios acumulados en modo batch stock
+      const textoLower = texto.toLowerCase().trim()
+      if ((textoLower === "confirmar" || textoLower === "confirmo" || textoLower === "sí" || textoLower === "si" || textoLower === "ok") && modoBatchStock && cambiosStockAcumulados.length > 0) {
+        addMessage({ tipo: "usuario", contenido: texto })
+        
+        const resumenPreConfirmacion = cambiosStockAcumulados.map(c => 
+          `• ${c.producto}: ${c.stockAnterior} → ${c.cantidad} ${c.unidad || "unidades"}`
+        ).join("\n")
+        
+        addMessage({
+          tipo: "sistema",
+          contenido: `📋 **Confirmando ${cambiosStockAcumulados.length} cambios:**\n\n${resumenPreConfirmacion}\n\nAplicando cambios...`,
+        })
+        
+        setIsProcessing(true)
+        
+        try {
+          const resultados: string[] = []
+          for (const cambio of cambiosStockAcumulados) {
+            try {
+              await actualizarStockDirecto(
+                cambio.productoId,
+                cambio.cantidad,
+                `Actualización batch: ${cambio.stockAnterior} → ${cambio.cantidad}`
+              )
+              resultados.push(`✅ ${cambio.producto}: ${cambio.stockAnterior} → ${cambio.cantidad} ${cambio.unidad || "unidades"}`)
+            } catch (error) {
+              resultados.push(`❌ ${cambio.producto}: ${error instanceof Error ? error.message : "Error desconocido"}`)
+            }
+          }
+          
+          const mensajeFinal = resultados.length === 1
+            ? resultados[0]
+            : `✅ **Cambios aplicados:**\n\n${resultados.join("\n")}`
+          
+          addMessage({
+            tipo: "sistema",
+            contenido: mensajeFinal,
+          })
+          
+          // Limpiar lista acumulada
+          setCambiosStockAcumulados([])
         } catch (error) {
           addMessage({
             tipo: "error",
-            contenido: error instanceof Error ? error.message : "Error actualizando stock",
-            accion,
+            contenido: error instanceof Error ? error.message : "Error ejecutando cambios",
           })
         } finally {
           setIsProcessing(false)
         }
+        return
+      }
+      
+      // Cancelar cambios acumulados en modo batch stock
+      if ((textoLower === "cancelar" || textoLower === "limpiar" || textoLower === "borrar" || textoLower === "reset") && modoBatchStock && cambiosStockAcumulados.length > 0) {
+        addMessage({ tipo: "usuario", contenido: texto })
+        setCambiosStockAcumulados([])
+        addMessage({
+          tipo: "sistema",
+          contenido: "✅ Cambios cancelados. Podés empezar de nuevo.",
+        })
         return
       }
 
@@ -1594,6 +1952,14 @@ ${pedidos.map(p => `- ${p.nombre}`).join("\n")}`
   useEffect(() => {
     if (!modo || modo === "pregunta" || modo === "stock") {
       setProductosAcumulados([])
+    }
+  }, [modo])
+  
+  // Limpiar cambios de stock acumulados cuando se sale del modo stock
+  useEffect(() => {
+    if (modo !== "stock") {
+      setCambiosStockAcumulados([])
+      setModoBatchStock(false)
     }
   }, [modo])
 

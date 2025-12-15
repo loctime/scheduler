@@ -708,6 +708,7 @@ export async function POST(request: NextRequest) {
     // ==================== MODO STOCK ====================
     if (modo === "stock") {
       const msgNormalizado = mensaje.replace(/\n+/g, " ").replace(/\s+/g, " ").trim()
+      const msgLower = msgNormalizado.toLowerCase()
       
       // Filtrar productos según pedido seleccionado (si aplica)
       let productosFiltrados = productos
@@ -723,28 +724,137 @@ export async function POST(request: NextRequest) {
         stockActual: stockActual[p.id] ?? 0,
       }))
       
-      // Extraer cantidad (número)
-      const matchCantidad = msgNormalizado.match(/(\d+)/)
-      const cantidad = matchCantidad ? parseInt(matchCantidad[1]) : null
+      // ==================== COMANDOS ESPECIALES EN MODO STOCK ====================
+      
+      // Ver último cambio
+      if (msgLower.match(/^(último|ver último|último cambio)$/i)) {
+        return NextResponse.json({
+          accion: {
+            accion: "ver_ultimo_cambio_stock",
+            mensaje: "Ver último cambio realizado",
+            confianza: 0.9,
+          }
+        })
+      }
+      
+      // Deshacer último cambio
+      if (msgLower.match(/^(deshacer|undo|revertir)$/i)) {
+        return NextResponse.json({
+          accion: {
+            accion: "deshacer_ultimo_stock",
+            mensaje: "Deshacer último cambio de stock",
+            confianza: 0.9,
+          }
+        })
+      }
+      
+      // Modo batch: activar/desactivar acumulación
+      if (msgLower.match(/^(batch|acumular|modo batch)$/i)) {
+        return NextResponse.json({
+          accion: {
+            accion: "toggle_batch_stock",
+            mensaje: "Activar/desactivar modo batch",
+            confianza: 0.9,
+          }
+        })
+      }
+      
+      // Ver lista de cambios pendientes (si está en modo batch)
+      if (msgLower.match(/^(lista|ver lista|cambios pendientes)$/i)) {
+        return NextResponse.json({
+          accion: {
+            accion: "ver_lista_cambios_stock",
+            mensaje: "Ver lista de cambios pendientes",
+            confianza: 0.9,
+          }
+        })
+      }
+      
+      // Múltiples productos en un mensaje: "papa 20 leche 15 tomate 10"
+      const patronMultiples = /(\w+(?:\s+\w+)*)\s+(\d+)/g
+      const matchesMultiples = [...msgNormalizado.matchAll(patronMultiples)]
+      
+      if (matchesMultiples.length > 1) {
+        const productosParaActualizar: Array<{ producto: string, cantidad: number }> = []
+        
+        for (const match of matchesMultiples) {
+          if (match[1] && match[2]) {
+            const nombreProd = match[1].trim()
+            const cantidadProd = parseInt(match[2])
+            if (cantidadProd >= 0 && nombreProd.length > 1) {
+              productosParaActualizar.push({
+                producto: nombreProd,
+                cantidad: cantidadProd
+              })
+            }
+          }
+        }
+        
+        if (productosParaActualizar.length > 0) {
+          return NextResponse.json({
+            accion: {
+              accion: "actualizar_stock_multiples",
+              productos: productosParaActualizar,
+              mensaje: `Actualizar stock de ${productosParaActualizar.length} productos`,
+              confianza: 0.9,
+            }
+          })
+        }
+      }
+      
+      // ==================== EXTRAER CANTIDAD Y PRODUCTO (ACEPTA AMBOS ÓRDENES) ====================
+      let cantidad: number | null = null
+      let nombreProducto: string = ""
+      
+      // Formato 1: "20 papa" o "20 de papa"
+      const matchCantidadInicio = msgNormalizado.match(/^(\d+)\s+(?:de\s+)?(.+)/)
+      if (matchCantidadInicio) {
+        cantidad = parseInt(matchCantidadInicio[1])
+        nombreProducto = matchCantidadInicio[2].trim()
+      } else {
+        // Formato 2: "papa 20"
+        const matchCantidadFinal = msgNormalizado.match(/(.+?)\s+(\d+)$/)
+        if (matchCantidadFinal) {
+          cantidad = parseInt(matchCantidadFinal[2])
+          nombreProducto = matchCantidadFinal[1].trim()
+        } else {
+          // Formato 3: Buscar cualquier número y el resto como producto
+          const matchCantidad = msgNormalizado.match(/(\d+)/)
+          if (matchCantidad) {
+            cantidad = parseInt(matchCantidad[1])
+            nombreProducto = msgNormalizado.replace(/\d+/g, "").replace(/\s+/g, " ").trim()
+          }
+        }
+      }
       
       if (!cantidad || cantidad < 0) {
         return NextResponse.json({
           accion: {
             accion: "conversacion",
-            mensaje: "Necesito saber la cantidad. Por ejemplo: 'papa 20' para establecer el stock de papa en 20.",
+            mensaje: "Necesito saber la cantidad. Por ejemplo: 'papa 20', '20 papa', o '20 de papa'.",
+            confianza: 0.5,
+          }
+        })
+      }
+      
+      if (!nombreProducto || nombreProducto.length < 1) {
+        return NextResponse.json({
+          accion: {
+            accion: "conversacion",
+            mensaje: "No identifiqué el nombre del producto. Por ejemplo: 'papa 20', '20 papa', o 'leche 15'.",
             confianza: 0.5,
           }
         })
       }
       
       // Buscar producto por nombre (buscar palabras que no sean números)
-      const palabras = msgNormalizado.split(/\s+/).filter((p: string) => !/^\d+$/.test(p) && p.length > 1)
+      const palabras = nombreProducto.split(/\s+/).filter((p: string) => !/^\d+$/.test(p) && p.length > 1)
       
       if (palabras.length === 0) {
         return NextResponse.json({
           accion: {
             accion: "conversacion",
-            mensaje: "No identifiqué el nombre del producto. Por ejemplo: 'papa 20' o 'leche 15'.",
+            mensaje: "No identifiqué el nombre del producto. Por ejemplo: 'papa 20', '20 papa', o 'leche 15'.",
             confianza: 0.5,
           }
         })
@@ -839,7 +949,11 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      // Retornar acción para actualizar stock directamente
+      // Obtener stock anterior para mostrar diferencia
+      const stockAnterior = stockActual[productoEncontrado.id] ?? 0
+      const diferencia = cantidad - stockAnterior
+      
+      // Retornar acción para actualizar stock con información de diferencia
       return NextResponse.json({
         accion: {
           accion: "actualizar_stock",
@@ -847,7 +961,10 @@ export async function POST(request: NextRequest) {
           producto: productoEncontrado.nombre,
           cantidad,
           unidad: productoEncontrado.unidad,
+          stockAnterior,
+          diferencia,
           confianza: 0.9,
+          mensaje: `📊 Actualizando stock de ${productoEncontrado.nombre}:\n${stockAnterior} → ${cantidad} ${productoEncontrado.unidad || "unidades"} ${diferencia !== 0 ? `(${diferencia > 0 ? "+" : ""}${diferencia})` : ""}`,
         }
       })
     }

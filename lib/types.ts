@@ -50,6 +50,11 @@ export type TipoAccion =
   | "quitar_de_lista"
   | "cambiar_cantidad"
   | "agregar_multiples"
+  | "ver_ultimo_cambio_stock"
+  | "deshacer_ultimo_stock"
+  | "toggle_batch_stock"
+  | "ver_lista_cambios_stock"
+  | "actualizar_stock_multiples"
 
 export interface StockAccionParsed {
   accion: TipoAccion
