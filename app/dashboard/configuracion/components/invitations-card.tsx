@@ -3,16 +3,36 @@
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { useInvitaciones } from "@/hooks/use-invitaciones"
+import { useData } from "@/contexts/data-context"
 import { InvitacionLink } from "@/lib/types"
 import { Loader2, Copy, Link as LinkIcon, X } from "lucide-react"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 
+const PAGINAS_DISPONIBLES = [
+  { id: "horarios", label: "Horarios" },
+  { id: "pedidos", label: "Pedidos" },
+  { id: "fabrica", label: "Fábrica" },
+  { id: "empleados", label: "Empleados" },
+  { id: "turnos", label: "Turnos" },
+  { id: "configuracion", label: "Configuración" },
+]
+
 export function InvitationsCard({ user }: { user: any }) {
   const { toast } = useToast()
-  const { links, loading: loadingLinks, crearLinkInvitacion, eliminarLink } = useInvitaciones(user)
+  const { userData } = useData()
+  const { links, loading: loadingLinks, crearLinkInvitacion, eliminarLink } = useInvitaciones(user, userData)
   const [linkAEliminar, setLinkAEliminar] = useState<InvitacionLink | null>(null)
+  const [dialogAbierto, setDialogAbierto] = useState(false)
+  const [rolSeleccionado, setRolSeleccionado] = useState<"branch" | "factory" | "admin" | "invited" | "manager">("invited")
+  const [paginasSeleccionadas, setPaginasSeleccionadas] = useState<string[]>([])
+  const [crearLinks, setCrearLinks] = useState(false)
+  const [creando, setCreando] = useState(false)
 
   const copiarLink = (token: string) => {
     const url = `${typeof window !== "undefined" ? window.location.origin : ""}/registro?token=${token}`
@@ -21,6 +41,38 @@ export function InvitationsCard({ user }: { user: any }) {
       title: "Link copiado",
       description: "El link de invitación ha sido copiado al portapapeles",
     })
+  }
+
+  const handleCrearLink = async () => {
+    setCreando(true)
+    try {
+      const permisos = {
+        paginas: paginasSeleccionadas,
+        crearLinks: crearLinks,
+      }
+      
+      // El hook useInvitaciones ahora hereda automáticamente el grupoId del usuario
+      // No necesitamos pasarlo explícitamente, pero lo podemos hacer si queremos forzar un grupo específico
+      const link = await crearLinkInvitacion(rolSeleccionado, undefined, permisos)
+      if (link) {
+        copiarLink(link.token)
+        setDialogAbierto(false)
+        // Resetear formulario
+        setRolSeleccionado("invited")
+        setPaginasSeleccionadas([])
+        setCrearLinks(false)
+      }
+    } finally {
+      setCreando(false)
+    }
+  }
+
+  const togglePagina = (paginaId: string) => {
+    setPaginasSeleccionadas(prev =>
+      prev.includes(paginaId)
+        ? prev.filter(p => p !== paginaId)
+        : [...prev, paginaId]
+    )
   }
 
   return (
@@ -32,15 +84,94 @@ export function InvitationsCard({ user }: { user: any }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <Dialog open={dialogAbierto} onOpenChange={setDialogAbierto}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Crear Link de Invitación</DialogTitle>
+              <DialogDescription>
+                Configura el rol y los permisos para el nuevo colaborador
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6 py-4">
+              <div className="space-y-2">
+                <Label>Rol del Usuario</Label>
+                <Select value={rolSeleccionado} onValueChange={(value) => setRolSeleccionado(value as any)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="invited">Invitado</SelectItem>
+                    <SelectItem value="branch">Sucursal</SelectItem>
+                    <SelectItem value="factory">Fábrica</SelectItem>
+                    <SelectItem value="manager">Gerente</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  El rol determina los permisos base del usuario
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <Label>Páginas Accesibles</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  {PAGINAS_DISPONIBLES.map((pagina) => (
+                    <div key={pagina.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`pagina-${pagina.id}`}
+                        checked={paginasSeleccionadas.includes(pagina.id)}
+                        onCheckedChange={() => togglePagina(pagina.id)}
+                      />
+                      <Label
+                        htmlFor={`pagina-${pagina.id}`}
+                        className="text-sm font-normal cursor-pointer"
+                      >
+                        {pagina.label}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Selecciona las páginas que el usuario podrá ver y usar
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="crear-links"
+                  checked={crearLinks}
+                  onCheckedChange={(checked) => setCrearLinks(checked === true)}
+                />
+                <Label htmlFor="crear-links" className="text-sm font-normal cursor-pointer">
+                  Permitir crear links de colaborador
+                </Label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDialogAbierto(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleCrearLink} disabled={creando}>
+                {creando ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creando...
+                  </>
+                ) : (
+                  <>
+                    <LinkIcon className="mr-2 h-4 w-4" />
+                    Crear Link
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Button
           type="button"
           variant="outline"
-          onClick={async () => {
-            const link = await crearLinkInvitacion()
-            if (link) {
-              copiarLink(link.token)
-            }
-          }}
+          onClick={() => setDialogAbierto(true)}
           className="w-full"
         >
           <LinkIcon className="mr-2 h-4 w-4" />
@@ -79,6 +210,24 @@ export function InvitationsCard({ user }: { user: any }) {
                     <p className="text-xs text-muted-foreground font-mono truncate">
                       {url}
                     </p>
+                    {link.role && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Rol: <span className="font-medium capitalize">{link.role}</span>
+                      </p>
+                    )}
+                    {link.permisos && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        <p className="font-medium">Permisos:</p>
+                        {link.permisos.paginas && link.permisos.paginas.length > 0 && (
+                          <p className="ml-2">
+                            Páginas: {link.permisos.paginas.map(p => PAGINAS_DISPONIBLES.find(pa => pa.id === p)?.label || p).join(", ")}
+                          </p>
+                        )}
+                        {link.permisos.crearLinks && (
+                          <p className="ml-2">✓ Puede crear links</p>
+                        )}
+                      </div>
+                    )}
                     {link.usado && (
                       <p className="text-xs text-muted-foreground mt-1">
                         Vinculado por: <span className="font-medium">

@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Dialog,
@@ -36,14 +38,14 @@ export default function AdminPage() {
   const { user, userData } = useData()
   const { users, loading, cambiarRol, buscarUsuarioPorEmail, recargarUsuarios } = useAdminUsers(user)
   const { groups, loading: loadingGroups, crearGrupo, eliminarGrupo, agregarUsuarioAGrupo, removerUsuarioDeGrupo, recargarGrupos } = useGroups(user)
-  const { crearLinkInvitacion } = useInvitaciones(user)
+  const { crearLinkInvitacion } = useInvitaciones(user, userData)
   const { toast } = useToast()
   const puedeGestionarInvitaciones = userData?.role === "admin" || userData?.role === "manager"
   
   const [busqueda, setBusqueda] = useState("")
   const [filtroRol, setFiltroRol] = useState<string>("todos")
   const [mostrarDialogLink, setMostrarDialogLink] = useState(false)
-  const [rolLinkSeleccionado, setRolLinkSeleccionado] = useState<UserRole>("branch")
+  const [rolLinkSeleccionado, setRolLinkSeleccionado] = useState<UserRole>("manager")
   const [linkGenerado, setLinkGenerado] = useState<string | null>(null)
   const [generandoLink, setGenerandoLink] = useState(false)
   const [busquedaEmail, setBusquedaEmail] = useState("")
@@ -55,6 +57,11 @@ export default function AdminPage() {
   const [nombreGrupo, setNombreGrupo] = useState("")
   const [managerIdGrupo, setManagerIdGrupo] = useState<string>("")
   const [creandoGrupo, setCreandoGrupo] = useState(false)
+  
+  // Estados para creación de grupo al crear link de manager
+  // Por defecto activado cuando el rol es manager
+  const [crearGrupoConLink, setCrearGrupoConLink] = useState(true)
+  const [nombreGrupoNuevo, setNombreGrupoNuevo] = useState("")
   
   // Estados para selector múltiple de usuarios
   const [usuariosSeleccionados, setUsuariosSeleccionados] = useState<Record<string, string[]>>({}) // grupoId -> userIds[]
@@ -105,12 +112,39 @@ export default function AdminPage() {
   const handleGenerarLink = async () => {
     if (!user || !puedeGestionarInvitaciones) return
 
+    // Si es manager y quiere crear grupo, validar nombre
+    if (rolLinkSeleccionado === "manager" && crearGrupoConLink) {
+      if (!nombreGrupoNuevo.trim()) {
+        toast({
+          title: "Error",
+          description: "Por favor ingresa un nombre para el grupo",
+          variant: "destructive",
+        })
+        return
+      }
+    }
+
     setGenerandoLink(true)
     try {
-      const link = await crearLinkInvitacion(rolLinkSeleccionado)
+      let grupoIdCreado: string | null = null
+      
+      // Si es manager y quiere crear grupo, crearlo primero
+      if (rolLinkSeleccionado === "manager" && crearGrupoConLink) {
+        // Crear grupo sin managerId (se asignará cuando el gerente se registre)
+        grupoIdCreado = await crearGrupo(nombreGrupoNuevo.trim(), "", "")
+        if (!grupoIdCreado) {
+          setGenerandoLink(false)
+          return
+        }
+      }
+      
+      const link = await crearLinkInvitacion(rolLinkSeleccionado, grupoIdCreado || undefined)
       if (link) {
         const url = `${window.location.origin}/registro?token=${link.token}`
         setLinkGenerado(url)
+        // Resetear estados
+        setCrearGrupoConLink(false)
+        setNombreGrupoNuevo("")
       }
     } catch (error) {
       console.error("Error al generar link:", error)
@@ -233,7 +267,16 @@ export default function AdminPage() {
                 <div className="space-y-4 py-4">
                   <div>
                     <label className="text-sm font-medium mb-2 block">Rol a asignar</label>
-                    <Select value={rolLinkSeleccionado} onValueChange={(value) => setRolLinkSeleccionado(value as UserRole)}>
+                    <Select value={rolLinkSeleccionado} onValueChange={(value) => {
+                      setRolLinkSeleccionado(value as UserRole)
+                      // Activar opción de crear grupo si es manager, desactivar si no
+                      if (value === "manager") {
+                        setCrearGrupoConLink(true)
+                      } else {
+                        setCrearGrupoConLink(false)
+                        setNombreGrupoNuevo("")
+                      }
+                    }}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -246,6 +289,43 @@ export default function AdminPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  
+                  {rolLinkSeleccionado === "manager" && (
+                    <div className="space-y-3 p-4 border rounded-lg bg-muted/50">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="crear-grupo"
+                          checked={crearGrupoConLink}
+                          onCheckedChange={(checked) => {
+                            setCrearGrupoConLink(checked === true)
+                            if (!checked) {
+                              setNombreGrupoNuevo("")
+                            }
+                          }}
+                        />
+                        <Label htmlFor="crear-grupo" className="text-sm font-medium cursor-pointer">
+                          Crear grupo nuevo para este gerente
+                        </Label>
+                      </div>
+                      {crearGrupoConLink && (
+                        <div className="space-y-2">
+                          <label htmlFor="nombre-grupo" className="text-sm font-medium">
+                            Nombre del grupo
+                          </label>
+                          <Input
+                            id="nombre-grupo"
+                            placeholder="Ej: Grupo Norte, Sucursal Centro, etc."
+                            value={nombreGrupoNuevo}
+                            onChange={(e) => setNombreGrupoNuevo(e.target.value)}
+                            disabled={generandoLink}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            El grupo se creará automáticamente y el gerente será asignado como manager cuando se registre.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {linkGenerado ? (
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Link generado:</label>

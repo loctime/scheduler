@@ -6,7 +6,7 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { InvitacionLink } from "@/lib/types"
 
-export function useInvitaciones(user: any) {
+export function useInvitaciones(user: any, userData?: { grupoIds?: string[] } | null) {
   const { toast } = useToast()
   const [links, setLinks] = useState<InvitacionLink[]>([])
   const [loading, setLoading] = useState(true)
@@ -17,7 +17,11 @@ export function useInvitaciones(user: any) {
   }
 
   // Crear nuevo link de invitación
-  const crearLinkInvitacion = async (role?: "branch" | "factory" | "admin" | "invited" | "manager", grupoId?: string) => {
+  const crearLinkInvitacion = async (
+    role?: "branch" | "factory" | "admin" | "invited" | "manager",
+    grupoId?: string,
+    permisos?: { paginas?: string[]; crearLinks?: boolean }
+  ) => {
     if (!user || !db) return null
 
     try {
@@ -35,9 +39,19 @@ export function useInvitaciones(user: any) {
         linkData.role = role
       }
 
-      // Si se especifica un grupoId, agregarlo al link (para links creados por manager)
-      if (grupoId) {
-        linkData.grupoId = grupoId
+      // Determinar el grupoId a usar:
+      // 1. Si se especifica explícitamente, usarlo
+      // 2. Si no, heredar el grupoId del usuario que crea el link (si pertenece a un grupo)
+      // Esto asegura que todos los links creados por usuarios del mismo grupo pertenezcan al mismo grupo
+      const grupoIdFinal = grupoId || (userData?.grupoIds && userData.grupoIds.length > 0 ? userData.grupoIds[0] : undefined)
+      
+      if (grupoIdFinal) {
+        linkData.grupoId = grupoIdFinal
+      }
+
+      // Si se especifican permisos, agregarlos al link
+      if (permisos) {
+        linkData.permisos = permisos
       }
 
       const linkRef = await addDoc(collection(db, COLLECTIONS.INVITACIONES), linkData)
@@ -49,7 +63,8 @@ export function useInvitaciones(user: any) {
         activo: true,
         usado: false,
         role: role,
-        grupoId: grupoId,
+        grupoId: grupoIdFinal,
+        permisos: permisos,
       }
 
       await cargarLinks()

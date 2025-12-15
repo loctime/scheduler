@@ -15,6 +15,10 @@ interface UserData {
   role?: string
   ownerId?: string
   grupoIds?: string[]
+  permisos?: {
+    paginas?: string[]
+    crearLinks?: boolean
+  }
 }
 
 interface DataContextType {
@@ -110,6 +114,7 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
           role: data.role || "user",
           ownerId: data.ownerId,
           grupoIds: data.grupoIds || [],
+          permisos: data.permisos,
         })
       } else {
         // Si no existe el documento, crear uno por defecto

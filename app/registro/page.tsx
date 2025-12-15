@@ -95,6 +95,7 @@ function RegistroContent() {
     const linkData = linkDoc.data()
     const roleDelLink = linkData.role
     const grupoIdDelLink = linkData.grupoId
+    const permisosDelLink = linkData.permisos
 
     // Verificar si el usuario ya existe en Firestore
     const userRef = doc(db, COLLECTIONS.USERS, user.uid)
@@ -117,6 +118,10 @@ function RegistroContent() {
           updateData.ownerId = null
         } else if (ownerId) {
           updateData.ownerId = ownerId
+        }
+        // Aplicar permisos del link si existen
+        if (permisosDelLink) {
+          updateData.permisos = permisosDelLink
         }
         await updateDoc(userRef, updateData)
         console.log("✅ Usuario actualizado con nuevo rol exitosamente")
@@ -169,27 +174,46 @@ function RegistroContent() {
         userData.ownerId = ownerId
       }
       
+      // Aplicar permisos del link si existen
+      if (permisosDelLink) {
+        userData.permisos = permisosDelLink
+        console.log("🔐 Permisos aplicados:", permisosDelLink)
+      }
+      
       // Si el link tiene grupoId, agregar el usuario al grupo
       if (grupoIdDelLink) {
         userData.grupoIds = [grupoIdDelLink]
         
-        // Actualizar el grupo para agregar el userId
+        // Actualizar el grupo
         try {
           const grupoRef = doc(db, COLLECTIONS.GROUPS, grupoIdDelLink)
           const grupoDoc = await getDoc(grupoRef)
           if (grupoDoc.exists()) {
             const grupoData = grupoDoc.data()
+            const updateData: any = {}
+            
+            // Si el usuario es manager y el grupo no tiene managerId, asignarlo
+            if (rolAAsignar === "manager" && (!grupoData.managerId || grupoData.managerId === "")) {
+              updateData.managerId = user.uid
+              updateData.managerEmail = user.email || null
+              console.log("👔 Gerente asignado como manager del grupo:", grupoIdDelLink)
+            }
+            
+            // Agregar el userId al array de userIds si no está
             const userIds = grupoData.userIds || []
             if (!userIds.includes(user.uid)) {
-              await updateDoc(grupoRef, {
-                userIds: [...userIds, user.uid],
-                updatedAt: serverTimestamp(),
-              })
-              console.log("✅ Usuario agregado al grupo:", grupoIdDelLink)
+              updateData.userIds = [...userIds, user.uid]
+            }
+            
+            // Actualizar el grupo si hay cambios
+            if (Object.keys(updateData).length > 0) {
+              updateData.updatedAt = serverTimestamp()
+              await updateDoc(grupoRef, updateData)
+              console.log("✅ Grupo actualizado:", updateData)
             }
           }
         } catch (error) {
-          console.error("Error al agregar usuario al grupo:", error)
+          console.error("Error al actualizar el grupo:", error)
         }
       }
       
