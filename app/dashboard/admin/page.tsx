@@ -18,6 +18,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -28,15 +38,17 @@ import { useData } from "@/contexts/data-context"
 import { useAdminUsers, UserRole, UserData } from "@/hooks/use-admin-users"
 import { useGroups } from "@/hooks/use-groups"
 import { useInvitaciones } from "@/hooks/use-invitaciones"
-import { Shield, Loader2, Search, UserPlus, Copy, Check, Users, Link as LinkIcon, Mail, FolderTree, Plus, Trash2, X } from "lucide-react"
+import { Shield, Loader2, Search, UserPlus, Copy, Check, Users, Link as LinkIcon, Mail, FolderTree, Plus, Trash2, X, Pencil } from "lucide-react"
 import { Group } from "@/lib/types"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { useToast } from "@/hooks/use-toast"
+import { UsersTable } from "./components/users-table"
+import { GroupsTable } from "./components/groups-table"
 
 export default function AdminPage() {
   const { user, userData } = useData()
-  const { users, loading, cambiarRol, buscarUsuarioPorEmail, recargarUsuarios } = useAdminUsers(user)
+  const { users, loading, cambiarRol, eliminarUsuario, buscarUsuarioPorEmail, recargarUsuarios } = useAdminUsers(user)
   const { groups, loading: loadingGroups, crearGrupo, eliminarGrupo, agregarUsuarioAGrupo, removerUsuarioDeGrupo, recargarGrupos } = useGroups(user)
   const { crearLinkInvitacion } = useInvitaciones(user, userData)
   const { toast } = useToast()
@@ -63,12 +75,16 @@ export default function AdminPage() {
   const [crearGrupoConLink, setCrearGrupoConLink] = useState(true)
   const [nombreGrupoNuevo, setNombreGrupoNuevo] = useState("")
   
-  // Estados para selector múltiple de usuarios
-  const [usuariosSeleccionados, setUsuariosSeleccionados] = useState<Record<string, string[]>>({}) // grupoId -> userIds[]
-  const [agregandoUsuarios, setAgregandoUsuarios] = useState<Record<string, boolean>>({}) // grupoId -> boolean
-  
   // Estado local para grupos (para actualizaciones reactivas)
   const [gruposLocales, setGruposLocales] = useState<Group[]>(groups)
+  
+  // Estados para diálogos de edición y eliminación
+  const [usuarioEditando, setUsuarioEditando] = useState<UserData | null>(null)
+  const [usuarioEliminando, setUsuarioEliminando] = useState<UserData | null>(null)
+  const [mostrarDialogEditar, setMostrarDialogEditar] = useState(false)
+  const [mostrarDialogEliminar, setMostrarDialogEliminar] = useState(false)
+  const [nuevoRol, setNuevoRol] = useState<UserRole>("branch")
+  const [eliminando, setEliminando] = useState(false)
   
   // Sincronizar grupos locales con grupos del hook
   useEffect(() => {
@@ -107,6 +123,38 @@ export default function AdminPage() {
       // Recargar usuarios
       await recargarUsuarios()
     }
+    return exito
+  }
+
+  const handleAbrirEditar = (usuario: UserData) => {
+    setUsuarioEditando(usuario)
+    setNuevoRol(usuario.role || "branch")
+    setMostrarDialogEditar(true)
+  }
+
+  const handleGuardarEdicion = async () => {
+    if (!usuarioEditando) return
+    const exito = await handleCambiarRol(usuarioEditando.id, nuevoRol)
+    if (exito) {
+      setMostrarDialogEditar(false)
+      setUsuarioEditando(null)
+    }
+  }
+
+  const handleAbrirEliminar = (usuario: UserData) => {
+    setUsuarioEliminando(usuario)
+    setMostrarDialogEliminar(true)
+  }
+
+  const handleConfirmarEliminar = async () => {
+    if (!usuarioEliminando) return
+    setEliminando(true)
+    const exito = await eliminarUsuario(usuarioEliminando.id)
+    if (exito) {
+      setMostrarDialogEliminar(false)
+      setUsuarioEliminando(null)
+    }
+    setEliminando(false)
   }
 
   const handleGenerarLink = async () => {
@@ -213,8 +261,8 @@ export default function AdminPage() {
     }
   }
 
-  const getRoleLabel = (role?: UserRole) => {
-    switch (role) {
+  const getRoleLabel = (role?: string) => {
+    switch (role as UserRole) {
       case "admin":
         return "Administrador"
       case "factory":
@@ -226,6 +274,102 @@ export default function AdminPage() {
       default:
         return "Sin rol"
     }
+  }
+
+  const renderGruposContent = () => {
+    if (loadingGroups) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      )
+    }
+    
+    if (gruposLocales.length === 0) {
+      return (
+        <Card className="text-center py-12">
+          <CardContent>
+            <FolderTree className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <CardTitle className="text-xl">No hay grupos</CardTitle>
+            <CardDescription className="mt-2">
+              Crea tu primer grupo para organizar usuarios
+            </CardDescription>
+          </CardContent>
+        </Card>
+      )
+    }
+    
+    return (
+      <GroupsTable
+        groups={gruposLocales}
+        users={users}
+        getRoleLabel={getRoleLabel}
+        onDelete={async (grupoId) => {
+          const grupo = gruposLocales.find(g => g.id === grupoId)
+          if (!grupo) return
+          
+          // Usar el mismo patrón de confirmación que usuarios
+          if (window.confirm(`¿Eliminar el grupo "${grupo.nombre}"? Esta acción no se puede deshacer.`)) {
+            setGruposLocales((prev: Group[]) => prev.filter((g: Group) => g.id !== grupoId))
+            try {
+              await eliminarGrupo(grupoId)
+              await recargarGrupos()
+              toast({
+                title: "Grupo eliminado",
+                description: `El grupo "${grupo.nombre}" ha sido eliminado exitosamente`,
+              })
+            } catch (error) {
+              await recargarGrupos()
+              toast({
+                title: "Error",
+                description: "No se pudo eliminar el grupo",
+                variant: "destructive",
+              })
+            }
+          }
+        }}
+        onAddUsers={async (grupoId, userIds) => {
+          setGruposLocales((prev: Group[]) => prev.map((g: Group) => 
+            g.id === grupoId 
+              ? { ...g, userIds: [...g.userIds, ...userIds] }
+              : g
+          ))
+          try {
+            await Promise.all(
+              userIds.map((userId: string) => agregarUsuarioAGrupo(grupoId, userId))
+            )
+            await recargarGrupos()
+          } catch (error) {
+            console.error("Error al agregar usuarios:", error)
+            await recargarGrupos()
+            toast({
+              title: "Error",
+              description: "No se pudieron agregar todos los usuarios. Revirtiendo cambios...",
+              variant: "destructive",
+            })
+          }
+        }}
+        onRemoveUser={async (grupoId, userId) => {
+          setGruposLocales((prev: Group[]) => prev.map((g: Group) => 
+            g.id === grupoId 
+              ? { ...g, userIds: g.userIds.filter((id: string) => id !== userId) }
+              : g
+          ))
+          try {
+            await removerUsuarioDeGrupo(grupoId, userId)
+            await recargarGrupos()
+          } catch (error) {
+            console.error("Error al remover usuario:", error)
+            await recargarGrupos()
+            toast({
+              title: "Error",
+              description: "No se pudo remover el usuario. Revirtiendo cambios...",
+              variant: "destructive",
+            })
+          }
+        }}
+      />
+    )
   }
 
   if (loading) {
@@ -377,29 +521,34 @@ export default function AdminPage() {
           </TabsList>
 
           <TabsContent value="usuarios" className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por email o nombre..."
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                  className="pl-9"
-                />
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+              <div className="flex flex-col sm:flex-row gap-3 flex-1">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por email o nombre..."
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Select value={filtroRol} onValueChange={setFiltroRol}>
+                  <SelectTrigger className="w-full sm:w-[200px]">
+                    <SelectValue placeholder="Filtrar por rol" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos los roles</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="manager">Gerente</SelectItem>
+                    <SelectItem value="factory">Fábrica</SelectItem>
+                    <SelectItem value="branch">Sucursal</SelectItem>
+                    <SelectItem value="invited">Invitado</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <Select value={filtroRol} onValueChange={setFiltroRol}>
-                <SelectTrigger className="w-full sm:w-[200px]">
-                  <SelectValue placeholder="Filtrar por rol" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos los roles</SelectItem>
-                  <SelectItem value="admin">Administrador</SelectItem>
-                  <SelectItem value="manager">Gerente</SelectItem>
-                  <SelectItem value="factory">Fábrica</SelectItem>
-                  <SelectItem value="branch">Sucursal</SelectItem>
-                  <SelectItem value="invited">Invitado</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="text-sm text-muted-foreground">
+                {usuariosFiltrados.length} {usuariosFiltrados.length === 1 ? "usuario" : "usuarios"}
+              </div>
             </div>
 
             {usuariosFiltrados.length === 0 ? (
@@ -415,396 +564,120 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {usuariosFiltrados.map((usuario) => (
-                  <Card key={usuario.id}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-lg font-semibold truncate max-w-[70%]">
-                        {usuario.displayName || "Sin nombre"}
-                      </CardTitle>
-                      <Badge className={`text-xs ${getRoleBadgeColor(usuario.role)}`}>
-                        {getRoleLabel(usuario.role)}
-                      </Badge>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <p className="text-sm text-muted-foreground truncate">
-                        <Mail className="h-3 w-3 inline mr-1" />
-                        {usuario.email || "Sin email"}
-                      </p>
-                      {usuario.createdAt && (
-                        <p className="text-xs text-muted-foreground">
-                          Registrado: {format(usuario.createdAt.toDate(), "dd/MM/yyyy", { locale: es })}
-                        </p>
-                      )}
-                      {usuario.ownerId && (
-                        <p className="text-xs text-muted-foreground">
-                          Invitado por: {usuario.ownerId.substring(0, 8)}...
-                        </p>
-                      )}
-                      {(() => {
-                        const gruposUsuario = obtenerGruposDeUsuario(usuario.id)
-                        if (gruposUsuario.length > 0) {
-                          return (
-                            <div className="mt-2">
-                              <p className="text-xs font-medium text-muted-foreground mb-1">Grupos:</p>
-                              <div className="flex flex-wrap gap-1">
-                                {gruposUsuario.map(grupo => (
-                                  <Badge key={grupo.id} variant="outline" className="text-xs">
-                                    {grupo.nombre}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )
-                        }
-                        return null
-                      })()}
-                      <div className="pt-2 border-t">
-                        <label className="text-xs font-medium mb-2 block">Cambiar rol:</label>
-                        <Select
-                          value={usuario.role || "branch"}
-                          onValueChange={(value) => handleCambiarRol(usuario.id, value as UserRole)}
-                        >
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                  <SelectItem value="branch">Sucursal</SelectItem>
-                  <SelectItem value="factory">Fábrica</SelectItem>
-                  <SelectItem value="manager">Gerente</SelectItem>
-                  <SelectItem value="admin">Administrador</SelectItem>
-                  <SelectItem value="invited">Invitado</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              <UsersTable
+                users={usuariosFiltrados}
+                groups={gruposLocales}
+                getRoleBadgeColor={getRoleBadgeColor}
+                getRoleLabel={getRoleLabel}
+                obtenerGruposDeUsuario={obtenerGruposDeUsuario}
+                onEdit={handleAbrirEditar}
+                onDelete={handleAbrirEliminar}
+              />
             )}
           </TabsContent>
 
           <TabsContent value="grupos" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold">Gestión de Grupos</h2>
-                <p className="text-sm text-muted-foreground">Crea y gestiona grupos de trabajo</p>
-              </div>
-              <Dialog open={mostrarDialogGrupo} onOpenChange={setMostrarDialogGrupo}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Crear Grupo
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Crear Nuevo Grupo</DialogTitle>
-                    <DialogDescription>
-                      Crea un nuevo grupo de trabajo y asigna un gerente
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">Nombre del Grupo</label>
-                      <Input
-                        placeholder="Ej: Grupo Norte"
-                        value={nombreGrupo}
-                        onChange={(e) => setNombreGrupo(e.target.value)}
-                      />
+            <>
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <h2 className="text-xl font-bold">Gestión de Grupos</h2>
+                  <p className="text-sm text-muted-foreground">Crea y gestiona grupos de trabajo</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {!loadingGroups && (
+                    <div className="text-sm text-muted-foreground">
+                      {gruposLocales.length} {gruposLocales.length === 1 ? "grupo" : "grupos"}
                     </div>
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">Gerente</label>
-                      <Select value={managerIdGrupo} onValueChange={setManagerIdGrupo}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar gerente" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {users.filter(u => u.role === "manager" || !u.role).map(user => (
-                            <SelectItem key={user.id} value={user.id}>
-                              {user.displayName || user.email} {user.role === "manager" && "(Manager)"}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button
-                      onClick={async () => {
-                        if (!nombreGrupo.trim() || !managerIdGrupo) {
-                          toast({
-                            title: "Error",
-                            description: "Completa todos los campos",
-                            variant: "destructive",
-                          })
-                          return
-                        }
-                        setCreandoGrupo(true)
-                        const manager = users.find(u => u.id === managerIdGrupo)
-                        const grupoId = await crearGrupo(nombreGrupo, managerIdGrupo, manager?.email)
-                        if (grupoId) {
-                          setNombreGrupo("")
-                          setManagerIdGrupo("")
-                          setMostrarDialogGrupo(false)
-                          // Actualizar grupoIds del manager
-                          const managerData = users.find(u => u.id === managerIdGrupo)
-                          if (managerData) {
-                            const grupoIds = managerData.grupoIds || []
-                            if (!grupoIds.includes(grupoId)) {
-                              // Esto se hará automáticamente cuando se actualice el grupo
-                            }
-                          }
-                        }
-                        setCreandoGrupo(false)
-                      }}
-                      disabled={creandoGrupo || !nombreGrupo.trim() || !managerIdGrupo}
-                      className="w-full"
-                    >
-                      {creandoGrupo ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Creando...
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Crear Grupo
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-
-            {loadingGroups ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            ) : groups.length === 0 ? (
-              <Card className="text-center py-12">
-                <CardContent>
-                  <FolderTree className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <CardTitle className="text-xl">No hay grupos</CardTitle>
-                  <CardDescription className="mt-2">
-                    Crea tu primer grupo para organizar usuarios
-                  </CardDescription>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {gruposLocales.map((grupo) => {
-                  const manager = users.find(u => u.id === grupo.managerId)
-                  const usuariosGrupo = users.filter(u => grupo.userIds.includes(u.id))
-                  return (
-                    <Card key={grupo.id}>
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-lg font-semibold">{grupo.nombre}</CardTitle>
+                  )}
+                  <Dialog open={mostrarDialogGrupo} onOpenChange={setMostrarDialogGrupo}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Crear Grupo
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Crear Nuevo Grupo</DialogTitle>
+                        <DialogDescription>
+                          Crea un nuevo grupo de trabajo y asigna un gerente
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Nombre del Grupo</label>
+                          <Input
+                            placeholder="Ej: Grupo Norte"
+                            value={nombreGrupo}
+                            onChange={(e) => setNombreGrupo(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Gerente</label>
+                          <Select value={managerIdGrupo} onValueChange={setManagerIdGrupo}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar gerente" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {users.filter(u => u.role === "manager" || !u.role).map(user => (
+                                <SelectItem key={user.id} value={user.id}>
+                                  {user.displayName || user.email} {user.role === "manager" && "(Manager)"}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <Button
-                          variant="ghost"
-                          size="icon"
                           onClick={async () => {
-                            if (confirm(`¿Eliminar el grupo "${grupo.nombre}"?`)) {
-                              // Actualización optimista
-                              setGruposLocales((prev: Group[]) => prev.filter((g: Group) => g.id !== grupo.id))
-                              try {
-                                await eliminarGrupo(grupo.id)
-                                // Los grupos se sincronizarán automáticamente
-                              } catch (error) {
-                                // Revertir en caso de error
-                                await recargarGrupos()
+                            if (!nombreGrupo.trim() || !managerIdGrupo) {
+                              toast({
+                                title: "Error",
+                                description: "Completa todos los campos",
+                                variant: "destructive",
+                              })
+                              return
+                            }
+                            setCreandoGrupo(true)
+                            const manager = users.find(u => u.id === managerIdGrupo)
+                            const grupoId = await crearGrupo(nombreGrupo, managerIdGrupo, manager?.email)
+                            if (grupoId) {
+                              setNombreGrupo("")
+                              setManagerIdGrupo("")
+                              setMostrarDialogGrupo(false)
+                              // Actualizar grupoIds del manager
+                              const managerData = users.find(u => u.id === managerIdGrupo)
+                              if (managerData) {
+                                const grupoIds = managerData.grupoIds || []
+                                if (!grupoIds.includes(grupoId)) {
+                                  // Esto se hará automáticamente cuando se actualice el grupo
+                                }
                               }
                             }
+                            setCreandoGrupo(false)
                           }}
+                          disabled={creandoGrupo || !nombreGrupo.trim() || !managerIdGrupo}
+                          className="w-full"
                         >
-                          <Trash2 className="h-4 w-4 text-destructive" />
+                          {creandoGrupo ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Creando...
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="h-4 w-4 mr-2" />
+                              Crear Grupo
+                            </>
+                          )}
                         </Button>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <p className="text-sm">
-                          <strong>Gerente:</strong> {manager?.displayName || manager?.email || "No asignado"}
-                        </p>
-                        <p className="text-sm">
-                          <strong>Usuarios:</strong> {usuariosGrupo.length}
-                        </p>
-                        <div className="space-y-2">
-                          <label className="text-xs font-medium">Agregar usuarios al grupo:</label>
-                          {(() => {
-                            const usuariosDisponibles = users
-                              .filter(u => (u.role === "branch" || u.role === "factory" || !u.role))
-                              .filter(u => !grupo.userIds.includes(u.id))
-                              .filter(u => u.id !== grupo.managerId) // Excluir al manager del grupo
-                            
-                            const seleccionados = usuariosSeleccionados[grupo.id] || []
-                            
-                            if (usuariosDisponibles.length === 0) {
-                              return (
-                                <p className="text-xs text-muted-foreground">
-                                  No hay usuarios disponibles para agregar
-                                </p>
-                              )
-                            }
-                            
-                            return (
-                              <div className="space-y-2">
-                                <Select
-                                  onValueChange={(userId) => {
-                                    if (!seleccionados.includes(userId)) {
-                                      setUsuariosSeleccionados(prev => ({
-                                        ...prev,
-                                        [grupo.id]: [...seleccionados, userId]
-                                      }))
-                                    }
-                                  }}
-                                >
-                                  <SelectTrigger className="h-8 text-xs">
-                                    <SelectValue placeholder="Seleccionar usuarios..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {usuariosDisponibles
-                                      .filter(u => !seleccionados.includes(u.id))
-                                      .map(user => (
-                                        <SelectItem key={user.id} value={user.id}>
-                                          {user.displayName || user.email} {user.role && `(${getRoleLabel(user.role)})`}
-                                        </SelectItem>
-                                      ))}
-                                  </SelectContent>
-                                </Select>
-                                
-                                {seleccionados.length > 0 && (
-                                  <div className="space-y-2">
-                                    <div className="flex flex-wrap gap-1.5">
-                                      {seleccionados.map(userId => {
-                                        const user = users.find(u => u.id === userId)
-                                        if (!user) return null
-                                        return (
-                                          <Badge key={userId} variant="secondary" className="text-xs flex items-center gap-1">
-                                            {user.displayName || user.email}
-                                            <button
-                                              onClick={() => {
-                                                setUsuariosSeleccionados(prev => ({
-                                                  ...prev,
-                                                  [grupo.id]: seleccionados.filter(id => id !== userId)
-                                                }))
-                                              }}
-                                              className="ml-1 hover:bg-destructive/20 rounded-full p-0.5"
-                                            >
-                                              <X className="h-3 w-3" />
-                                            </button>
-                                          </Badge>
-                                        )
-                                      })}
-                                    </div>
-                                    <Button
-                                      size="sm"
-                                      className="w-full h-7 text-xs"
-                                      onClick={async () => {
-                                        if (seleccionados.length === 0) return
-                                        
-                                        setAgregandoUsuarios((prev: Record<string, boolean>) => ({ ...prev, [grupo.id]: true }))
-                                        
-                                        try {
-                                          // Actualización optimista: actualizar estado local primero
-                                          setGruposLocales((prev: Group[]) => prev.map((g: Group) => 
-                                            g.id === grupo.id 
-                                              ? { ...g, userIds: [...g.userIds, ...seleccionados] }
-                                              : g
-                                          ))
-                                          
-                                          // Agregar todos los usuarios seleccionados
-                                          await Promise.all(
-                                            seleccionados.map((userId: string) => agregarUsuarioAGrupo(grupo.id, userId))
-                                          )
-                                          
-                                          // Limpiar selección
-                                          setUsuariosSeleccionados((prev: Record<string, string[]>) => {
-                                            const newState = { ...prev }
-                                            delete newState[grupo.id]
-                                            return newState
-                                          })
-                                          
-                                          // Sincronizar con el servidor (sin recargar toda la página)
-                                          await recargarGrupos()
-                                        } catch (error) {
-                                          console.error("Error al agregar usuarios:", error)
-                                          // Revertir actualización optimista en caso de error
-                                          await recargarGrupos()
-                                          toast({
-                                            title: "Error",
-                                            description: "No se pudieron agregar todos los usuarios. Revirtiendo cambios...",
-                                            variant: "destructive",
-                                          })
-                                        } finally {
-                                          setAgregandoUsuarios((prev: Record<string, boolean>) => ({ ...prev, [grupo.id]: false }))
-                                        }
-                                      }}
-                                      disabled={agregandoUsuarios[grupo.id] || seleccionados.length === 0}
-                                    >
-                                      {agregandoUsuarios[grupo.id] ? (
-                                        <>
-                                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                          Agregando...
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Plus className="h-3 w-3 mr-1" />
-                                          Agregar {seleccionados.length} usuario{seleccionados.length > 1 ? 's' : ''}
-                                        </>
-                                      )}
-                                    </Button>
-                                  </div>
-                                )}
-                              </div>
-                            )
-                          })()}
-                        </div>
-                        {usuariosGrupo.length > 0 && (
-                          <div className="pt-2 border-t">
-                            <p className="text-xs font-medium mb-2">Usuarios del grupo:</p>
-                            <div className="space-y-1">
-                              {usuariosGrupo.map(user => (
-                                <div key={user.id} className="flex items-center justify-between text-xs">
-                                  <span>{user.displayName || user.email}</span>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 px-2"
-                                    onClick={async () => {
-                                      // Actualización optimista: actualizar estado local primero
-                                      setGruposLocales((prev: Group[]) => prev.map((g: Group) => 
-                                        g.id === grupo.id 
-                                          ? { ...g, userIds: g.userIds.filter((id: string) => id !== user.id) }
-                                          : g
-                                      ))
-                                      
-                                      try {
-                                        await removerUsuarioDeGrupo(grupo.id, user.id)
-                                        // Sincronizar con el servidor (sin recargar toda la página)
-                                        await recargarGrupos()
-                                      } catch (error) {
-                                        console.error("Error al remover usuario:", error)
-                                        // Revertir actualización optimista en caso de error
-                                        await recargarGrupos()
-                                        toast({
-                                          title: "Error",
-                                          description: "No se pudo remover el usuario. Revirtiendo cambios...",
-                                          variant: "destructive",
-                                        })
-                                      }
-                                    }}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  )
-                })}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </div>
-            )}
+
+              {renderGruposContent()}
+            </>
           </TabsContent>
 
           <TabsContent value="buscar" className="space-y-4">
@@ -887,6 +760,73 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Dialog de edición de usuario */}
+        <Dialog open={mostrarDialogEditar} onOpenChange={setMostrarDialogEditar}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Usuario</DialogTitle>
+              <DialogDescription>
+                Cambia el rol del usuario {usuarioEditando?.displayName || usuarioEditando?.email}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Rol:</label>
+                <Select value={nuevoRol} onValueChange={(value) => setNuevoRol(value as UserRole)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="branch">Sucursal</SelectItem>
+                    <SelectItem value="factory">Fábrica</SelectItem>
+                    <SelectItem value="manager">Gerente</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="invited">Invitado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setMostrarDialogEditar(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleGuardarEdicion}>
+                  Guardar Cambios
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de confirmación de eliminación */}
+        <AlertDialog open={mostrarDialogEliminar} onOpenChange={setMostrarDialogEliminar}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción no se puede deshacer. Se eliminará permanentemente el usuario{" "}
+                <strong>{usuarioEliminando?.displayName || usuarioEliminando?.email}</strong> del sistema.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={eliminando}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmarEliminar}
+                disabled={eliminando}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {eliminando ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Eliminando...
+                  </>
+                ) : (
+                  "Eliminar"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   )
