@@ -37,7 +37,7 @@ const getContrastColor = (hexColor: string): string => {
 }
 
 export default function ConfiguracionPage() {
-  const { user, shifts } = useData()
+  const { user, userData, shifts } = useData()
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -611,7 +611,9 @@ export default function ConfiguracionPage() {
           </CardContent>
         </Card>
 
-        <InvitationsCard user={user} />
+        {userData?.role === "admin" || userData?.role === "manager" ? (
+          <InvitationsCard user={user} />
+        ) : null}
 
         <div className="flex justify-end">
           <Button onClick={handleSave} disabled={saving} size="lg">

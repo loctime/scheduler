@@ -503,10 +503,10 @@ export function useGroupMessaging(user: any, conversacionIdExterno?: string | nu
         
         const mensajesData = snapshot.docs.map((doc) => {
           const data = doc.data()
-          const mensaje = {
+          const mensaje: MensajeGrupo = {
             id: doc.id,
-            ...data,
-            timestamp: data.createdAt?.toDate() || new Date(),
+            ...(data as any),
+            timestamp: data.createdAt?.toDate?.() || data.createdAt || new Date(),
           }
           console.log(`[MENSAJES] Mensaje cargado:`, {
             id: mensaje.id,
