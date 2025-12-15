@@ -48,6 +48,18 @@
           "sizes": "32x32"
         }
       ]
+    },
+    {
+      "name": "Mensajería",
+      "short_name": "Mensajes",
+      "description": "Abrir la mensajería",
+      "url": "/mensajeria",
+      "icons": [
+        {
+          "src": "/icon-light-32x32.png",
+          "sizes": "32x32"
+        }
+      ]
     }
   ]
 }

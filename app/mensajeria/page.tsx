@@ -8,13 +8,16 @@ import { DataProvider } from "@/contexts/data-context"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { ConversationsList } from "@/components/group-chat/conversations-list"
 import { GroupChatInterface } from "@/components/group-chat/group-chat-interface"
-import { Loader2 } from "lucide-react"
+import { Loader2, ArrowLeft } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 export default function MensajeriaPage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [conversacionActiva, setConversacionActiva] = useState<string | null>(null)
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     if (!isFirebaseConfigured() || !auth) {
@@ -44,23 +47,54 @@ export default function MensajeriaPage() {
 
   if (!user) return null
 
+  // En móvil: mostrar solo lista o solo chat, no ambos
+  const mostrarLista = isMobile ? !conversacionActiva : true
+  const mostrarChat = isMobile ? !!conversacionActiva : true
+
   return (
     <DataProvider user={user}>
       <DashboardLayout user={user}>
-        <div className="flex h-[calc(100vh-8rem)] border rounded-lg overflow-hidden">
-          <div className="w-80 border-r bg-card">
+        <div className="flex h-[calc(100vh-8rem)] border rounded-lg overflow-hidden relative">
+          {/* Lista de conversaciones */}
+          <div className={`${
+            isMobile 
+              ? mostrarLista ? "absolute inset-0 z-10" : "hidden"
+              : "w-80 border-r"
+          } bg-card transition-transform`}>
             <ConversationsList
               user={user}
               onSelectConversation={setConversacionActiva}
               conversacionActiva={conversacionActiva}
             />
           </div>
-          <div className="flex-1 bg-background">
+          
+          {/* Área de chat */}
+          <div className={`flex-1 bg-background ${
+            isMobile && !mostrarChat ? "hidden" : ""
+          }`}>
             {conversacionActiva ? (
-              <GroupChatInterface
-                user={user}
-                conversacionId={conversacionActiva}
-              />
+              <div className="flex flex-col h-full">
+                {/* Botón volver en móvil */}
+                {isMobile && (
+                  <div className="border-b bg-card px-4 py-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setConversacionActiva(null)}
+                      className="gap-2"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                      Volver a conversaciones
+                    </Button>
+                  </div>
+                )}
+                <div className="flex-1 overflow-hidden">
+                  <GroupChatInterface
+                    user={user}
+                    conversacionId={conversacionActiva}
+                  />
+                </div>
+              </div>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 <div className="text-center">

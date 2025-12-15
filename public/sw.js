@@ -5,6 +5,7 @@ const CACHE_NAME = `stock-chat-pwa-${APP_VERSION}`
 const urlsToCache = [
   '/',
   '/chat',
+  '/mensajeria',
   '/manifest.json',
   '/icon-light-32x32.png',
   '/icon-dark-32x32.png',
