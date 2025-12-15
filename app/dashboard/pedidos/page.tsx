@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { 
   Plus, Trash2, Copy, MessageCircle, RotateCcw, Upload, Package, 
-  Construction, Pencil, Check, X, Cog, ExternalLink, Link as LinkIcon,
+  Pencil, Check, X, Cog, ExternalLink, Link as LinkIcon,
   FileText, Download, Bell, Loader2, CheckCircle, AlertTriangle
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
@@ -1022,16 +1022,6 @@ export default function PedidosPage() {
   return (
     <DashboardLayout user={user}>
       <div className="px-1 sm:px-0">
-        {/* Banner de desarrollo - compacto en móvil */}
-        <div className="mb-3 sm:mb-4 lg:mb-6 rounded-lg border-2 border-dashed border-amber-500/50 bg-amber-500/10 p-2 sm:p-3">
-          <div className="flex items-center gap-2">
-            <Construction className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400 shrink-0" />
-            <p className="text-xs sm:text-sm font-medium text-amber-700 dark:text-amber-300">
-              🚧 En desarrollo
-            </p>
-          </div>
-        </div>
-
         <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 lg:gap-6">
           {/* Sidebar / Selector de pedidos */}
           <PedidosSidebar

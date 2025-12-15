@@ -24,6 +24,11 @@ export function useGroups(user: any) {
         id: doc.id,
         ...doc.data(),
       })) as Group[]
+      console.log("[GROUPS][load] encontrados", groupsData.map(g => ({
+        id: g.id,
+        managerId: g.managerId,
+        userIds: g.userIds,
+      })))
       
       // Ordenar por nombre
       groupsData.sort((a, b) => a.nombre.localeCompare(b.nombre))

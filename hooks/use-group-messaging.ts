@@ -50,8 +50,16 @@ export function useGroupMessaging(user: any, conversacionIdExterno?: string | nu
     const firestoreDb = db
 
     try {
+      console.log("[CONV][crear] datos usuario", {
+        uid: user?.uid,
+        email: user?.email,
+        grupoIds: userData?.grupoIds,
+        grupoDestinoId,
+        tipo,
+      })
       // Obtener el grupo del usuario actual
       const miGrupoId = userData.grupoIds?.[0] || user.uid
+      console.log("[CONV][crear] miGrupoId resuelto", { miGrupoId })
       
       // Buscar conversación existente
       const conversacionesQuery = query(
@@ -86,15 +94,21 @@ export function useGroupMessaging(user: any, conversacionIdExterno?: string | nu
         // El otro participante se puede obtener después
       }
 
-      const nuevaConversacion = await addDoc(collection(firestoreDb, COLLECTIONS.CONVERSACIONES), {
-        tipo,
-        participantes: [miGrupoId, grupoDestinoId],
-        nombresParticipantes,
-        noLeidos: {},
-        activa: true,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      })
+      // Para evitar depender de grupoIds en reglas, incluimos también el uid del creador
+      const participantes = Array.from(new Set([miGrupoId, grupoDestinoId, user.uid]))
+
+      const nuevaConversacion = await addDoc(
+        collection(firestoreDb, COLLECTIONS.CONVERSACIONES),
+        {
+          tipo,
+          participantes,
+          nombresParticipantes,
+          noLeidos: {},
+          activa: true,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }
+      )
 
       return nuevaConversacion.id
     } catch (error: any) {
@@ -118,6 +132,12 @@ export function useGroupMessaging(user: any, conversacionIdExterno?: string | nu
     const firestoreDb = db
 
     try {
+      console.log("[CONV][crear directa] datos", {
+        uid: user?.uid,
+        email: user?.email,
+        grupoIds: userData?.grupoIds,
+        usuarioDestinoId,
+      })
       // Buscar conversación existente (puede estar con userId o grupoId)
       const conversacionesQuery = query(
         collection(firestoreDb, COLLECTIONS.CONVERSACIONES),
@@ -181,7 +201,10 @@ export function useGroupMessaging(user: any, conversacionIdExterno?: string | nu
     conversacionId: string,
     contenido: string
   ): Promise<boolean> => {
-    if (!db || !user || !contenido.trim()) return false
+    if (!db || !user || !contenido.trim()) {
+      console.error("[ENVIAR] No se puede enviar mensaje:", { tieneDb: !!db, tieneUser: !!user, tieneContenido: !!contenido.trim() })
+      return false
+    }
 
     // Guardar db en constante local para que TypeScript entienda que no es undefined
     const firestoreDb = db
@@ -200,7 +223,15 @@ export function useGroupMessaging(user: any, conversacionIdExterno?: string | nu
         updatedAt: serverTimestamp(),
       }
 
-      await addDoc(collection(firestoreDb, COLLECTIONS.MENSAJES), nuevoMensaje)
+      console.log("[ENVIAR] Enviando mensaje:", {
+        conversacionId,
+        remitenteId: nuevoMensaje.remitenteId,
+        remitenteNombre: nuevoMensaje.remitenteNombre,
+        contenido: nuevoMensaje.contenido.substring(0, 50),
+      })
+
+      const docRef = await addDoc(collection(firestoreDb, COLLECTIONS.MENSAJES), nuevoMensaje)
+      console.log("[ENVIAR] ✅ Mensaje enviado con ID:", docRef.id)
 
       // Actualizar conversación con último mensaje
       const conversacionRef = doc(firestoreDb, COLLECTIONS.CONVERSACIONES, conversacionId)
@@ -311,13 +342,20 @@ export function useGroupMessaging(user: any, conversacionIdExterno?: string | nu
     const firestoreDb = db
 
     const miGrupoId = userData.grupoIds?.[0] || user.uid
+    console.log("[CONV][carga listas] usuario", {
+      uid: user?.uid,
+      email: user?.email,
+      grupoIds: userData?.grupoIds,
+      miGrupoId,
+    })
     
     // Cargar conversaciones de grupo (donde participa el grupo)
-    const conversacionesGrupoQuery = query(
-      collection(firestoreDb, COLLECTIONS.CONVERSACIONES),
-      where("participantes", "array-contains", miGrupoId),
-      where("activa", "==", true)
-    )
+      const conversacionesGrupoQuery = query(
+        collection(firestoreDb, COLLECTIONS.CONVERSACIONES),
+        // Buscar por grupoId o por uid para no depender de grupoIds en reglas
+        where("participantes", "array-contains-any", [miGrupoId, user.uid]),
+        where("activa", "==", true)
+      )
 
     // Cargar conversaciones directas (donde participa el usuario)
     const conversacionesDirectasQuery = query(
@@ -337,6 +375,11 @@ export function useGroupMessaging(user: any, conversacionIdExterno?: string | nu
           id: doc.id,
           ...doc.data(),
         })) as ConversacionGrupo[]
+        console.log("[CONV][snapshot grupo]", {
+          total: conversacionesGrupo.length,
+          ids: conversacionesGrupo.map(c => c.id),
+          participantes: conversacionesGrupo.map(c => ({ id: c.id, participantes: c.participantes })),
+        })
 
         // Combinar y actualizar
         const todas = [...conversacionesGrupo, ...conversacionesDirectas]
@@ -356,6 +399,13 @@ export function useGroupMessaging(user: any, conversacionIdExterno?: string | nu
       },
       (error) => {
         console.error("Error al cargar conversaciones de grupo:", error)
+        if ((error as any)?.code === "permission-denied") {
+          console.error("[CONV][grupo] permission-denied", {
+            uid: user?.uid,
+            miGrupoId,
+            grupoIds: userData?.grupoIds,
+          })
+        }
         setLoading(false)
       }
     )
@@ -367,6 +417,11 @@ export function useGroupMessaging(user: any, conversacionIdExterno?: string | nu
           id: doc.id,
           ...doc.data(),
         })) as ConversacionGrupo[]
+        console.log("[CONV][snapshot directas]", {
+          total: conversacionesDirectas.length,
+          ids: conversacionesDirectas.map(c => c.id),
+          participantes: conversacionesDirectas.map(c => ({ id: c.id, participantes: c.participantes })),
+        })
 
         // Combinar y actualizar
         const todas = [...conversacionesGrupo, ...conversacionesDirectas]
@@ -386,6 +441,13 @@ export function useGroupMessaging(user: any, conversacionIdExterno?: string | nu
       },
       (error) => {
         console.error("Error al cargar conversaciones directas:", error)
+        if ((error as any)?.code === "permission-denied") {
+          console.error("[CONV][directas] permission-denied", {
+            uid: user?.uid,
+            miGrupoId,
+            grupoIds: userData?.grupoIds,
+          })
+        }
         setLoading(false)
       }
     )
@@ -400,7 +462,18 @@ export function useGroupMessaging(user: any, conversacionIdExterno?: string | nu
   useEffect(() => {
     const conversacionIdParaCargar = conversacionIdExterno ?? conversacionActiva
     
+    console.log(`[MENSAJES] Iniciando carga de mensajes:`, {
+      conversacionIdParaCargar,
+      conversacionIdExterno,
+      conversacionActiva,
+      tieneDb: !!db,
+      tieneUser: !!user,
+      userId: user?.uid,
+      grupoIds: userData?.grupoIds,
+    })
+    
     if (!db || !conversacionIdParaCargar) {
+      console.log(`[MENSAJES] No se puede cargar: db=${!!db}, conversacionId=${!!conversacionIdParaCargar}`)
       setMensajes({})
       return
     }
@@ -416,18 +489,38 @@ export function useGroupMessaging(user: any, conversacionIdExterno?: string | nu
       orderBy("createdAt", "asc"),
       limit(100)
     )
+    
+    console.log(`[MENSAJES] Query creada para conversación: ${conversacionIdParaCargar}`)
 
     const unsubscribe = onSnapshot(
       mensajesQuery,
       (snapshot) => {
+        console.log(`[MENSAJES] Snapshot recibido para conversación ${conversacionIdParaCargar}:`, {
+          totalDocs: snapshot.docs.length,
+          hasPendingWrites: snapshot.metadata.hasPendingWrites,
+          fromCache: snapshot.metadata.fromCache,
+        })
+        
         const mensajesData = snapshot.docs.map((doc) => {
           const data = doc.data()
-          return {
+          const mensaje = {
             id: doc.id,
             ...data,
             timestamp: data.createdAt?.toDate() || new Date(),
           }
+          console.log(`[MENSAJES] Mensaje cargado:`, {
+            id: mensaje.id,
+            remitenteId: mensaje.remitenteId,
+            remitenteNombre: mensaje.remitenteNombre,
+            contenido: mensaje.contenido?.substring(0, 50),
+            esMio: mensaje.remitenteId === user?.uid,
+          })
+          return mensaje
         }) as MensajeGrupo[]
+
+        console.log(`[MENSAJES] Total mensajes procesados: ${mensajesData.length}`)
+        console.log(`[MENSAJES] Mensajes propios: ${mensajesData.filter(m => m.remitenteId === user?.uid).length}`)
+        console.log(`[MENSAJES] Mensajes de otros: ${mensajesData.filter(m => m.remitenteId !== user?.uid).length}`)
 
         setMensajes(prev => ({
           ...prev,
@@ -444,7 +537,17 @@ export function useGroupMessaging(user: any, conversacionIdExterno?: string | nu
         }
       },
       (error) => {
-        console.error("Error al cargar mensajes:", error)
+        console.error("[MENSAJES] Error al cargar mensajes:", error)
+        logger.error("Error al cargar mensajes:", error)
+        // Mostrar error más detallado para debugging
+        if (error.code === 'permission-denied') {
+          console.error("[MENSAJES] ❌ Permisos denegados para leer mensajes de la conversación:", conversacionIdParaCargar)
+          console.error("[MENSAJES] Usuario:", user?.uid)
+          console.error("[MENSAJES] GrupoIds del usuario:", userData?.grupoIds)
+          console.error("[MENSAJES] Email del usuario:", user?.email)
+        } else {
+          console.error("[MENSAJES] Error desconocido:", error.code, error.message)
+        }
       }
     )
 
