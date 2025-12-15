@@ -1650,7 +1650,6 @@ ${pedidos.map(p => `- ${p.nombre}`).join("\n")}`
       }
       
       // Confirmar cambios acumulados en modo batch stock
-      const textoLower = texto.toLowerCase().trim()
       if ((textoLower === "confirmar" || textoLower === "confirmo" || textoLower === "sí" || textoLower === "si" || textoLower === "ok") && modoBatchStock && cambiosStockAcumulados.length > 0) {
         addMessage({ tipo: "usuario", contenido: texto })
         
@@ -1761,7 +1760,6 @@ ${pedidos.map(p => `- ${p.nombre}`).join("\n")}`
       }
 
       // Si el usuario escribe "confirmar" y hay productos acumulados
-      const textoLower = texto.toLowerCase().trim()
       if ((textoLower === "confirmar" || textoLower === "confirmo" || textoLower === "sí" || textoLower === "si" || textoLower === "ok") && productosAcumulados.length > 0) {
         addMessage({ tipo: "usuario", contenido: texto })
         

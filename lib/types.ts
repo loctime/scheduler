@@ -356,3 +356,32 @@ export interface Recepcion {
   userId: string
   createdAt?: any
 }
+
+export interface MensajeGrupo {
+  id: string
+  conversacionId: string
+  remitenteId: string
+  remitenteNombre?: string
+  remitenteEmail?: string
+  remitenteRole?: string
+  contenido: string
+  leido: boolean
+  leidoPor?: string[] // IDs de usuarios que leyeron el mensaje
+  timestamp?: Date
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface ConversacionGrupo {
+  id: string
+  tipo: "grupo" | "directo" | "rol" // grupo = entre grupos, directo = entre usuarios, rol = por rol (factory, branch)
+  participantes: string[] // IDs de grupos o usuarios según el tipo
+  nombresParticipantes?: string[] // Nombres para mostrar
+  ultimoMensaje?: string
+  ultimoMensajeAt?: any
+  ultimoMensajePor?: string
+  noLeidos?: Record<string, number> // { userId: cantidad }
+  createdAt?: any
+  updatedAt?: any
+  activa: boolean
+}
