@@ -19,7 +19,7 @@ export default function HomePage() {
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        router.push("/dashboard")
+        router.push("/chat")
       } else {
         setLoading(false)
       }

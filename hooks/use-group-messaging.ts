@@ -39,13 +39,16 @@ export function useGroupMessaging(user: any) {
   ): Promise<string | null> => {
     if (!db || !user || !userData) return null
 
+    // Guardar db en constante local para que TypeScript entienda que no es undefined
+    const firestoreDb = db
+
     try {
       // Obtener el grupo del usuario actual
       const miGrupoId = userData.grupoIds?.[0] || user.uid
       
       // Buscar conversación existente
       const conversacionesQuery = query(
-        collection(db, COLLECTIONS.CONVERSACIONES),
+        collection(firestoreDb, COLLECTIONS.CONVERSACIONES),
         where("participantes", "array-contains", miGrupoId),
         where("tipo", "==", tipo),
         where("activa", "==", true)
@@ -76,7 +79,7 @@ export function useGroupMessaging(user: any) {
         // El otro participante se puede obtener después
       }
 
-      const nuevaConversacion = await addDoc(collection(db, COLLECTIONS.CONVERSACIONES), {
+      const nuevaConversacion = await addDoc(collection(firestoreDb, COLLECTIONS.CONVERSACIONES), {
         tipo,
         participantes: [miGrupoId, grupoDestinoId],
         nombresParticipantes,
@@ -105,6 +108,9 @@ export function useGroupMessaging(user: any) {
   ): Promise<boolean> => {
     if (!db || !user || !contenido.trim()) return false
 
+    // Guardar db en constante local para que TypeScript entienda que no es undefined
+    const firestoreDb = db
+
     try {
       const nuevoMensaje = {
         conversacionId,
@@ -119,10 +125,10 @@ export function useGroupMessaging(user: any) {
         updatedAt: serverTimestamp(),
       }
 
-      await addDoc(collection(db, COLLECTIONS.MENSAJES), nuevoMensaje)
+      await addDoc(collection(firestoreDb, COLLECTIONS.MENSAJES), nuevoMensaje)
 
       // Actualizar conversación con último mensaje
-      const conversacionRef = doc(db, COLLECTIONS.CONVERSACIONES, conversacionId)
+      const conversacionRef = doc(firestoreDb, COLLECTIONS.CONVERSACIONES, conversacionId)
       const conversacionDoc = await getDoc(conversacionRef)
       
       if (conversacionDoc.exists()) {
@@ -161,6 +167,9 @@ export function useGroupMessaging(user: any) {
   const marcarComoLeidos = useCallback(async (conversacionId: string, mensajesActuales: MensajeGrupo[]) => {
     if (!db || !user || !userData) return
 
+    // Guardar db en constante local para que TypeScript entienda que no es undefined
+    const firestoreDb = db
+
     try {
       const mensajesNoLeidos = mensajesActuales.filter(
         m => !m.leidoPor?.includes(user.uid) && m.remitenteId !== user.uid
@@ -169,7 +178,7 @@ export function useGroupMessaging(user: any) {
       if (mensajesNoLeidos.length === 0) return
 
       const batch = mensajesNoLeidos.map(mensaje => {
-        const mensajeRef = doc(db, COLLECTIONS.MENSAJES, mensaje.id)
+        const mensajeRef = doc(firestoreDb, COLLECTIONS.MENSAJES, mensaje.id)
         return updateDoc(mensajeRef, {
           leidoPor: [...(mensaje.leidoPor || []), user.uid],
         })
@@ -178,7 +187,7 @@ export function useGroupMessaging(user: any) {
       await Promise.all(batch)
 
       // Actualizar contador de no leídos en la conversación
-      const conversacionRef = doc(db, COLLECTIONS.CONVERSACIONES, conversacionId)
+      const conversacionRef = doc(firestoreDb, COLLECTIONS.CONVERSACIONES, conversacionId)
       const conversacionDoc = await getDoc(conversacionRef)
       
       if (conversacionDoc.exists()) {
@@ -205,6 +214,9 @@ export function useGroupMessaging(user: any) {
       return
     }
 
+    // Guardar db en constante local para que TypeScript entienda que no es undefined
+    const firestoreDb = db
+
     const miGrupoId = userData.grupoIds?.[0] || user.uid
     
     // Crear queries para cada participante posible (grupoId y userId)
@@ -213,7 +225,7 @@ export function useGroupMessaging(user: any) {
     // Firestore no permite OR queries fácilmente, así que haremos múltiples queries
     const conversacionesQueries = participantes.map(participanteId => 
       query(
-        collection(db, COLLECTIONS.CONVERSACIONES),
+        collection(firestoreDb, COLLECTIONS.CONVERSACIONES),
         where("participantes", "array-contains", participanteId),
         where("activa", "==", true)
       )
@@ -221,7 +233,7 @@ export function useGroupMessaging(user: any) {
     
     // Usar solo la primera query por ahora (la del grupo principal)
     const conversacionesQuery = query(
-      collection(db, COLLECTIONS.CONVERSACIONES),
+      collection(firestoreDb, COLLECTIONS.CONVERSACIONES),
       where("participantes", "array-contains", miGrupoId),
       where("activa", "==", true)
     )
@@ -253,10 +265,13 @@ export function useGroupMessaging(user: any) {
       return
     }
 
+    // Guardar db en constante local para que TypeScript entienda que no es undefined
+    const firestoreDb = db
+
     let hasMarkedAsRead = false
 
     const mensajesQuery = query(
-      collection(db, COLLECTIONS.MENSAJES),
+      collection(firestoreDb, COLLECTIONS.MENSAJES),
       where("conversacionId", "==", conversacionActiva),
       orderBy("createdAt", "asc"),
       limit(100)
