@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       const msgNormalizado = mensaje.replace(/\n+/g, " ").replace(/\s+/g, " ").trim()
       const msgLower = msgNormalizado.toLowerCase()
       
-      // Preparar datos - Filtrar productos que tengan pedidoId válido
+      // Preparar datos - Filtrar productos que tengan pedidoId válido (optimizado)
       const pedidosIds = new Set(pedidos.map((p: any) => p.id))
       const productosCompletos = (productos as Array<{
         id: string
@@ -45,19 +45,23 @@ export async function POST(request: NextRequest) {
         return pedidosIds.has(p.pedidoId)
       })
       
-      // ==================== FUNCIÓN AUXILIAR: Buscar producto inteligente ====================
+      // Crear Map para búsquedas rápidas O(1) por nombre exacto
+      const productosMap = new Map<string, typeof productosCompletos[0]>()
+      productosCompletos.forEach(p => {
+        productosMap.set(p.nombre.toLowerCase(), p)
+      })
+      
+      // ==================== FUNCIÓN AUXILIAR: Buscar producto inteligente (optimizada) ====================
       const buscarProducto = (texto: string): { producto: any, confianza: number, sugerencias?: string[] } | null => {
         const palabras = texto.split(/\s+/).filter((p: string) => p.length > 1)
         if (palabras.length === 0) return null
         
         const textoBusqueda = palabras.join(" ").toLowerCase()
         
-        // 1. Búsqueda exacta
-        let productoEncontrado = productosCompletos.find(p => 
-          p.nombre.toLowerCase() === textoBusqueda
-        )
-        if (productoEncontrado) {
-          return { producto: productoEncontrado, confianza: 1.0 }
+        // 1. Búsqueda exacta O(1) usando Map
+        const productoExacto = productosMap.get(textoBusqueda)
+        if (productoExacto) {
+          return { producto: productoExacto, confianza: 1.0 }
         }
         
         // 2. Búsqueda que contiene todas las palabras
@@ -870,7 +874,9 @@ export async function POST(request: NextRequest) {
       ) || null
       
       if (productoEncontrado) {
-        console.log(`[STOCK-CHAT] Coincidencia exacta encontrada: ${productoEncontrado.nombre}`)
+        if (process.env.NODE_ENV === "development") {
+          console.log(`[STOCK-CHAT] Coincidencia exacta encontrada: ${productoEncontrado.nombre}`)
+        }
       } else {
         // Segundo: buscar si el nombre del producto contiene todas las palabras del mensaje
         const productosQueContienen = productosConStock.filter(producto => {
@@ -884,12 +890,16 @@ export async function POST(request: NextRequest) {
         
         if (productosQueContienen.length === 1) {
           productoEncontrado = productosQueContienen[0]
-          console.log(`[STOCK-CHAT] Coincidencia única encontrada: ${productoEncontrado.nombre}`)
+          if (process.env.NODE_ENV === "development") {
+            console.log(`[STOCK-CHAT] Coincidencia única encontrada: ${productoEncontrado.nombre}`)
+          }
         } else if (productosQueContienen.length > 1) {
           productoEncontrado = productosQueContienen.reduce((prev, curr) => 
             curr.nombre.length < prev.nombre.length ? curr : prev
           )
-          console.log(`[STOCK-CHAT] Múltiples coincidencias, eligiendo la más corta: ${productoEncontrado.nombre}`)
+          if (process.env.NODE_ENV === "development") {
+            console.log(`[STOCK-CHAT] Múltiples coincidencias, eligiendo la más corta: ${productoEncontrado.nombre}`)
+          }
         } else {
           // Tercero: buscar si alguna palabra del mensaje está al inicio del nombre del producto
           const productosQueEmpiezan = productosConStock.filter(producto => {
@@ -902,7 +912,9 @@ export async function POST(request: NextRequest) {
           
           if (productosQueEmpiezan.length === 1) {
             productoEncontrado = productosQueEmpiezan[0]
-            console.log(`[STOCK-CHAT] Coincidencia por inicio encontrada: ${productoEncontrado.nombre}`)
+            if (process.env.NODE_ENV === "development") {
+              console.log(`[STOCK-CHAT] Coincidencia por inicio encontrada: ${productoEncontrado.nombre}`)
+            }
           } else if (productosQueEmpiezan.length > 1) {
             productoEncontrado = productosQueEmpiezan.reduce((prev, curr) => 
               curr.nombre.length < prev.nombre.length ? curr : prev
@@ -973,8 +985,10 @@ export async function POST(request: NextRequest) {
     const msgNormalizado = mensaje.replace(/\n+/g, " ").replace(/\s+/g, " ").trim()
     const msgLower = msgNormalizado.toLowerCase()
     
-    console.log(`[STOCK-CHAT] Mensaje: "${msgNormalizado}"`)
-    console.log(`[STOCK-CHAT] Modo: ${modoActual}`)
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[STOCK-CHAT] Mensaje: "${msgNormalizado}"`)
+      console.log(`[STOCK-CHAT] Modo: ${modoActual}`)
+    }
     
     // Filtrar productos según pedido seleccionado (si aplica)
     let productosFiltrados = productos
@@ -1238,9 +1252,11 @@ export async function POST(request: NextRequest) {
     const accion = modoActual === "ingreso" ? "entrada" : "salida"
     const verbo = modoActual === "ingreso" ? "agregar" : "quitar"
     
-    console.log(`[STOCK-CHAT] Producto encontrado: ${productoEncontrado.nombre} (${productoEncontrado.id})`)
-    console.log(`[STOCK-CHAT] Cantidad: ${cantidad}`)
-    console.log(`[STOCK-CHAT] Acción: ${accion}`)
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[STOCK-CHAT] Producto encontrado: ${productoEncontrado.nombre} (${productoEncontrado.id})`)
+      console.log(`[STOCK-CHAT] Cantidad: ${cantidad}`)
+      console.log(`[STOCK-CHAT] Acción: ${accion}`)
+    }
     
     // Retornar información del producto para acumular
     return NextResponse.json({

@@ -1006,16 +1006,33 @@ Responde de forma concisa, útil y amigable. Si es una pregunta sobre el inventa
 
     // null = modo pregunta (por defecto)
     const modoActual = modo || "pregunta"
-    console.log(`[CHAT] Enviando mensaje: "${texto}", modo actual:`, modoActual)
+
+    // Agregar mensaje del usuario inmediatamente para mejor UX
+    addMessage({ tipo: "usuario", contenido: texto })
+    setIsProcessing(true)
 
     // Filtrar productos según pedido seleccionado (solo en modos ingreso/egreso/stock)
+    // Optimizado: solo filtrar si es necesario
     const productosFiltrados = (modoActual === "ingreso" || modoActual === "egreso" || modoActual === "stock") && pedidoSeleccionado
       ? productos.filter(p => p.pedidoId === pedidoSeleccionado)
       : productos
 
-    // Agregar mensaje del usuario
-    addMessage({ tipo: "usuario", contenido: texto })
-    setIsProcessing(true)
+    // Preparar datos de forma eficiente (solo los campos necesarios)
+    // Usar slice para evitar mutaciones y optimizar memoria
+    const productosPreparados = productosFiltrados.map(p => ({
+      id: p.id,
+      nombre: p.nombre,
+      unidad: p.unidad,
+      stockMinimo: p.stockMinimo,
+      pedidoId: p.pedidoId,
+    }))
+
+    const pedidosPreparados = pedidos.map(p => ({ 
+      id: p.id, 
+      nombre: p.nombre,
+      formatoSalida: p.formatoSalida,
+      mensajePrevio: p.mensajePrevio,
+    }))
 
     // Crear nuevo AbortController para esta petición
     abortControllerRef.current = new AbortController()
@@ -1026,14 +1043,14 @@ Responde de forma concisa, útil y amigable. Si es una pregunta sobre el inventa
         try {
           // Construir contexto para Ollama (solo si hay datos relevantes)
           let contexto = ""
-          if (productosFiltrados.length > 0 || pedidos.length > 0) {
+          if (productosPreparados.length > 0 || pedidos.length > 0) {
             contexto = `Información del sistema de inventario:
-- Productos disponibles: ${productosFiltrados.length}
+- Productos disponibles: ${productosPreparados.length}
 - Pedidos/Proveedores: ${pedidos.length}
 - Productos con stock registrado: ${Object.keys(stockActual).length}
 
 Lista de productos (primeros 20):
-${productosFiltrados.slice(0, 20).map(p => {
+${productosPreparados.slice(0, 20).map(p => {
   const stock = stockActual[p.id] ?? 0
   return `- ${p.nombre} (${stock} ${p.unidad || "unidades"})`
 }).join("\n")}
@@ -1064,22 +1081,11 @@ ${pedidos.map(p => `- ${p.nombre}`).join("\n")}`
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mensaje: texto,
-          modo: modoActual, // Incluir el modo activo (null se convierte en "pregunta")
+          modo: modoActual,
           pedidoSeleccionado: (modoActual === "ingreso" || modoActual === "egreso" || modoActual === "stock") ? pedidoSeleccionado : null,
-          productos: productosFiltrados.map(p => ({
-            id: p.id,
-            nombre: p.nombre,
-            unidad: p.unidad,
-            stockMinimo: p.stockMinimo,
-            pedidoId: p.pedidoId,
-          })),
+          productos: productosPreparados,
           stockActual,
-          pedidos: pedidos.map(p => ({ 
-            id: p.id, 
-            nombre: p.nombre,
-            formatoSalida: p.formatoSalida,
-            mensajePrevio: p.mensajePrevio,
-          })),
+          pedidos: pedidosPreparados,
           nombreEmpresa,
         }),
         signal: abortControllerRef.current.signal,
@@ -1093,10 +1099,11 @@ ${pedidos.map(p => `- ${p.nombre}`).join("\n")}`
       const data = await response.json()
       const accion: StockAccionParsed = data.accion
 
-      console.log(`[CHAT] Acción recibida:`, accion)
-      console.log(`[CHAT] Mensaje original: "${texto}"`)
-      console.log(`[CHAT] Tiene comando sugerido:`, !!accion.comandoSugerido)
-      console.log(`[CHAT] Tiene producto acumulado:`, !!(accion as any).productoAcumulado)
+      // Logs solo en desarrollo
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[CHAT] Acción recibida:`, accion)
+        console.log(`[CHAT] Mensaje original: "${texto}"`)
+      }
 
       // Manejar cambio de modo
       if (accion.accion === "cambiar_modo") {
