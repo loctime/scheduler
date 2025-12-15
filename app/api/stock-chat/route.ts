@@ -45,6 +45,407 @@ export async function POST(request: NextRequest) {
         return pedidosIds.has(p.pedidoId)
       })
       
+      // ==================== FUNCIÓN AUXILIAR: Buscar producto inteligente ====================
+      const buscarProducto = (texto: string): { producto: any, confianza: number, sugerencias?: string[] } | null => {
+        const palabras = texto.split(/\s+/).filter((p: string) => p.length > 1)
+        if (palabras.length === 0) return null
+        
+        const textoBusqueda = palabras.join(" ").toLowerCase()
+        
+        // 1. Búsqueda exacta
+        let productoEncontrado = productosCompletos.find(p => 
+          p.nombre.toLowerCase() === textoBusqueda
+        )
+        if (productoEncontrado) {
+          return { producto: productoEncontrado, confianza: 1.0 }
+        }
+        
+        // 2. Búsqueda que contiene todas las palabras
+        const productosQueContienen = productosCompletos.filter(p => {
+          const nombreLower = p.nombre.toLowerCase()
+          return palabras.every((pal: string) => 
+            nombreLower.includes(pal.toLowerCase())
+          )
+        })
+        
+        if (productosQueContienen.length === 1) {
+          return { producto: productosQueContienen[0], confianza: 0.9 }
+        } else if (productosQueContienen.length > 1) {
+          // Múltiples coincidencias - elegir la más corta (más específica)
+          const mejor = productosQueContienen.reduce((prev, curr) => 
+            curr.nombre.length < prev.nombre.length ? curr : prev
+          )
+          const sugerencias = productosQueContienen
+            .filter(p => p.id !== mejor.id)
+            .map(p => p.nombre)
+            .slice(0, 3)
+          return { producto: mejor, confianza: 0.8, sugerencias }
+        }
+        
+        // 3. Búsqueda parcial (al menos una palabra)
+        const productosParciales = productosCompletos.filter(p => {
+          const nombreLower = p.nombre.toLowerCase()
+          return palabras.some((pal: string) => 
+            nombreLower.includes(pal.toLowerCase())
+          )
+        })
+        
+        if (productosParciales.length === 1) {
+          return { producto: productosParciales[0], confianza: 0.7 }
+        } else if (productosParciales.length > 1) {
+          const mejor = productosParciales.reduce((prev, curr) => 
+            curr.nombre.length < prev.nombre.length ? curr : prev
+          )
+          const sugerencias = productosParciales
+            .filter(p => p.id !== mejor.id)
+            .map(p => p.nombre)
+            .slice(0, 5)
+          return { producto: mejor, confianza: 0.6, sugerencias }
+        }
+        
+        // 4. No encontrado - generar sugerencias similares
+        const calcularSimilitud = (str1: string, str2: string): number => {
+          const palabras1 = str1.split(/\s+/)
+          const palabras2 = str2.split(/\s+/)
+          let coincidencias = 0
+          palabras1.forEach(p1 => {
+            if (palabras2.some(p2 => p2.includes(p1) || p1.includes(p2))) {
+              coincidencias++
+            }
+          })
+          return coincidencias / Math.max(palabras1.length, palabras2.length)
+        }
+        
+        const sugerencias = productosCompletos
+          .map(p => ({
+            nombre: p.nombre,
+            similitud: calcularSimilitud(textoBusqueda, p.nombre.toLowerCase())
+          }))
+          .filter(p => p.similitud > 0.3)
+          .sort((a, b) => b.similitud - a.similitud)
+          .slice(0, 5)
+          .map(p => p.nombre)
+        
+        return sugerencias.length > 0 ? { producto: null, confianza: 0, sugerencias } : null
+      }
+      
+      // ==================== CAMBIAR DE MODO ====================
+      const comandosModo = {
+        ingreso: ["ingreso", "entra", "entrada", "agregar stock", "modo ingreso", "modo agregar"],
+        egreso: ["egreso", "sale", "salida", "quitar stock", "modo egreso", "modo quitar"],
+        stock: ["stock directo", "establecer stock", "fijar stock", "modo stock", "modo establecer"],
+        pregunta: ["pregunta", "normal", "salir", "volver", "modo pregunta", "modo normal"],
+      }
+      
+      for (const [modo, comandos] of Object.entries(comandosModo)) {
+        if (comandos.some(cmd => msgLower === cmd || msgLower.startsWith(cmd + " ") || msgLower.endsWith(" " + cmd))) {
+          if (modo === "pregunta") {
+            return NextResponse.json({
+              accion: {
+                accion: "cambiar_modo",
+                modo: null,
+                mensaje: "✅ Volviste al modo pregunta. Podés hacer consultas o usar comandos.",
+                confianza: 0.9,
+              }
+            })
+          }
+          return NextResponse.json({
+            accion: {
+              accion: "cambiar_modo",
+              modo: modo as "ingreso" | "egreso" | "stock",
+              mensaje: `✅ Modo ${modo === "ingreso" ? "Ingreso" : modo === "egreso" ? "Egreso" : "Stock"} activado. ${modo === "ingreso" ? "Escribí productos con cantidad, por ejemplo: 'papa 20'" : modo === "egreso" ? "Escribí productos con cantidad, por ejemplo: 'papa 5'" : "Escribí productos con cantidad para establecer stock, por ejemplo: 'papa 20'"}`,
+              confianza: 0.9,
+            }
+          })
+        }
+      }
+      
+      // Limpiar selección de pedido
+      if (msgLower.match(/^(todos|sin pedido|ningún pedido|limpiar pedido|deseleccionar pedido)$/i)) {
+        return NextResponse.json({
+          accion: {
+            accion: "seleccionar_pedido",
+            pedidoId: null,
+            mensaje: "✅ Selección de pedido limpiada. Ahora podés trabajar con todos los productos.",
+            confianza: 0.9,
+          }
+        })
+      }
+      
+      // ==================== PREGUNTAS NATURALES SOBRE STOCK ====================
+      const patronesPreguntas = [
+        { regex: /cuántas?\s+(.+?)\s+ha[yn]?/i, tipo: "cantidad" },
+        { regex: /cuánto\s+tengo\s+de\s+(.+?)(?:\s|$|\.|,)/i, tipo: "cantidad" },
+        { regex: /cuánto\s+ha[yn]?\s+de\s+(.+?)(?:\s|$|\.|,)/i, tipo: "cantidad" },
+        { regex: /ha[yn]?\s+(.+?)(?:\s|$|\.|,)/i, tipo: "existencia" },
+        { regex: /qué\s+stock\s+tengo\s+de\s+(.+?)(?:\s|$|\.|,)/i, tipo: "stock" },
+        { regex: /stock\s+de\s+(.+?)(?:\s|$|\.|,)/i, tipo: "stock" },
+        { regex: /cuánto\s+es\s+(.+?)(?:\s|$|\.|,)/i, tipo: "cantidad" },
+      ]
+      
+      for (const patron of patronesPreguntas) {
+        const match = msgNormalizado.match(patron.regex)
+        if (match && match[1]) {
+          const nombreProducto = match[1].trim()
+          const resultado = buscarProducto(nombreProducto)
+          
+          if (resultado && resultado.producto) {
+            const producto = resultado.producto
+            const stock = stockActual[producto.id] ?? 0
+            const unidad = producto.unidad || "u"
+            const minimo = producto.stockMinimo || 0
+            const estado = stock < minimo ? "⚠️" : "✅"
+            const pedido = pedidos.find((p: any) => p.id === producto.pedidoId)
+            
+            let respuesta = ""
+            if (patron.tipo === "existencia") {
+              respuesta = stock > 0 
+                ? `✅ Sí, tenés ${stock} ${unidad} de ${producto.nombre}`
+                : `❌ No, no tenés ${producto.nombre} (stock: 0 ${unidad})`
+            } else {
+              respuesta = `📦 **${producto.nombre}**: ${stock} ${unidad}`
+            }
+            
+            if (pedido) {
+              respuesta += `\n📋 Pedido: ${pedido.nombre}`
+            }
+            if (minimo > 0) {
+              respuesta += `\n${estado} Mínimo: ${minimo} ${unidad}`
+            }
+            
+            if (resultado.sugerencias && resultado.sugerencias.length > 0) {
+              respuesta += `\n\n💡 También encontré: ${resultado.sugerencias.join(", ")}`
+            }
+            
+            return NextResponse.json({
+              accion: {
+                accion: "conversacion",
+                mensaje: respuesta,
+                confianza: resultado.confianza,
+              }
+            })
+          } else if (resultado && resultado.sugerencias) {
+            return NextResponse.json({
+              accion: {
+                accion: "conversacion",
+                mensaje: `No encontré "${nombreProducto}". ¿Quisiste decir: ${resultado.sugerencias.map(s => `"${s}"`).join(", ")}?`,
+                confianza: 0.5,
+              }
+            })
+          }
+          break
+        }
+      }
+      
+      // ==================== ACCIONES RÁPIDAS (agregar/quitar sin cambiar modo) ====================
+      const patronesAcciones = [
+        { regex: /(?:agregar|sumar|poner|meter)\s+(\d+)\s+(?:de\s+)?(.+?)(?:\s|$|\.|,)/i, tipo: "entrada" },
+        { regex: /(?:quitar|sacar|restar|retirar)\s+(\d+)\s+(?:de\s+)?(.+?)(?:\s|$|\.|,)/i, tipo: "salida" },
+        { regex: /(\d+)\s+(?:de\s+)?(.+?)\s+(?:agregar|sumar|poner|meter)/i, tipo: "entrada" },
+        { regex: /(\d+)\s+(?:de\s+)?(.+?)\s+(?:quitar|sacar|restar|retirar)/i, tipo: "salida" },
+      ]
+      
+      for (const patron of patronesAcciones) {
+        const match = msgNormalizado.match(patron.regex)
+        if (match && match[1] && match[2]) {
+          const cantidad = parseInt(match[1])
+          const nombreProducto = match[2].trim()
+          const resultado = buscarProducto(nombreProducto)
+          
+          if (resultado && resultado.producto && resultado.confianza >= 0.7) {
+            const producto = resultado.producto
+            
+            // Validar stock si es salida
+            if (patron.tipo === "salida") {
+              const stockActualProducto = stockActual[producto.id] ?? 0
+              if (stockActualProducto < cantidad) {
+                return NextResponse.json({
+                  accion: {
+                    accion: "conversacion",
+                    mensaje: `❌ No podés quitar ${cantidad} ${producto.unidad || "unidades"} de ${producto.nombre}. Solo tenés ${stockActualProducto} ${producto.unidad || "unidades"}.`,
+                    confianza: 0.9,
+                  }
+                })
+              }
+            }
+            
+            return NextResponse.json({
+              accion: {
+                accion: patron.tipo === "entrada" ? "entrada" : "salida",
+                productoId: producto.id,
+                producto: producto.nombre,
+                cantidad,
+                unidad: producto.unidad,
+                confianza: resultado.confianza,
+                mensaje: `✅ ${patron.tipo === "entrada" ? "Agregar" : "Quitar"} ${cantidad} ${producto.unidad || "unidades"} de ${producto.nombre}? Escribí "sí" para confirmar.`,
+                requiereConfirmacion: true,
+              }
+            })
+          } else if (resultado && resultado.sugerencias) {
+            return NextResponse.json({
+              accion: {
+                accion: "conversacion",
+                mensaje: `No encontré "${nombreProducto}". ¿Quisiste decir: ${resultado.sugerencias.map(s => `"${s}"`).join(", ")}?`,
+                confianza: 0.5,
+              }
+            })
+          }
+          break
+        }
+      }
+      
+      // ==================== ANÁLISIS Y ESTADÍSTICAS ====================
+      if (msgLower.match(/qu[ée]\s+est[áa]\s+bajo|qu[ée]\s+falta|qu[ée]\s+necesito|productos?\s+bajos?|stock\s+bajo/i)) {
+        const productosBajos = productosCompletos.filter(p => {
+          const stock = stockActual[p.id] ?? 0
+          return stock < (p.stockMinimo || 0)
+        })
+        
+        if (productosBajos.length === 0) {
+          return NextResponse.json({
+            accion: {
+              accion: "conversacion",
+              mensaje: "✅ ¡Todo bien! No tenés productos con stock bajo.",
+              confianza: 0.9,
+            }
+          })
+        }
+        
+        const lista = productosBajos
+          .sort((a, b) => {
+            const stockA = stockActual[a.id] ?? 0
+            const stockB = stockActual[b.id] ?? 0
+            const minimoA = a.stockMinimo || 0
+            const minimoB = b.stockMinimo || 0
+            const faltaA = minimoA - stockA
+            const faltaB = minimoB - stockB
+            return faltaB - faltaA
+          })
+          .map(p => {
+            const stock = stockActual[p.id] ?? 0
+            const minimo = p.stockMinimo || 0
+            const falta = minimo - stock
+            return `⚠️ ${p.nombre}: ${stock}/${minimo} ${p.unidad || "u"} (faltan ${falta})`
+          })
+          .join("\n")
+        
+        return NextResponse.json({
+          accion: {
+            accion: "conversacion",
+            mensaje: `📉 **Productos con stock bajo** (${productosBajos.length}):\n\n${lista}`,
+            confianza: 0.9,
+          }
+        })
+      }
+      
+      // Resumen general
+      if (msgLower.match(/resumen|estad[íi]sticas?|total|cuántos?\s+productos?/i)) {
+        const totalProductos = productosCompletos.length
+        const productosConStock = productosCompletos.filter(p => (stockActual[p.id] ?? 0) > 0).length
+        const productosBajos = productosCompletos.filter(p => {
+          const stock = stockActual[p.id] ?? 0
+          return stock < (p.stockMinimo || 0)
+        }).length
+        const totalStock = Object.values(stockActual).reduce((sum: number, val: any) => sum + (val || 0), 0)
+        
+        return NextResponse.json({
+          accion: {
+            accion: "conversacion",
+            mensaje: `📊 **Resumen del inventario:**\n\n• Total de productos: ${totalProductos}\n• Productos con stock: ${productosConStock}\n• Productos con stock bajo: ${productosBajos}\n• Stock total: ${totalStock} unidades`,
+            confianza: 0.9,
+          }
+        })
+      }
+      
+      // Búsqueda avanzada: "productos con X", "todo lo de Y"
+      if (msgLower.match(/productos?\s+(?:con|que\s+tienen?|de)\s+(.+?)(?:\s|$|\.|,)/i)) {
+        const match = msgNormalizado.match(/productos?\s+(?:con|que\s+tienen?|de)\s+(.+?)(?:\s|$|\.|,)/i)
+        if (match && match[1]) {
+          const termino = match[1].trim().toLowerCase()
+          const productosEncontrados = productosCompletos.filter(p => 
+            p.nombre.toLowerCase().includes(termino)
+          )
+          
+          if (productosEncontrados.length === 0) {
+            return NextResponse.json({
+              accion: {
+                accion: "conversacion",
+                mensaje: `No encontré productos que contengan "${termino}".`,
+                confianza: 0.9,
+              }
+            })
+          }
+          
+          const lista = productosEncontrados.map(p => {
+            const stock = stockActual[p.id] ?? 0
+            const unidad = p.unidad || "u"
+            const estado = stock < (p.stockMinimo || 0) ? "⚠️" : "✅"
+            return `${estado} ${p.nombre}: ${stock} ${unidad}`
+          }).join("\n")
+          
+          return NextResponse.json({
+            accion: {
+              accion: "conversacion",
+              mensaje: `🔍 **Productos con "${termino}"** (${productosEncontrados.length}):\n\n${lista}`,
+              confianza: 0.9,
+            }
+          })
+        }
+      }
+      
+      // Ayuda contextual
+      if (msgLower.match(/^(ayuda|help|comandos|qué puedo hacer|qué puedo decir)$/i)) {
+        return NextResponse.json({
+          accion: {
+            accion: "conversacion",
+            mensaje: "💡 **Comandos disponibles:**\n\n📦 **Consultas:**\n• \"cuántas X hay\" - Ver stock de un producto\n• \"stock\" - Ver todo el inventario\n• \"stock nombrepedido\" - Ver stock de un pedido\n• \"qué está bajo\" - Ver productos con stock bajo\n• \"resumen\" - Ver estadísticas\n• \"productos con X\" - Buscar productos\n\n⚡ **Acciones rápidas:**\n• \"agregar 5 de X\" - Agregar stock sin cambiar modo\n• \"quitar 3 de Y\" - Quitar stock sin cambiar modo\n\n🔄 **Cambiar modo:**\n• \"ingreso\" o \"entra\" - Modo ingreso\n• \"egreso\" o \"sale\" - Modo egreso\n• \"modo stock\" - Modo stock directo\n• \"pregunta\" o \"normal\" - Volver a modo pregunta\n\n📋 **Pedidos:**\n• \"pedido nombrepedido\" - Generar pedido\n• \"nombrepedido\" - Seleccionar pedido\n• \"todos\" - Limpiar selección de pedido",
+            confianza: 0.9,
+          }
+        })
+      }
+      
+      // ==================== SELECCIONAR PEDIDO (solo nombre) ====================
+      const pedidoSolo = pedidos.find((p: any) => {
+        const nombreLower = p.nombre.toLowerCase()
+        return nombreLower === msgLower || 
+               nombreLower.split(" ")[0] === msgLower ||
+               nombreLower.includes(msgLower) ||
+               msgLower.includes(nombreLower.split(" ")[0])
+      })
+      
+      if (pedidoSolo && msgLower.length > 2 && !msgLower.startsWith("stock ") && !msgLower.startsWith("pedido ")) {
+        const productosDelPedido = productosCompletos
+          .filter(p => p.pedidoId === pedidoSolo.id)
+          .sort((a, b) => (stockActual[a.id] ?? 0) - (stockActual[b.id] ?? 0))
+        
+        if (productosDelPedido.length === 0) {
+          return NextResponse.json({
+            accion: {
+              accion: "seleccionar_pedido",
+              pedidoId: pedidoSolo.id,
+              mensaje: `✅ Pedido "${pedidoSolo.nombre}" seleccionado.\n\nEl pedido no tiene productos cargados todavía.`,
+              confianza: 0.9,
+            }
+          })
+        }
+        
+        const lista = productosDelPedido.map(p => {
+          const stock = stockActual[p.id] ?? 0
+          const unidad = p.unidad || "u"
+          const estado = stock < (p.stockMinimo || 0) ? "⚠️" : "✅"
+          return `${estado} ${p.nombre}: ${stock} ${unidad}`
+        }).join("\n")
+        
+        return NextResponse.json({
+          accion: {
+            accion: "seleccionar_pedido",
+            pedidoId: pedidoSolo.id,
+            mensaje: `✅ Pedido "${pedidoSolo.nombre}" seleccionado\n\n📦 **Stock:**\n\n${lista}\n\nTotal: ${productosDelPedido.length} productos`,
+            confianza: 0.9,
+          }
+        })
+      }
+      
       // ==================== COMANDO: "pedido nombrepedido" ====================
       if (msgLower.startsWith("pedido ")) {
         const nombrePedido = msgNormalizado.substring(7).trim() // Remover "pedido "
@@ -198,7 +599,7 @@ export async function POST(request: NextRequest) {
         )
         
         if (pedidoEncontrado) {
-          // Es un pedido
+          // Es un pedido - mostrar stock Y seleccionarlo
           const productosDelPedido = productosCompletos
             .filter(p => p.pedidoId === pedidoEncontrado.id)
             .sort((a, b) => (stockActual[a.id] ?? 0) - (stockActual[b.id] ?? 0))
@@ -206,8 +607,9 @@ export async function POST(request: NextRequest) {
           if (productosDelPedido.length === 0) {
             return NextResponse.json({
               accion: {
-                accion: "conversacion",
-                mensaje: `El pedido "${pedidoEncontrado.nombre}" no tiene productos cargados.`,
+                accion: "seleccionar_pedido",
+                pedidoId: pedidoEncontrado.id,
+                mensaje: `✅ Pedido "${pedidoEncontrado.nombre}" seleccionado.\n\nEl pedido no tiene productos cargados todavía.`,
                 confianza: 0.9,
               }
             })
@@ -222,88 +624,82 @@ export async function POST(request: NextRequest) {
           
           return NextResponse.json({
             accion: {
-              accion: "conversacion",
-              mensaje: `📦 **Stock de ${pedidoEncontrado.nombre}**\n\n${lista}\n\nTotal: ${productosDelPedido.length} productos`,
+              accion: "seleccionar_pedido",
+              pedidoId: pedidoEncontrado.id,
+              mensaje: `✅ Pedido "${pedidoEncontrado.nombre}" seleccionado\n\n📦 **Stock:**\n\n${lista}\n\nTotal: ${productosDelPedido.length} productos`,
               confianza: 0.9,
             }
           })
         }
         
         // Si no es pedido, buscar como producto
-        const palabras = resto.split(/\s+/).filter((p: string) => p.length > 1)
-        if (palabras.length === 0) {
-          return NextResponse.json({
-            accion: {
-              accion: "conversacion",
-              mensaje: "No encontré ese pedido ni producto. Escribí 'stock' para ver todo el inventario.",
-              confianza: 0.5,
-            }
-          })
-        }
+        const resultado = buscarProducto(resto)
         
-        // Buscar producto
-        const textoBusqueda = palabras.join(" ").toLowerCase()
-        let productoEncontrado = productosCompletos.find(p => 
-          p.nombre.toLowerCase() === textoBusqueda
-        )
-        
-        if (!productoEncontrado) {
-          // Buscar productos que contengan todas las palabras
-          const productosQueContienen = productosCompletos.filter(p => {
-            const nombreLower = p.nombre.toLowerCase()
-            return palabras.every((pal: string) => 
-              nombreLower.includes(pal.toLowerCase())
-            )
-          })
+        if (resultado && resultado.producto) {
+          const producto = resultado.producto
+          const stock = stockActual[producto.id] ?? 0
+          const unidad = producto.unidad || "u"
+          const minimo = producto.stockMinimo || 0
+          const estado = stock < minimo ? "⚠️" : "✅"
+          const pedido = pedidos.find((p: any) => p.id === producto.pedidoId)
           
-          if (productosQueContienen.length === 1) {
-            productoEncontrado = productosQueContienen[0]
-          } else if (productosQueContienen.length > 1) {
-            productoEncontrado = productosQueContienen.reduce((prev, curr) => 
-              curr.nombre.length < prev.nombre.length ? curr : prev
-            )
+          let respuesta = `📦 **${producto.nombre}**: ${stock} ${unidad}`
+          if (pedido) {
+            respuesta += `\n📋 Pedido: ${pedido.nombre}`
           }
-        }
-        
-        if (!productoEncontrado) {
+          if (minimo > 0) {
+            respuesta += `\n${estado} Mínimo: ${minimo} ${unidad}`
+          }
+          
+          if (resultado.sugerencias && resultado.sugerencias.length > 0) {
+            respuesta += `\n\n💡 También encontré: ${resultado.sugerencias.join(", ")}`
+          }
+          
           return NextResponse.json({
             accion: {
               accion: "conversacion",
-              mensaje: `No encontré "${resto}" en tu inventario. Escribí "stock" para ver todos los productos.`,
+              mensaje: respuesta,
+              confianza: resultado.confianza,
+            }
+          })
+        } else if (resultado && resultado.sugerencias) {
+          return NextResponse.json({
+            accion: {
+              accion: "conversacion",
+              mensaje: `No encontré "${resto}". ¿Quisiste decir: ${resultado.sugerencias.map(s => `"${s}"`).join(", ")}?`,
               confianza: 0.5,
             }
           })
         }
-        
-        // Mostrar stock del producto
-        const stock = stockActual[productoEncontrado.id] ?? 0
-        const unidad = productoEncontrado.unidad || "u"
-        const minimo = productoEncontrado.stockMinimo || 0
-        const estado = stock < minimo ? "⚠️" : "✅"
-        const pedido = pedidos.find((p: any) => p.id === productoEncontrado!.pedidoId)
-        
-        let respuesta = `📦 **${productoEncontrado.nombre}**: ${stock} ${unidad}`
-        if (pedido) {
-          respuesta += `\n📋 Pedido: ${pedido.nombre}`
-        }
-        if (minimo > 0) {
-          respuesta += `\n${estado} Mínimo: ${minimo} ${unidad}`
-        }
-        
-        return NextResponse.json({
-          accion: {
-            accion: "conversacion",
-            mensaje: respuesta,
-            confianza: 0.9,
-          }
-        })
       }
       
       // ==================== MENSAJE NO RECONOCIDO ====================
+      // Intentar sugerir productos similares si el mensaje parece ser un nombre de producto
+      const palabras = msgLower.split(/\s+/).filter((p: string) => p.length > 2)
+      if (palabras.length > 0 && palabras.length <= 3) {
+        const sugerencias = productosCompletos
+          .filter(p => {
+            const nombreLower = p.nombre.toLowerCase()
+            return palabras.some(pal => nombreLower.includes(pal))
+          })
+          .slice(0, 5)
+          .map(p => p.nombre)
+        
+        if (sugerencias.length > 0) {
+          return NextResponse.json({
+            accion: {
+              accion: "conversacion",
+              mensaje: `No entendí "${msgNormalizado}". ¿Quisiste decir alguno de estos productos?\n\n${sugerencias.map(s => `• ${s}`).join("\n")}\n\nO escribí "ayuda" para ver todos los comandos disponibles.`,
+              confianza: 0.5,
+            }
+          })
+        }
+      }
+      
       return NextResponse.json({
         accion: {
           accion: "conversacion",
-          mensaje: "Comandos disponibles:\n\n• **stock** - Ver todo el inventario\n• **stock nombrepedido** - Ver stock de un pedido\n• **stock nombreproducto** - Ver stock de un producto\n• **pedido nombrepedido** - Generar pedido de un proveedor",
+          mensaje: `No entendí "${msgNormalizado}". Escribí "ayuda" para ver todos los comandos disponibles.`,
           confianza: 0.5,
         }
       })

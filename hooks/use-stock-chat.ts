@@ -1077,6 +1077,47 @@ ${pedidos.map(p => `- ${p.nombre}`).join("\n")}`
       console.log(`[CHAT] Tiene comando sugerido:`, !!accion.comandoSugerido)
       console.log(`[CHAT] Tiene producto acumulado:`, !!(accion as any).productoAcumulado)
 
+      // Manejar cambio de modo
+      if (accion.accion === "cambiar_modo") {
+        setModo((accion as any).modo || null) // null = modo pregunta
+        addMessage({
+          tipo: "sistema",
+          contenido: accion.mensaje || "Modo cambiado",
+          accion,
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      // Manejar selección de pedido (puede ser null para limpiar)
+      if (accion.accion === "seleccionar_pedido") {
+        setPedidoSeleccionado((accion as any).pedidoId || null)
+        addMessage({
+          tipo: "sistema",
+          contenido: accion.mensaje || "Pedido seleccionado",
+          accion,
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      // Manejar acciones rápidas con confirmación (desde modo pregunta)
+      if ((accion.accion === "entrada" || accion.accion === "salida") && accion.requiereConfirmacion) {
+        setAccionPendiente({
+          id: crypto.randomUUID(),
+          accion: accion,
+          timestamp: new Date(),
+        })
+        addMessage({
+          tipo: "confirmacion",
+          contenido: accion.mensaje || "¿Confirmás esta acción?",
+          accion: accion,
+          requiereConfirmacion: true,
+        })
+        setIsProcessing(false)
+        return
+      }
+
       // Si la acción es "actualizar_stock" (modo stock), ejecutarla directamente
       if (accion.accion === "actualizar_stock") {
         setIsProcessing(true)

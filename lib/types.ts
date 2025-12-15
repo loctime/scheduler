@@ -43,6 +43,8 @@ export type TipoAccion =
   | "ayuda"
   | "consulta_general"
   | "conversacion"
+  | "cambiar_modo"
+  | "seleccionar_pedido"
 
 export interface StockAccionParsed {
   accion: TipoAccion
