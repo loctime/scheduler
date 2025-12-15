@@ -8,6 +8,12 @@ import { LoginForm } from "@/components/login-form"
 import { FirebaseConfigNotice } from "@/components/firebase-config-notice"
 import { Loader2 } from "lucide-react"
 
+// Función para detectar si está corriendo como PWA
+function isPWA(): boolean {
+  if (typeof window === "undefined") return false
+  return window.matchMedia("(display-mode: standalone)").matches
+}
+
 export default function HomePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -19,7 +25,13 @@ export default function HomePage() {
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        router.push("/chat")
+        // Solo redirigir al chat si está corriendo como PWA
+        if (isPWA()) {
+          router.push("/chat")
+        } else {
+          // Si es web normal, redirigir al dashboard
+          router.push("/dashboard")
+        }
       } else {
         setLoading(false)
       }
