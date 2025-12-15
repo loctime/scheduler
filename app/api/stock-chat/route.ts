@@ -6,6 +6,7 @@ interface ProductoInfo {
   unidad?: string
   stockActual?: number
   pedidoId?: string
+  orden?: number
 }
 
 // ==================== API ROUTE SIMPLIFICADA ====================
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
         unidad?: string
         pedidoId?: string
         stockMinimo?: number
+        orden?: number
       }>).filter(p => {
         // Solo incluir productos que tengan pedidoId y que ese pedido exista
         if (!p.pedidoId) return false
@@ -366,9 +368,16 @@ export async function POST(request: NextRequest) {
         const match = msgNormalizado.match(/productos?\s+(?:con|que\s+tienen?|de)\s+(.+?)(?:\s|$|\.|,)/i)
         if (match && match[1]) {
           const termino = match[1].trim().toLowerCase()
-          const productosEncontrados = productosCompletos.filter(p => 
-            p.nombre.toLowerCase().includes(termino)
-          )
+          const productosEncontrados = productosCompletos
+            .filter(p => p.nombre.toLowerCase().includes(termino))
+            .sort((a, b) => {
+              const ordenA = a.orden ?? 0
+              const ordenB = b.orden ?? 0
+              if (ordenA !== ordenB) {
+                return ordenA - ordenB
+              }
+              return a.nombre.localeCompare(b.nombre)
+            })
           
           if (productosEncontrados.length === 0) {
             return NextResponse.json({
@@ -420,7 +429,14 @@ export async function POST(request: NextRequest) {
       if (pedidoSolo && msgLower.length > 2 && !msgLower.startsWith("stock ") && !msgLower.startsWith("pedido ")) {
         const productosDelPedido = productosCompletos
           .filter(p => p.pedidoId === pedidoSolo.id)
-          .sort((a, b) => (stockActual[a.id] ?? 0) - (stockActual[b.id] ?? 0))
+          .sort((a, b) => {
+            const ordenA = a.orden ?? 0
+            const ordenB = b.orden ?? 0
+            if (ordenA !== ordenB) {
+              return ordenA - ordenB
+            }
+            return a.nombre.localeCompare(b.nombre)
+          })
         
         if (productosDelPedido.length === 0) {
           return NextResponse.json({
@@ -489,6 +505,14 @@ export async function POST(request: NextRequest) {
           const cantidadAPedir = minimo - stock
           return { producto: p, cantidadAPedir }
         }).filter(item => item.cantidadAPedir > 0)
+        .sort((a, b) => {
+          const ordenA = a.producto.orden ?? 0
+          const ordenB = b.producto.orden ?? 0
+          if (ordenA !== ordenB) {
+            return ordenA - ordenB
+          }
+          return a.producto.nombre.localeCompare(b.producto.nombre)
+        })
         
         if (productosConCantidad.length === 0) {
           return NextResponse.json({
@@ -559,7 +583,14 @@ export async function POST(request: NextRequest) {
           const nombrePedido = pedido.nombre
           
           const lista = prods
-            .sort((a, b) => (stockActual[a.id] ?? 0) - (stockActual[b.id] ?? 0))
+            .sort((a, b) => {
+              const ordenA = a.orden ?? 0
+              const ordenB = b.orden ?? 0
+              if (ordenA !== ordenB) {
+                return ordenA - ordenB
+              }
+              return a.nombre.localeCompare(b.nombre)
+            })
             .map(p => {
               const stock = stockActual[p.id] ?? 0
               const unidad = p.unidad || "u"
@@ -606,7 +637,14 @@ export async function POST(request: NextRequest) {
           // Es un pedido - mostrar stock Y seleccionarlo
           const productosDelPedido = productosCompletos
             .filter(p => p.pedidoId === pedidoEncontrado.id)
-            .sort((a, b) => (stockActual[a.id] ?? 0) - (stockActual[b.id] ?? 0))
+            .sort((a, b) => {
+              const ordenA = a.orden ?? 0
+              const ordenB = b.orden ?? 0
+              if (ordenA !== ordenB) {
+                return ordenA - ordenB
+              }
+              return a.nombre.localeCompare(b.nombre)
+            })
           
           if (productosDelPedido.length === 0) {
             return NextResponse.json({

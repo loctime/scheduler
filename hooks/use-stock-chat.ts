@@ -1025,6 +1025,7 @@ Responde de forma concisa, útil y amigable. Si es una pregunta sobre el inventa
       unidad: p.unidad,
       stockMinimo: p.stockMinimo,
       pedidoId: p.pedidoId,
+      orden: p.orden,
     }))
 
     const pedidosPreparados = pedidos.map(p => ({ 
