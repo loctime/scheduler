@@ -750,7 +750,7 @@ export async function POST(request: NextRequest) {
     // ==================== MODO STOCK ====================
     if (modo === "stock") {
       // Detectar múltiples líneas con productos (cada línea: "producto cantidad" o "cantidad producto")
-      const lineas = mensaje.split(/\n/).map(l => l.trim()).filter(l => l.length > 0)
+      const lineas = mensaje.split(/\n/).map((l: string) => l.trim()).filter((l: string) => l.length > 0)
       
       // Si hay múltiples líneas, intentar procesarlas como múltiples productos
       if (lineas.length > 1) {
@@ -1092,7 +1092,7 @@ export async function POST(request: NextRequest) {
     // ==================== COMANDOS ESPECIALES EN MODO INGRESO/EGRESO ====================
     if (modoActual === "ingreso" || modoActual === "egreso") {
       // Detectar múltiples líneas con productos (cada línea: "producto cantidad" o "cantidad producto")
-      const lineas = mensaje.split(/\n/).map(l => l.trim()).filter(l => l.length > 0)
+      const lineas = mensaje.split(/\n/).map((l: string) => l.trim()).filter((l: string) => l.length > 0)
       
       // Si hay múltiples líneas, intentar procesarlas como múltiples productos
       if (lineas.length > 1) {
