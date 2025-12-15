@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import type { ChatMessage } from "@/lib/types"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 interface OllamaStatus {
   status: "checking" | "ok" | "error"
@@ -61,6 +62,7 @@ export function ChatInterface({
   const [lastSentMessage, setLastSentMessage] = useState<string>("")
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const isMobile = useIsMobile()
 
   // Auto-scroll al final cuando hay nuevos mensajes
   useEffect(() => {
@@ -151,10 +153,17 @@ export function ChatInterface({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
+      // En móvil: Enter siempre crea nueva línea (no hay Shift+Enter disponible)
+      // En desktop: Enter envía el mensaje, Shift+Enter crea nueva línea
+      if (isMobile) {
+        // En móvil, permitir que Enter cree nueva línea (no prevenir comportamiento por defecto)
+        return
+      }
+      // En desktop, Enter envía el mensaje
       e.preventDefault()
       handleSubmit(e as any)
     }
-    // Shift + Enter permite nueva línea (comportamiento por defecto del textarea)
+    // Shift + Enter siempre permite nueva línea (comportamiento por defecto del textarea)
   }
 
   const handleQuickAction = (texto: string) => {
