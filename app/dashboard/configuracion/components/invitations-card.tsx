@@ -217,8 +217,8 @@ export function InvitationsCard({ user }: { user: any }) {
                 </p>
               </div>
 
-              {/* Solo mostrar opción de crear links si el usuario es gerente o tiene el permiso */}
-              {(userData?.role === "manager" || userData?.permisos?.crearLinks === true) && (
+              {/* Solo mostrar opción de crear links si el usuario es gerente (no solo si tiene el permiso) */}
+              {userData?.role === "manager" && (
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="crear-links"

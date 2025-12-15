@@ -64,10 +64,67 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     await signOut(auth)
   }
 
-  // Filtrar navItems según el role del usuario
+  // Mapeo de rutas a IDs de páginas (debe coincidir con el de layout.tsx)
+  const ROUTE_TO_PAGE_ID: Record<string, string> = {
+    "/dashboard": "horarios",
+    "/dashboard/horarios": "horarios",
+    "/dashboard/horarios-mensuales": "horarios",
+    "/dashboard/pedidos": "pedidos",
+    "/dashboard/fabrica": "fabrica",
+    "/dashboard/fabrica/historial": "fabrica",
+    "/dashboard/empleados": "empleados",
+    "/dashboard/turnos": "turnos",
+    "/dashboard/configuracion": "configuracion",
+    "/dashboard/gerente": "gerente",
+    "/dashboard/admin": "admin",
+  }
+
+  // Filtrar navItems según el role del usuario y permisos
   const navItemsFiltered = navItems.filter((item) => {
-    // Si el usuario es invitado, solo mostrar Pedidos
-    if (userData?.role === "invited") {
+    // Si el usuario tiene permisos definidos, verificar que la página esté permitida
+    if (userData?.permisos?.paginas && Array.isArray(userData.permisos.paginas) && userData.permisos.paginas.length > 0) {
+      const pageId = ROUTE_TO_PAGE_ID[item.href]
+      // Si la ruta no está mapeada (como /mensajeria), NO permitirla cuando hay permisos definidos
+      if (!pageId) {
+        // Excluir mensajería y otras rutas no mapeadas cuando hay permisos definidos
+        return false
+      }
+      
+      // Si el permiso es "horarios", verificar según el rol del usuario
+      if (userData.permisos.paginas.includes("horarios")) {
+        // Si el usuario es "invited" (creado por fábrica/sucursal), solo permitir vista mensual
+        if (userData.role === "invited") {
+          // Solo permitir "/dashboard/horarios-mensuales", excluir "/dashboard" y "/dashboard/horarios"
+          if (item.href === "/dashboard/horarios-mensuales") {
+            // Continuar con las otras verificaciones
+          } else if (item.href === "/dashboard" || item.href === "/dashboard/horarios") {
+            // Excluir la vista de edición de horarios para usuarios invited
+            return false
+          } else {
+            // Para otras páginas, verificar normalmente
+            if (!userData.permisos.paginas.includes(pageId)) {
+              return false
+            }
+          }
+        } else {
+          // Si NO es "invited" (fue creado por gerente), permitir ambas vistas
+          const tienePermiso = userData.permisos.paginas.includes(pageId)
+          if (!tienePermiso) {
+            return false
+          }
+        }
+      } else {
+        // Si no tiene permiso de "horarios", verificar normalmente
+        const tienePermiso = userData.permisos.paginas.includes(pageId)
+        if (!tienePermiso) {
+          return false
+        }
+      }
+      // Si pasa la verificación de permisos, continuar con las otras verificaciones
+    }
+    
+    // Si el usuario es invitado y NO tiene permisos definidos, solo mostrar Pedidos
+    if (userData?.role === "invited" && (!userData?.permisos?.paginas || !Array.isArray(userData.permisos.paginas) || userData.permisos.paginas.length === 0)) {
       return item.href === "/dashboard/pedidos"
     }
     // Si el item requiere un rol específico, verificar que el usuario lo tenga
@@ -77,6 +134,12 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     // Usuarios normales ven todas las páginas (excepto las que requieren roles específicos)
     return true
   })
+  
+  // Debug: mostrar permisos en consola
+  if (userData?.permisos?.paginas) {
+    console.log("🔐 Permisos del usuario:", userData.permisos.paginas)
+    console.log("📋 Items filtrados:", navItemsFiltered.map(item => item.href))
+  }
 
   const NavContent = ({ onItemClick }: { onItemClick?: () => void }) => (
     <div className="flex flex-col gap-1 md:flex-row">

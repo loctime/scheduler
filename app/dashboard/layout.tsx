@@ -13,6 +13,7 @@ import { Loader2 } from "lucide-react"
 const ROUTE_TO_PAGE_ID: Record<string, string> = {
   "/dashboard": "horarios",
   "/dashboard/horarios": "horarios",
+  "/dashboard/horarios-mensuales": "horarios", // Vista mensual también mapea a "horarios"
   "/dashboard/pedidos": "pedidos",
   "/dashboard/fabrica": "fabrica",
   "/dashboard/fabrica/historial": "fabrica",
@@ -99,15 +100,56 @@ function ProtectedRoute({
       const pageId = ROUTE_TO_PAGE_ID[pathname]
       
       // Verificar permisos basados en páginas accesibles si el usuario tiene permisos definidos
-      if (userData.permisos?.paginas && pageId) {
+      if (userData.permisos?.paginas && Array.isArray(userData.permisos.paginas) && userData.permisos.paginas.length > 0) {
         // Si tiene permisos definidos, verificar que la página esté en la lista
-        if (!userData.permisos.paginas.includes(pageId)) {
-          // Redirigir a la primera página permitida o a pedidos por defecto
-          const primeraPagina = userData.permisos.paginas[0]
-          const rutaPermitida = Object.entries(ROUTE_TO_PAGE_ID).find(([_, id]) => id === primeraPagina)?.[0] || "/dashboard/pedidos"
-          router.push(rutaPermitida)
-          return
+        if (pageId) {
+          let tienePermiso = false
+          
+          // Si el permiso es "horarios", verificar según el rol del usuario
+          if (userData.permisos.paginas.includes("horarios")) {
+            // Si el usuario es "invited" (creado por fábrica/sucursal), solo permitir vista mensual
+            if (userData.role === "invited") {
+              // Solo permitir acceso a vista mensual, bloquear vista de edición
+              if (pathname === "/dashboard/horarios-mensuales") {
+                tienePermiso = true
+              } else if (pathname === "/dashboard" || pathname === "/dashboard/horarios") {
+                // Bloquear acceso a la vista de edición para usuarios invited
+                tienePermiso = false
+              } else {
+                // Para otras páginas, verificar normalmente
+                tienePermiso = userData.permisos.paginas.includes(pageId)
+              }
+            } else {
+              // Si NO es "invited" (fue creado por gerente), permitir ambas vistas
+              tienePermiso = userData.permisos.paginas.includes(pageId)
+            }
+          } else {
+            // Si no tiene permiso de "horarios", verificar normalmente
+            tienePermiso = userData.permisos.paginas.includes(pageId)
+          }
+          
+          if (!tienePermiso) {
+            // Redirigir a la primera página permitida o a pedidos por defecto
+            const primeraPagina = userData.permisos.paginas[0]
+            // Buscar la ruta correspondiente a la primera página permitida
+            // Si es "horarios", preferir "/dashboard/horarios-mensuales" si está disponible
+            let rutaPermitida = "/dashboard/pedidos"
+            if (primeraPagina === "horarios") {
+              // Preferir vista mensual si el usuario tiene permiso de horarios
+              rutaPermitida = "/dashboard/horarios-mensuales"
+            } else {
+              for (const [ruta, id] of Object.entries(ROUTE_TO_PAGE_ID)) {
+                if (id === primeraPagina) {
+                  rutaPermitida = ruta
+                  break
+                }
+              }
+            }
+            router.push(rutaPermitida)
+            return
+          }
         }
+        // Si no hay pageId pero tiene permisos, permitir acceso (puede ser una ruta no mapeada pero permitida)
       } else {
         // Lógica de permisos basada en roles (comportamiento anterior)
         // Si el usuario es invitado y está intentando acceder a una página no permitida
