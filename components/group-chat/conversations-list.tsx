@@ -52,6 +52,7 @@ export function ConversationsList({
     if (!db || !user || !mostrarUsuarios) return
 
     const cargarUsuarios = async () => {
+      if (!db) return
       setLoadingUsuarios(true)
       try {
         const usersQuery = query(
@@ -59,12 +60,12 @@ export function ConversationsList({
           orderBy("displayName")
         )
         const snapshot = await getDocs(usersQuery)
-        const usuariosData = snapshot.docs
+        const usuariosData = (snapshot.docs
           .map((doc) => ({
             id: doc.id,
             ...doc.data(),
-          }))
-          .filter((u: UserInfo) => u.uid !== user.uid) as UserInfo[]
+          })) as UserInfo[])
+          .filter((u) => u.uid !== user.uid)
         
         setUsuarios(usuariosData)
       } catch (error) {
