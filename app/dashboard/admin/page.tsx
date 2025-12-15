@@ -33,11 +33,12 @@ import { es } from "date-fns/locale"
 import { useToast } from "@/hooks/use-toast"
 
 export default function AdminPage() {
-  const { user } = useData()
+  const { user, userData } = useData()
   const { users, loading, cambiarRol, buscarUsuarioPorEmail, recargarUsuarios } = useAdminUsers(user)
   const { groups, loading: loadingGroups, crearGrupo, eliminarGrupo, agregarUsuarioAGrupo, removerUsuarioDeGrupo, recargarGrupos } = useGroups(user)
   const { crearLinkInvitacion } = useInvitaciones(user)
   const { toast } = useToast()
+  const puedeGestionarInvitaciones = userData?.role === "admin" || userData?.role === "manager"
   
   const [busqueda, setBusqueda] = useState("")
   const [filtroRol, setFiltroRol] = useState<string>("todos")
@@ -102,7 +103,7 @@ export default function AdminPage() {
   }
 
   const handleGenerarLink = async () => {
-    if (!user) return
+    if (!user || !puedeGestionarInvitaciones) return
 
     setGenerandoLink(true)
     try {
@@ -214,67 +215,69 @@ export default function AdminPage() {
             </h1>
             <p className="text-muted-foreground">Gestiona usuarios y roles del sistema</p>
           </div>
-          <Dialog open={mostrarDialogLink} onOpenChange={setMostrarDialogLink}>
-            <DialogTrigger asChild>
-              <Button>
-                <UserPlus className="h-4 w-4 mr-2" />
-                Crear Link de Registro
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Crear Link de Registro</DialogTitle>
-                <DialogDescription>
-                  Genera un link de registro con un rol específico. El usuario que use este link será asignado automáticamente con ese rol.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Rol a asignar</label>
-                  <Select value={rolLinkSeleccionado} onValueChange={(value) => setRolLinkSeleccionado(value as UserRole)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="branch">Sucursal</SelectItem>
-                      <SelectItem value="factory">Fábrica</SelectItem>
-                      <SelectItem value="manager">Gerente</SelectItem>
-                      <SelectItem value="admin">Administrador (Developer)</SelectItem>
-                      <SelectItem value="invited">Invitado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {linkGenerado ? (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Link generado:</label>
-                    <div className="flex gap-2">
-                      <Input value={linkGenerado} readOnly className="font-mono text-xs" />
-                      <Button onClick={copiarLink} size="icon" variant="outline">
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Comparte este link con el usuario. Al registrarse, se le asignará automáticamente el rol "{getRoleLabel(rolLinkSeleccionado)}".
-                    </p>
+          {puedeGestionarInvitaciones && (
+            <Dialog open={mostrarDialogLink} onOpenChange={setMostrarDialogLink}>
+              <DialogTrigger asChild>
+                <Button>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Crear Link de Registro
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Crear Link de Registro</DialogTitle>
+                  <DialogDescription>
+                    Genera un link de registro con un rol específico. El usuario que use este link será asignado automáticamente con ese rol.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Rol a asignar</label>
+                    <Select value={rolLinkSeleccionado} onValueChange={(value) => setRolLinkSeleccionado(value as UserRole)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="branch">Sucursal</SelectItem>
+                        <SelectItem value="factory">Fábrica</SelectItem>
+                        <SelectItem value="manager">Gerente</SelectItem>
+                        <SelectItem value="admin">Administrador (Developer)</SelectItem>
+                        <SelectItem value="invited">Invitado</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                ) : (
-                  <Button onClick={handleGenerarLink} disabled={generandoLink} className="w-full">
-                    {generandoLink ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Generando...
-                      </>
-                    ) : (
-                      <>
-                        <LinkIcon className="h-4 w-4 mr-2" />
-                        Generar Link
-                      </>
-                    )}
-                  </Button>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
+                  {linkGenerado ? (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Link generado:</label>
+                      <div className="flex gap-2">
+                        <Input value={linkGenerado} readOnly className="font-mono text-xs" />
+                        <Button onClick={copiarLink} size="icon" variant="outline">
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Comparte este link con el usuario. Al registrarse, se le asignará automáticamente el rol "{getRoleLabel(rolLinkSeleccionado)}".
+                      </p>
+                    </div>
+                  ) : (
+                    <Button onClick={handleGenerarLink} disabled={generandoLink} className="w-full">
+                      {generandoLink ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Generando...
+                        </>
+                      ) : (
+                        <>
+                          <LinkIcon className="h-4 w-4 mr-2" />
+                          Generar Link
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         <Tabs defaultValue="usuarios" className="w-full">
