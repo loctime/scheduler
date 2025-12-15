@@ -1101,6 +1101,221 @@ ${pedidos.map(p => `- ${p.nombre}`).join("\n")}`
         return
       }
 
+      // ==================== COMANDOS ESPECIALES EN MODO INGRESO/EGRESO ====================
+      
+      // Manejar ver lista acumulada
+      if (accion.accion === "ver_lista_acumulada") {
+        if (productosAcumulados.length === 0) {
+          addMessage({
+            tipo: "sistema",
+            contenido: "📋 La lista está vacía. Agregá productos escribiendo 'producto cantidad'.",
+            accion,
+          })
+        } else {
+          const resumen = productosAcumulados.map(p => 
+            `• ${p.cantidad} ${p.unidad || "unidades"} de ${p.producto}`
+          ).join("\n")
+          const verbo = modo === "ingreso" ? "agregar" : "quitar"
+          const totalCantidad = productosAcumulados.reduce((sum, p) => sum + p.cantidad, 0)
+          addMessage({
+            tipo: "sistema",
+            contenido: `📋 **Lista actual (${productosAcumulados.length} productos, ${totalCantidad} unidades):**\n\n${resumen}\n\nEscribí "confirmar" para ${verbo} todo.`,
+            accion,
+          })
+        }
+        setIsProcessing(false)
+        return
+      }
+
+      // Manejar deshacer último
+      if (accion.accion === "deshacer_ultimo") {
+        if (productosAcumulados.length === 0) {
+          addMessage({
+            tipo: "sistema",
+            contenido: "❌ No hay productos para deshacer. La lista está vacía.",
+            accion,
+          })
+        } else {
+          const ultimo = productosAcumulados[productosAcumulados.length - 1]
+          setProductosAcumulados(prev => prev.slice(0, -1))
+          addMessage({
+            tipo: "sistema",
+            contenido: `✅ Eliminado: ${ultimo.cantidad} ${ultimo.unidad || "unidades"} de ${ultimo.producto}`,
+            accion,
+          })
+        }
+        setIsProcessing(false)
+        return
+      }
+
+      // Manejar quitar producto específico de la lista
+      if (accion.accion === "quitar_de_lista" && (accion as any).producto) {
+        const nombreProducto = (accion as any).producto.toLowerCase()
+        const encontrado = productosAcumulados.find(p => 
+          p.producto.toLowerCase().includes(nombreProducto) ||
+          nombreProducto.includes(p.producto.toLowerCase())
+        )
+        
+        if (!encontrado) {
+          addMessage({
+            tipo: "sistema",
+            contenido: `❌ No encontré "${(accion as any).producto}" en la lista.`,
+            accion,
+          })
+        } else {
+          setProductosAcumulados(prev => prev.filter(p => 
+            !(p.productoId === encontrado.productoId && p.accion === encontrado.accion)
+          ))
+          addMessage({
+            tipo: "sistema",
+            contenido: `✅ Eliminado: ${encontrado.cantidad} ${encontrado.unidad || "unidades"} de ${encontrado.producto}`,
+            accion,
+          })
+        }
+        setIsProcessing(false)
+        return
+      }
+
+      // Manejar cambiar cantidad de producto en la lista
+      if (accion.accion === "cambiar_cantidad" && (accion as any).producto && (accion as any).cantidad) {
+        const nombreProducto = (accion as any).producto.toLowerCase()
+        const nuevaCantidad = (accion as any).cantidad
+        
+        const encontrado = productosAcumulados.find(p => 
+          p.producto.toLowerCase().includes(nombreProducto) ||
+          nombreProducto.includes(p.producto.toLowerCase())
+        )
+        
+        if (!encontrado) {
+          addMessage({
+            tipo: "sistema",
+            contenido: `❌ No encontré "${(accion as any).producto}" en la lista.`,
+            accion,
+          })
+        } else {
+          setProductosAcumulados(prev => prev.map(p => {
+            if (p.productoId === encontrado.productoId && p.accion === encontrado.accion) {
+              return { ...p, cantidad: nuevaCantidad }
+            }
+            return p
+          }))
+          addMessage({
+            tipo: "sistema",
+            contenido: `✅ Cantidad actualizada: ${nuevaCantidad} ${encontrado.unidad || "unidades"} de ${encontrado.producto}`,
+            accion,
+          })
+        }
+        setIsProcessing(false)
+        return
+      }
+
+      // Manejar agregar múltiples productos
+      if (accion.accion === "agregar_multiples" && (accion as any).productos) {
+        const productosParaAgregar = (accion as any).productos as Array<{ producto: string, cantidad: number }>
+        const productosEncontrados: Array<{
+          productoId: string
+          producto: string
+          cantidad: number
+          unidad?: string
+          accion: "entrada" | "salida"
+        }> = []
+        const productosNoEncontrados: string[] = []
+        
+        // Filtrar productos según pedido seleccionado
+        const productosFiltrados = pedidoSeleccionado && (modo === "ingreso" || modo === "egreso")
+          ? productos.filter(p => p.pedidoId === pedidoSeleccionado)
+          : productos
+        
+        for (const item of productosParaAgregar) {
+          // Buscar producto
+          const palabras = item.producto.split(/\s+/).filter((p: string) => p.length > 1)
+          if (palabras.length === 0) continue
+          
+          const textoBusqueda = palabras.join(" ").toLowerCase()
+          let productoEncontrado = productosFiltrados.find(p => 
+            p.nombre.toLowerCase() === textoBusqueda
+          )
+          
+          if (!productoEncontrado) {
+            const productosQueContienen = productosFiltrados.filter(p => {
+              const nombreLower = p.nombre.toLowerCase()
+              return palabras.every((pal: string) => 
+                nombreLower.includes(pal.toLowerCase())
+              )
+            })
+            
+            if (productosQueContienen.length === 1) {
+              productoEncontrado = productosQueContienen[0]
+            } else if (productosQueContienen.length > 1) {
+              productoEncontrado = productosQueContienen.reduce((prev, curr) => 
+                curr.nombre.length < prev.nombre.length ? curr : prev
+              )
+            }
+          }
+          
+          if (productoEncontrado) {
+            // Validar stock si es egreso
+            if (modo === "egreso") {
+              const stockActualProducto = stockActual[productoEncontrado.id] ?? 0
+              if (stockActualProducto < item.cantidad) {
+                productosNoEncontrados.push(`${item.producto} (solo hay ${stockActualProducto})`)
+                continue
+              }
+            }
+            
+            productosEncontrados.push({
+              productoId: productoEncontrado.id,
+              producto: productoEncontrado.nombre,
+              cantidad: item.cantidad,
+              unidad: productoEncontrado.unidad,
+              accion: modo === "ingreso" ? "entrada" : "salida",
+            })
+          } else {
+            productosNoEncontrados.push(item.producto)
+          }
+        }
+        
+        if (productosEncontrados.length > 0) {
+          setProductosAcumulados(prev => {
+            const nuevaLista = [...prev]
+            for (const prod of productosEncontrados) {
+              const existe = nuevaLista.find(p => p.productoId === prod.productoId && p.accion === prod.accion)
+              if (existe) {
+                const index = nuevaLista.indexOf(existe)
+                nuevaLista[index] = { ...existe, cantidad: existe.cantidad + prod.cantidad }
+              } else {
+                nuevaLista.push(prod)
+              }
+            }
+            return nuevaLista
+          })
+          
+          const resumen = productosEncontrados.map(p => 
+            `• ${p.cantidad} ${p.unidad || "unidades"} de ${p.producto}`
+          ).join("\n")
+          
+          let mensaje = `✅ Agregados ${productosEncontrados.length} productos:\n\n${resumen}`
+          if (productosNoEncontrados.length > 0) {
+            mensaje += `\n\n❌ No se encontraron: ${productosNoEncontrados.join(", ")}`
+          }
+          mensaje += `\n\nEscribí "confirmar" para aplicar todos los cambios.`
+          
+          addMessage({
+            tipo: "sistema",
+            contenido: mensaje,
+            accion,
+          })
+        } else {
+          addMessage({
+            tipo: "sistema",
+            contenido: `❌ No se encontraron productos. Verificá los nombres: ${productosNoEncontrados.join(", ")}`,
+            accion,
+          })
+        }
+        setIsProcessing(false)
+        return
+      }
+
       // Manejar acciones rápidas con confirmación (desde modo pregunta)
       if ((accion.accion === "entrada" || accion.accion === "salida") && accion.requiereConfirmacion) {
         setAccionPendiente({

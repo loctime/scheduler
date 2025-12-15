@@ -874,28 +874,151 @@ export async function POST(request: NextRequest) {
       pedidoId: p.pedidoId,
     }))
     
-    // Extraer cantidad (número)
-    const matchCantidad = msgNormalizado.match(/(\d+)/)
-    const cantidad = matchCantidad ? parseInt(matchCantidad[1]) : null
+    // ==================== COMANDOS ESPECIALES EN MODO INGRESO/EGRESO ====================
+    if (modoActual === "ingreso" || modoActual === "egreso") {
+      // Ver lista actual
+      if (msgLower.match(/^(lista|ver lista|qué tengo|qué agregué|mostrar lista)$/i)) {
+        return NextResponse.json({
+          accion: {
+            accion: "ver_lista_acumulada",
+            mensaje: "Mostrar lista de productos acumulados",
+            confianza: 0.9,
+          }
+        })
+      }
+      
+      // Deshacer último
+      if (msgLower.match(/^(deshacer|quitar último|borrar último|último|undo)$/i)) {
+        return NextResponse.json({
+          accion: {
+            accion: "deshacer_ultimo",
+            mensaje: "Eliminar último producto agregado",
+            confianza: 0.9,
+          }
+        })
+      }
+      
+      // Quitar producto específico de la lista
+      const matchQuitar = msgLower.match(/^(quitar|sin|eliminar|borrar)\s+(.+?)(?:\s|$|\.|,)/i)
+      if (matchQuitar && matchQuitar[2]) {
+        const nombreProducto = matchQuitar[2].trim()
+        return NextResponse.json({
+          accion: {
+            accion: "quitar_de_lista",
+            producto: nombreProducto,
+            mensaje: `Quitar ${nombreProducto} de la lista`,
+            confianza: 0.9,
+          }
+        })
+      }
+      
+      // Cambiar cantidad de producto en la lista
+      const matchCambiar = msgLower.match(/^(cambiar|editar|modificar)\s+(.+?)\s+(?:a|en|por)\s+(\d+)/i)
+      if (matchCambiar && matchCambiar[2] && matchCambiar[3]) {
+        const nombreProducto = matchCambiar[2].trim()
+        const nuevaCantidad = parseInt(matchCambiar[3])
+        if (nuevaCantidad > 0) {
+          return NextResponse.json({
+            accion: {
+              accion: "cambiar_cantidad",
+              producto: nombreProducto,
+              cantidad: nuevaCantidad,
+              mensaje: `Cambiar cantidad de ${nombreProducto} a ${nuevaCantidad}`,
+              confianza: 0.9,
+            }
+          })
+        }
+      }
+      
+      // Múltiples productos en un mensaje: "papa 10 leche 5 tomate 3"
+      // Buscar patrones como "palabra número palabra número..."
+      const patronMultiples = /(\w+(?:\s+\w+)*)\s+(\d+)/g
+      const matchesMultiples = [...msgNormalizado.matchAll(patronMultiples)]
+      
+      if (matchesMultiples.length > 1) {
+        const productosParaAgregar: Array<{ producto: string, cantidad: number }> = []
+        
+        for (const match of matchesMultiples) {
+          if (match[1] && match[2]) {
+            const nombreProd = match[1].trim()
+            const cantidadProd = parseInt(match[2])
+            if (cantidadProd > 0 && nombreProd.length > 1) {
+              productosParaAgregar.push({
+                producto: nombreProd,
+                cantidad: cantidadProd
+              })
+            }
+          }
+        }
+        
+        if (productosParaAgregar.length > 0) {
+          return NextResponse.json({
+            accion: {
+              accion: "agregar_multiples",
+              productos: productosParaAgregar,
+              mensaje: `Agregar ${productosParaAgregar.length} productos a la lista`,
+              confianza: 0.9,
+            }
+          })
+        }
+      }
+    }
+    
+    // ==================== EXTRAER CANTIDAD Y PRODUCTO (ACEPTA AMBOS ÓRDENES) ====================
+    // Intentar diferentes formatos: "papa 10", "10 papa", "10 de papa"
+    let cantidad: number | null = null
+    let nombreProducto: string = ""
+    
+    // Formato 1: "10 papa" o "10 de papa"
+    const matchCantidadInicio = msgNormalizado.match(/^(\d+)\s+(?:de\s+)?(.+)/)
+    if (matchCantidadInicio) {
+      cantidad = parseInt(matchCantidadInicio[1])
+      nombreProducto = matchCantidadInicio[2].trim()
+    } else {
+      // Formato 2: "papa 10"
+      const matchCantidadFinal = msgNormalizado.match(/(.+?)\s+(\d+)$/)
+      if (matchCantidadFinal) {
+        cantidad = parseInt(matchCantidadFinal[2])
+        nombreProducto = matchCantidadFinal[1].trim()
+      } else {
+        // Formato 3: Buscar cualquier número y el resto como producto
+        const matchCantidad = msgNormalizado.match(/(\d+)/)
+        if (matchCantidad) {
+          cantidad = parseInt(matchCantidad[1])
+          // Eliminar el número del texto para obtener el producto
+          nombreProducto = msgNormalizado.replace(/\d+/g, "").replace(/\s+/g, " ").trim()
+        }
+      }
+    }
     
     if (!cantidad || cantidad <= 0) {
       return NextResponse.json({
         accion: {
           accion: "conversacion",
-          mensaje: "Necesito saber la cantidad. Por ejemplo: 'leche 20' o 'papa 10'.",
+          mensaje: "Necesito saber la cantidad. Por ejemplo: 'leche 20', '20 leche', o 'papa 10'.",
+          confianza: 0.5,
+        }
+      })
+    }
+    
+    if (!nombreProducto || nombreProducto.length < 2) {
+      return NextResponse.json({
+        accion: {
+          accion: "conversacion",
+          mensaje: "No identifiqué el nombre del producto. Por ejemplo: 'leche 20', '20 leche', o 'papa 10'.",
           confianza: 0.5,
         }
       })
     }
     
     // Buscar producto por nombre (buscar palabras que no sean números)
-    const palabras = msgNormalizado.split(/\s+/).filter((p: string) => !/^\d+$/.test(p) && p.length > 1)
+    const palabras = nombreProducto.split(/\s+/).filter((p: string) => !/^\d+$/.test(p) && p.length > 1)
     
     if (palabras.length === 0) {
       return NextResponse.json({
         accion: {
           accion: "conversacion",
-          mensaje: "No identifiqué el nombre del producto. Por ejemplo: 'leche 20' o 'papa 10'.",
+          mensaje: "No identifiqué el nombre del producto. Por ejemplo: 'leche 20', '20 leche', o 'papa 10'.",
           confianza: 0.5,
         }
       })

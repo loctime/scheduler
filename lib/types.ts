@@ -45,6 +45,11 @@ export type TipoAccion =
   | "conversacion"
   | "cambiar_modo"
   | "seleccionar_pedido"
+  | "ver_lista_acumulada"
+  | "deshacer_ultimo"
+  | "quitar_de_lista"
+  | "cambiar_cantidad"
+  | "agregar_multiples"
 
 export interface StockAccionParsed {
   accion: TipoAccion
