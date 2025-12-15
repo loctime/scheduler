@@ -101,6 +101,74 @@ export function useGroupMessaging(user: any) {
     }
   }, [user, userData, groups, toast])
 
+  // Obtener o crear conversación directa con un usuario
+  const obtenerOCrearConversacionDirecta = useCallback(async (
+    usuarioDestinoId: string
+  ): Promise<string | null> => {
+    if (!db || !user || !userData) return null
+
+    // Guardar db en constante local para que TypeScript entienda que no es undefined
+    const firestoreDb = db
+
+    try {
+      // Buscar conversación existente (puede estar con userId o grupoId)
+      const conversacionesQuery = query(
+        collection(firestoreDb, COLLECTIONS.CONVERSACIONES),
+        where("participantes", "array-contains", user.uid),
+        where("tipo", "==", "directo"),
+        where("activa", "==", true)
+      )
+      
+      const snapshot = await getDocs(conversacionesQuery)
+      const conversacionExistente = snapshot.docs.find(doc => {
+        const data = doc.data() as ConversacionGrupo
+        return data.participantes.includes(usuarioDestinoId) && data.participantes.length === 2
+      })
+
+      if (conversacionExistente) {
+        return conversacionExistente.id
+      }
+
+      // Obtener datos del usuario destino para el nombre
+      let nombreDestino = "Usuario"
+      try {
+        const usuarioDestinoDoc = await getDoc(doc(firestoreDb, COLLECTIONS.USERS, usuarioDestinoId))
+        if (usuarioDestinoDoc.exists()) {
+          const usuarioDestinoData = usuarioDestinoDoc.data()
+          nombreDestino = usuarioDestinoData.displayName || usuarioDestinoData.email?.split("@")[0] || "Usuario"
+        }
+      } catch (error) {
+        logger.error("Error al obtener datos del usuario destino:", error)
+      }
+
+      // Crear nueva conversación directa
+      const nombresParticipantes = [
+        userData.displayName || user.email?.split("@")[0] || "Usuario",
+        nombreDestino
+      ]
+
+      const nuevaConversacion = await addDoc(collection(firestoreDb, COLLECTIONS.CONVERSACIONES), {
+        tipo: "directo",
+        participantes: [user.uid, usuarioDestinoId],
+        nombresParticipantes,
+        noLeidos: {},
+        activa: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+
+      return nuevaConversacion.id
+    } catch (error: any) {
+      logger.error("Error al obtener/crear conversación directa:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo crear la conversación",
+        variant: "destructive",
+      })
+      return null
+    }
+  }, [user, userData, toast])
+
   // Enviar mensaje
   const enviarMensaje = useCallback(async (
     conversacionId: string,
@@ -137,8 +205,18 @@ export function useGroupMessaging(user: any) {
         
         // Incrementar contador de no leídos para todos los participantes excepto el remitente
         conversacionData.participantes.forEach(participanteId => {
-          if (participanteId !== user.uid && participanteId !== userData?.grupoIds?.[0]) {
-            noLeidos[participanteId] = (noLeidos[participanteId] || 0) + 1
+          // Para conversaciones directas, usar userId directamente
+          // Para conversaciones de grupo, usar grupoId
+          if (conversacionData.tipo === "directo") {
+            // En conversaciones directas, los participantes son userIds
+            if (participanteId !== user.uid) {
+              noLeidos[participanteId] = (noLeidos[participanteId] || 0) + 1
+            }
+          } else {
+            // En conversaciones de grupo, los participantes son grupoIds
+            if (participanteId !== user.uid && participanteId !== userData?.grupoIds?.[0]) {
+              noLeidos[participanteId] = (noLeidos[participanteId] || 0) + 1
+            }
           }
         })
 
@@ -193,9 +271,17 @@ export function useGroupMessaging(user: any) {
       if (conversacionDoc.exists()) {
         const data = conversacionDoc.data() as ConversacionGrupo
         const noLeidos = { ...(data.noLeidos || {}) }
-        const miGrupoId = userData.grupoIds?.[0] || user.uid
-        delete noLeidos[miGrupoId]
-        delete noLeidos[user.uid]
+        
+        // Limpiar contador según el tipo de conversación
+        if (data.tipo === "directo") {
+          // En conversaciones directas, solo limpiar el userId
+          delete noLeidos[user.uid]
+        } else {
+          // En conversaciones de grupo, limpiar tanto grupoId como userId
+          const miGrupoId = userData.grupoIds?.[0] || user.uid
+          delete noLeidos[miGrupoId]
+          delete noLeidos[user.uid]
+        }
         
         await updateDoc(conversacionRef, {
           noLeidos,
@@ -207,7 +293,7 @@ export function useGroupMessaging(user: any) {
     }
   }, [user, userData])
 
-  // Cargar conversaciones del usuario
+  // Cargar conversaciones del usuario (grupos y directas)
   useEffect(() => {
     if (!db || !user || !userData) {
       setLoading(false)
@@ -219,43 +305,88 @@ export function useGroupMessaging(user: any) {
 
     const miGrupoId = userData.grupoIds?.[0] || user.uid
     
-    // Crear queries para cada participante posible (grupoId y userId)
-    const participantes = [miGrupoId, user.uid]
-    
-    // Firestore no permite OR queries fácilmente, así que haremos múltiples queries
-    const conversacionesQueries = participantes.map(participanteId => 
-      query(
-        collection(firestoreDb, COLLECTIONS.CONVERSACIONES),
-        where("participantes", "array-contains", participanteId),
-        where("activa", "==", true)
-      )
-    )
-    
-    // Usar solo la primera query por ahora (la del grupo principal)
-    const conversacionesQuery = query(
+    // Cargar conversaciones de grupo (donde participa el grupo)
+    const conversacionesGrupoQuery = query(
       collection(firestoreDb, COLLECTIONS.CONVERSACIONES),
       where("participantes", "array-contains", miGrupoId),
       where("activa", "==", true)
     )
 
-    const unsubscribe = onSnapshot(
-      conversacionesQuery,
+    // Cargar conversaciones directas (donde participa el usuario)
+    const conversacionesDirectasQuery = query(
+      collection(firestoreDb, COLLECTIONS.CONVERSACIONES),
+      where("participantes", "array-contains", user.uid),
+      where("tipo", "==", "directo"),
+      where("activa", "==", true)
+    )
+
+    let conversacionesGrupo: ConversacionGrupo[] = []
+    let conversacionesDirectas: ConversacionGrupo[] = []
+
+    const unsubscribeGrupo = onSnapshot(
+      conversacionesGrupoQuery,
       (snapshot) => {
-        const conversacionesData = snapshot.docs.map((doc) => ({
+        conversacionesGrupo = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         })) as ConversacionGrupo[]
 
-        setConversaciones(conversacionesData)
+        // Combinar y actualizar
+        const todas = [...conversacionesGrupo, ...conversacionesDirectas]
+        // Eliminar duplicados
+        const unicas = todas.filter((conv, index, self) =>
+          index === self.findIndex(c => c.id === conv.id)
+        )
+        // Ordenar por último mensaje
+        unicas.sort((a, b) => {
+          const aTime = a.ultimoMensajeAt?.toDate?.()?.getTime() || a.ultimoMensajeAt?.getTime?.() || 0
+          const bTime = b.ultimoMensajeAt?.toDate?.()?.getTime() || b.ultimoMensajeAt?.getTime?.() || 0
+          return bTime - aTime
+        })
+
+        setConversaciones(unicas)
         setLoading(false)
       },
       (error) => {
-        console.error("Error al cargar conversaciones:", error)
+        console.error("Error al cargar conversaciones de grupo:", error)
         setLoading(false)
       }
     )
 
-    return () => unsubscribe()
+    const unsubscribeDirectas = onSnapshot(
+      conversacionesDirectasQuery,
+      (snapshot) => {
+        conversacionesDirectas = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as ConversacionGrupo[]
+
+        // Combinar y actualizar
+        const todas = [...conversacionesGrupo, ...conversacionesDirectas]
+        // Eliminar duplicados
+        const unicas = todas.filter((conv, index, self) =>
+          index === self.findIndex(c => c.id === conv.id)
+        )
+        // Ordenar por último mensaje
+        unicas.sort((a, b) => {
+          const aTime = a.ultimoMensajeAt?.toDate?.()?.getTime() || a.ultimoMensajeAt?.getTime?.() || 0
+          const bTime = b.ultimoMensajeAt?.toDate?.()?.getTime() || b.ultimoMensajeAt?.getTime?.() || 0
+          return bTime - aTime
+        })
+
+        setConversaciones(unicas)
+        setLoading(false)
+      },
+      (error) => {
+        console.error("Error al cargar conversaciones directas:", error)
+        setLoading(false)
+      }
+    )
+
+    return () => {
+      unsubscribeGrupo()
+      unsubscribeDirectas()
+    }
   }, [user, userData])
 
   // Cargar mensajes de la conversación activa
@@ -321,6 +452,7 @@ export function useGroupMessaging(user: any) {
     setConversacionActiva,
     enviarMensaje,
     obtenerOCrearConversacion,
+    obtenerOCrearConversacionDirecta,
     marcarComoLeidos,
     loading,
   }
