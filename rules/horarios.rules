@@ -38,6 +38,34 @@ function getUserFirstGroupId() {
     : null;
 }
 
+// Verificar si el usuario actual y otro usuario comparten al menos un grupo
+function compartenGrupo(userId) {
+  let userData = getUserData();
+  if (!isAuth() || userData == null || !(userData.grupoIds is list) || userData.grupoIds.size() == 0) {
+    return false;
+  }
+  if (!exists(/databases/$(db)/documents/apps/horarios/users/$(userId))) {
+    return false;
+  }
+  let targetUserData = get(/databases/$(db)/documents/apps/horarios/users/$(userId)).data;
+  if (!(targetUserData.grupoIds is list) || targetUserData.grupoIds.size() == 0) {
+    return false;
+  }
+  // Verificar si hay algún grupoId en común comparando directamente
+  // Verificamos el primer grupoId del usuario actual contra todos los del usuario objetivo
+  return (userData.grupoIds.size() > 0 && targetUserData.grupoIds.size() > 0 && (
+      (userData.grupoIds[0] == targetUserData.grupoIds[0])
+      || (targetUserData.grupoIds.size() > 1 && userData.grupoIds[0] == targetUserData.grupoIds[1])
+      || (targetUserData.grupoIds.size() > 2 && userData.grupoIds[0] == targetUserData.grupoIds[2])
+      || (userData.grupoIds.size() > 1 && userData.grupoIds[1] == targetUserData.grupoIds[0])
+      || (userData.grupoIds.size() > 1 && targetUserData.grupoIds.size() > 1 && userData.grupoIds[1] == targetUserData.grupoIds[1])
+      || (userData.grupoIds.size() > 1 && targetUserData.grupoIds.size() > 2 && userData.grupoIds[1] == targetUserData.grupoIds[2])
+      || (userData.grupoIds.size() > 2 && userData.grupoIds[2] == targetUserData.grupoIds[0])
+      || (userData.grupoIds.size() > 2 && targetUserData.grupoIds.size() > 1 && userData.grupoIds[2] == targetUserData.grupoIds[1])
+      || (userData.grupoIds.size() > 2 && targetUserData.grupoIds.size() > 2 && userData.grupoIds[2] == targetUserData.grupoIds[2])
+    ));
+}
+
 // Verificar si el manager es manager de un grupo que contiene al usuario
 function esManagerDelGrupoDelUsuario(userId) {
   return isManagerHorarios()
@@ -110,6 +138,7 @@ match /apps/horarios/users/{userId} {
   // - Admin puede leer todos los usuarios
   // - Manager puede leer todos los usuarios (la aplicación filtrará por grupos)
   // - Factory puede leer todos los usuarios (la aplicación filtrará por grupos)
+  // - Usuarios invited pueden leer usuarios del mismo grupo
   allow read: if isAuth() && (
     userId == uid()
     || (exists(/databases/$(db)/documents/apps/horarios/users/$(userId))
@@ -118,6 +147,7 @@ match /apps/horarios/users/{userId} {
     || isAdminHorarios()
     || isManagerHorarios() // Manager puede leer todos los usuarios para filtrar en la aplicación
     || isFactoryHorarios() // Factory puede leer todos los usuarios para filtrar en la aplicación
+    || (isInvitedUser() && compartenGrupo(userId)) // Usuarios invited pueden leer usuarios del mismo grupo
   );
   // Crear: el usuario puede crear su propio documento
   allow create: if isAuth() && userId == uid();
@@ -324,9 +354,11 @@ match /apps/horarios/invitaciones/{invitacionId} {
 // Colección: apps/horarios/pedidos
 match /apps/horarios/pedidos/{pedidoId} {
   // Permitir lectura si es el dueño O si es un usuario invitado del dueño O si es factory O si no hay autenticación
+  // O si es un usuario invited y el pedido pertenece a un usuario del mismo grupo
   allow read: if (isAuth() && esPropietario(resource.data.userId)) 
     || puedeAccederComoInvitado(resource.data.userId)
     || isFactoryHorarios()
+    || (isInvitedUser() && exists(/databases/$(db)/documents/apps/horarios/users/$(resource.data.userId)) && compartenGrupo(resource.data.userId))
     || !isAuth();
   // Crear: verificar que userId sea correcto (solo dueños pueden crear)
   allow create: if isAuth() && request.resource.data.userId == uid()

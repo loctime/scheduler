@@ -188,11 +188,31 @@ export function useFabricaPedidos(user: any) {
     try {
       setLoading(true)
       
-      // Cargar pedidos con estado "creado" o "processing"
-      const pedidosQuery = query(
-        collection(db, COLLECTIONS.PEDIDOS),
-        where("estado", "in", ["creado", "processing"])
-      )
+      // Si el usuario es "invited" y tiene userIdsDelGrupo, filtrar por esos userIds
+      // Si no, cargar todos los pedidos (para factory/manager)
+      let pedidosQuery;
+      if (userData?.role === "invited" && userIdsDelGrupo.length > 0) {
+        // Firestore limita el operador "in" a 10 elementos, así que si hay más, cargamos todos
+        if (userIdsDelGrupo.length <= 10) {
+          pedidosQuery = query(
+            collection(db, COLLECTIONS.PEDIDOS),
+            where("estado", "in", ["creado", "processing"]),
+            where("userId", "in", userIdsDelGrupo.slice(0, 10))
+          )
+        } else {
+          // Si hay más de 10, cargamos todos y filtramos después
+          pedidosQuery = query(
+            collection(db, COLLECTIONS.PEDIDOS),
+            where("estado", "in", ["creado", "processing"])
+          )
+        }
+      } else {
+        // Para factory/manager, cargar todos los pedidos
+        pedidosQuery = query(
+          collection(db, COLLECTIONS.PEDIDOS),
+          where("estado", "in", ["creado", "processing"])
+        )
+      }
       
       const snapshot = await getDocs(pedidosQuery)
       const pedidosData = snapshot.docs.map((doc) => ({
@@ -434,10 +454,20 @@ export function useFabricaPedidos(user: any) {
     }
 
     // Configurar listener en tiempo real para pedidos
-    const pedidosQuery = query(
-      collection(db, COLLECTIONS.PEDIDOS),
-      where("estado", "in", ["creado", "processing"])
-    )
+    // Si el usuario es "invited" y tiene userIdsDelGrupo, filtrar por esos userIds
+    let pedidosQuery;
+    if (userData?.role === "invited" && userIdsDelGrupo.length > 0 && userIdsDelGrupo.length <= 10) {
+      pedidosQuery = query(
+        collection(db, COLLECTIONS.PEDIDOS),
+        where("estado", "in", ["creado", "processing"]),
+        where("userId", "in", userIdsDelGrupo.slice(0, 10))
+      )
+    } else {
+      pedidosQuery = query(
+        collection(db, COLLECTIONS.PEDIDOS),
+        where("estado", "in", ["creado", "processing"])
+      )
+    }
 
     const unsubscribePedidos = onSnapshot(
       pedidosQuery,

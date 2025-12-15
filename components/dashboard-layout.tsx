@@ -127,9 +127,18 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     if (userData?.role === "invited" && (!userData?.permisos?.paginas || !Array.isArray(userData.permisos.paginas) || userData.permisos.paginas.length === 0)) {
       return item.href === "/dashboard/pedidos"
     }
+    
     // Si el item requiere un rol específico, verificar que el usuario lo tenga
-    if ((item as any).role && userData?.role !== (item as any).role) {
-      return false
+    // PERO si el usuario tiene permisos definidos y tiene el permiso para esa página, permitirla
+    if ((item as any).role) {
+      const pageId = ROUTE_TO_PAGE_ID[item.href]
+      // Si tiene permisos definidos y tiene el permiso para esta página, permitirla aunque no tenga el rol
+      if (userData?.permisos?.paginas && Array.isArray(userData.permisos.paginas) && pageId && userData.permisos.paginas.includes(pageId)) {
+        // Permitir porque tiene el permiso
+      } else if (userData?.role !== (item as any).role) {
+        // No tiene el rol requerido ni el permiso, bloquear
+        return false
+      }
     }
     // Usuarios normales ven todas las páginas (excepto las que requieren roles específicos)
     return true
