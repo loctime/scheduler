@@ -5,7 +5,7 @@ import { useGroupMessaging } from "@/hooks/use-group-messaging"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
-import { MessageCircle, Factory, Building2, Loader2, User, Search, X } from "lucide-react"
+import { MessageCircle, Factory, Building2, Loader2, User, Search, X, Users } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { useGroups } from "@/hooks/use-groups"
@@ -16,6 +16,7 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 interface ConversationsListProps {
   user: any
   onSelectConversation: (conversacionId: string) => void
+  conversacionActiva?: string | null
 }
 
 interface UserInfo {
@@ -30,15 +31,19 @@ interface UserInfo {
 export function ConversationsList({
   user,
   onSelectConversation,
+  conversacionActiva: conversacionActivaProp,
 }: ConversationsListProps) {
   const { 
     conversaciones, 
-    conversacionActiva, 
+    conversacionActiva: conversacionActivaHook, 
     setConversacionActiva, 
     obtenerOCrearConversacion,
     obtenerOCrearConversacionDirecta,
     loading 
   } = useGroupMessaging(user)
+  
+  // Usar la prop si está disponible, sino usar el del hook
+  const conversacionActiva = conversacionActivaProp ?? conversacionActivaHook
   const { groups } = useGroups(user)
   const { userData } = useData()
   
@@ -167,26 +172,46 @@ export function ConversationsList({
                            conv.noLeidos?.[userData?.grupoIds?.[0] || ""] || 0
               }
               
+              const isActive = conversacionActiva === conv.id
+              const esGrupo = conv.tipo !== "directo"
+              
               return (
                 <Button
                   key={conv.id}
-                  variant={conversacionActiva === conv.id ? "secondary" : "ghost"}
-                  className="w-full justify-start mb-1 h-auto py-3"
+                  variant={isActive ? "secondary" : "ghost"}
+                  className={`w-full justify-start mb-1 h-auto py-3 transition-colors ${
+                    isActive 
+                      ? esGrupo 
+                        ? "bg-blue-500/10 border-l-4 border-blue-500" 
+                        : "bg-primary/10 border-l-4 border-primary"
+                      : esGrupo
+                        ? "hover:bg-blue-500/5"
+                        : "hover:bg-muted"
+                  }`}
                   onClick={() => handleSelectConversation(conv.id)}
                 >
                   {conv.tipo === "directo" ? (
                     <User className="h-4 w-4 mr-2 shrink-0" />
                   ) : (
-                    <MessageCircle className="h-4 w-4 mr-2 shrink-0" />
+                    <Users className={`h-4 w-4 mr-2 shrink-0 ${esGrupo ? "text-blue-600 dark:text-blue-400" : ""}`} />
                   )}
                   <div className="flex-1 text-left min-w-0">
-                    <div className="font-medium truncate">
+                    <div className={`font-medium truncate flex items-center gap-2 ${
+                      esGrupo ? "text-blue-700 dark:text-blue-300" : ""
+                    }`}>
                       {conv.tipo === "directo" 
                         ? conv.nombresParticipantes?.find(n => n !== (userData?.displayName || user?.email?.split("@")[0] || "Usuario")) || "Usuario"
                         : conv.nombresParticipantes?.join(" ↔ ") || "Conversación"}
+                      {esGrupo && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-normal">
+                          Grupo
+                        </span>
+                      )}
                     </div>
                     {conv.ultimoMensaje && (
-                      <div className="text-xs text-muted-foreground truncate mt-1">
+                      <div className={`text-xs truncate mt-1 ${
+                        esGrupo ? "text-blue-600/80 dark:text-blue-400/80" : "text-muted-foreground"
+                      }`}>
                         {conv.ultimoMensaje}
                       </div>
                     )}

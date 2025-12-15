@@ -22,7 +22,7 @@ import { ConversacionGrupo, MensajeGrupo, Group } from "@/lib/types"
 import { useGroups } from "@/hooks/use-groups"
 import { useData } from "@/contexts/data-context"
 
-export function useGroupMessaging(user: any) {
+export function useGroupMessaging(user: any, conversacionIdExterno?: string | null) {
   const { toast } = useToast()
   const { groups } = useGroups(user)
   const { userData } = useData()
@@ -31,6 +31,13 @@ export function useGroupMessaging(user: any) {
   const [mensajes, setMensajes] = useState<Record<string, MensajeGrupo[]>>({})
   const [conversacionActiva, setConversacionActiva] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  
+  // Sincronizar conversacionId externo con el estado interno
+  useEffect(() => {
+    if (conversacionIdExterno !== undefined) {
+      setConversacionActiva(conversacionIdExterno)
+    }
+  }, [conversacionIdExterno])
 
   // Obtener o crear conversación entre grupos
   const obtenerOCrearConversacion = useCallback(async (
@@ -391,7 +398,9 @@ export function useGroupMessaging(user: any) {
 
   // Cargar mensajes de la conversación activa
   useEffect(() => {
-    if (!db || !conversacionActiva) {
+    const conversacionIdParaCargar = conversacionIdExterno ?? conversacionActiva
+    
+    if (!db || !conversacionIdParaCargar) {
       setMensajes({})
       return
     }
@@ -403,7 +412,7 @@ export function useGroupMessaging(user: any) {
 
     const mensajesQuery = query(
       collection(firestoreDb, COLLECTIONS.MENSAJES),
-      where("conversacionId", "==", conversacionActiva),
+      where("conversacionId", "==", conversacionIdParaCargar),
       orderBy("createdAt", "asc"),
       limit(100)
     )
@@ -422,7 +431,7 @@ export function useGroupMessaging(user: any) {
 
         setMensajes(prev => ({
           ...prev,
-          [conversacionActiva]: mensajesData,
+          [conversacionIdParaCargar]: mensajesData,
         }))
 
         // Marcar como leídos solo una vez cuando se carga la conversación
@@ -430,7 +439,7 @@ export function useGroupMessaging(user: any) {
           hasMarkedAsRead = true
           // Usar setTimeout para evitar llamadas síncronas que causen bucles
           setTimeout(() => {
-            marcarComoLeidos(conversacionActiva, mensajesData)
+            marcarComoLeidos(conversacionIdParaCargar, mensajesData)
           }, 500)
         }
       },
@@ -443,12 +452,15 @@ export function useGroupMessaging(user: any) {
       unsubscribe()
       hasMarkedAsRead = false
     }
-  }, [conversacionActiva, marcarComoLeidos])
+  }, [conversacionIdExterno, conversacionActiva, marcarComoLeidos])
+
+  // Usar conversacionIdExterno si está disponible, sino usar conversacionActiva
+  const conversacionIdParaMensajes = conversacionIdExterno ?? conversacionActiva
 
   return {
     conversaciones,
-    mensajes: mensajes[conversacionActiva || ""] || [],
-    conversacionActiva,
+    mensajes: mensajes[conversacionIdParaMensajes || ""] || [],
+    conversacionActiva: conversacionIdParaMensajes,
     setConversacionActiva,
     enviarMensaje,
     obtenerOCrearConversacion,

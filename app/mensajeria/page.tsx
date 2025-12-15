@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { onAuthStateChanged } from "firebase/auth"
 import { auth, isFirebaseConfigured } from "@/lib/firebase"
 import { DataProvider } from "@/contexts/data-context"
+import { DashboardLayout } from "@/components/dashboard-layout"
 import { ConversationsList } from "@/components/group-chat/conversations-list"
 import { GroupChatInterface } from "@/components/group-chat/group-chat-interface"
 import { Loader2 } from "lucide-react"
@@ -45,29 +46,32 @@ export default function MensajeriaPage() {
 
   return (
     <DataProvider user={user}>
-      <div className="flex h-screen">
-        <div className="w-80 border-r">
-          <ConversationsList
-            user={user}
-            onSelectConversation={setConversacionActiva}
-          />
-        </div>
-        <div className="flex-1">
-          {conversacionActiva ? (
-            <GroupChatInterface
+      <DashboardLayout user={user}>
+        <div className="flex h-[calc(100vh-8rem)] border rounded-lg overflow-hidden">
+          <div className="w-80 border-r bg-card">
+            <ConversationsList
               user={user}
-              conversacionId={conversacionActiva}
+              onSelectConversation={setConversacionActiva}
+              conversacionActiva={conversacionActiva}
             />
-          ) : (
-            <div className="flex items-center justify-center h-full text-muted-foreground">
-              <div className="text-center">
-                <p className="text-lg font-medium mb-2">Selecciona una conversación</p>
-                <p className="text-sm">Elige una conversación existente o crea una nueva con otro grupo</p>
+          </div>
+          <div className="flex-1 bg-background">
+            {conversacionActiva ? (
+              <GroupChatInterface
+                user={user}
+                conversacionId={conversacionActiva}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                <div className="text-center">
+                  <p className="text-lg font-medium mb-2">Selecciona una conversación</p>
+                  <p className="text-sm">Elige una conversación existente o crea una nueva con otro grupo</p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     </DataProvider>
   )
 }
