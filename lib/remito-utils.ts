@@ -1197,7 +1197,7 @@ export async function generarPDFRemito(remito: Remito, nombreEmpresa?: string, n
       const yInicioFirmas = yPos
       
       // Firma de envío (izquierda)
-      if (tieneFirmaEnvio) {
+      if (tieneFirmaEnvio && remito.firmaEnvio) {
         pdf.setFontSize(9)
         pdf.setFont("helvetica", "bold")
         pdf.text("FIRMA REPARTIDOR", margin, yInicioFirmas)
@@ -1222,7 +1222,7 @@ export async function generarPDFRemito(remito: Remito, nombreEmpresa?: string, n
       }
       
       // Firma de recepción (derecha)
-      if (tieneFirmaRecepcion) {
+      if (tieneFirmaRecepcion && remito.firmaRecepcion) {
         const xFirmaRecepcion = tieneFirmaEnvio ? margin + anchoFirma + espacioEntreFirmas : margin
         pdf.setFontSize(9)
         pdf.setFont("helvetica", "bold")

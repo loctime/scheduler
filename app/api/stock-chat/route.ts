@@ -680,7 +680,7 @@ export async function POST(request: NextRequest) {
         const sugerencias = productosCompletos
           .filter(p => {
             const nombreLower = p.nombre.toLowerCase()
-            return palabras.some(pal => nombreLower.includes(pal))
+            return palabras.some((pal: string) => nombreLower.includes(pal))
           })
           .slice(0, 5)
           .map(p => p.nombre)

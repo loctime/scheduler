@@ -121,7 +121,9 @@ function RegistroContent() {
         await updateDoc(userRef, updateData)
         console.log("✅ Usuario actualizado con nuevo rol exitosamente")
       } else if (userData.role !== "invited" || (userData.ownerId && userData.ownerId !== ownerId)) {
-        await signOut(auth)
+        if (auth) {
+          await signOut(auth)
+        }
         throw new Error("Esta cuenta ya está registrada. Por favor inicia sesión normalmente.")
       } else {
         // Si ya es invitado del mismo owner, actualizar información
