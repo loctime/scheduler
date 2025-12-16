@@ -52,9 +52,17 @@ El sistema implementa 5 roles principales:
 - **Rol por defecto**: Nuevos usuarios sin rol asignado tienen este rol
 
 ### 5. **Invited** (Invitado/Colaborador)
-- **Acceso**: Limitado, vinculado a un usuario dueño
-- **Funcionalidades**: Depende de la configuración del dueño
-- **Uso**: Para colaboradores temporales o con acceso restringido
+- **Acceso**: Limitado, vinculado a un usuario dueño (`ownerId`)
+- **Funcionalidades**: 
+  - Accede a los recursos del usuario propietario (pedidos, stock, horarios)
+  - Puede gestionar pedidos y stock en nombre del propietario
+  - Las acciones se registran como si fueran del propietario
+- **Uso**: Para colaboradores temporales, empleados o asistentes que necesitan trabajar con los datos de otro usuario sin tener acceso completo al sistema
+- **Características técnicas**:
+  - El usuario invitado tiene un campo `ownerId` que lo vincula al propietario
+  - Las reglas de Firestore permiten acceso a recursos donde `userId == ownerId` del invitado
+  - El sistema usa `esPropietario(userId)` que retorna `true` para invitados del propietario
+- **Creación**: Se crea mediante links de registro con rol `invited` que incluyen el `ownerId`
 
 ## 👥 Sistema de Grupos
 
@@ -228,7 +236,8 @@ El sistema permite crear links de registro con roles específicos:
 3. Haz clic en "Crear Link de Registro"
 4. Selecciona el rol (`admin`, `manager`, `factory`, `branch`, `invited`)
 5. Si es `manager`, selecciona el grupo
-6. Copia el link generado
+6. Si es `invited`, el sistema usará automáticamente tu `userId` como `ownerId`
+7. Copia el link generado
 
 #### Como Manager
 1. Ve a `/dashboard/gerente`
@@ -261,7 +270,9 @@ interface InvitacionLink {
 3. El sistema asigna automáticamente:
    - El rol especificado en el link
    - El grupo (si el link tiene `grupoId`)
-   - Actualiza `grupoIds` en el usuario
+   - El `ownerId` (para usuarios `invited`, se asigna el `ownerId` del link)
+   - Actualiza `grupoIds` en el usuario (si aplica)
+4. Para usuarios `invited`, el sistema vincula automáticamente el usuario al propietario mediante `ownerId`
 
 ## 🔄 Sincronización Automática
 

@@ -33,6 +33,7 @@ Aplicación web completa para crear, modificar y gestionar horarios de empleados
 - **Enlaces Públicos de Pedidos**: Comparte pedidos con fábricas mediante enlaces públicos sin necesidad de autenticación
 - **Sistema de Recepciones**: Registra recepciones de pedidos con productos recibidos, devoluciones y observaciones
 - **Estados de Pedidos**: Flujo completo de estados: creado → processing → enviado → recibido → completado
+- **Reiniciar Pedidos**: Permite reiniciar pedidos enviados para hacer correcciones o modificaciones
 
 ### Chat de Stock con IA
 - **Asistente de IA**: Chat inteligente para gestionar stock usando lenguaje natural
@@ -552,6 +553,23 @@ El sistema permite registrar recepciones detalladas de pedidos recibidos:
    - Después de registrar la recepción, puedes firmar digitalmente
    - La firma se guarda en el remito de recepción
    - El pedido cambia a estado "recibido" o "completado"
+
+#### Reiniciar Pedido
+
+Si necesitas corregir o modificar un pedido que ya fue enviado, puedes reiniciarlo:
+
+1. **Requisitos**:
+   - El pedido debe estar en estado "enviado"
+   - Solo la sucursal que creó el pedido puede reiniciarlo
+
+2. **Proceso**:
+   - Selecciona el pedido en estado "enviado"
+   - Haz clic en "Reiniciar Pedido"
+   - El sistema eliminará el remito de envío asociado
+   - El pedido volverá a estado "creado"
+   - Podrás modificar productos, cantidades o generar un nuevo enlace público
+
+3. **Nota**: El remito de envío anterior se elimina, pero puedes generar uno nuevo después de hacer las modificaciones necesarias.
 
 #### Panel de Fábrica (Rol Factory)
 

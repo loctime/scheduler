@@ -11,7 +11,7 @@ export interface InvitacionLink {
   usadoEn?: any // Timestamp de cuando se usó
   createdAt?: any
   expiresAt?: any // Opcional: fecha de expiración
-  role?: "branch" | "factory" | "admin" | "invited" | "manager" // Rol que se asignará al usuario que use el link
+  role?: "branch" | "factory" | "admin" | "invited" | "manager" | "delivery" // Rol que se asignará al usuario que use el link
   grupoId?: string // ID del grupo al que pertenecerá el usuario (para links creados por manager)
   permisos?: {
     paginas?: string[] // Páginas accesibles: "horarios", "pedidos", "fabrica", "empleados", "turnos", "configuracion"
