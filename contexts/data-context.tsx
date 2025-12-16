@@ -223,12 +223,42 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
     }
   }, [user, userData, toast])
 
-  // Cargar datos del usuario primero
+  // Cargar datos del usuario primero y configurar listener en tiempo real
   useEffect(() => {
-    if (user) {
-      loadUserData()
-    } else {
+    if (!user || !db) {
       setUserData(null)
+      return
+    }
+    
+    // Cargar datos iniciales
+    loadUserData()
+    
+    // Configurar listener en tiempo real para el documento del usuario
+    const userRef = doc(db, COLLECTIONS.USERS, user.uid)
+    const unsubscribeUser = onSnapshot(
+      userRef,
+      (userDoc) => {
+        if (userDoc.exists()) {
+          const data = userDoc.data()
+          setUserData({
+            uid: data.uid || user.uid,
+            email: data.email || user.email,
+            displayName: data.displayName || user.displayName,
+            photoURL: data.photoURL || user.photoURL,
+            role: data.role || "user",
+            ownerId: data.ownerId,
+            grupoIds: data.grupoIds || [],
+            permisos: data.permisos,
+          })
+        }
+      },
+      (error) => {
+        console.error("Error en listener de usuario:", error)
+      }
+    )
+    
+    return () => {
+      unsubscribeUser()
     }
   }, [user, loadUserData])
 

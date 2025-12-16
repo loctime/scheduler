@@ -1,11 +1,8 @@
 # Scripts de Utilidad
 
-## delete-old-schedules.js
+## Requisitos Comunes
 
-Script para eliminar schedules antiguos que no tienen el campo `createdBy`.
-
-### Requisitos
-
+Todos los scripts requieren:
 1. Firebase Admin SDK configurado
 2. Credenciales de servicio de Firebase
 
@@ -20,6 +17,10 @@ Script para eliminar schedules antiguos que no tienen el campo `createdBy`.
 ```bash
 export FIREBASE_SERVICE_ACCOUNT='{"type":"service_account",...}'
 ```
+
+## delete-old-schedules.js
+
+Script para eliminar schedules antiguos que no tienen el campo `createdBy`.
 
 ### Uso
 
@@ -38,4 +39,37 @@ El script:
 ⚠️ **Este script elimina datos permanentemente. No se puede deshacer.**
 
 Solo elimina schedules que NO tienen el campo `createdBy`. Los schedules con `createdBy` se mantienen intactos.
+
+## add-invitation-permission.js
+
+Script para agregar el permiso de crear links de invitado a un usuario (especialmente útil para cuentas antiguas de sucursal que no tienen este permiso).
+
+### Uso
+
+```bash
+# Opción 1: Pasar el UID como argumento
+node scripts/add-invitation-permission.js uefWFJ8LMbXOhYN186RITrUVHF42
+
+# Opción 2: El script pedirá el UID interactivamente
+node scripts/add-invitation-permission.js
+```
+
+El script:
+1. Busca el usuario por UID en `apps/horarios/users/{userId}`
+2. Muestra la información del usuario encontrado
+3. Verifica si ya tiene el permiso (y pregunta si desea continuar)
+4. Agrega el campo `permisos.crearLinks = true` al documento del usuario
+5. Preserva todos los demás datos del usuario
+
+### Ejemplo
+
+```bash
+node scripts/add-invitation-permission.js uefWFJ8LMbXOhYN186RITrUVHF42
+```
+
+### Notas
+
+- El script preserva todos los datos existentes del usuario
+- Si el usuario ya tiene `permisos.crearLinks = true`, el script lo notificará y pedirá confirmación
+- Si el usuario no tiene el objeto `permisos`, se creará automáticamente
 
