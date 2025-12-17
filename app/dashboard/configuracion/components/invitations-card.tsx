@@ -85,6 +85,26 @@ export function InvitationsCard({ user }: { user: any }) {
     }
   }, [userData])
 
+  // Establece las páginas seleccionadas por defecto según el rol seleccionado
+  const getDefaultPaginasForRol = (rol?: string) => {
+    const disponibles = getPaginasDisponiblesPorRol(userData?.role).map(p => p.id)
+    if (rol === "factory") {
+      return disponibles.filter(p => p !== "pedidos")
+    }
+    if (rol === "branch") {
+      return disponibles.filter(p => p !== "fabrica")
+    }
+    // Por defecto, seleccionar todas las disponibles
+    return disponibles
+  }
+
+  // Cuando se abre el diálogo o cambia el rol seleccionado, inicializar checkboxes
+  useEffect(() => {
+    if (dialogAbierto) {
+      setPaginasSeleccionadas(getDefaultPaginasForRol(rolSeleccionado))
+    }
+  }, [dialogAbierto, rolSeleccionado, userData?.role])
+
   const copiarLink = (token: string) => {
     const url = `${typeof window !== "undefined" ? window.location.origin : ""}/registro?token=${token}`
     navigator.clipboard.writeText(url)

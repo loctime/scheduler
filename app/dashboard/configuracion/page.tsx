@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator"
 import { MedioTurno } from "@/lib/types"
 import { ProfileCard } from "./components/profile-card"
 import { InvitationsCard } from "./components/invitations-card"
+import { FirmaDigital } from "@/components/remitos/firma-digital"
 
 // Función helper para determinar el color de texto según el contraste
 const getContrastColor = (hexColor: string): string => {
@@ -52,6 +53,8 @@ export default function ConfiguracionPage() {
     minutosDescanso: 30,
     horasMinimasParaDescanso: 6,
     mediosTurnos: [],
+    nombreFirma: undefined,
+    firmaDigital: undefined,
   })
 
   const shiftColorOptions = useMemo(() => {
@@ -90,7 +93,8 @@ export default function ConfiguracionPage() {
         const configSnap = await getDoc(configRef)
 
         if (configSnap.exists()) {
-          setConfig(configSnap.data() as Configuracion)
+          const configData = configSnap.data() as Configuracion
+          setConfig(configData)
         } else {
           // Configuración por defecto
           const defaultConfig: Configuracion = {
@@ -104,6 +108,8 @@ export default function ConfiguracionPage() {
             minutosDescanso: 30,
             horasMinimasParaDescanso: 6,
             mediosTurnos: [],
+            nombreFirma: undefined,
+            firmaDigital: undefined,
           }
           
           // Limpiar undefined antes de guardar (Firestore no acepta undefined)
@@ -186,6 +192,14 @@ export default function ConfiguracionPage() {
       if (config.colorEmpresa !== undefined && config.colorEmpresa !== null) {
         dataToSave.colorEmpresa = config.colorEmpresa
       }
+      
+      // Agregar firma digital si existe
+      if (config.nombreFirma !== undefined) {
+        dataToSave.nombreFirma = config.nombreFirma
+      }
+      if (config.firmaDigital !== undefined) {
+        dataToSave.firmaDigital = config.firmaDigital || null
+      }
 
       // Si el documento no existe, agregar createdAt
       const configSnap = await getDoc(configRef)
@@ -238,7 +252,31 @@ export default function ConfiguracionPage() {
         {/* Sección de Perfil */}
         <ProfileCard />
 
+        {/* Sección de Firma Digital - Disponible para todos */}
         <Card>
+          <CardHeader>
+            <CardTitle>Firma Digital</CardTitle>
+            <CardDescription>Configura tu firma digital para usar en remitos y documentos</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <FirmaDigital
+              nombre={config.nombreFirma || ""}
+              firma={config.firmaDigital}
+              onFirmaChange={(firma) => {
+                setConfig({
+                  ...config,
+                  nombreFirma: firma.nombre,
+                  firmaDigital: firma.firma,
+                })
+              }}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Configuraciones del calendario - Solo para usuarios con acceso a horarios (factory y branch) */}
+        {(userData?.role === "factory" || userData?.role === "branch") && (
+          <>
+            <Card>
           <CardHeader>
             <CardTitle>Configuración General</CardTitle>
             <CardDescription>Configuración básica de la empresa</CardDescription>
@@ -610,6 +648,8 @@ export default function ConfiguracionPage() {
             </div>
           </CardContent>
         </Card>
+          </>
+        )}
 
         {(userData?.role === "admin" || userData?.role === "manager" || userData?.role === "branch" || userData?.role === "factory") ? (
           <InvitationsCard user={user} />

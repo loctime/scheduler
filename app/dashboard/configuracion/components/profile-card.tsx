@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
 import { db, auth, COLLECTIONS } from "@/lib/firebase"
 import { EmailAuthProvider, reauthenticateWithCredential, updateEmail, updatePassword } from "firebase/auth"
-import { collection, doc, getDocs, query, serverTimestamp, updateDoc, where } from "firebase/firestore"
+import { collection, doc, getDoc, getDocs, query, serverTimestamp, updateDoc, where } from "firebase/firestore"
 import { Loader2, EyeOff, Eye, User, Mail, Lock } from "lucide-react"
 
 export function ProfileCard() {
@@ -30,7 +30,6 @@ export function ProfileCard() {
 
   const [emailDialogOpen, setEmailDialogOpen] = useState(false)
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
-  const [ownerDialogOpen, setOwnerDialogOpen] = useState(false)
   const [newEmail, setNewEmail] = useState("")
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
@@ -39,38 +38,39 @@ export function ProfileCard() {
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [updatingProfile, setUpdatingProfile] = useState(false)
-  const [availableOwners, setAvailableOwners] = useState<Array<{ uid: string; email?: string; displayName?: string }>>([])
-  const [selectedOwnerId, setSelectedOwnerId] = useState<string>("")
+  const [ownerEmail, setOwnerEmail] = useState<string | null>(null)
+  
 
   const loadAvailableOwners = async () => {
-    if (!ownerDialogOpen || !db || userData?.role !== "invited") return
-
-    try {
-      const usersRef = collection(db, COLLECTIONS.USERS)
-      const q = query(usersRef, where("role", "in", ["branch", "admin", "factory", "manager"]))
-      const snapshot = await getDocs(q)
-
-      const owners = snapshot.docs
-        .map(doc => ({
-          uid: doc.id,
-          email: doc.data().email,
-          displayName: doc.data().displayName,
-        }))
-        .filter(owner => owner.uid !== user?.uid)
-
-      setAvailableOwners(owners)
-      if (userData?.ownerId) {
-        setSelectedOwnerId(userData.ownerId)
-      }
-    } catch (error) {
-      console.error("Error cargando owners:", error)
-    }
+    return
   }
 
+  // Cargar email del referido (owner) para mostrar en el perfil
   useEffect(() => {
-    loadAvailableOwners()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ownerDialogOpen, userData, user, db])
+    let mounted = true
+    const fetchOwnerEmail = async () => {
+      if (!db || !userData?.ownerId) {
+        if (mounted) setOwnerEmail(null)
+        return
+      }
+      try {
+        const ownerRef = doc(db, COLLECTIONS.USERS, userData.ownerId)
+        const snap = await getDoc(ownerRef)
+        if (!mounted) return
+        if (snap.exists()) {
+          // @ts-ignore
+          setOwnerEmail(snap.data()?.email || null)
+        } else {
+          setOwnerEmail(null)
+        }
+      } catch (error) {
+        if (mounted) setOwnerEmail(null)
+      }
+    }
+    fetchOwnerEmail()
+    return () => { mounted = false }
+  }, [userData?.ownerId, db])
+
 
   const handleUpdateEmail = async () => {
     if (!auth?.currentUser || !user?.email) {
@@ -221,50 +221,7 @@ export function ProfileCard() {
   }
 
   const handleUpdateOwner = async () => {
-    if (!db || !user || userData?.role !== "invited") {
-      toast({
-        title: "Error",
-        description: "Solo los usuarios invitados pueden cambiar su dueño",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (!selectedOwnerId) {
-      toast({
-        title: "Error",
-        description: "Por favor selecciona un dueño",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      setUpdatingProfile(true)
-      const userRef = doc(db, COLLECTIONS.USERS, user.uid)
-      await updateDoc(userRef, {
-        ownerId: selectedOwnerId,
-        updatedAt: serverTimestamp(),
-      })
-
-      toast({
-        title: "Dueño actualizado",
-        description: "Tu dueño ha sido actualizado exitosamente. Recarga la página para ver los cambios.",
-      })
-
-      setOwnerDialogOpen(false)
-      setTimeout(() => {
-        window.location.reload()
-      }, 1500)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo actualizar el dueño",
-        variant: "destructive",
-      })
-    } finally {
-      setUpdatingProfile(false)
-    }
+    return
   }
 
   return (
@@ -498,78 +455,14 @@ export function ProfileCard() {
           <>
             <Separator />
             <div className="space-y-2">
-              <Label>Dueño Actual</Label>
+              <Label>Referido</Label>
               <div className="flex items-center gap-2">
                 <Input
                   type="text"
-                  value={
-                    availableOwners.find(o => o.uid === userData?.ownerId)?.email ||
-                    userData?.ownerId ||
-                    "No asignado"
-                  }
+                  value={ownerEmail || userData?.ownerId || "No asignado"}
                   disabled
                   className="flex-1"
                 />
-                <Dialog open={ownerDialogOpen} onOpenChange={setOwnerDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <User className="h-4 w-4 mr-2" />
-                      Cambiar Dueño
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Cambiar Dueño</DialogTitle>
-                      <DialogDescription>
-                        Selecciona un nuevo dueño para tu cuenta. Esto cambiará a qué usuario estás vinculado.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="owner-select">Nuevo Dueño</Label>
-                        <Select
-                          value={selectedOwnerId}
-                          onValueChange={setSelectedOwnerId}
-                          disabled={updatingProfile}
-                        >
-                          <SelectTrigger id="owner-select">
-                            <SelectValue placeholder="Selecciona un dueño" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableOwners.map((owner) => (
-                              <SelectItem key={owner.uid} value={owner.uid}>
-                                {owner.displayName || owner.email || owner.uid}
-                                {owner.email && ` (${owner.email})`}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setOwnerDialogOpen(false)
-                          setSelectedOwnerId(userData?.ownerId || "")
-                        }}
-                        disabled={updatingProfile}
-                      >
-                        Cancelar
-                      </Button>
-                      <Button onClick={handleUpdateOwner} disabled={updatingProfile}>
-                        {updatingProfile ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Actualizando...
-                          </>
-                        ) : (
-                          "Actualizar Dueño"
-                        )}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
               </div>
             </div>
           </>
