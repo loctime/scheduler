@@ -273,8 +273,13 @@ export default function ConfiguracionPage() {
           </CardContent>
         </Card>
 
-        {/* Configuraciones del calendario - Solo para usuarios con acceso a horarios (factory y branch) */}
-        {(userData?.role === "factory" || userData?.role === "branch") && (
+        {/* Configuraciones del calendario - Usuarios con rol factory/branch o con permiso 'horarios' */}
+        {(() => {
+          const tienePermisoPaginas = userData?.permisos?.paginas && Array.isArray(userData.permisos.paginas)
+          const permisoHorarios = tienePermisoPaginas ? userData.permisos.paginas.includes("horarios") : false
+          const rolConAcceso = userData?.role === "factory" || userData?.role === "branch"
+          return (permisoHorarios || rolConAcceso)
+        })() && (
           <>
             <Card>
           <CardHeader>

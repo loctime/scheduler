@@ -87,15 +87,20 @@ export function InvitationsCard({ user }: { user: any }) {
 
   // Establece las páginas seleccionadas por defecto según el rol seleccionado
   const getDefaultPaginasForRol = (rol?: string) => {
-    const disponibles = getPaginasDisponiblesPorRol(userData?.role).map(p => p.id)
+    // Páginas disponibles por rol del CREADOR
+    const disponiblesPorRol = getPaginasDisponiblesPorRol(userData?.role).map(p => p.id)
+    // Si el creador tiene permisos explícitos, restringir a su lista
+    const creadorPermisos = Array.isArray(userData?.permisos?.paginas) ? userData.permisos.paginas : null
+    const permitidas = creadorPermisos ? disponiblesPorRol.filter(p => creadorPermisos.includes(p)) : disponiblesPorRol
+
     if (rol === "factory") {
-      return disponibles.filter(p => p !== "pedidos")
+      return permitidas.filter(p => p !== "pedidos")
     }
     if (rol === "branch") {
-      return disponibles.filter(p => p !== "fabrica")
+      return permitidas.filter(p => p !== "fabrica")
     }
-    // Por defecto, seleccionar todas las disponibles
-    return disponibles
+    // Por defecto, seleccionar todas las permitidas
+    return permitidas
   }
 
   // Cuando se abre el diálogo o cambia el rol seleccionado, inicializar checkboxes
@@ -104,6 +109,14 @@ export function InvitationsCard({ user }: { user: any }) {
       setPaginasSeleccionadas(getDefaultPaginasForRol(rolSeleccionado))
     }
   }, [dialogAbierto, rolSeleccionado, userData?.role])
+
+  // Construir las páginas que se mostrarán en el formulario: solo las que el creador puede asignar
+  const paginasPermitablesPorCreador = (() => {
+    const disponibles = getPaginasDisponiblesPorRol(userData?.role)
+    const creadorPermisos = Array.isArray(userData?.permisos?.paginas) ? userData.permisos.paginas : null
+    if (!creadorPermisos) return disponibles
+    return disponibles.filter(p => creadorPermisos.includes(p.id))
+  })()
 
   const copiarLink = (token: string) => {
     const url = `${typeof window !== "undefined" ? window.location.origin : ""}/registro?token=${token}`
@@ -117,8 +130,10 @@ export function InvitationsCard({ user }: { user: any }) {
   const handleCrearLink = async () => {
     setCreando(true)
     try {
+      // Filtrar las páginas para asegurarnos que el creador no otorgue páginas que no posee
+      const paginasEnviables = paginasSeleccionadas.filter(p => paginasPermitablesPorCreador.some(pp => pp.id === p))
       const permisos = {
-        paginas: paginasSeleccionadas,
+        paginas: paginasEnviables,
         crearLinks: crearLinks,
       }
       
@@ -211,7 +226,7 @@ export function InvitationsCard({ user }: { user: any }) {
               <div className="space-y-3">
                 <Label>Páginas Accesibles</Label>
                 <div className="grid grid-cols-2 gap-3">
-                  {getPaginasDisponiblesPorRol(userData?.role).map((pagina) => (
+                  {paginasPermitablesPorCreador.map((pagina) => (
                     <div key={pagina.id} className="flex items-center space-x-2">
                       <Checkbox
                         id={`pagina-${pagina.id}`}
