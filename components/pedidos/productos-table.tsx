@@ -241,6 +241,7 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
           const pedidoBase = calcularPedido(product.stockMinimo, stockActualValue)
           const ajuste = ajustesPedido[product.id] ?? 0
           const pedidoCalculado = Math.max(0, pedidoBase + ajuste)
+          const displayPedido = viewMode === "pedir" ? Math.max(pedidoCalculado, product.stockMinimo) : pedidoCalculado
 
           return (
             <div
@@ -293,7 +294,7 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
                         </Button>
 
                         <StockInput
-                          value={pedidoCalculado}
+                          value={displayPedido}
                           onChange={(v) => {
                             if (!onAjustePedidoChange) return
                             const newAjuste = v - pedidoBase
