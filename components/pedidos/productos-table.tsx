@@ -51,7 +51,7 @@ function StockInput({ value, onChange, onFocus }: { value: number | undefined; o
       type="number"
       inputMode="numeric"
       min="0"
-      value={value !== undefined ? value : ""}
+      value={value !== undefined ? String(value) : ""}
       onChange={(e) => onChange(e.target.value === "" ? 0 : parseInt(e.target.value, 10) || 0)}
       onFocus={(e) => {
         onFocus?.()
@@ -241,7 +241,10 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
           const pedidoBase = calcularPedido(product.stockMinimo, stockActualValue)
           const ajuste = ajustesPedido[product.id] ?? 0
           const pedidoCalculado = Math.max(0, pedidoBase + ajuste)
-          const displayPedido = viewMode === "pedir" ? Math.max(pedidoCalculado, product.stockMinimo) : pedidoCalculado
+          // Mostrar el valor lógico calculado en el input. No cambiar cálculos,
+          // solo la representación visual para permitir mostrar 0 aunque
+          // el mínimo (product.stockMinimo) se muestre por separado.
+          const displayPedido = pedidoCalculado
 
           return (
             <div
