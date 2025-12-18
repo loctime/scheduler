@@ -31,18 +31,7 @@ export function StockChatFloating() {
 
   return (
     <>
-      {/* Botón flotante - solo cuando el chat está cerrado */}
-      {!chatIsOpen && (
-        <div className="fixed bottom-4 left-4 z-50">
-          <Button
-            onClick={() => setChatIsOpen(true)}
-            size="lg"
-            className="h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90"
-          >
-            <MessageCircle className="h-6 w-6" />
-          </Button>
-        </div>
-      )}
+      {/* El botón del chat ahora está en el navbar; no mostrar botón flotante */}
 
       {/* Sidebar - cuando el chat está abierto */}
       {chatIsOpen && (

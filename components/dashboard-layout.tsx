@@ -52,9 +52,11 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
   
   // Obtener estado del chat para ajustar el padding del contenido
   let chatIsOpen = false
+  let setChatIsOpen: ((open: boolean) => void) | undefined = undefined
   try {
     const chatContext = useStockChatContext()
     chatIsOpen = chatContext.chatIsOpen
+    setChatIsOpen = chatContext.setChatIsOpen
   } catch {
     // Si no hay contexto (página fuera del dashboard), no hacer nada
   }
@@ -204,6 +206,18 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
               <Calendar className="h-4 w-4 text-accent-foreground sm:h-6 sm:w-6" />
             </div>
             <h1 className="text-base font-bold text-card-foreground sm:text-xl">Gestión de Horarios</h1>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative h-8 w-8 sm:h-10 sm:w-10"
+              onClick={() => setChatIsOpen?.(true)}
+              title="Abrir chat"
+            >
+              <MessageSquare className="h-4 w-4" />
+            </Button>
           </div>
 
           <DropdownMenu>
