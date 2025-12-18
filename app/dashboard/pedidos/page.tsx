@@ -218,6 +218,8 @@ export default function PedidosPage() {
   
   // Tab state
   const [activeTab, setActiveTab] = useState<"productos" | "remitos" | "recepcion">("productos")
+  // Vista: 'pedir' para ajustar cantidades a pedir, 'stock' para editar stock
+  const [viewMode, setViewMode] = useState<"pedir" | "stock">("pedir")
 
   // Focus input when entering edit mode
   useEffect(() => {
@@ -1232,8 +1234,9 @@ export default function PedidosPage() {
 
                   {/* Acciones de pedido */}
                   {products.length > 0 && (
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-1.5 pt-1.5 border-t border-border">
-                      <span className={cn(
+                    <div className="flex flex-col gap-2 pt-1.5 border-t border-border">
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
                         "text-[11px] font-medium px-1.5 py-0.5 rounded-full shrink-0",
                         productosAPedirActualizados.length > 0 
                           ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
@@ -1244,8 +1247,35 @@ export default function PedidosPage() {
                           : "✓ OK"
                         }
                       </span>
-                      <div className="flex-1" />
-                      <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto">
+                        {/* View mode tabs: 'Pedir' (ajustar cantidades) vs 'Stock' (editar stock) */}
+                        <div className="flex items-center gap-2 ml-2">
+                        <button
+                          type="button"
+                          aria-pressed={viewMode === "pedir"}
+                          onClick={() => setViewMode("pedir")}
+                          className={cn(
+                            "text-[11px] px-2 py-0.5 rounded transition-colors",
+                            viewMode === "pedir" ? "bg-primary text-primary-foreground border border-primary" : "bg-muted hover:bg-accent border border-border"
+                          )}
+                        >
+                          Pedir
+                        </button>
+                        <button
+                          type="button"
+                          aria-pressed={viewMode === "stock"}
+                          onClick={() => setViewMode("stock")}
+                          className={cn(
+                            "text-[11px] px-2 py-0.5 rounded transition-colors",
+                            viewMode === "stock" ? "bg-primary text-primary-foreground border border-primary" : "bg-muted hover:bg-accent border border-border"
+                          )}
+                        >
+                          Stock
+                        </button>
+                        </div>
+                        <div className="flex-1" />
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto justify-end">
                         <Button 
                           size="sm" 
                           className="h-7 px-2 flex-1 sm:flex-initial"
@@ -1341,6 +1371,7 @@ export default function PedidosPage() {
                   ajustesPedido={ajustesPedido}
                   onAjustePedidoChange={handleAjustePedidoChange}
                   configMode={showConfig}
+                  viewMode={viewMode}
                   stockMinimoDefault={selectedPedido?.stockMinimoDefault ?? 0}
                 />
               ) : activeTab === "recepcion" ? (
