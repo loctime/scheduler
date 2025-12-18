@@ -293,6 +293,11 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
                 ) : (
                   <>
                     <div className="flex flex-col items-center shrink-0">
+                      <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Pedir</span>
+                      <span className={cn("font-bold text-lg w-8 text-center tabular-nums", pedidoCalculado > 0 ? "text-amber-600" : "text-green-600")}>{pedidoCalculado}</span>
+                    </div>
+
+                    <div className="flex flex-col items-center shrink-0">
                       <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Actual</span>
                       <div className="flex items-center gap-1">
                         <Button
