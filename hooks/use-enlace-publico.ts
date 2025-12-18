@@ -95,6 +95,7 @@ export function useEnlacePublico(user: any) {
         // y desactivar sus enlaces para permitir crear un nuevo enlace.
         try {
           await Promise.all(pedidosActivos.map(async (p: any) => {
+            if (!db) return
             try {
               await updateDoc(doc(db, COLLECTIONS.PEDIDOS, p.id), {
                 estado: "completado",
