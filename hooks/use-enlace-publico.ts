@@ -91,12 +91,45 @@ export function useEnlacePublico(user: any) {
         .filter(p => p.id !== pedidoId) // Excluir el pedido actual
       
       if (pedidosActivos.length > 0) {
-        const pedidoActivo = pedidosActivos[0]
-        const nombrePedido = pedidoActivo.nombre || "otro pedido"
-        const estadoPedido = pedidoActivo.estado === "processing" 
-          ? `en proceso (tomado por: ${pedidoActivo.assignedToNombre || "otro usuario"})`
-          : "creado"
-        throw new Error(`Ya tenés un pedido "${nombrePedido}" en estado "${estadoPedido}". Completá o cancelá ese pedido antes de crear un nuevo enlace.`)
+        // En lugar de bloquear, marcar los pedidos activos anteriores como "completado"
+        // y desactivar sus enlaces para permitir crear un nuevo enlace.
+        try {
+          await Promise.all(pedidosActivos.map(async (p: any) => {
+            try {
+              await updateDoc(doc(db, COLLECTIONS.PEDIDOS, p.id), {
+                estado: "completado",
+                updatedAt: serverTimestamp(),
+              })
+            } catch (err) {
+              logger.error("No se pudo actualizar estado del pedido activo:", err)
+            }
+
+            // Intentar desactivar enlaces asociados a ese pedido (no bloquear si falla)
+            try {
+              const enlacesQueryPrev = query(
+                collection(db, COLLECTIONS.ENLACES_PUBLICOS),
+                where("pedidoId", "==", p.id),
+                where("activo", "==", true),
+                where("userId", "==", userIdToQuery)
+              )
+              const enlacesSnapshotPrev = await getDocs(enlacesQueryPrev)
+              const desactivarPrev = enlacesSnapshotPrev.docs.map((doc) =>
+                setDoc(doc.ref, { activo: false }, { merge: true })
+              )
+              await Promise.all(desactivarPrev)
+            } catch (err) {
+              logger.error("No se pudieron desactivar enlaces del pedido activo:", err)
+            }
+          }))
+
+          toast({
+            title: "Pedidos previos archivados",
+            description: "Se archivaron pedidos previos en estado 'creado' para poder generar este enlace",
+            variant: "default",
+          })
+        } catch (err) {
+          logger.error("Error al archivar pedidos activos:", err)
+        }
       }
 
       // Verificar si hay un pedido en "processing" y mostrar warning (no bloquear)
