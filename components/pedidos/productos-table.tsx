@@ -292,22 +292,34 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
                   </>
                 ) : (
                   <>
-                    <PedidoControls
-                      pedidoCalculado={pedidoCalculado}
-                      onDecrement={() => {
-                        if (onAjustePedidoChange) onAjustePedidoChange(product.id, (ajuste ?? 0) - 1)
-                        else onStockChange(product.id, stockActualValue + 1)
-                      }}
-                      onIncrement={() => {
-                        if (onAjustePedidoChange) onAjustePedidoChange(product.id, (ajuste ?? 0) + 1)
-                        else if (stockActualValue > 0) onStockChange(product.id, stockActualValue - 1)
-                      }}
-                      disabledDecrement={pedidoCalculado <= 0 && (!onAjustePedidoChange || (ajuste ?? 0) <= 0)}
-                    />
-
                     <div className="flex flex-col items-center shrink-0">
                       <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Actual</span>
-                      <StockInput value={stockActual[product.id]} onChange={(v) => onStockChange(product.id, v)} onFocus={() => startEditing(product.id, "stockActual", (stockActual[product.id] ?? 0).toString())} />
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={() => onStockChange(product.id, Math.max(0, (stockActualValue ?? 0) - 1))}
+                          disabled={(stockActualValue ?? 0) <= 0}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+
+                        <StockInput
+                          value={stockActual[product.id]}
+                          onChange={(v) => onStockChange(product.id, v)}
+                          onFocus={() => startEditing(product.id, "stockActual", (stockActual[product.id] ?? 0).toString())}
+                        />
+
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={() => onStockChange(product.id, (stockActualValue ?? 0) + 1)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </>
                 )}
