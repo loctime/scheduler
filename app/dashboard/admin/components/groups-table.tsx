@@ -217,8 +217,11 @@ export function GroupsTable({
                           <div className="p-2 border rounded-md bg-muted/30 space-y-1">
                             <p className="text-xs font-medium mb-1">Usuarios del grupo:</p>
                             {usuariosGrupo.map(user => (
-                              <div key={user.id} className="flex items-center justify-between text-xs">
-                                <span>{user.displayName || user.email}</span>
+                              <div key={user.id} className="flex items-center justify-between">
+                                <div className="flex flex-col text-sm">
+                                  <span className="font-medium">{user.displayName || "Sin nombre"}</span>
+                                  <span className="text-xs text-muted-foreground">{user.email || "-"}</span>
+                                </div>
                                 <Button
                                   variant="ghost"
                                   size="sm"
