@@ -1137,7 +1137,7 @@ export default function PedidosPage() {
                       onClick={() => setActiveTab("productos")}
                     >
                       <span className="hidden sm:inline">Productos</span>
-                      <span className="sm:hidden">Prod.</span>
+                      <span className="sm:hidden">Productos</span>
                     </Button>
                     <Button
                       variant="ghost"
@@ -1150,7 +1150,7 @@ export default function PedidosPage() {
                     >
                       <span className="hidden sm:inline">Remitos {remitos.length > 0 && `(${remitos.length})`}</span>
                       <span className="sm:hidden">
-                        Rem. {remitos.length > 0 && `(${remitos.length})`}
+                        Remitos {remitos.length > 0 && `(${remitos.length})`}
                       </span>
                     </Button>
                     {(selectedPedido.estado === "enviado" || selectedPedido.estado === "recibido") && (
@@ -1283,7 +1283,8 @@ export default function PedidosPage() {
                           disabled={productosAPedirActualizados.length === 0}
                         >
                           <Copy className="h-3.5 w-3.5 sm:mr-1" />
-                          <span className="hidden sm:inline text-xs">Copiar pedido</span>
+                          <span className="sm:hidden text-xs">copiar</span>
+                          <span className="hidden sm:inline text-xs">copiar</span>
                         </Button>
                         <Button 
                           size="sm"
@@ -1296,14 +1297,14 @@ export default function PedidosPage() {
                           {loadingEnlace ? (
                             <>
                               <Loader2 className="h-3.5 w-3.5 sm:mr-1 animate-spin" />
+                              <span className="sm:hidden text-xs">Generando...</span>
                               <span className="hidden sm:inline text-xs">Generando...</span>
                             </>
                           ) : (
                             <>
                               <LinkIcon className="h-3.5 w-3.5 sm:mr-1" />
-                              <span className="hidden sm:inline text-xs">
-                                {selectedPedido ? "Generar link" : "Crear y generar link"}
-                              </span>
+                              <span className="sm:hidden text-xs">enviar</span>
+                              <span className="hidden sm:inline text-xs">enviar pedido</span>
                             </>
                           )}
                         </Button>
@@ -1333,24 +1334,7 @@ export default function PedidosPage() {
                             </span>
                           </Button>
                         )}
-                        <Button 
-                          size="sm"
-                          className="h-7 px-2 bg-green-600 hover:bg-green-700 text-white flex-1 sm:flex-initial"
-                          onClick={handleWhatsApp} 
-                          disabled={productosAPedirActualizados.length === 0}
-                        >
-                          <MessageCircle className="h-3.5 w-3.5 sm:mr-1" />
-                          <span className="hidden sm:inline text-xs">WA</span>
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-7 px-2 sm:px-2"
-                          onClick={() => setClearDialogOpen(true)}
-                          title="Limpiar stock"
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" />
-                        </Button>
+                        {/* WhatsApp and Clear buttons removed per request */}
                       </div>
                     </div>
                   )}

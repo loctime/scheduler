@@ -354,9 +354,11 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
                   </>
                 )}
 
-                <Button variant="ghost" size="icon" onClick={() => onDeleteProduct(product.id)} className="h-7 w-7 shrink-0 opacity-60 hover:opacity-100">
-                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                </Button>
+                {configMode && (
+                  <Button variant="ghost" size="icon" onClick={() => onDeleteProduct(product.id)} className="h-7 w-7 shrink-0 opacity-60 hover:opacity-100">
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  </Button>
+                )}
               </div>
             </div>
           )
