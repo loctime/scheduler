@@ -102,6 +102,7 @@ export function ScheduleCell({
   const [startTime, setStartTime] = useState("")
   const [endTime, setEndTime] = useState("")
   const [textoEspecial, setTextoEspecial] = useState("")
+  const [colorEspecial, setColorEspecial] = useState<string>("")
   
   const hasBackgroundStyle = !!backgroundStyle
   const dayOfWeek = getDay(parseISO(date))
@@ -121,6 +122,17 @@ export function ScheduleCell({
   const existingHorarioEspecial = assignments.find(
     (a) => a.type === "shift" && !a.shiftId && (a.startTime || a.endTime)
   )
+
+  // Obtener colores únicos de los turnos disponibles
+  const availableColors = React.useMemo(() => {
+    const colorSet = new Set<string>()
+    quickShifts.forEach((shift) => {
+      if (shift.color) {
+        colorSet.add(shift.color)
+      }
+    })
+    return Array.from(colorSet)
+  }, [quickShifts])
   
   const handleOpenNotaDialog = () => {
     if (existingNota?.texto) {
@@ -136,10 +148,13 @@ export function ScheduleCell({
       setStartTime(existingHorarioEspecial.startTime || "")
       setEndTime(existingHorarioEspecial.endTime || "")
       setTextoEspecial(existingHorarioEspecial.texto || "")
+      // Obtener el color del horario especial (puede estar en el objeto como propiedad adicional)
+      setColorEspecial((existingHorarioEspecial as any).color || "")
     } else {
       setStartTime("")
       setEndTime("")
       setTextoEspecial("")
+      setColorEspecial("")
     }
     setHorarioEspecialDialogOpen(true)
   }
@@ -159,11 +174,12 @@ export function ScheduleCell({
       onAssignmentUpdate(date, employeeId, updatedAssignments, { scheduleId })
     } else {
       // Crear o actualizar el horario especial
-      const horarioEspecialAssignment: ShiftAssignment = {
+      const horarioEspecialAssignment: ShiftAssignment & { color?: string } = {
         type: "shift",
         startTime: trimmedStartTime || undefined,
         endTime: trimmedEndTime || undefined,
         texto: trimmedTexto || undefined,
+        color: colorEspecial.trim() || undefined,
       }
       
       // Eliminar horarios especiales existentes y agregar el nuevo
@@ -179,6 +195,7 @@ export function ScheduleCell({
     setStartTime("")
     setEndTime("")
     setTextoEspecial("")
+    setColorEspecial("")
   }
 
   const handleDeleteHorarioEspecial = () => {
@@ -192,6 +209,7 @@ export function ScheduleCell({
     setStartTime("")
     setEndTime("")
     setTextoEspecial("")
+    setColorEspecial("")
   }
 
   const handleSaveNota = () => {
@@ -491,6 +509,34 @@ export function ScheduleCell({
                 }}
               />
             </div>
+            {availableColors.length > 0 && (
+              <div className="grid gap-2">
+                <Label>Color (opcional)</Label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className={`h-10 w-10 rounded-full border-2 transition-all ${
+                      !colorEspecial ? "border-foreground scale-110" : "border-transparent"
+                    }`}
+                    style={{ backgroundColor: "transparent", borderStyle: "dashed" }}
+                    onClick={() => setColorEspecial("")}
+                    title="Sin color"
+                  />
+                  {availableColors.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`h-10 w-10 rounded-full border-2 transition-all ${
+                        colorEspecial === color ? "border-foreground scale-110" : "border-transparent"
+                      }`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => setColorEspecial(color)}
+                      title={color}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             {existingHorarioEspecial && (

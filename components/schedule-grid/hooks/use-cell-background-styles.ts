@@ -93,6 +93,17 @@ export function useCellBackgroundStyles({
         return { backgroundColor: defaultGreenColor }
       }
 
+      // Buscar horario especial (sin shiftId pero con startTime/endTime)
+      const horarioEspecial = assignments.find(
+        (a) => a.type === "shift" && !a.shiftId && (a.startTime || a.endTime)
+      )
+
+      // Si hay un horario especial con color, usar ese color
+      if (horarioEspecial && (horarioEspecial as any).color) {
+        const especialColor = (horarioEspecial as any).color
+        return { backgroundColor: hexToRgba(especialColor, 0.35) }
+      }
+
       // Buscar medio franco
       const medioFranco = assignments.find((a) => a.type === "medio_franco")
 
