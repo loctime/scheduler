@@ -5,11 +5,28 @@ import {
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  Clock,
 } from 'lucide-react'
 import { DayButton, DayPicker, getDefaultClassNames } from 'react-day-picker'
 
 import { cn } from '@/lib/utils'
 import { Button, buttonVariants } from '@/components/ui/button'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 function Calendar({
   className,
@@ -19,9 +36,11 @@ function Calendar({
   buttonVariant = 'ghost',
   formatters,
   components,
+  onSpecialSchedule,
   ...props
 }: React.ComponentProps<typeof DayPicker> & {
   buttonVariant?: React.ComponentProps<typeof Button>['variant']
+  onSpecialSchedule?: (date: Date, schedule: { startTime?: string; endTime?: string; texto?: string }) => void
 }) {
   const defaultClassNames = getDefaultClassNames()
 
@@ -155,7 +174,9 @@ function Calendar({
             <ChevronDownIcon className={cn('size-4', className)} {...props} />
           )
         },
-        DayButton: CalendarDayButton,
+        DayButton: (dayButtonProps) => (
+          <CalendarDayButton {...dayButtonProps} onSpecialSchedule={onSpecialSchedule} />
+        ),
         WeekNumber: ({ children, ...props }) => {
           return (
             <td {...props}>
@@ -176,16 +197,48 @@ function CalendarDayButton({
   className,
   day,
   modifiers,
+  onSpecialSchedule,
   ...props
-}: React.ComponentProps<typeof DayButton>) {
+}: React.ComponentProps<typeof DayButton> & {
+  onSpecialSchedule?: (date: Date, schedule: { startTime?: string; endTime?: string; texto?: string }) => void
+}) {
   const defaultClassNames = getDefaultClassNames()
+  const [isDialogOpen, setIsDialogOpen] = React.useState(false)
+  const [startTime, setStartTime] = React.useState('')
+  const [endTime, setEndTime] = React.useState('')
+  const [texto, setTexto] = React.useState('')
 
   const ref = React.useRef<HTMLButtonElement>(null)
   React.useEffect(() => {
     if (modifiers.focused) ref.current?.focus()
   }, [modifiers.focused])
 
-  return (
+  const handleSpecialSchedule = () => {
+    setIsDialogOpen(true)
+  }
+
+  const handleSaveSpecialSchedule = () => {
+    if (onSpecialSchedule) {
+      onSpecialSchedule(day.date, {
+        startTime: startTime || undefined,
+        endTime: endTime || undefined,
+        texto: texto || undefined,
+      })
+    }
+    setIsDialogOpen(false)
+    setStartTime('')
+    setEndTime('')
+    setTexto('')
+  }
+
+  const handleCancel = () => {
+    setIsDialogOpen(false)
+    setStartTime('')
+    setEndTime('')
+    setTexto('')
+  }
+
+  const dayButton = (
     <Button
       ref={ref}
       variant="ghost"
@@ -207,6 +260,81 @@ function CalendarDayButton({
       )}
       {...props}
     />
+  )
+
+  if (!onSpecialSchedule) {
+    return dayButton
+  }
+
+  return (
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          {dayButton}
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onClick={handleSpecialSchedule}>
+            <Clock className="mr-2 h-4 w-4" />
+            Asignar horario especial
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Asignar horario especial</DialogTitle>
+            <DialogDescription>
+              Ingrese los detalles del horario especial para el día {day.date.toLocaleDateString('es-ES', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="startTime">Hora de inicio (opcional)</Label>
+              <Input
+                id="startTime"
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                placeholder="HH:MM"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="endTime">Hora de fin (opcional)</Label>
+              <Input
+                id="endTime"
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                placeholder="HH:MM"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="texto">Descripción o nota (opcional)</Label>
+              <Input
+                id="texto"
+                value={texto}
+                onChange={(e) => setTexto(e.target.value)}
+                placeholder="Ej: Reunión especial, Evento, etc."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancel}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveSpecialSchedule}>
+              Guardar horario especial
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
