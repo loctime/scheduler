@@ -112,6 +112,32 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
           }
         }
 
+        // Manejar horario especial (sin shiftId pero con startTime/endTime)
+        if (assignment.type === "shift" && !assignment.shiftId && (assignment.startTime || assignment.endTime)) {
+          const timeDisplay = []
+          if (assignment.startTime && assignment.endTime) {
+            timeDisplay.push(`${assignment.startTime} - ${assignment.endTime}`)
+          } else if (assignment.startTime) {
+            timeDisplay.push(`Desde ${assignment.startTime}`)
+          } else if (assignment.endTime) {
+            timeDisplay.push(`Hasta ${assignment.endTime}`)
+          }
+          
+          if (assignment.texto) {
+            timeDisplay.push(assignment.texto)
+          }
+
+          return (
+            <div key={`horario-especial-${idx}`} className="text-center text-xs sm:text-sm md:text-base">
+              {timeDisplay.map((line, lineIdx) => (
+                <span key={lineIdx} className="block font-semibold text-primary">
+                  {line}
+                </span>
+              ))}
+            </div>
+          )
+        }
+
         const shift = getShiftInfo(assignment.shiftId || "")
         if (!shift) return null
         const displayTimeLines = getShiftDisplayTime(assignment.shiftId || "", shift, assignment)

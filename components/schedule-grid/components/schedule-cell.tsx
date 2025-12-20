@@ -20,7 +20,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Check, RotateCcw, Undo2, Lock, FileText, X } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Check, RotateCcw, Undo2, Lock, FileText, X, Clock } from "lucide-react"
 import { ShiftAssignment, Turno, MedioTurno, Configuracion } from "@/lib/types"
 import { CellAssignments } from "./cell-assignments"
 import { QuickShiftSelector } from "./quick-shift-selector"
@@ -97,6 +98,10 @@ export function ScheduleCell({
 }: ScheduleCellProps) {
   const [notaDialogOpen, setNotaDialogOpen] = useState(false)
   const [notaTexto, setNotaTexto] = useState("")
+  const [horarioEspecialDialogOpen, setHorarioEspecialDialogOpen] = useState(false)
+  const [startTime, setStartTime] = useState("")
+  const [endTime, setEndTime] = useState("")
+  const [textoEspecial, setTextoEspecial] = useState("")
   
   const hasBackgroundStyle = !!backgroundStyle
   const dayOfWeek = getDay(parseISO(date))
@@ -112,6 +117,11 @@ export function ScheduleCell({
   // Verificar si ya hay una nota en esta celda
   const existingNota = assignments.find((a) => a.type === "nota")
   
+  // Verificar si ya hay un horario especial en esta celda
+  const existingHorarioEspecial = assignments.find(
+    (a) => a.type === "shift" && !a.shiftId && (a.startTime || a.endTime)
+  )
+  
   const handleOpenNotaDialog = () => {
     if (existingNota?.texto) {
       setNotaTexto(existingNota.texto)
@@ -119,6 +129,69 @@ export function ScheduleCell({
       setNotaTexto("")
     }
     setNotaDialogOpen(true)
+  }
+
+  const handleOpenHorarioEspecialDialog = () => {
+    if (existingHorarioEspecial) {
+      setStartTime(existingHorarioEspecial.startTime || "")
+      setEndTime(existingHorarioEspecial.endTime || "")
+      setTextoEspecial(existingHorarioEspecial.texto || "")
+    } else {
+      setStartTime("")
+      setEndTime("")
+      setTextoEspecial("")
+    }
+    setHorarioEspecialDialogOpen(true)
+  }
+
+  const handleSaveHorarioEspecial = () => {
+    if (!onAssignmentUpdate) return
+    
+    const trimmedStartTime = startTime.trim()
+    const trimmedEndTime = endTime.trim()
+    const trimmedTexto = textoEspecial.trim()
+    
+    // Si no hay horas ni texto, eliminar el horario especial
+    if (!trimmedStartTime && !trimmedEndTime && !trimmedTexto) {
+      const updatedAssignments = assignments.filter(
+        (a) => !(a.type === "shift" && !a.shiftId && (a.startTime || a.endTime))
+      )
+      onAssignmentUpdate(date, employeeId, updatedAssignments, { scheduleId })
+    } else {
+      // Crear o actualizar el horario especial
+      const horarioEspecialAssignment: ShiftAssignment = {
+        type: "shift",
+        startTime: trimmedStartTime || undefined,
+        endTime: trimmedEndTime || undefined,
+        texto: trimmedTexto || undefined,
+      }
+      
+      // Eliminar horarios especiales existentes y agregar el nuevo
+      const otherAssignments = assignments.filter(
+        (a) => !(a.type === "shift" && !a.shiftId && (a.startTime || a.endTime))
+      )
+      const updatedAssignments = [...otherAssignments, horarioEspecialAssignment]
+      
+      onAssignmentUpdate(date, employeeId, updatedAssignments, { scheduleId })
+    }
+    
+    setHorarioEspecialDialogOpen(false)
+    setStartTime("")
+    setEndTime("")
+    setTextoEspecial("")
+  }
+
+  const handleDeleteHorarioEspecial = () => {
+    if (!onAssignmentUpdate) return
+    
+    const updatedAssignments = assignments.filter(
+      (a) => !(a.type === "shift" && !a.shiftId && (a.startTime || a.endTime))
+    )
+    onAssignmentUpdate(date, employeeId, updatedAssignments, { scheduleId })
+    setHorarioEspecialDialogOpen(false)
+    setStartTime("")
+    setEndTime("")
+    setTextoEspecial("")
   }
 
   const handleSaveNota = () => {
@@ -305,6 +378,10 @@ export function ScheduleCell({
                 <FileText className="mr-2 h-4 w-4" />
                 {existingNota ? "Editar nota" : "Agregar nota"}
               </ContextMenuItem>
+              <ContextMenuItem onClick={handleOpenHorarioEspecialDialog}>
+                <Clock className="mr-2 h-4 w-4" />
+                {existingHorarioEspecial ? "Editar horario especial" : "Asignar horario especial"}
+              </ContextMenuItem>
               {assignments.length > 0 && (
                 <>
                   <ContextMenuSeparator />
@@ -361,6 +438,70 @@ export function ScheduleCell({
               Cancelar
             </Button>
             <Button onClick={handleSaveNota}>
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo para asignar/editar horario especial */}
+      <Dialog open={horarioEspecialDialogOpen} onOpenChange={setHorarioEspecialDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {existingHorarioEspecial ? "Editar horario especial" : "Asignar horario especial"}
+            </DialogTitle>
+            <DialogDescription>
+              Ingrese las horas de inicio y fin para crear un horario manual personalizado
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="startTime">Hora de inicio (opcional)</Label>
+              <Input
+                id="startTime"
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                placeholder="HH:MM"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="endTime">Hora de fin (opcional)</Label>
+              <Input
+                id="endTime"
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                placeholder="HH:MM"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="textoEspecial">Descripción o nota (opcional)</Label>
+              <Input
+                id="textoEspecial"
+                value={textoEspecial}
+                onChange={(e) => setTextoEspecial(e.target.value)}
+                placeholder="Ej: Reunión especial, Evento, etc."
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSaveHorarioEspecial()
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            {existingHorarioEspecial && (
+              <Button variant="destructive" onClick={handleDeleteHorarioEspecial}>
+                Eliminar horario especial
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setHorarioEspecialDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveHorarioEspecial}>
               Guardar
             </Button>
           </DialogFooter>
