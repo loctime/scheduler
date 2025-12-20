@@ -598,33 +598,43 @@ export default function EmpleadosPage() {
                         return (
                           <TableRow key={employee.id} className="border-border">
                             <TableCell className="font-medium text-foreground">
-                              {editingThisField === 'name' ? (
-                                <Input
-                                  value={inlineValue}
-                                  onChange={(e) => setInlineValue(e.target.value)}
-                                  onBlur={() => handleInlineSave(employee.id, 'name', inlineValue)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      handleInlineSave(employee.id, 'name', inlineValue)
-                                    } else if (e.key === 'Escape') {
-                                      setEditingField(null)
-                                      setInlineValue("")
-                                    }
-                                  }}
-                                  autoFocus
-                                  className="h-8"
-                                />
-                              ) : (
-                                <div
-                                  onClick={() => {
-                                    setEditingField({ id: employee.id, field: 'name' })
-                                    setInlineValue(employee.name)
-                                  }}
-                                  className="cursor-pointer hover:bg-muted rounded px-2 py-1 -mx-2 transition-colors"
-                                >
-                                  {employee.name}
-                                </div>
-                              )}
+                              <div className="flex items-center gap-2">
+                                {editingThisField === 'name' ? (
+                                  <div className="flex items-center gap-2 flex-1">
+                                    <Input
+                                      value={inlineValue}
+                                      onChange={(e) => setInlineValue(e.target.value)}
+                                      onBlur={() => handleInlineSave(employee.id, 'name', inlineValue)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          handleInlineSave(employee.id, 'name', inlineValue)
+                                        } else if (e.key === 'Escape') {
+                                          setEditingField(null)
+                                          setInlineValue("")
+                                        }
+                                      }}
+                                      autoFocus
+                                      className="h-8 flex-1"
+                                    />
+                                  </div>
+                                ) : (
+                                  <>
+                                    <span className="flex-1">{employee.name}</span>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      onClick={() => {
+                                        setEditingField({ id: employee.id, field: 'name' })
+                                        setInlineValue(employee.name)
+                                      }}
+                                      title="Editar nombre"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="text-muted-foreground">
                               {editingThisField === 'email' ? (
