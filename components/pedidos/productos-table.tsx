@@ -123,9 +123,27 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
   const [newProductUnidad, setNewProductUnidad] = useState("U")
   const newProductInputRef = useRef<HTMLInputElement | null>(null)
 
+  // Estado local para stockMinimo (actualización inmediata en UI)
+  const [stockMinimoLocal, setStockMinimoLocal] = useState<Record<string, number>>({})
+
   useEffect(() => {
     if (isCreatingProduct && newProductInputRef.current) newProductInputRef.current.focus()
   }, [isCreatingProduct])
+
+  // Sincronizar stockMinimoLocal cuando cambia products (solo limpiar productos eliminados)
+  useEffect(() => {
+    setStockMinimoLocal(prev => {
+      const productIds = new Set(products.map(p => p.id))
+      const nuevo: Record<string, number> = {}
+      // Solo mantener valores locales para productos que aún existen
+      Object.keys(prev).forEach(productId => {
+        if (productIds.has(productId)) {
+          nuevo[productId] = prev[productId]
+        }
+      })
+      return nuevo
+    })
+  }, [products])
 
   const startEditing = (id: string, field: string, value = "") => {
     setEditingField({ id, field })
@@ -238,7 +256,9 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
           const isEditing = editingField?.id === product.id
           const editingThisField = isEditing ? editingField?.field : null
           const stockActualValue = stockActual[product.id] ?? 0
-          const pedidoBase = calcularPedido(product.stockMinimo, stockActualValue)
+          // Usar valor local para stockMinimo (actualización inmediata en UI)
+          const stockMinimoValue = stockMinimoLocal[product.id] ?? product.stockMinimo
+          const pedidoBase = calcularPedido(stockMinimoValue, stockActualValue)
           const ajuste = ajustesPedido[product.id] ?? 0
           const pedidoCalculado = Math.max(0, pedidoBase + ajuste)
           // Mostrar el valor lógico calculado en el input. No cambiar cálculos,
@@ -280,22 +300,23 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
                           size="icon"
                           className="h-9 w-9"
                           onClick={() => {
-                            const nuevoValor = Math.max(0, product.stockMinimo - 1)
-                            if (nuevoValor !== product.stockMinimo) {
-                              onUpdateProduct(product.id, "stockMinimo", nuevoValor.toString())
-                            }
+                            const nuevoValor = Math.max(0, stockMinimoValue - 1)
+                            // Actualizar estado local primero (actualización inmediata en UI)
+                            setStockMinimoLocal(prev => ({ ...prev, [product.id]: nuevoValor }))
+                            // Llamar a onUpdateProduct en segundo plano
+                            onUpdateProduct(product.id, "stockMinimo", nuevoValor.toString())
                           }}
-                          disabled={product.stockMinimo <= 0}
+                          disabled={stockMinimoValue <= 0}
                         >
                           <Minus className="h-4 w-4" />
                         </Button>
                         <StockInput
-                          value={product.stockMinimo}
+                          value={stockMinimoValue}
                           onChange={(v) => {
-                            // Solo guardar si el valor cambió
-                            if (v !== product.stockMinimo) {
-                              onUpdateProduct(product.id, "stockMinimo", v.toString())
-                            }
+                            // Actualizar estado local primero (actualización inmediata en UI)
+                            setStockMinimoLocal(prev => ({ ...prev, [product.id]: v }))
+                            // Llamar a onUpdateProduct en segundo plano
+                            onUpdateProduct(product.id, "stockMinimo", v.toString())
                           }}
                         />
                         <Button
@@ -303,9 +324,10 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
                           size="icon"
                           className="h-9 w-9"
                           onClick={() => {
-                            const nuevoValor = product.stockMinimo + 1
-                          
-                            // 1. Update inmediato en UI
+                            const nuevoValor = stockMinimoValue + 1
+                            // Actualizar estado local primero (actualización inmediata en UI)
+                            setStockMinimoLocal(prev => ({ ...prev, [product.id]: nuevoValor }))
+                            // Llamar a onUpdateProduct en segundo plano
                             onUpdateProduct(product.id, "stockMinimo", nuevoValor.toString())
                           }}
                         >
@@ -314,7 +336,7 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
                       </div>
                     </div>
                   ) : (
-                    <p className="text-[10px] text-muted-foreground">mín: {product.stockMinimo}</p>
+                    <p className="text-[10px] text-muted-foreground">mín: {stockMinimoValue}</p>
                   )}
                 </div>
 
