@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { 
   Plus, Trash2, Copy, MessageCircle, RotateCcw, Upload, Package, 
   Pencil, Check, X, Cog, ExternalLink, Link as LinkIcon,
-  FileText, Download, Bell, Loader2, CheckCircle, AlertTriangle
+  FileText, Download, Bell, Loader2, CheckCircle, AlertTriangle, ChevronDown
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
@@ -35,6 +35,12 @@ import {
 } from "@/components/pedidos/pedido-dialogs"
 import { cn } from "@/lib/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { PWAUpdateNotification } from "@/components/pwa-update-notification"
 
@@ -210,11 +216,14 @@ export default function PedidosPage() {
   // Inline edit states
   const [isEditingName, setIsEditingName] = useState(false)
   const [isEditingMensaje, setIsEditingMensaje] = useState(false)
+  const [isEditingSheetUrl, setIsEditingSheetUrl] = useState(false)
   const [showConfig, setShowConfig] = useState(false)
   const [editingName, setEditingName] = useState("")
   const [editingMensaje, setEditingMensaje] = useState("")
+  const [editingSheetUrl, setEditingSheetUrl] = useState("")
   const nameInputRef = useRef<HTMLInputElement>(null)
   const mensajeInputRef = useRef<HTMLInputElement>(null)
+  const sheetUrlInputRef = useRef<HTMLInputElement>(null)
   
   // Tab state
   const [activeTab, setActiveTab] = useState<"productos" | "remitos" | "recepcion">("productos")
@@ -236,16 +245,25 @@ export default function PedidosPage() {
     }
   }, [isEditingMensaje])
 
+  useEffect(() => {
+    if (isEditingSheetUrl && sheetUrlInputRef.current) {
+      sheetUrlInputRef.current.focus()
+      sheetUrlInputRef.current.select()
+    }
+  }, [isEditingSheetUrl])
+
   // Ya no cargamos enlaces existentes - siempre generamos nuevos
 
   // Reset edit states when selectedPedido changes
   useEffect(() => {
     setIsEditingName(false)
     setIsEditingMensaje(false)
+    setIsEditingSheetUrl(false)
     setActiveTab("productos") // Reset tab when changing pedido
     if (selectedPedido) {
       setEditingName(selectedPedido.nombre)
       setEditingMensaje(selectedPedido.mensajePrevio || "")
+      setEditingSheetUrl(selectedPedido.sheetUrl || "")
     }
   }, [selectedPedido])
 
@@ -569,6 +587,49 @@ export default function PedidosPage() {
       toast({ title: "Copiado", description: "Pedido copiado al portapapeles" })
     } catch {
       toast({ title: "Error", description: "No se pudo copiar", variant: "destructive" })
+    }
+  }
+
+  // Función para copiar solo la columna "Pedir" y abrir Google Sheet
+  const handleLlevarPedidoASheet = async () => {
+    if (!selectedPedido?.sheetUrl) {
+      toast({ 
+        title: "Error", 
+        description: "No hay link de Google Sheet configurado", 
+        variant: "destructive" 
+      })
+      return
+    }
+
+    if (products.length === 0) {
+      toast({ title: "Sin productos", description: "No hay productos para copiar" })
+      return
+    }
+
+    try {
+      // Copiar solo la columna "Pedir" (una línea por producto, respetando el orden actual)
+      const cantidadesPedir = products.map(p => {
+        const cantidad = calcularPedidoConAjuste(p.stockMinimo, stockActual[p.id], p.id)
+        return cantidad.toString()
+      })
+      
+      const textoACopiar = cantidadesPedir.join("\n")
+      await navigator.clipboard.writeText(textoACopiar)
+      
+      // Abrir el Google Sheet en una nueva pestaña
+      window.open(selectedPedido.sheetUrl, "_blank")
+      
+      toast({ 
+        title: "Copiado y abierto", 
+        description: "Las cantidades se copiaron al portapapeles y se abrió el Google Sheet" 
+      })
+    } catch (error) {
+      console.error("Error al llevar pedido a Sheet:", error)
+      toast({ 
+        title: "Error", 
+        description: "No se pudo copiar o abrir el Sheet", 
+        variant: "destructive" 
+      })
     }
   }
 
@@ -1010,6 +1071,39 @@ export default function PedidosPage() {
     }
   }
 
+  // Sheet URL handlers
+  const handleStartEditSheetUrl = () => {
+    if (selectedPedido) {
+      setEditingSheetUrl(selectedPedido.sheetUrl || "")
+      setIsEditingSheetUrl(true)
+    }
+  }
+
+  const handleSaveSheetUrl = async () => {
+    if (!selectedPedido) return
+    await updatePedido(
+      selectedPedido.nombre,
+      selectedPedido.stockMinimoDefault,
+      selectedPedido.formatoSalida,
+      selectedPedido.mensajePrevio,
+      editingSheetUrl.trim() || undefined
+    )
+    setIsEditingSheetUrl(false)
+  }
+
+  const handleCancelEditSheetUrl = () => {
+    setEditingSheetUrl(selectedPedido?.sheetUrl || "")
+    setIsEditingSheetUrl(false)
+  }
+
+  const handleSheetUrlKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSaveSheetUrl()
+    } else if (e.key === "Escape") {
+      handleCancelEditSheetUrl()
+    }
+  }
+
   // Loading state
   if (loading) {
     return (
@@ -1229,6 +1323,43 @@ export default function PedidosPage() {
                           ))}
                         </div>
                       </div>
+
+                      {/* Link de Google Sheet */}
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+                          Link de Google Sheet del pedido
+                        </label>
+                        <p className="text-[9px] text-muted-foreground mt-0.5 mb-1">
+                          Pegá acá el link del Sheet que usa la empresa para este pedido.
+                        </p>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          {isEditingSheetUrl ? (
+                            <>
+                              <Input
+                                ref={sheetUrlInputRef}
+                                value={editingSheetUrl}
+                                onChange={(e) => setEditingSheetUrl(e.target.value)}
+                                onKeyDown={handleSheetUrlKeyDown}
+                                className="text-sm h-7 flex-1"
+                                placeholder="https://docs.google.com/spreadsheets/..."
+                              />
+                              <Button variant="ghost" size="icon" onClick={handleSaveSheetUrl} className="h-7 w-7 shrink-0 text-green-600">
+                                <Check className="h-3 w-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={handleCancelEditSheetUrl} className="h-7 w-7 shrink-0">
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </>
+                          ) : (
+                            <div 
+                              onClick={handleStartEditSheetUrl}
+                              className="flex-1 text-xs px-2 py-1 rounded border border-border bg-muted/50 cursor-pointer hover:bg-muted truncate"
+                            >
+                              {selectedPedido.sheetUrl || "Sin configurar"}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -1276,16 +1407,33 @@ export default function PedidosPage() {
                       </div>
 
                       <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto justify-end">
-                        <Button 
-                          size="sm" 
-                          className="h-7 px-2 flex-1 sm:flex-initial"
-                          onClick={handleCopyPedido} 
-                          disabled={productosAPedirActualizados.length === 0}
-                        >
-                          <Copy className="h-3.5 w-3.5 sm:mr-1" />
-                          <span className="sm:hidden text-xs">copiar</span>
-                          <span className="hidden sm:inline text-xs">copiar</span>
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              size="sm" 
+                              className="h-7 px-2 flex-1 sm:flex-initial"
+                              disabled={productosAPedirActualizados.length === 0}
+                            >
+                              <Copy className="h-3.5 w-3.5 sm:mr-1" />
+                              <span className="sm:hidden text-xs">copiar</span>
+                              <span className="hidden sm:inline text-xs">copiar</span>
+                              <ChevronDown className="h-3 w-3 ml-1 opacity-50" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={handleCopyPedido}>
+                              <Copy className="h-4 w-4 mr-2" />
+                              Copiar pedido completo
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={handleLlevarPedidoASheet}
+                              disabled={!selectedPedido?.sheetUrl}
+                            >
+                              <FileText className="h-4 w-4 mr-2" />
+                              Llevar pedido a Sheet
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                         <Button 
                           size="sm"
                           variant="outline"

@@ -256,6 +256,7 @@ export interface Pedido {
   stockMinimoDefault: number
   formatoSalida: string
   mensajePrevio?: string
+  sheetUrl?: string
   userId: string
   estado?: string
   assignedTo?: string

@@ -269,7 +269,7 @@ export function usePedidos(user: any) {
   }, [user, userData, toast])
 
   // Actualizar pedido
-  const updatePedido = useCallback(async (nombre: string, stockMinimoDefault: number, formatoSalida: string, mensajePrevio?: string) => {
+  const updatePedido = useCallback(async (nombre: string, stockMinimoDefault: number, formatoSalida: string, mensajePrevio?: string, sheetUrl?: string) => {
     if (!db || !selectedPedido) return false
 
     try {
@@ -278,6 +278,7 @@ export function usePedidos(user: any) {
         stockMinimoDefault,
         formatoSalida: formatoSalida || DEFAULT_FORMAT,
         mensajePrevio: mensajePrevio ?? selectedPedido.mensajePrevio ?? null,
+        sheetUrl: sheetUrl !== undefined ? (sheetUrl.trim() || null) : selectedPedido.sheetUrl ?? null,
         updatedAt: serverTimestamp(),
       })
       
@@ -286,7 +287,8 @@ export function usePedidos(user: any) {
         nombre: nombre.trim(), 
         stockMinimoDefault, 
         formatoSalida,
-        mensajePrevio: mensajePrevio ?? selectedPedido.mensajePrevio 
+        mensajePrevio: mensajePrevio ?? selectedPedido.mensajePrevio,
+        sheetUrl: sheetUrl !== undefined ? (sheetUrl.trim() || undefined) : selectedPedido.sheetUrl
       }
       setPedidos(prev => prev.map(p => p.id === selectedPedido.id ? updatedPedido : p))
       setSelectedPedido(updatedPedido)
