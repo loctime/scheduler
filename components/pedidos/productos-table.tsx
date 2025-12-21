@@ -271,7 +271,51 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
               <div className="flex items-center gap-2 flex-1">
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-xs truncate">{product.nombre}</p>
-                  <p className="text-[10px] text-muted-foreground">mín: {product.stockMinimo}</p>
+                  {configMode ? (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span className="text-[10px] text-muted-foreground">mín:</span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={() => {
+                            const nuevoValor = Math.max(0, product.stockMinimo - 1)
+                            if (nuevoValor !== product.stockMinimo) {
+                              onUpdateProduct(product.id, "stockMinimo", nuevoValor.toString())
+                            }
+                          }}
+                          disabled={product.stockMinimo <= 0}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <StockInput
+                          value={product.stockMinimo}
+                          onChange={(v) => {
+                            // Solo guardar si el valor cambió
+                            if (v !== product.stockMinimo) {
+                              onUpdateProduct(product.id, "stockMinimo", v.toString())
+                            }
+                          }}
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={() => {
+                            const nuevoValor = product.stockMinimo + 1
+                          
+                            // 1. Update inmediato en UI
+                            onUpdateProduct(product.id, "stockMinimo", nuevoValor.toString())
+                          }}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground">mín: {product.stockMinimo}</p>
+                  )}
                 </div>
 
                 {viewMode === "pedir" ? (
