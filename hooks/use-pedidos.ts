@@ -32,16 +32,21 @@ export function usePedidos(user: any) {
   const [loading, setLoading] = useState(true)
   const [stockActual, setStockActual] = useState<Record<string, number>>({})
 
+  // Helper para obtener el userId efectivo (unificado para lectura y escritura)
+  const getEffectiveUserId = useCallback((): string | null => {
+    if (!user) return null
+    return userData?.role === "invited" && userData?.ownerId 
+      ? userData.ownerId 
+      : user.uid
+  }, [user, userData])
+
   // Cargar pedidos
   const loadPedidos = useCallback(async () => {
     if (!user || !db) return
     
     try {
-      // Si el usuario es invitado, cargar pedidos del ownerId
-      // Si no, cargar pedidos del userId normal
-      const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
-        ? userData.ownerId 
-        : user.uid
+      const userIdToQuery = getEffectiveUserId()
+      if (!userIdToQuery) return
       
       const pedidosQuery = query(
         collection(db, COLLECTIONS.PEDIDOS),
@@ -67,9 +72,10 @@ export function usePedidos(user: any) {
         variant: "destructive",
       })
     }
-  }, [user, userData, selectedPedido, toast])
+  }, [user, getEffectiveUserId, selectedPedido, toast])
 
-  // Cargar productos del pedido seleccionado
+  // Cargar productos del pedido seleccionado - 100% READ-ONLY
+  // NO hace escrituras automáticas. Solo lee desde Firestore.
   const loadProducts = useCallback(async () => {
     if (!user || !db || !selectedPedido) {
       setProducts([])
@@ -77,10 +83,11 @@ export function usePedidos(user: any) {
     }
     
     try {
-      // Si el usuario es invitado, usar ownerId para cargar productos
-      const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
-        ? userData.ownerId 
-        : user.uid
+      const userIdToQuery = getEffectiveUserId()
+      if (!userIdToQuery) {
+        setProducts([])
+        return
+      }
       
       const productsQuery = query(
         collection(db, COLLECTIONS.PRODUCTS),
@@ -92,54 +99,6 @@ export function usePedidos(user: any) {
         id: doc.id,
         ...doc.data(),
       })) as Producto[]
-      
-      // Identificar productos sin orden o sin unidad (productos antiguos)
-      const productosSinOrden = productsData.filter(p => p.orden === undefined)
-      const productosSinUnidad = productsData.filter(p => !p.unidad || p.unidad.trim() === "")
-      
-      // Si hay productos sin orden, asignarles uno basado en orden alfabético
-      if (productosSinOrden.length > 0 && db) {
-        const dbInstance = db // TypeScript ahora sabe que db no es undefined
-        // Ordenar alfabéticamente primero
-        const productosConOrden = productsData.filter(p => p.orden !== undefined)
-        productosSinOrden.sort((a, b) => a.nombre.localeCompare(b.nombre))
-        
-        // Calcular el orden inicial (máximo orden existente + 1, o 0)
-        const maxOrden = productosConOrden.length > 0
-          ? Math.max(...productosConOrden.map(p => p.orden ?? 0), -1) + 1
-          : 0
-        
-        // Asignar orden a productos sin orden
-        productosSinOrden.forEach((product, index) => {
-          product.orden = maxOrden + index
-        })
-        
-        // Guardar el orden en la base de datos
-        const batch = writeBatch(dbInstance)
-        productosSinOrden.forEach((product) => {
-          const productRef = doc(dbInstance, COLLECTIONS.PRODUCTS, product.id)
-          batch.update(productRef, {
-            orden: product.orden,
-            updatedAt: serverTimestamp(),
-          })
-        })
-        await batch.commit()
-      }
-      
-      // Si hay productos sin unidad, asignarles "U" como valor por defecto
-      if (productosSinUnidad.length > 0 && db) {
-        const dbInstance = db // TypeScript ahora sabe que db no es undefined
-        const batch = writeBatch(dbInstance)
-        productosSinUnidad.forEach((product) => {
-          const productRef = doc(dbInstance, COLLECTIONS.PRODUCTS, product.id)
-          batch.update(productRef, {
-            unidad: "U",
-            updatedAt: serverTimestamp(),
-          })
-          product.unidad = "U"
-        })
-        await batch.commit()
-      }
       
       // Ordenar por orden, y si tienen el mismo orden, alfabéticamente
       productsData.sort((a, b) => {
@@ -160,7 +119,82 @@ export function usePedidos(user: any) {
         variant: "destructive",
       })
     }
-  }, [user, selectedPedido, toast])
+  }, [user, selectedPedido, getEffectiveUserId, toast])
+
+  // Corregir orden de productos sin orden - función separada, solo se llama explícitamente
+  const fixProductsOrder = useCallback(async (): Promise<boolean> => {
+    if (!db || !selectedPedido || products.length === 0) return false
+
+    try {
+      const userIdToUse = getEffectiveUserId()
+      if (!userIdToUse) return false
+
+      // Identificar productos sin orden
+      const productosSinOrden = products.filter(p => p.orden === undefined)
+      if (productosSinOrden.length === 0) return true
+
+      // Ordenar alfabéticamente
+      const productosConOrden = products.filter(p => p.orden !== undefined)
+      productosSinOrden.sort((a, b) => a.nombre.localeCompare(b.nombre))
+      
+      // Calcular el orden inicial (máximo orden existente + 1, o 0)
+      const maxOrden = productosConOrden.length > 0
+        ? Math.max(...productosConOrden.map(p => p.orden ?? 0), -1) + 1
+        : 0
+      
+      // Escribir en Firestore usando userId efectivo unificado
+      const dbInstance = db // TypeScript ahora sabe que db no es undefined
+      const batch = writeBatch(dbInstance)
+      productosSinOrden.forEach((product, index) => {
+        const productRef = doc(dbInstance, COLLECTIONS.PRODUCTS, product.id)
+        batch.update(productRef, {
+          orden: maxOrden + index,
+          updatedAt: serverTimestamp(),
+        })
+      })
+      await batch.commit()
+      
+      // Recargar productos desde Firestore para reflejar cambios
+      await loadProducts()
+      return true
+    } catch (error: any) {
+      logger.error("Error al corregir orden de productos:", error)
+      return false
+    }
+  }, [db, selectedPedido, products, getEffectiveUserId, loadProducts])
+
+  // Corregir unidad de productos sin unidad - función separada, solo se llama explícitamente
+  const fixProductsUnit = useCallback(async (): Promise<boolean> => {
+    if (!db || !selectedPedido || products.length === 0) return false
+
+    try {
+      const userIdToUse = getEffectiveUserId()
+      if (!userIdToUse) return false
+
+      // Identificar productos sin unidad
+      const productosSinUnidad = products.filter(p => !p.unidad || p.unidad.trim() === "")
+      if (productosSinUnidad.length === 0) return true
+
+      // Escribir en Firestore usando userId efectivo unificado
+      const dbInstance = db // TypeScript ahora sabe que db no es undefined
+      const batch = writeBatch(dbInstance)
+      productosSinUnidad.forEach((product) => {
+        const productRef = doc(dbInstance, COLLECTIONS.PRODUCTS, product.id)
+        batch.update(productRef, {
+          unidad: "U",
+          updatedAt: serverTimestamp(),
+        })
+      })
+      await batch.commit()
+      
+      // Recargar productos desde Firestore para reflejar cambios
+      await loadProducts()
+      return true
+    } catch (error: any) {
+      logger.error("Error al corregir unidad de productos:", error)
+      return false
+    }
+  }, [db, selectedPedido, products, getEffectiveUserId, loadProducts])
 
   // Inicialización
   useEffect(() => {
@@ -273,6 +307,7 @@ export function usePedidos(user: any) {
     if (!db || !selectedPedido) return false
 
     try {
+      // Primero escribir en Firestore - solo actualizar estado local si la escritura es exitosa
       await updateDoc(doc(db, COLLECTIONS.PEDIDOS, selectedPedido.id), {
         nombre: nombre.trim(),
         stockMinimoDefault,
@@ -282,6 +317,8 @@ export function usePedidos(user: any) {
         updatedAt: serverTimestamp(),
       })
       
+      // Solo actualizar estado local DESPUÉS de confirmar la escritura exitosa
+      // El listener de onSnapshot también actualizará, pero esto mejora la UX
       const updatedPedido = { 
         ...selectedPedido, 
         nombre: nombre.trim(), 
@@ -297,6 +334,7 @@ export function usePedidos(user: any) {
       return true
     } catch (error: any) {
       logger.error("Error al actualizar pedido:", error)
+      // No actualizar estado local - el listener de onSnapshot mantendrá el estado correcto
       toast({ title: "Error", description: "No se pudo actualizar", variant: "destructive" })
       return false
     }
@@ -372,10 +410,11 @@ export function usePedidos(user: any) {
         }
       })
 
-      // Si el usuario es invitado, usar ownerId para crear productos
-      const userIdToUse = userData?.role === "invited" && userData?.ownerId 
-        ? userData.ownerId 
-        : user.uid
+      const userIdToUse = getEffectiveUserId()
+      if (!userIdToUse) {
+        toast({ title: "Error", description: "Usuario no válido", variant: "destructive" })
+        return false
+      }
       
       for (const nombre of nuevos) {
         const docRef = doc(collection(db, COLLECTIONS.PRODUCTS))
@@ -404,7 +443,7 @@ export function usePedidos(user: any) {
       toast({ title: "Error", description: "No se pudo importar", variant: "destructive" })
       return false
     }
-  }, [user, userData, selectedPedido, products, loadProducts, toast])
+  }, [user, getEffectiveUserId, selectedPedido, products, loadProducts, toast])
 
   // Actualizar producto
   const updateProduct = useCallback(async (productId: string, field: string, value: string) => {
@@ -462,10 +501,11 @@ export function usePedidos(user: any) {
         ? Math.max(...products.map(p => p.orden ?? 0), -1) + 1
         : 0
 
-      // Si el usuario es invitado, usar ownerId para crear productos
-      const userIdToUse = userData?.role === "invited" && userData?.ownerId 
-        ? userData.ownerId 
-        : user.uid
+      const userIdToUse = getEffectiveUserId()
+      if (!userIdToUse) {
+        toast({ title: "Error", description: "Usuario no válido", variant: "destructive" })
+        return null
+      }
 
       const docRef = await addDoc(collection(db, COLLECTIONS.PRODUCTS), {
         pedidoId: selectedPedido.id,
@@ -488,7 +528,7 @@ export function usePedidos(user: any) {
       toast({ title: "Error", description: "No se pudo crear el producto", variant: "destructive" })
       return null
     }
-  }, [user, userData, selectedPedido, products, loadProducts, toast])
+  }, [user, getEffectiveUserId, selectedPedido, products, loadProducts, toast])
 
   // Eliminar producto
   const deleteProduct = useCallback(async (productId: string) => {
@@ -533,13 +573,12 @@ export function usePedidos(user: any) {
         })
       })
       
+      // Primero confirmar la escritura en Firestore
       await batch.commit()
       
-      // Actualizar estado local sin recargar desde Firestore para mejor UX
-      setProducts(prev => {
-        const ordered = newOrder.map(id => prev.find(p => p.id === id)!).filter(Boolean)
-        return ordered.map((p, index) => ({ ...p, orden: index }))
-      })
+      // Solo actualizar estado local DESPUÉS de confirmar la escritura exitosa
+      // Recargar desde Firestore para garantizar consistencia
+      await loadProducts()
       
       return true
     } catch (error: any) {
@@ -549,7 +588,7 @@ export function usePedidos(user: any) {
         description: "No se pudo actualizar el orden", 
         variant: "destructive" 
       })
-      // Recargar productos en caso de error
+      // Recargar productos desde Firestore para restaurar estado correcto
       await loadProducts()
       return false
     }
@@ -596,9 +635,11 @@ export function usePedidos(user: any) {
         updateData.fechaRecepcion = fechaRecepcion
       }
 
+      // Primero escribir en Firestore - solo actualizar estado local si la escritura es exitosa
       await updateDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId), updateData)
       
-      // Actualizar estado local
+      // Solo actualizar estado local DESPUÉS de confirmar la escritura exitosa
+      // El listener de onSnapshot también actualizará, pero esto mejora la UX
       setPedidos(prev => prev.map(p => 
         p.id === pedidoId 
           ? { ...p, estado, fechaEnvio, fechaRecepcion }
@@ -612,6 +653,7 @@ export function usePedidos(user: any) {
       return true
     } catch (error: any) {
       logger.error("Error al actualizar estado del pedido:", error)
+      // No actualizar estado local - el listener de onSnapshot mantendrá el estado correcto
       toast({
         title: "Error",
         description: "No se pudo actualizar el estado",
@@ -629,11 +671,14 @@ export function usePedidos(user: any) {
     if (!db) return false
 
     try {
+      // Primero escribir en Firestore - solo actualizar estado local si la escritura es exitosa
       await updateDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId), {
         remitoEnvioId,
         updatedAt: serverTimestamp(),
       })
       
+      // Solo actualizar estado local DESPUÉS de confirmar la escritura exitosa
+      // El listener de onSnapshot también actualizará, pero esto mejora la UX
       setPedidos(prev => prev.map(p => 
         p.id === pedidoId ? { ...p, remitoEnvioId } : p
       ))
@@ -645,6 +690,7 @@ export function usePedidos(user: any) {
       return true
     } catch (error: any) {
       logger.error("Error al actualizar remito de envío:", error)
+      // No actualizar estado local - el listener de onSnapshot mantendrá el estado correcto
       return false
     }
   }, [selectedPedido])
@@ -657,11 +703,14 @@ export function usePedidos(user: any) {
     if (!db) return false
 
     try {
+      // Primero escribir en Firestore - solo actualizar estado local si la escritura es exitosa
       await updateDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId), {
         enlacePublicoId,
         updatedAt: serverTimestamp(),
       })
       
+      // Solo actualizar estado local DESPUÉS de confirmar la escritura exitosa
+      // El listener de onSnapshot también actualizará, pero esto mejora la UX
       setPedidos(prev => prev.map(p => 
         p.id === pedidoId ? { ...p, enlacePublicoId } : p
       ))
@@ -673,6 +722,7 @@ export function usePedidos(user: any) {
       return true
     } catch (error: any) {
       logger.error("Error al actualizar enlace público:", error)
+      // No actualizar estado local - el listener de onSnapshot mantendrá el estado correcto
       return false
     }
   }, [selectedPedido])
@@ -705,6 +755,10 @@ export function usePedidos(user: any) {
     updatePedidoEstado,
     updateRemitoEnvio,
     updateEnlacePublico,
+    
+    // Funciones de corrección (solo se llaman explícitamente)
+    fixProductsOrder,
+    fixProductsUnit,
   }
 }
 
