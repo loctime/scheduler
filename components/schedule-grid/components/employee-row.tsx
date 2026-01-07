@@ -179,6 +179,18 @@ export function EmployeeRow({
                     <span className="font-bold text-foreground">Horas extra mes:</span>
                     <span className="font-semibold">{formatStatValue(employeeStats[employee.id].horasExtrasMes)}h</span>
                   </div>
+                  {(employeeStats[employee.id].horasLicenciaEmbarazo ?? 0) > 0 && (
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold text-foreground">Lic. Embarazo:</span>
+                      <span className="font-semibold">{formatStatValue(employeeStats[employee.id].horasLicenciaEmbarazo!)}h</span>
+                    </div>
+                  )}
+                  {(employeeStats[employee.id].horasMedioFranco ?? 0) > 0 && (
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold text-foreground">Medio Franco:</span>
+                      <span className="font-semibold">{formatStatValue(employeeStats[employee.id].horasMedioFranco!)}h</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

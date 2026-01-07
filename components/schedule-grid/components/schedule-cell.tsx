@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Check, RotateCcw, Undo2, Lock, FileText, X, Clock } from "lucide-react"
+import { Check, RotateCcw, Undo2, Lock, FileText, X, Clock, Baby } from "lucide-react"
 import { ShiftAssignment, Turno, MedioTurno, Configuracion } from "@/lib/types"
 import { CellAssignments } from "./cell-assignments"
 import { QuickShiftSelector } from "./quick-shift-selector"
@@ -103,6 +103,10 @@ export function ScheduleCell({
   const [endTime, setEndTime] = useState("")
   const [textoEspecial, setTextoEspecial] = useState("")
   const [colorEspecial, setColorEspecial] = useState<string>("")
+  const [licenciaEmbarazoDialogOpen, setLicenciaEmbarazoDialogOpen] = useState(false)
+  const [licenciaStartTime, setLicenciaStartTime] = useState("")
+  const [licenciaEndTime, setLicenciaEndTime] = useState("")
+  const [selectedShiftForLicencia, setSelectedShiftForLicencia] = useState<{ assignment: ShiftAssignment; shift: Turno } | null>(null)
   
   const hasBackgroundStyle = !!backgroundStyle
   const dayOfWeek = getDay(parseISO(date))
@@ -122,6 +126,17 @@ export function ScheduleCell({
   const existingHorarioEspecial = assignments.find(
     (a) => a.type === "shift" && !a.shiftId && (a.startTime || a.endTime)
   )
+
+  // Encontrar turnos (shifts) disponibles para asignar licencia
+  const availableShifts = React.useMemo(() => {
+    return assignments
+      .filter((a) => a.type === "shift" && a.shiftId)
+      .map((a) => {
+        const shift = getShiftInfo(a.shiftId!)
+        return shift ? { assignment: a, shift } : null
+      })
+      .filter((item): item is { assignment: ShiftAssignment; shift: Turno } => item !== null)
+  }, [assignments, getShiftInfo])
 
   // Obtener colores únicos de los turnos disponibles
   const availableColors = React.useMemo(() => {
@@ -253,6 +268,206 @@ export function ScheduleCell({
     
     // Limpiar todas las asignaciones de la celda
     onAssignmentUpdate(date, employeeId, [], { scheduleId })
+  }
+
+  const handleOpenLicenciaEmbarazoDialog = (shiftAssignment: ShiftAssignment, shift: Turno) => {
+    setSelectedShiftForLicencia({ assignment: shiftAssignment, shift })
+    setLicenciaStartTime("")
+    setLicenciaEndTime("")
+    setLicenciaEmbarazoDialogOpen(true)
+  }
+
+  const timeToMinutes = (time: string): number => {
+    const [hours, minutes] = time.split(":").map(Number)
+    return hours * 60 + minutes
+  }
+
+  const minutesToTime = (minutes: number): string => {
+    const hours = Math.floor(minutes / 60)
+    const mins = minutes % 60
+    return `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`
+  }
+
+  const handleSaveLicenciaEmbarazo = () => {
+    if (!onAssignmentUpdate || !selectedShiftForLicencia) return
+
+    const trimmedStartTime = licenciaStartTime.trim()
+    const trimmedEndTime = licenciaEndTime.trim()
+
+    if (!trimmedStartTime || !trimmedEndTime) {
+      return // Validación básica - el diálogo debe validar antes
+    }
+
+    const { assignment: shiftAssignment, shift } = selectedShiftForLicencia
+
+    // Obtener el horario base del turno (considerando ajustes)
+    const shiftStartTime = shiftAssignment.startTime || shift.startTime || ""
+    const shiftEndTime = shiftAssignment.endTime || shift.endTime || ""
+    const shiftStartTime2 = shiftAssignment.startTime2 || shift.startTime2
+    const shiftEndTime2 = shiftAssignment.endTime2 || shift.endTime2
+
+    // Validar que el rango esté dentro del turno
+    const licenciaStart = timeToMinutes(trimmedStartTime)
+    const licenciaEnd = timeToMinutes(trimmedEndTime)
+    const shiftStart = timeToMinutes(shiftStartTime)
+    const shiftEnd = timeToMinutes(shiftEndTime)
+
+    // Validar que el rango esté contenido en el turno
+    if (licenciaStart < shiftStart || licenciaEnd > shiftEnd) {
+      // Si el turno tiene segunda franja, también validar ahí
+      if (shiftStartTime2 && shiftEndTime2) {
+        const shiftStart2 = timeToMinutes(shiftStartTime2)
+        const shiftEnd2 = timeToMinutes(shiftEndTime2)
+        if (!(licenciaStart >= shiftStart2 && licenciaEnd <= shiftEnd2)) {
+          return // Fuera de rango
+        }
+      } else {
+        return // Fuera de rango
+      }
+    }
+
+    if (licenciaStart >= licenciaEnd) {
+      return // Rango inválido
+    }
+
+    // Crear los tramos divididos
+    const newAssignments: ShiftAssignment[] = []
+
+    // Si el turno tiene segunda franja (turno cortado)
+    if (shiftStartTime2 && shiftEndTime2) {
+      const shiftStart2 = timeToMinutes(shiftStartTime2)
+      const shiftEnd2 = timeToMinutes(shiftEndTime2)
+
+      // Determinar en qué franja está la licencia
+      if (licenciaStart >= shiftStart2 && licenciaEnd <= shiftEnd2) {
+        // Licencia está en la segunda franja
+        // Mantener primera franja completa
+        const firstPart: ShiftAssignment = {
+          shiftId: shiftAssignment.shiftId,
+          type: "shift",
+          startTime: shiftStartTime,
+          endTime: shiftEndTime,
+        }
+        newAssignments.push(firstPart)
+
+        // Tramo antes de licencia en segunda franja (si existe)
+        if (licenciaStart > shiftStart2) {
+          newAssignments.push({
+            shiftId: shiftAssignment.shiftId,
+            type: "shift",
+            startTime2: shiftStartTime2,
+            endTime2: trimmedStartTime,
+          })
+        }
+
+        // Tramo de licencia
+        newAssignments.push({
+          type: "licencia_embarazo",
+          startTime: trimmedStartTime,
+          endTime: trimmedEndTime,
+        })
+
+        // Tramo después de licencia en segunda franja (si existe)
+        if (licenciaEnd < shiftEnd2) {
+          newAssignments.push({
+            shiftId: shiftAssignment.shiftId,
+            type: "shift",
+            startTime2: trimmedEndTime,
+            endTime2: shiftEndTime2,
+          })
+        }
+      } else if (licenciaStart >= shiftStart && licenciaEnd <= shiftEnd) {
+        // Licencia está en la primera franja
+        // Tramo antes de licencia en primera franja (si existe)
+        if (licenciaStart > shiftStart) {
+          newAssignments.push({
+            shiftId: shiftAssignment.shiftId,
+            type: "shift",
+            startTime: shiftStartTime,
+            endTime: trimmedStartTime,
+          })
+        }
+
+        // Tramo de licencia
+        newAssignments.push({
+          type: "licencia_embarazo",
+          startTime: trimmedStartTime,
+          endTime: trimmedEndTime,
+        })
+
+        // Tramo después de licencia en primera franja (si existe)
+        if (licenciaEnd < shiftEnd) {
+          newAssignments.push({
+            shiftId: shiftAssignment.shiftId,
+            type: "shift",
+            startTime: trimmedEndTime,
+            endTime: shiftEndTime,
+          })
+        }
+
+        // Mantener segunda franja completa
+        newAssignments.push({
+          shiftId: shiftAssignment.shiftId,
+          type: "shift",
+          startTime2: shiftStartTime2,
+          endTime2: shiftEndTime2,
+        })
+      }
+    } else {
+      // Turno continuo (una sola franja)
+      // Tramo antes de licencia (si existe)
+      if (licenciaStart > shiftStart) {
+        newAssignments.push({
+          shiftId: shiftAssignment.shiftId,
+          type: "shift",
+          startTime: shiftStartTime,
+          endTime: trimmedStartTime,
+        })
+      }
+
+      // Tramo de licencia
+      newAssignments.push({
+        type: "licencia_embarazo",
+        startTime: trimmedStartTime,
+        endTime: trimmedEndTime,
+      })
+
+      // Tramo después de licencia (si existe)
+      if (licenciaEnd < shiftEnd) {
+        newAssignments.push({
+          shiftId: shiftAssignment.shiftId,
+          type: "shift",
+          startTime: trimmedEndTime,
+          endTime: shiftEndTime,
+        })
+      }
+    }
+
+    // Mantener todas las demás asignaciones (francos, notas, otros turnos, etc.)
+    const otherAssignments = assignments.filter(
+      (a) => !(a.type === "shift" && a.shiftId === shiftAssignment.shiftId)
+    )
+
+    // Separar por tipo para ordenar correctamente
+    const turnAssignments = newAssignments.filter((a) => a.type === "shift")
+    const licenciaAssignments = newAssignments.filter((a) => a.type === "licencia_embarazo")
+    const otherTurnAssignments = otherAssignments.filter((a) => a.type === "shift")
+    const otherSpecialAssignments = otherAssignments.filter((a) => a.type !== "shift")
+
+    // Ordenar: turnos (del mismo shift, otros shifts), licencia, otros (francos, notas, etc.)
+    const finalAssignments = [
+      ...turnAssignments,
+      ...otherTurnAssignments,
+      ...licenciaAssignments,
+      ...otherSpecialAssignments,
+    ]
+
+    onAssignmentUpdate(date, employeeId, finalAssignments, { scheduleId })
+
+    setLicenciaEmbarazoDialogOpen(false)
+    setLicenciaStartTime("")
+    setLicenciaEndTime("")
+    setSelectedShiftForLicencia(null)
   }
 
   return (
@@ -400,6 +615,38 @@ export function ScheduleCell({
                 <Clock className="mr-2 h-4 w-4" />
                 {existingHorarioEspecial ? "Editar horario especial" : "Asignar horario especial"}
               </ContextMenuItem>
+              {availableShifts.length > 0 && (
+                <>
+                  <ContextMenuSeparator />
+                  {availableShifts.length === 1 ? (
+                    <ContextMenuItem
+                      onClick={() => handleOpenLicenciaEmbarazoDialog(availableShifts[0].assignment, availableShifts[0].shift)}
+                    >
+                      <Baby className="mr-2 h-4 w-4" />
+                      Asignar Licencia por Embarazo
+                    </ContextMenuItem>
+                  ) : (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <ContextMenuItem onSelect={(e) => e.preventDefault()}>
+                          <Baby className="mr-2 h-4 w-4" />
+                          Asignar Licencia por Embarazo
+                        </ContextMenuItem>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        {availableShifts.map(({ assignment, shift }, index) => (
+                          <DropdownMenuItem
+                            key={index}
+                            onClick={() => handleOpenLicenciaEmbarazoDialog(assignment, shift)}
+                          >
+                            {shift.name || `Turno ${index + 1}`}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </>
+              )}
               {assignments.length > 0 && (
                 <>
                   <ContextMenuSeparator />
@@ -548,6 +795,139 @@ export function ScheduleCell({
               Cancelar
             </Button>
             <Button onClick={handleSaveHorarioEspecial}>
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo para asignar licencia por embarazo */}
+      <Dialog open={licenciaEmbarazoDialogOpen} onOpenChange={setLicenciaEmbarazoDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Asignar Licencia por Embarazo</DialogTitle>
+            <DialogDescription>
+              {selectedShiftForLicencia && (
+                <>
+                  Selecciona el rango horario dentro del turno <strong>{selectedShiftForLicencia.shift.name}</strong>.
+                  <br />
+                  {(() => {
+                    const shift = selectedShiftForLicencia.shift
+                    const assignment = selectedShiftForLicencia.assignment
+                    const startTime = assignment.startTime || shift.startTime || ""
+                    const endTime = assignment.endTime || shift.endTime || ""
+                    const startTime2 = assignment.startTime2 || shift.startTime2
+                    const endTime2 = assignment.endTime2 || shift.endTime2
+                    
+                    if (startTime2 && endTime2) {
+                      return `Horario del turno: ${startTime} - ${endTime} y ${startTime2} - ${endTime2}`
+                    }
+                    return `Horario del turno: ${startTime} - ${endTime}`
+                  })()}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="licenciaStartTime">Hora de inicio</Label>
+              <Input
+                id="licenciaStartTime"
+                type="time"
+                value={licenciaStartTime}
+                onChange={(e) => setLicenciaStartTime(e.target.value)}
+                min={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.startTime || selectedShiftForLicencia.shift.startTime || "") : undefined}
+                max={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.endTime || selectedShiftForLicencia.shift.endTime || "") : undefined}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="licenciaEndTime">Hora de fin</Label>
+              <Input
+                id="licenciaEndTime"
+                type="time"
+                value={licenciaEndTime}
+                onChange={(e) => setLicenciaEndTime(e.target.value)}
+                min={licenciaStartTime || (selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.startTime || selectedShiftForLicencia.shift.startTime || "") : undefined)}
+                max={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.endTime || selectedShiftForLicencia.shift.endTime || "") : undefined}
+              />
+            </div>
+            {licenciaStartTime && licenciaEndTime && selectedShiftForLicencia && (() => {
+              const shift = selectedShiftForLicencia.shift
+              const assignment = selectedShiftForLicencia.assignment
+              const shiftStartTime = assignment.startTime || shift.startTime || ""
+              const shiftEndTime = assignment.endTime || shift.endTime || ""
+              const shiftStartTime2 = assignment.startTime2 || shift.startTime2
+              const shiftEndTime2 = assignment.endTime2 || shift.endTime2
+
+              const licenciaStart = timeToMinutes(licenciaStartTime)
+              const licenciaEnd = timeToMinutes(licenciaEndTime)
+              const shiftStart = timeToMinutes(shiftStartTime)
+              const shiftEnd = timeToMinutes(shiftEndTime)
+
+              let isValid = false
+              let errorMessage = ""
+
+              if (licenciaStart >= licenciaEnd) {
+                errorMessage = "La hora de inicio debe ser anterior a la hora de fin"
+              } else if (shiftStartTime2 && shiftEndTime2) {
+                const shiftStart2 = timeToMinutes(shiftStartTime2)
+                const shiftEnd2 = timeToMinutes(shiftEndTime2)
+                isValid = (licenciaStart >= shiftStart && licenciaEnd <= shiftEnd) || (licenciaStart >= shiftStart2 && licenciaEnd <= shiftEnd2)
+                if (!isValid) {
+                  errorMessage = `El rango debe estar contenido en ${shiftStartTime} - ${shiftEndTime} o en ${shiftStartTime2} - ${shiftEndTime2}`
+                }
+              } else {
+                isValid = licenciaStart >= shiftStart && licenciaEnd <= shiftEnd
+                if (!isValid) {
+                  errorMessage = `El rango debe estar contenido en ${shiftStartTime} - ${shiftEndTime}`
+                }
+              }
+
+              if (errorMessage) {
+                return (
+                  <div className="text-sm text-destructive">
+                    {errorMessage}
+                  </div>
+                )
+              }
+
+              const duration = licenciaEnd - licenciaStart
+              return (
+                <div className="text-sm text-muted-foreground">
+                  Duración: {Math.floor(duration / 60)}h {duration % 60}min
+                </div>
+              )
+            })()}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLicenciaEmbarazoDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveLicenciaEmbarazo}
+              disabled={!licenciaStartTime || !licenciaEndTime || !selectedShiftForLicencia || (() => {
+                if (!selectedShiftForLicencia || !licenciaStartTime || !licenciaEndTime) return true
+                const shift = selectedShiftForLicencia.shift
+                const assignment = selectedShiftForLicencia.assignment
+                const shiftStartTime = assignment.startTime || shift.startTime || ""
+                const shiftEndTime = assignment.endTime || shift.endTime || ""
+                const shiftStartTime2 = assignment.startTime2 || shift.startTime2
+                const shiftEndTime2 = assignment.endTime2 || shift.endTime2
+
+                const licenciaStart = timeToMinutes(licenciaStartTime)
+                const licenciaEnd = timeToMinutes(licenciaEndTime)
+                const shiftStart = timeToMinutes(shiftStartTime)
+                const shiftEnd = timeToMinutes(shiftEndTime)
+
+                if (licenciaStart >= licenciaEnd) return true
+                if (shiftStartTime2 && shiftEndTime2) {
+                  const shiftStart2 = timeToMinutes(shiftStartTime2)
+                  const shiftEnd2 = timeToMinutes(shiftEndTime2)
+                  return !((licenciaStart >= shiftStart && licenciaEnd <= shiftEnd) || (licenciaStart >= shiftStart2 && licenciaEnd <= shiftEnd2))
+                }
+                return !(licenciaStart >= shiftStart && licenciaEnd <= shiftEnd)
+              })()}
+            >
               Guardar
             </Button>
           </DialogFooter>

@@ -39,6 +39,14 @@ export function getShiftDisplayTime(
     return ["1/2 Franco"]
   }
 
+  // Si es licencia embarazo, usar sus horarios directamente
+  if (assignment?.type === "licencia_embarazo") {
+    if (assignment.startTime && assignment.endTime) {
+      return [formatTimeRange(assignment.startTime, assignment.endTime)]
+    }
+    return ["LICENCIA EMBARAZO"]
+  }
+
   // Si es franco, no debería llegar aquí, pero por seguridad:
   if (assignment?.type === "franco") {
     return ["FRANCO"]

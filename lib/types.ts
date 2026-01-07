@@ -167,7 +167,7 @@ export interface Turno {
 
 export interface ShiftAssignment {
   shiftId?: string
-  type?: "shift" | "franco" | "medio_franco" | "nota"
+  type?: "shift" | "franco" | "medio_franco" | "licencia_embarazo" | "nota"
   startTime?: string
   endTime?: string
   startTime2?: string

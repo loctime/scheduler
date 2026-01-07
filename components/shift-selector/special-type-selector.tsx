@@ -6,13 +6,15 @@ import { Input } from "@/components/ui/input"
 import { MedioTurno } from "@/lib/types"
 
 interface SpecialTypeSelectorProps {
-  specialType: "shift" | "franco" | "medio_franco" | null
-  onTypeChange: (type: "shift" | "franco" | "medio_franco") => void
+  specialType: "shift" | "franco" | "medio_franco" | "licencia_embarazo" | null
+  onTypeChange: (type: "shift" | "franco" | "medio_franco" | "licencia_embarazo") => void
   medioFrancoTime: { startTime: string; endTime: string }
   onMedioFrancoTimeChange: (time: { startTime: string; endTime: string }) => void
   selectedMedioTurnoId: string | null
   onMedioTurnoSelect: (id: string | null, time: { startTime: string; endTime: string }) => void
   mediosTurnos?: MedioTurno[]
+  licenciaEmbarazoTime?: { startTime: string; endTime: string }
+  onLicenciaEmbarazoTimeChange?: (time: { startTime: string; endTime: string }) => void
 }
 
 export function SpecialTypeSelector({
@@ -23,11 +25,13 @@ export function SpecialTypeSelector({
   selectedMedioTurnoId,
   onMedioTurnoSelect,
   mediosTurnos,
+  licenciaEmbarazoTime = { startTime: "", endTime: "" },
+  onLicenciaEmbarazoTimeChange,
 }: SpecialTypeSelectorProps) {
   return (
     <div className="space-y-3 border-b pb-4">
       <Label className="text-sm font-medium">Estado del día:</Label>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <Button
           type="button"
           variant={specialType === "franco" ? "default" : "outline"}
@@ -47,6 +51,16 @@ export function SpecialTypeSelector({
           className="w-full"
         >
           1/2 Franco
+        </Button>
+        <Button
+          type="button"
+          variant={specialType === "licencia_embarazo" ? "default" : "outline"}
+          onClick={() => {
+            onTypeChange("licencia_embarazo")
+          }}
+          className="w-full"
+        >
+          Lic. Embarazo
         </Button>
         <Button
           type="button"
@@ -125,6 +139,36 @@ export function SpecialTypeSelector({
                   className="text-sm"
                 />
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {specialType === "licencia_embarazo" && onLicenciaEmbarazoTimeChange && (
+        <div className="space-y-3 pt-2">
+          <Label className="text-xs font-medium">Ingresa el horario de licencia por embarazo:</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Hora Inicio</Label>
+              <Input
+                type="time"
+                value={licenciaEmbarazoTime.startTime}
+                onChange={(e) => {
+                  onLicenciaEmbarazoTimeChange({ ...licenciaEmbarazoTime, startTime: e.target.value })
+                }}
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Hora Fin</Label>
+              <Input
+                type="time"
+                value={licenciaEmbarazoTime.endTime}
+                onChange={(e) => {
+                  onLicenciaEmbarazoTimeChange({ ...licenciaEmbarazoTime, endTime: e.target.value })
+                }}
+                className="text-sm"
+              />
             </div>
           </div>
         </div>

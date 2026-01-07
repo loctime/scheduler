@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils"
 import { getSuggestionForDay } from "@/lib/pattern-learning"
 import { format, parseISO, getDay } from "date-fns"
 import { Lock } from "lucide-react"
+import { useState, useEffect } from "react"
 
 interface ShiftSelectorPopoverProps {
   open: boolean
@@ -55,6 +56,22 @@ export function ShiftSelectorPopover({
   const { toast } = useToast()
   const { user } = useData()
   const { config } = useConfig(user)
+  const [licenciaEmbarazoTime, setLicenciaEmbarazoTime] = useState({ startTime: "", endTime: "" })
+  
+  // Inicializar licencia embarazo time si hay asignación existente
+  useEffect(() => {
+    if (open) {
+      const existingLicencia = selectedAssignments.find(a => a.type === "licencia_embarazo")
+      if (existingLicencia) {
+        setLicenciaEmbarazoTime({
+          startTime: existingLicencia.startTime || "",
+          endTime: existingLicencia.endTime || ""
+        })
+      } else {
+        setLicenciaEmbarazoTime({ startTime: "", endTime: "" })
+      }
+    }
+  }, [open, selectedAssignments])
   
   // Obtener sugerencia de patrón para este día
   const suggestion = weekStartDate && schedules.length > 0
@@ -179,6 +196,26 @@ export function ShiftSelectorPopover({
       return
     }
 
+    // Si es licencia embarazo, validar que tenga horario
+    if (specialType === "licencia_embarazo") {
+      if (!licenciaEmbarazoTime.startTime || !licenciaEmbarazoTime.endTime) {
+        toast({
+          title: "Error",
+          description: "Debes especificar un horario para la licencia por embarazo",
+          variant: "destructive",
+        })
+        return
+      }
+      finalizeAssignments([
+        {
+          type: "licencia_embarazo",
+          startTime: licenciaEmbarazoTime.startTime,
+          endTime: licenciaEmbarazoTime.endTime,
+        },
+      ])
+      return
+    }
+
     // Comportamiento normal para turnos
     const assignments: ShiftAssignment[] = tempSelected.map(buildAssignmentFromShift)
     finalizeAssignments(assignments, tempSelected)
@@ -189,18 +226,22 @@ export function ShiftSelectorPopover({
     onOpenChange(false)
   }
 
-  const handleSpecialTypeChange = (type: "shift" | "franco" | "medio_franco") => {
+  const handleSpecialTypeChange = (type: "shift" | "franco" | "medio_franco" | "licencia_embarazo") => {
     setSpecialType(type)
-    if (type === "franco" || type === "medio_franco") {
-      // Limpiar turnos seleccionados cuando se cambia a franco/medio_franco
+    if (type === "franco" || type === "medio_franco" || type === "licencia_embarazo") {
+      // Limpiar turnos seleccionados cuando se cambia a tipo especial
       setTempSelected([])
     }
     if (type === "medio_franco") {
       setSelectedMedioTurnoId(null)
       setMedioFrancoTime({ startTime: "", endTime: "" })
     }
+    if (type === "licencia_embarazo") {
+      setLicenciaEmbarazoTime({ startTime: "", endTime: "" })
+    }
     if (type === "shift") {
       setMedioFrancoTime({ startTime: "", endTime: "" })
+      setLicenciaEmbarazoTime({ startTime: "", endTime: "" })
       setSelectedMedioTurnoId(null)
     }
     if (type === "franco") {
@@ -270,10 +311,12 @@ export function ShiftSelectorPopover({
             selectedMedioTurnoId={selectedMedioTurnoId}
             onMedioTurnoSelect={handleMedioTurnoSelect}
             mediosTurnos={config?.mediosTurnos}
+            licenciaEmbarazoTime={licenciaEmbarazoTime}
+            onLicenciaEmbarazoTimeChange={setLicenciaEmbarazoTime}
           />
           
           {/* Lista de turnos (solo mostrar si es turno normal) */}
-          {(specialType === "shift" || specialType === null) && (
+          {(specialType === "shift" || specialType === null || specialType === undefined) && (
             <div className="space-y-3">
               <Label className="text-sm font-medium">Turnos disponibles:</Label>
               <div className="max-h-[60vh] overflow-y-auto pr-1">

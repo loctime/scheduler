@@ -248,6 +248,112 @@ export function calculateDailyHours(
 }
 
 /**
+ * Calcula el desglose de horas por tipo de tramo
+ * Retorna horas trabajadas, horas de licencia embarazo y horas de medio franco
+ */
+export function calculateHoursBreakdown(
+  shiftIds: string[] | any[], // Puede ser string[] o ShiftAssignment[]
+  shifts: Turno[],
+  minutosDescanso: number = 30,
+  horasMinimasParaDescanso: number = 6
+): {
+  trabajo: number
+  licencia_embarazo: number
+  medio_franco: number
+} {
+  const shiftMap = new Map(shifts.map((s) => [s.id, s]))
+  let horasTrabajo = 0
+  let horasLicenciaEmbarazo = 0
+  let horasMedioFranco = 0
+
+  // Si es array de ShiftAssignment
+  if (shiftIds.length > 0 && typeof shiftIds[0] === "object" && "type" in shiftIds[0]) {
+    const assignments = shiftIds as any[]
+    assignments.forEach((assignment) => {
+      // Ignorar francos
+      if (assignment.type === "franco") {
+        return
+      }
+      
+      // Calcular horas de medio franco
+      if (assignment.type === "medio_franco") {
+        if (assignment.startTime && assignment.endTime) {
+          const [hStart, mStart] = assignment.startTime.split(":").map(Number)
+          const [hEnd, mEnd] = assignment.endTime.split(":").map(Number)
+          const start = hStart * 60 + mStart
+          const end = hEnd * 60 + mEnd
+          const totalMinutes = end - start
+          horasMedioFranco += totalMinutes / 60
+        }
+        return
+      }
+
+      // Calcular horas de licencia embarazo
+      if (assignment.type === "licencia_embarazo") {
+        if (assignment.startTime && assignment.endTime) {
+          const [hStart, mStart] = assignment.startTime.split(":").map(Number)
+          const [hEnd, mEnd] = assignment.endTime.split(":").map(Number)
+          const start = hStart * 60 + mStart
+          const end = hEnd * 60 + mEnd
+          const totalMinutes = end - start
+          horasLicenciaEmbarazo += totalMinutes / 60
+        }
+        return
+      }
+      
+      // Turno normal (trabajo)
+      if (assignment.shiftId) {
+        const shift = shiftMap.get(assignment.shiftId)
+        if (shift) {
+          // Usar horarios ajustados si existen, sino usar los del turno base
+          const tempShift: any = { ...shift }
+          
+          if (assignment.startTime && typeof assignment.startTime === 'string' && assignment.startTime.trim() !== '') {
+            tempShift.startTime = assignment.startTime
+          }
+          
+          if (assignment.endTime !== undefined && assignment.endTime !== null) {
+            const endTimeStr = String(assignment.endTime).trim()
+            if (endTimeStr !== '') {
+              tempShift.endTime = endTimeStr
+            }
+          }
+          
+          if (assignment.startTime2 && typeof assignment.startTime2 === 'string' && assignment.startTime2.trim() !== '') {
+            tempShift.startTime2 = assignment.startTime2
+          }
+          
+          if (assignment.endTime2 && typeof assignment.endTime2 === 'string' && assignment.endTime2.trim() !== '') {
+            tempShift.endTime2 = assignment.endTime2
+          }
+          
+          horasTrabajo += calculateShiftHours(tempShift, minutosDescanso, horasMinimasParaDescanso)
+        }
+      }
+    })
+    return {
+      trabajo: horasTrabajo,
+      licencia_embarazo: horasLicenciaEmbarazo,
+      medio_franco: horasMedioFranco
+    }
+  }
+
+  // Comportamiento original para string[] - todo cuenta como trabajo
+  shiftIds.forEach((shiftId) => {
+    const shift = shiftMap.get(shiftId)
+    if (shift) {
+      horasTrabajo += calculateShiftHours(shift, minutosDescanso, horasMinimasParaDescanso)
+    }
+  })
+
+  return {
+    trabajo: horasTrabajo,
+    licencia_embarazo: 0,
+    medio_franco: 0
+  }
+}
+
+/**
  * Valida que un empleado no tenga más de X horas por semana
  * Actualizado para considerar descansos
  */

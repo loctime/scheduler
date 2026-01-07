@@ -3,7 +3,7 @@ import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import type { Empleado, Turno, Horario, ShiftAssignment, Separador, MedioTurno, ShiftAssignmentValue } from "@/lib/types"
-import { calculateDailyHours } from "@/lib/validations"
+import { calculateDailyHours, calculateHoursBreakdown } from "@/lib/validations"
 
 export function useExportSchedule() {
   const [exporting, setExporting] = useState(false)
@@ -1055,13 +1055,15 @@ export function useExportSchedule() {
 
         // Calcular métricas adicionales para cada empleado
         const dashboardData = allEmployees.map((employee) => {
-          const stats = employeeMonthlyStats[employee.id] || { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0 }
+          const stats = employeeMonthlyStats[employee.id] || { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0, horasLicenciaEmbarazo: 0, horasMedioFranco: 0 }
           
           // Calcular horas trabajadas totales del mes
           let totalHoursWorked = 0
           let daysWorked = 0
           let medioFrancos = 0
           let francosCount = 0
+          let totalLicenciaEmbarazo = 0
+          let totalMedioFranco = 0
 
           monthWeeks.forEach((weekDays) => {
             const weekSchedule = getWeekSchedule(weekDays[0])
@@ -1076,6 +1078,16 @@ export function useExportSchedule() {
 
               const normalizedAssignments = normalizeAssignments(assignments)
               if (normalizedAssignments.length === 0) return
+
+              // Calcular desglose de horas por tipo
+              const hoursBreakdown = calculateHoursBreakdown(
+                normalizedAssignments,
+                shifts,
+                config?.minutosDescanso ?? 30,
+                config?.horasMinimasParaDescanso ?? 6
+              )
+              totalLicenciaEmbarazo += hoursBreakdown.licencia_embarazo
+              totalMedioFranco += hoursBreakdown.medio_franco
 
               // Contar francos y medio francos
               normalizedAssignments.forEach((assignment) => {
@@ -1117,20 +1129,46 @@ export function useExportSchedule() {
             diasTrabajados: daysWorked,
             promedioHorasSemana: avgHoursPerWeek,
             promedioHorasExtrasSemana: avgExtraHoursPerWeek,
+            horasLicenciaEmbarazo: totalLicenciaEmbarazo > 0 ? totalLicenciaEmbarazo : (stats.horasLicenciaEmbarazo || 0),
+            horasMedioFranco: totalMedioFranco > 0 ? totalMedioFranco : (stats.horasMedioFranco || 0),
           }
         })
+
+        // Verificar si hay datos de licencia embarazo o medio franco para incluir columnas
+        const hasLicenciaEmbarazo = dashboardData.some(d => (d.horasLicenciaEmbarazo || 0) > 0)
+        const hasMedioFranco = dashboardData.some(d => (d.horasMedioFranco || 0) > 0)
+        const hasExtraColumns = hasLicenciaEmbarazo || hasMedioFranco
 
         // Crear tabla
         const tableStartY = headerHeight + 20
         const rowHeight = 8
-        const colWidths = [
-          pdfWidth * 0.30, // Nombre
-          pdfWidth * 0.12, // Francos
-          pdfWidth * 0.12, // Horas Trabajadas
-          pdfWidth * 0.12, // Horas Extras
-          pdfWidth * 0.12, // Días Trabajados
-          pdfWidth * 0.12, // Promedio/Semana
+        const baseColWidths = [
+          pdfWidth * 0.25, // Nombre (reducido si hay columnas extras)
+          pdfWidth * 0.10, // Francos
+          pdfWidth * 0.10, // Horas Trabajadas
+          pdfWidth * 0.10, // Horas Extras
+          pdfWidth * 0.10, // Días Trabajados
+          pdfWidth * 0.10, // Promedio/Semana
         ]
+        
+        const extraColWidths: number[] = []
+        if (hasLicenciaEmbarazo) {
+          extraColWidths.push(pdfWidth * 0.10) // Lic. Embarazo
+        }
+        if (hasMedioFranco) {
+          extraColWidths.push(pdfWidth * 0.10) // Medio Franco
+        }
+        
+        // Ajustar ancho de columnas base si hay columnas extras
+        if (hasExtraColumns) {
+          const totalExtraWidth = extraColWidths.reduce((a, b) => a + b, 0)
+          const adjustment = totalExtraWidth / baseColWidths.length
+          for (let i = 0; i < baseColWidths.length; i++) {
+            baseColWidths[i] -= adjustment * 0.5
+          }
+        }
+        
+        const colWidths = [...baseColWidths, ...extraColWidths]
 
         // Encabezados de tabla
         pdf.setFontSize(10)
@@ -1144,10 +1182,16 @@ export function useExportSchedule() {
         pdf.line(margin, tableStartY + rowHeight, pdfWidth - margin, tableStartY + rowHeight)
         
         const headers = ['Empleado', 'Francos', 'Horas Trab.', 'Horas Extras', 'Días Trab.', 'Prom./Sem.']
+        if (hasLicenciaEmbarazo) {
+          headers.push('Lic. Emb.')
+        }
+        if (hasMedioFranco) {
+          headers.push('Med. Franco')
+        }
         let currentX = margin + 3
         headers.forEach((header, index) => {
           pdf.text(header, currentX, tableStartY + 5.5)
-          // Línea vertical entre columnas
+          // Línea vertical entre columnas (excepto la última)
           if (index < headers.length - 1) {
             pdf.line(currentX + colWidths[index] - 1, tableStartY, currentX + colWidths[index] - 1, tableStartY + rowHeight)
           }
@@ -1194,6 +1238,23 @@ export function useExportSchedule() {
           x += colWidths[4]
           
           pdf.text(`${data.promedioHorasSemana.toFixed(1)}h`, x, currentY + 5.5)
+          if (hasExtraColumns) {
+            pdf.line(x + colWidths[5] - 1, currentY, x + colWidths[5] - 1, currentY + rowHeight)
+          }
+          x += colWidths[5]
+          
+          if (hasLicenciaEmbarazo) {
+            pdf.text((data.horasLicenciaEmbarazo || 0).toFixed(1), x, currentY + 5.5)
+            const colIndex = 6
+            if (colIndex < colWidths.length - 1 || hasMedioFranco) {
+              pdf.line(x + colWidths[colIndex] - 1, currentY, x + colWidths[colIndex] - 1, currentY + rowHeight)
+            }
+            x += colWidths[colIndex]
+          }
+          
+          if (hasMedioFranco) {
+            pdf.text((data.horasMedioFranco || 0).toFixed(1), x, currentY + 5.5)
+          }
 
           currentY += rowHeight
 

@@ -352,6 +352,7 @@ export function useScheduleUpdates({
         let scheduleId: string
         let currentAssignments: Record<string, Record<string, any>> = {}
         let scheduleNombre = `Semana del ${weekStartStr}`
+        let finalAssignments: ShiftAssignment[] = assignments
 
         // Obtener el horario de esa semana específica
         if (options?.scheduleId) {
@@ -382,7 +383,11 @@ export function useScheduleUpdates({
           if (!currentAssignments[date]) {
             currentAssignments[date] = {}
           }
+          
+          // Nota: En horarios nuevos no hay medio_franco previo que proteger,
+          // así que se usa assignments directamente
           currentAssignments[date][employeeId] = assignments
+          finalAssignments = assignments
 
           const newScheduleData = {
             nombre: scheduleNombre,
@@ -417,18 +422,32 @@ export function useScheduleUpdates({
           const historyEntry = createHistoryEntry(weekSchedule, "modificado", user, weekStartStr, weekEndStr)
           await saveHistoryEntry(historyEntry)
 
+          // Proteger medio_franco: si existe en asignaciones actuales, asegurarse de que no se elimine
+          const currentEmployeeAssignments = normalizeAssignments(
+            weekSchedule.assignments[date]?.[employeeId]
+          )
+          const existingMedioFranco = currentEmployeeAssignments.find(
+            (a) => a.type === "medio_franco"
+          )
+          
+          // Si existe medio_franco actual y no está en las nuevas asignaciones, preservarlo
+          finalAssignments = [...assignments]
+          if (existingMedioFranco && !assignments.some((a) => a.type === "medio_franco")) {
+            finalAssignments.push(existingMedioFranco)
+          }
+
           // Actualizar assignments usando helper
           currentAssignments = updateAssignmentInAssignments(
             weekSchedule.assignments as any,
             date,
             employeeId,
-            assignments
+            finalAssignments
           )
         }
-
-        // Validar solapamientos (filtrar francos y medio francos)
-        const shiftIds = assignments
-          .filter((a) => a.type !== "franco" && a.type !== "medio_franco" && a.shiftId)
+        
+        // Validar solapamientos (filtrar francos, medio francos y licencia_embarazo)
+        const shiftIds = finalAssignments
+          .filter((a) => a.type !== "franco" && a.type !== "medio_franco" && a.type !== "licencia_embarazo" && a.shiftId)
           .map((a) => a.shiftId!)
         if (shiftIds.length > 0) {
           // Si la semana está completada, usar empleados del snapshot para la validación
@@ -474,9 +493,10 @@ export function useScheduleUpdates({
           const horasMinimasParaDescanso = config.horasMinimasParaDescanso || 6
           const horasMaximasPorDia = config.horasMaximasPorDia || 8
 
+          // Usar finalAssignments para validación (incluye medio_franco protegido si aplica)
           // Pasar las asignaciones completas para que calculateDailyHours maneje francos
           const dailyValidation = validateDailyHours(
-            assignments,
+            finalAssignments,
             shifts,
             horasMaximasPorDia,
             minutosDescanso,

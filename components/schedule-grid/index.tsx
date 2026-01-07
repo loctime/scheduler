@@ -31,6 +31,8 @@ export interface EmployeeMonthlyStats {
   francos: number
   horasExtrasSemana: number
   horasExtrasMes: number
+  horasLicenciaEmbarazo?: number
+  horasMedioFranco?: number
 }
 
 interface ScheduleGridProps {

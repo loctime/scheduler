@@ -10,7 +10,7 @@ import { getCustomMonthRange, getMonthWeeks, getInitialMonthForRange } from "@/l
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { useScheduleUpdates } from "@/hooks/use-schedule-updates"
 import { useSchedulesListener } from "@/hooks/use-schedules-listener"
-import { calculateExtraHours } from "@/lib/validations"
+import { calculateExtraHours, calculateHoursBreakdown } from "@/lib/validations"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { GeneralView } from "@/components/schedule-calendar/general-view"
 import { ExportOverlay } from "@/components/export-overlay"
@@ -206,7 +206,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   const employeeMonthlyStats = useMemo<Record<string, EmployeeMonthlyStats>>(() => {
     const stats: Record<string, EmployeeMonthlyStats> = {}
     employees.forEach((employee) => {
-      stats[employee.id] = { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0 }
+      stats[employee.id] = { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0, horasLicenciaEmbarazo: 0, horasMedioFranco: 0 }
     })
 
     if (employees.length === 0 || shiftsToUse.length === 0) {
@@ -241,7 +241,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
         Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
           if (!stats[employeeId]) {
-            stats[employeeId] = { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0 }
+            stats[employeeId] = { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0, horasLicenciaEmbarazo: 0, horasMedioFranco: 0 }
           }
 
           const normalizedAssignments = normalizeAssignments(assignmentValue)
@@ -260,6 +260,20 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
           if (francosCount > 0) {
             stats[employeeId].francos += francosCount
+          }
+
+          // Calcular horas por tipo usando calculateHoursBreakdown
+          const hoursBreakdown = calculateHoursBreakdown(
+            normalizedAssignments,
+            shiftsToUse,
+            minutosDescanso,
+            horasMinimasParaDescanso
+          )
+          if (hoursBreakdown.licencia_embarazo > 0) {
+            stats[employeeId].horasLicenciaEmbarazo = (stats[employeeId].horasLicenciaEmbarazo || 0) + hoursBreakdown.licencia_embarazo
+          }
+          if (hoursBreakdown.medio_franco > 0) {
+            stats[employeeId].horasMedioFranco = (stats[employeeId].horasMedioFranco || 0) + hoursBreakdown.medio_franco
           }
 
           // Calcular horas extras: simplemente contar los 30 minutos agregados

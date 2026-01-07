@@ -112,6 +112,26 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
           }
         }
 
+        if (assignment.type === "licencia_embarazo") {
+          const displayTimeLines = getShiftDisplayTime("", undefined, assignment)
+          const hasTime = assignment.startTime && assignment.endTime
+
+          if (hasTime) {
+            return (
+              <div key={`licencia-embarazo-${idx}`} className="text-center text-xs sm:text-sm md:text-base">
+                <span className="block font-semibold">{displayTimeLines[0] || `${assignment.startTime} - ${assignment.endTime}`}</span>
+                <span className="block text-[10px] sm:text-xs md:text-sm font-bold text-[#f59e0b]">LICENCIA EMBARAZO</span>
+              </div>
+            )
+          } else {
+            return (
+              <span key={`licencia-embarazo-${idx}`} className="block text-center text-xs sm:text-sm md:text-base font-bold text-[#f59e0b]">
+                LICENCIA EMBARAZO
+              </span>
+            )
+          }
+        }
+
         // Manejar horario especial (sin shiftId pero con startTime/endTime)
         if (assignment.type === "shift" && !assignment.shiftId && (assignment.startTime || assignment.endTime)) {
           const timeDisplay = []

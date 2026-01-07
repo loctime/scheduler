@@ -23,7 +23,7 @@ export function useShiftSelector({
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null)
   const [adjustedTimes, setAdjustedTimes] = useState<Record<string, Partial<ShiftAssignment>>>({})
   const [extensions, setExtensions] = useState<Record<string, { before: boolean; after: boolean }>>({})
-  const [specialType, setSpecialType] = useState<"shift" | "franco" | "medio_franco" | null>(null)
+  const [specialType, setSpecialType] = useState<"shift" | "franco" | "medio_franco" | "licencia_embarazo" | null>(null)
   const [medioFrancoTime, setMedioFrancoTime] = useState({ startTime: "", endTime: "" })
   const [selectedMedioTurnoId, setSelectedMedioTurnoId] = useState<string | null>(null)
   const prevOpenRef = useRef(false)
@@ -36,6 +36,7 @@ export function useShiftSelector({
       // Verificar si hay asignaciones especiales
       const hasFranco = selectedAssignments.some(a => a.type === "franco")
       const hasMedioFranco = selectedAssignments.some(a => a.type === "medio_franco")
+      const hasLicenciaEmbarazo = selectedAssignments.some(a => a.type === "licencia_embarazo")
       
       if (hasFranco) {
         setSpecialType("franco")
@@ -53,6 +54,10 @@ export function useShiftSelector({
           mt => mt.startTime === startTime && mt.endTime === endTime
         )
         setSelectedMedioTurnoId(matchingMedioTurno?.id || null)
+      } else if (hasLicenciaEmbarazo) {
+        setSpecialType("licencia_embarazo")
+        setTempSelected([])
+        setMedioFrancoTime({ startTime: "", endTime: "" })
       } else {
         setSpecialType("shift")
         setTempSelected(selectedShiftIds)
@@ -62,7 +67,7 @@ export function useShiftSelector({
       // Cargar horarios ajustados
       const adjusted: Record<string, Partial<ShiftAssignment>> = {}
       selectedAssignments.forEach((assignment) => {
-        if (assignment.shiftId && assignment.type !== "franco" && assignment.type !== "medio_franco") {
+        if (assignment.shiftId && assignment.type !== "franco" && assignment.type !== "medio_franco" && assignment.type !== "licencia_embarazo") {
           adjusted[assignment.shiftId] = {
             startTime: assignment.startTime,
             endTime: assignment.endTime,

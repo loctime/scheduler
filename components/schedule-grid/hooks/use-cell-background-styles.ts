@@ -104,14 +104,37 @@ export function useCellBackgroundStyles({
         return { backgroundColor: hexToRgba(especialColor, 0.35) }
       }
 
+      // Buscar licencia embarazo
+      const licenciaEmbarazo = assignments.find((a) => a.type === "licencia_embarazo")
+
       // Buscar medio franco
       const medioFranco = assignments.find((a) => a.type === "medio_franco")
 
       // Buscar turnos normales
       const shiftAssignments = assignments.filter((a) => a.type === "shift" && a.shiftId)
+      
+      // Color para licencia embarazo (naranja/amarillo)
+      const licenciaEmbarazoColor = "rgba(245, 158, 11, 0.35)" // amber-500 con opacidad
+
+      // Si hay licencia embarazo, aplicar color distintivo
+      if (licenciaEmbarazo) {
+        // Si solo hay licencia embarazo sin otros elementos, usar color sólido
+        if (shiftAssignments.length === 0 && !medioFranco) {
+          return { backgroundColor: licenciaEmbarazoColor }
+        }
+        // Si hay licencia embarazo con medio franco, crear gradiente
+        if (medioFranco && shiftAssignments.length === 0) {
+          return { backgroundColor: licenciaEmbarazoColor }
+        }
+        // Si hay licencia embarazo con turnos, mezclar colores
+        if (shiftAssignments.length > 0) {
+          // Usar color de licencia embarazo como fondo principal
+          return { backgroundColor: licenciaEmbarazoColor }
+        }
+      }
 
       // Si solo hay medio franco (sin turnos), crear gradiente vertical como turno cortado
-      if (medioFranco && shiftAssignments.length === 0) {
+      if (medioFranco && shiftAssignments.length === 0 && !licenciaEmbarazo) {
         if (medioFranco.startTime && medioFranco.endTime) {
           // Buscar un turno que coincida con el horario del medio franco para obtener su color
           const matchingShift = findMatchingShift(medioFranco.startTime, medioFranco.endTime)

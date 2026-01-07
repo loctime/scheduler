@@ -16,7 +16,7 @@ import { getCustomMonthRange, getMonthWeeks } from "@/lib/utils"
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { ExportOverlay } from "@/components/export-overlay"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
-import { calculateExtraHours } from "@/lib/validations"
+import { calculateExtraHours, calculateHoursBreakdown } from "@/lib/validations"
 import { ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
 
 const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAssignment[] => {
@@ -280,7 +280,7 @@ function HorariosMensualesContent() {
   const calculateMonthlyStats = useCallback((monthDate: Date): Record<string, EmployeeMonthlyStats> => {
     const stats: Record<string, EmployeeMonthlyStats> = {}
     employees.forEach((employee) => {
-      stats[employee.id] = { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0 }
+      stats[employee.id] = { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0, horasLicenciaEmbarazo: 0, horasMedioFranco: 0 }
     })
 
     if (employees.length === 0 || shifts.length === 0) {
@@ -317,7 +317,7 @@ function HorariosMensualesContent() {
 
         Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
           if (!stats[employeeId]) {
-            stats[employeeId] = { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0 }
+            stats[employeeId] = { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0, horasLicenciaEmbarazo: 0, horasMedioFranco: 0 }
           }
 
           const normalizedAssignments = normalizeAssignments(assignmentValue)
@@ -336,6 +336,20 @@ function HorariosMensualesContent() {
 
           if (francosCount > 0) {
             stats[employeeId].francos += francosCount
+          }
+
+          // Calcular horas por tipo usando calculateHoursBreakdown
+          const hoursBreakdown = calculateHoursBreakdown(
+            normalizedAssignments,
+            shifts,
+            minutosDescanso,
+            horasMinimasParaDescanso
+          )
+          if (hoursBreakdown.licencia_embarazo > 0) {
+            stats[employeeId].horasLicenciaEmbarazo = (stats[employeeId].horasLicenciaEmbarazo || 0) + hoursBreakdown.licencia_embarazo
+          }
+          if (hoursBreakdown.medio_franco > 0) {
+            stats[employeeId].horasMedioFranco = (stats[employeeId].horasMedioFranco || 0) + hoursBreakdown.medio_franco
           }
 
           const extraHours = calculateExtraHours(normalizedAssignments, shifts)
