@@ -116,21 +116,15 @@ export function useCellBackgroundStyles({
       // Color para licencia embarazo (naranja/amarillo)
       const licenciaEmbarazoColor = "rgba(245, 158, 11, 0.35)" // amber-500 con opacidad
 
-      // Si hay licencia embarazo, aplicar color distintivo
+      // Si hay licencia embarazo, solo aplicar color si NO hay turnos
+      // Si hay turnos, mantener el color normal del turno (la licencia solo se indica en el texto)
       if (licenciaEmbarazo) {
-        // Si solo hay licencia embarazo sin otros elementos, usar color sólido
+        // Solo aplicar color naranja si SOLO hay licencia embarazo (sin turnos ni medio franco)
         if (shiftAssignments.length === 0 && !medioFranco) {
           return { backgroundColor: licenciaEmbarazoColor }
         }
-        // Si hay licencia embarazo con medio franco, crear gradiente
-        if (medioFranco && shiftAssignments.length === 0) {
-          return { backgroundColor: licenciaEmbarazoColor }
-        }
-        // Si hay licencia embarazo con turnos, mezclar colores
-        if (shiftAssignments.length > 0) {
-          // Usar color de licencia embarazo como fondo principal
-          return { backgroundColor: licenciaEmbarazoColor }
-        }
+        // Si hay turnos, NO cambiar el color - seguir con la lógica normal de turnos
+        // La licencia se indicará solo en el texto del tramo correspondiente
       }
 
       // Si solo hay medio franco (sin turnos), crear gradiente vertical como turno cortado

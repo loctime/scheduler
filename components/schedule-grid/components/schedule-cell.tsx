@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useMemo } from "react"
 import type { CSSProperties } from "react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -107,6 +107,7 @@ export function ScheduleCell({
   const [licenciaStartTime, setLicenciaStartTime] = useState("")
   const [licenciaEndTime, setLicenciaEndTime] = useState("")
   const [selectedShiftForLicencia, setSelectedShiftForLicencia] = useState<{ assignment: ShiftAssignment; shift: Turno } | null>(null)
+  const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null)
   
   const hasBackgroundStyle = !!backgroundStyle
   const dayOfWeek = getDay(parseISO(date))
@@ -270,23 +271,257 @@ export function ScheduleCell({
     onAssignmentUpdate(date, employeeId, [], { scheduleId })
   }
 
-  const handleOpenLicenciaEmbarazoDialog = (shiftAssignment: ShiftAssignment, shift: Turno) => {
-    setSelectedShiftForLicencia({ assignment: shiftAssignment, shift })
-    setLicenciaStartTime("")
-    setLicenciaEndTime("")
-    setLicenciaEmbarazoDialogOpen(true)
-  }
-
   const timeToMinutes = (time: string): number => {
     const [hours, minutes] = time.split(":").map(Number)
     return hours * 60 + minutes
   }
 
   const minutesToTime = (minutes: number): string => {
-    const hours = Math.floor(minutes / 60)
-    const mins = minutes % 60
+    // Manejar valores negativos (turnos que cruzan medianoche)
+    let normalizedMinutes = minutes
+    if (normalizedMinutes < 0) {
+      normalizedMinutes = 24 * 60 + normalizedMinutes
+    }
+    normalizedMinutes = normalizedMinutes % (24 * 60)
+    
+    const hours = Math.floor(normalizedMinutes / 60)
+    const mins = normalizedMinutes % 60
     return `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`
   }
+
+  // Calcular duración de un turno considerando que puede cruzar medianoche
+  const calculateDuration = (startTime: string, endTime: string): number => {
+    const start = timeToMinutes(startTime)
+    const end = timeToMinutes(endTime)
+    
+    // Si el fin es menor que el inicio, cruza medianoche
+    if (end < start) {
+      return (24 * 60 - start) + end
+    }
+    return end - start
+  }
+
+  // Verificar si un tiempo está dentro de un rango (considerando cruce de medianoche)
+  const isTimeInRange = (time: string, rangeStart: string, rangeEnd: string): boolean => {
+    const timeMinutes = timeToMinutes(time)
+    const rangeStartMinutes = timeToMinutes(rangeStart)
+    const rangeEndMinutes = timeToMinutes(rangeEnd)
+    
+    // Si el rango cruza medianoche
+    if (rangeEndMinutes < rangeStartMinutes) {
+      return timeMinutes >= rangeStartMinutes || timeMinutes <= rangeEndMinutes
+    }
+    // Rango normal
+    return timeMinutes >= rangeStartMinutes && timeMinutes <= rangeEndMinutes
+  }
+
+  const handleOpenLicenciaEmbarazoDialog = (shiftAssignment: ShiftAssignment, shift: Turno) => {
+    setSelectedShiftForLicencia({ assignment: shiftAssignment, shift })
+    setLicenciaStartTime("")
+    setLicenciaEndTime("")
+    setSelectedSuggestion(null)
+    setLicenciaEmbarazoDialogOpen(true)
+  }
+
+  // Calcular sugerencias automáticas de licencia - Generalizado para cualquier turno
+  const calculateLicenciaSuggestions = useMemo(() => {
+    if (!selectedShiftForLicencia) return []
+
+    const { assignment, shift } = selectedShiftForLicencia
+    const MAX_WORK_HOURS = 4 // Máximo de 4 horas trabajables
+    const maxWorkMinutes = MAX_WORK_HOURS * 60
+
+    // Obtener horarios del turno (considerando ajustes del assignment)
+    const shiftStartTime = assignment.startTime || shift.startTime || ""
+    const shiftEndTime = assignment.endTime || shift.endTime || ""
+    const shiftStartTime2 = assignment.startTime2 || shift.startTime2
+    const shiftEndTime2 = assignment.endTime2 || shift.endTime2
+
+    if (!shiftStartTime || !shiftEndTime) return []
+
+    const shiftStart = timeToMinutes(shiftStartTime)
+    const shiftEnd = timeToMinutes(shiftEndTime)
+
+    const suggestions: Array<{
+      id: string
+      label: string
+      licenciaStart: string
+      licenciaEnd: string
+      trabajoStart: string
+      trabajoEnd: string
+      trabajoHours: number
+      licenciaHours: number
+      description: string
+    }> = []
+
+    // Si el turno tiene dos franjas (turno cortado)
+    if (shiftStartTime2 && shiftEndTime2) {
+      const firstDuration = calculateDuration(shiftStartTime, shiftEndTime)
+      const secondDuration = calculateDuration(shiftStartTime2, shiftEndTime2)
+      const totalDuration = firstDuration + secondDuration
+
+      // Verificar que el turno completo sea mayor a 4 horas
+      if (totalDuration <= maxWorkMinutes) {
+        return [] // El turno ya es menor o igual a 4 horas
+      }
+
+      // Para turnos cortados, ofrecer licencia completa en una de las dos franjas
+      // siempre que la otra franja tenga al menos 4 horas de trabajo
+      
+      // Sugerencia 1: Licencia en la primera franja (trabajo en la segunda)
+      if (secondDuration >= maxWorkMinutes) {
+        const trabajoHours = secondDuration / 60
+        const licenciaHours = firstDuration / 60
+        
+        suggestions.push({
+          id: "licencia-primera",
+          label: "Licencia en primera franja",
+          licenciaStart: shiftStartTime,
+          licenciaEnd: shiftEndTime,
+          trabajoStart: shiftStartTime2,
+          trabajoEnd: shiftEndTime2,
+          trabajoHours,
+          licenciaHours,
+          description: `Licencia: ${shiftStartTime} - ${shiftEndTime} | Trabajo: ${shiftStartTime2} - ${shiftEndTime2}`,
+        })
+      }
+
+      // Sugerencia 2: Licencia en la segunda franja (trabajo en la primera)
+      if (firstDuration >= maxWorkMinutes) {
+        const trabajoHours = firstDuration / 60
+        const licenciaHours = secondDuration / 60
+        
+        suggestions.push({
+          id: "licencia-segunda",
+          label: "Licencia en segunda franja",
+          licenciaStart: shiftStartTime2,
+          licenciaEnd: shiftEndTime2,
+          trabajoStart: shiftStartTime,
+          trabajoEnd: shiftEndTime,
+          trabajoHours,
+          licenciaHours,
+          description: `Trabajo: ${shiftStartTime} - ${shiftEndTime} | Licencia: ${shiftStartTime2} - ${shiftEndTime2}`,
+        })
+      }
+
+      // Si ninguna franja individual tiene 4h pero la suma sí, dividir la franja más larga
+      if (suggestions.length === 0) {
+        const longestDuration = Math.max(firstDuration, secondDuration)
+        const longestIsFirst = firstDuration >= secondDuration
+        
+        if (longestIsFirst && firstDuration > maxWorkMinutes) {
+          // Dividir primera franja
+          const shiftStart = timeToMinutes(shiftStartTime)
+          const shiftEnd = timeToMinutes(shiftEndTime)
+          const crossesMidnight = shiftEnd < shiftStart
+          
+          // Trabajo al inicio
+          let trabajoEndMinutes = shiftStart + maxWorkMinutes
+          if (trabajoEndMinutes >= 24 * 60) {
+            trabajoEndMinutes = trabajoEndMinutes % (24 * 60)
+          }
+          const trabajoEnd = minutesToTime(trabajoEndMinutes)
+          
+          suggestions.push({
+            id: "work-start",
+            label: "Trabajo al inicio (primera franja)",
+            licenciaStart: trabajoEnd,
+            licenciaEnd: shiftEndTime,
+            trabajoStart: shiftStartTime,
+            trabajoEnd: trabajoEnd,
+            trabajoHours: maxWorkMinutes / 60,
+            licenciaHours: (firstDuration - maxWorkMinutes) / 60,
+            description: `Trabajo: ${shiftStartTime} - ${trabajoEnd} (4h) | Licencia: ${trabajoEnd} - ${shiftEndTime}`,
+          })
+        } else if (!longestIsFirst && secondDuration > maxWorkMinutes) {
+          // Dividir segunda franja
+          const shiftStart2 = timeToMinutes(shiftStartTime2)
+          const shiftEnd2 = timeToMinutes(shiftEndTime2)
+          const crossesMidnight = shiftEnd2 < shiftStart2
+          
+          // Trabajo al inicio
+          let trabajoEndMinutes = shiftStart2 + maxWorkMinutes
+          if (trabajoEndMinutes >= 24 * 60) {
+            trabajoEndMinutes = trabajoEndMinutes % (24 * 60)
+          }
+          const trabajoEnd = minutesToTime(trabajoEndMinutes)
+          
+          suggestions.push({
+            id: "work-start",
+            label: "Trabajo al inicio (segunda franja)",
+            licenciaStart: trabajoEnd,
+            licenciaEnd: shiftEndTime2,
+            trabajoStart: shiftStartTime2,
+            trabajoEnd: trabajoEnd,
+            trabajoHours: maxWorkMinutes / 60,
+            licenciaHours: (secondDuration - maxWorkMinutes) / 60,
+            description: `Trabajo: ${shiftStartTime2} - ${trabajoEnd} (4h) | Licencia: ${trabajoEnd} - ${shiftEndTime2}`,
+          })
+        }
+      }
+    } else {
+      // Turno continuo (una sola franja) - funciona para cualquier horario, incluso si cruza medianoche
+      const totalDuration = calculateDuration(shiftStartTime, shiftEndTime)
+
+      if (totalDuration <= maxWorkMinutes) {
+        return [] // El turno ya es menor o igual a 4 horas
+      }
+
+      const crossesMidnight = shiftEnd < shiftStart
+
+      // Sugerencia 1: Trabajo al inicio (licencia al final)
+      let trabajoEndMinutes = shiftStart + maxWorkMinutes
+      // Si la suma supera 24h, ajustar (normalizar al rango 0-1439)
+      if (trabajoEndMinutes >= 24 * 60) {
+        trabajoEndMinutes = trabajoEndMinutes % (24 * 60)
+      }
+      const trabajoEnd = minutesToTime(trabajoEndMinutes)
+      const trabajoHours = maxWorkMinutes / 60
+      const licenciaHours = (totalDuration - maxWorkMinutes) / 60
+
+      suggestions.push({
+        id: "work-start",
+        label: "Trabajo al inicio",
+        licenciaStart: trabajoEnd,
+        licenciaEnd: shiftEndTime,
+        trabajoStart: shiftStartTime,
+        trabajoEnd: trabajoEnd,
+        trabajoHours,
+        licenciaHours,
+        description: `Trabajo: ${shiftStartTime} - ${trabajoEnd} (4h) | Licencia: ${trabajoEnd} - ${shiftEndTime}`,
+      })
+
+      // Sugerencia 2: Trabajo al final (licencia al inicio)
+      let trabajoStartMinutes: number
+      if (crossesMidnight) {
+        // El fin está en el día siguiente (ej: 00:00 = 0 min), trabajo empieza 4h antes
+        // Calcular desde el final del turno (que es en el día siguiente)
+        trabajoStartMinutes = (24 * 60 + shiftEnd) - maxWorkMinutes
+        if (trabajoStartMinutes < 0) {
+          trabajoStartMinutes = 24 * 60 + trabajoStartMinutes
+        } else if (trabajoStartMinutes >= 24 * 60) {
+          trabajoStartMinutes = trabajoStartMinutes - 24 * 60
+        }
+      } else {
+        trabajoStartMinutes = shiftEnd - maxWorkMinutes
+      }
+      const trabajoStart = minutesToTime(trabajoStartMinutes)
+      
+      suggestions.push({
+        id: "work-end",
+        label: "Trabajo al final",
+        licenciaStart: shiftStartTime,
+        licenciaEnd: trabajoStart,
+        trabajoStart: trabajoStart,
+        trabajoEnd: shiftEndTime,
+        trabajoHours,
+        licenciaHours,
+        description: `Licencia: ${shiftStartTime} - ${trabajoStart} | Trabajo: ${trabajoStart} - ${shiftEndTime} (4h)`,
+      })
+    }
+
+    return suggestions
+  }, [selectedShiftForLicencia])
 
   const handleSaveLicenciaEmbarazo = () => {
     if (!onAssignmentUpdate || !selectedShiftForLicencia) return
@@ -306,32 +541,41 @@ export function ScheduleCell({
     const shiftStartTime2 = shiftAssignment.startTime2 || shift.startTime2
     const shiftEndTime2 = shiftAssignment.endTime2 || shift.endTime2
 
-    // Validar que el rango esté dentro del turno
-    const licenciaStart = timeToMinutes(trimmedStartTime)
-    const licenciaEnd = timeToMinutes(trimmedEndTime)
-    const shiftStart = timeToMinutes(shiftStartTime)
-    const shiftEnd = timeToMinutes(shiftEndTime)
-
-    // Validar que el rango esté contenido en el turno
-    if (licenciaStart < shiftStart || licenciaEnd > shiftEnd) {
-      // Si el turno tiene segunda franja, también validar ahí
-      if (shiftStartTime2 && shiftEndTime2) {
-        const shiftStart2 = timeToMinutes(shiftStartTime2)
-        const shiftEnd2 = timeToMinutes(shiftEndTime2)
-        if (!(licenciaStart >= shiftStart2 && licenciaEnd <= shiftEnd2)) {
-          return // Fuera de rango
-        }
-      } else {
-        return // Fuera de rango
-      }
+    // Validar duración de licencia (considerando cruce de medianoche)
+    const licenciaDuration = calculateDuration(trimmedStartTime, trimmedEndTime)
+    if (licenciaDuration <= 0) {
+      return // Duración inválida
     }
 
-    if (licenciaStart >= licenciaEnd) {
-      return // Rango inválido
+    // Validar que el rango esté contenido en el turno
+    let isValid = false
+    
+    if (shiftStartTime2 && shiftEndTime2) {
+      // Turno cortado: validar en cualquiera de las dos franjas
+      const inFirstRange = isTimeInRange(trimmedStartTime, shiftStartTime, shiftEndTime) && 
+                           isTimeInRange(trimmedEndTime, shiftStartTime, shiftEndTime)
+      const inSecondRange = isTimeInRange(trimmedStartTime, shiftStartTime2, shiftEndTime2) && 
+                            isTimeInRange(trimmedEndTime, shiftStartTime2, shiftEndTime2)
+      
+      isValid = inFirstRange || inSecondRange
+    } else {
+      // Turno continuo: validar rango (considerando cruce de medianoche)
+      isValid = isTimeInRange(trimmedStartTime, shiftStartTime, shiftEndTime) && 
+                isTimeInRange(trimmedEndTime, shiftStartTime, shiftEndTime)
+    }
+    
+    if (!isValid) {
+      return // Fuera de rango
     }
 
     // Crear los tramos divididos
     const newAssignments: ShiftAssignment[] = []
+
+    // Convertir a minutos para comparaciones (necesario para determinar dónde está la licencia)
+    const licenciaStart = timeToMinutes(trimmedStartTime)
+    const licenciaEnd = timeToMinutes(trimmedEndTime)
+    const shiftStart = timeToMinutes(shiftStartTime)
+    const shiftEnd = timeToMinutes(shiftEndTime)
 
     // Si el turno tiene segunda franja (turno cortado)
     if (shiftStartTime2 && shiftEndTime2) {
@@ -339,7 +583,13 @@ export function ScheduleCell({
       const shiftEnd2 = timeToMinutes(shiftEndTime2)
 
       // Determinar en qué franja está la licencia
-      if (licenciaStart >= shiftStart2 && licenciaEnd <= shiftEnd2) {
+      // Para turnos que cruzan medianoche, necesitamos comparar considerando ese caso
+      const licenciaInFirst = isTimeInRange(trimmedStartTime, shiftStartTime, shiftEndTime) && 
+                              isTimeInRange(trimmedEndTime, shiftStartTime, shiftEndTime)
+      const licenciaInSecond = isTimeInRange(trimmedStartTime, shiftStartTime2, shiftEndTime2) && 
+                               isTimeInRange(trimmedEndTime, shiftStartTime2, shiftEndTime2)
+      
+      if (licenciaInSecond) {
         // Licencia está en la segunda franja
         // Mantener primera franja completa
         const firstPart: ShiftAssignment = {
@@ -351,7 +601,16 @@ export function ScheduleCell({
         newAssignments.push(firstPart)
 
         // Tramo antes de licencia en segunda franja (si existe)
-        if (licenciaStart > shiftStart2) {
+        // Comparar tiempos considerando cruce de medianoche
+        const shiftStart2Minutes = timeToMinutes(shiftStartTime2)
+        const licenciaStartMinutes = timeToMinutes(trimmedStartTime)
+        // Si no cruza medianoche, comparación normal. Si cruza, ajustar
+        const crossesMidnight = shiftEnd2 < shiftStart2
+        const licenciaStartIsAfter = crossesMidnight 
+          ? (licenciaStartMinutes >= shiftStart2Minutes || licenciaStartMinutes <= shiftEnd2)
+          : (licenciaStartMinutes > shiftStart2Minutes)
+        
+        if (licenciaStartIsAfter && trimmedStartTime !== shiftStartTime2) {
           newAssignments.push({
             shiftId: shiftAssignment.shiftId,
             type: "shift",
@@ -368,7 +627,13 @@ export function ScheduleCell({
         })
 
         // Tramo después de licencia en segunda franja (si existe)
-        if (licenciaEnd < shiftEnd2) {
+        const shiftEnd2Minutes = timeToMinutes(shiftEndTime2)
+        const licenciaEndMinutes = timeToMinutes(trimmedEndTime)
+        const licenciaEndIsBefore = crossesMidnight
+          ? (licenciaEndMinutes < shiftEnd2Minutes || licenciaEndMinutes >= shiftStart2Minutes)
+          : (licenciaEndMinutes < shiftEnd2Minutes)
+        
+        if (licenciaEndIsBefore && trimmedEndTime !== shiftEndTime2) {
           newAssignments.push({
             shiftId: shiftAssignment.shiftId,
             type: "shift",
@@ -376,10 +641,15 @@ export function ScheduleCell({
             endTime2: shiftEndTime2,
           })
         }
-      } else if (licenciaStart >= shiftStart && licenciaEnd <= shiftEnd) {
+      } else if (licenciaInFirst) {
         // Licencia está en la primera franja
         // Tramo antes de licencia en primera franja (si existe)
-        if (licenciaStart > shiftStart) {
+        const firstCrossesMidnight = shiftEnd < shiftStart
+        const licenciaStartIsAfterFirst = firstCrossesMidnight
+          ? (licenciaStart > shiftStart || licenciaStart <= shiftEnd)
+          : (licenciaStart > shiftStart)
+        
+        if (licenciaStartIsAfterFirst && trimmedStartTime !== shiftStartTime) {
           newAssignments.push({
             shiftId: shiftAssignment.shiftId,
             type: "shift",
@@ -396,7 +666,11 @@ export function ScheduleCell({
         })
 
         // Tramo después de licencia en primera franja (si existe)
-        if (licenciaEnd < shiftEnd) {
+        const licenciaEndIsBeforeFirst = firstCrossesMidnight
+          ? (licenciaEnd < shiftEnd || licenciaEnd >= shiftStart)
+          : (licenciaEnd < shiftEnd)
+        
+        if (licenciaEndIsBeforeFirst && trimmedEndTime !== shiftEndTime) {
           newAssignments.push({
             shiftId: shiftAssignment.shiftId,
             type: "shift",
@@ -415,8 +689,14 @@ export function ScheduleCell({
       }
     } else {
       // Turno continuo (una sola franja)
+      const crossesMidnight = shiftEnd < shiftStart
+      
       // Tramo antes de licencia (si existe)
-      if (licenciaStart > shiftStart) {
+      const licenciaStartIsAfter = crossesMidnight
+        ? (licenciaStart > shiftStart || licenciaStart <= shiftEnd)
+        : (licenciaStart > shiftStart)
+      
+      if (licenciaStartIsAfter && trimmedStartTime !== shiftStartTime) {
         newAssignments.push({
           shiftId: shiftAssignment.shiftId,
           type: "shift",
@@ -433,7 +713,11 @@ export function ScheduleCell({
       })
 
       // Tramo después de licencia (si existe)
-      if (licenciaEnd < shiftEnd) {
+      const licenciaEndIsBefore = crossesMidnight
+        ? (licenciaEnd < shiftEnd || licenciaEnd >= shiftStart)
+        : (licenciaEnd < shiftEnd)
+      
+      if (licenciaEndIsBefore && trimmedEndTime !== shiftEndTime) {
         newAssignments.push({
           shiftId: shiftAssignment.shiftId,
           type: "shift",
@@ -803,53 +1087,132 @@ export function ScheduleCell({
 
       {/* Diálogo para asignar licencia por embarazo */}
       <Dialog open={licenciaEmbarazoDialogOpen} onOpenChange={setLicenciaEmbarazoDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Asignar Licencia por Embarazo</DialogTitle>
             <DialogDescription>
               {selectedShiftForLicencia && (
                 <>
-                  Selecciona el rango horario dentro del turno <strong>{selectedShiftForLicencia.shift.name}</strong>.
+                  Turno: <strong>{selectedShiftForLicencia.shift.name}</strong>
                   <br />
-                  {(() => {
-                    const shift = selectedShiftForLicencia.shift
-                    const assignment = selectedShiftForLicencia.assignment
-                    const startTime = assignment.startTime || shift.startTime || ""
-                    const endTime = assignment.endTime || shift.endTime || ""
-                    const startTime2 = assignment.startTime2 || shift.startTime2
-                    const endTime2 = assignment.endTime2 || shift.endTime2
-                    
-                    if (startTime2 && endTime2) {
-                      return `Horario del turno: ${startTime} - ${endTime} y ${startTime2} - ${endTime2}`
-                    }
-                    return `Horario del turno: ${startTime} - ${endTime}`
-                  })()}
+                  <span className="text-xs">
+                    {(() => {
+                      const shift = selectedShiftForLicencia.shift
+                      const assignment = selectedShiftForLicencia.assignment
+                      const startTime = assignment.startTime || shift.startTime || ""
+                      const endTime = assignment.endTime || shift.endTime || ""
+                      const startTime2 = assignment.startTime2 || shift.startTime2
+                      const endTime2 = assignment.endTime2 || shift.endTime2
+                      
+                      if (startTime2 && endTime2) {
+                        return `Horario completo: ${startTime} - ${endTime} y ${startTime2} - ${endTime2}`
+                      }
+                      return `Horario completo: ${startTime} - ${endTime}`
+                    })()}
+                    <br />
+                    <span className="text-muted-foreground">
+                      El empleado trabajará 4 horas efectivas. El resto será licencia por embarazo.
+                    </span>
+                  </span>
                 </>
               )}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="licenciaStartTime">Hora de inicio</Label>
-              <Input
-                id="licenciaStartTime"
-                type="time"
-                value={licenciaStartTime}
-                onChange={(e) => setLicenciaStartTime(e.target.value)}
-                min={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.startTime || selectedShiftForLicencia.shift.startTime || "") : undefined}
-                max={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.endTime || selectedShiftForLicencia.shift.endTime || "") : undefined}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="licenciaEndTime">Hora de fin</Label>
-              <Input
-                id="licenciaEndTime"
-                type="time"
-                value={licenciaEndTime}
-                onChange={(e) => setLicenciaEndTime(e.target.value)}
-                min={licenciaStartTime || (selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.startTime || selectedShiftForLicencia.shift.startTime || "") : undefined)}
-                max={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.endTime || selectedShiftForLicencia.shift.endTime || "") : undefined}
-              />
+            {calculateLicenciaSuggestions.length > 0 && (
+              <div className="space-y-3 pb-3 border-b">
+                <Label className="text-sm font-semibold">Sugerencias automáticas:</Label>
+                <div className="space-y-2">
+                  {calculateLicenciaSuggestions.map((suggestion) => (
+                    <div
+                      key={suggestion.id}
+                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                        selectedSuggestion === suggestion.id
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:bg-muted/50"
+                      }`}
+                      onClick={() => {
+                        setSelectedSuggestion(suggestion.id)
+                        setLicenciaStartTime(suggestion.licenciaStart)
+                        setLicenciaEndTime(suggestion.licenciaEnd)
+                      }}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5">
+                          <div
+                            className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                              selectedSuggestion === suggestion.id
+                                ? "border-primary bg-primary"
+                                : "border-muted-foreground"
+                            }`}
+                          >
+                            {selectedSuggestion === suggestion.id && (
+                              <div className="w-2 h-2 rounded-full bg-primary-foreground" />
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm mb-1">{suggestion.label}</div>
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            <div>
+                              <span className="font-semibold text-blue-600 dark:text-blue-400">Trabajo:</span>{" "}
+                              <span className="text-blue-600 dark:text-blue-400 font-medium">
+                                {suggestion.trabajoStart} - {suggestion.trabajoEnd}
+                              </span>{" "}
+                              <span className="text-muted-foreground">({suggestion.trabajoHours.toFixed(1)} h)</span>
+                            </div>
+                            <div>
+                              <span className="font-semibold text-orange-600 dark:text-orange-400">Licencia:</span>{" "}
+                              <span className="text-orange-600 dark:text-orange-400 font-medium">
+                                {suggestion.licenciaStart} - {suggestion.licenciaEnd}
+                              </span>{" "}
+                              <span className="text-muted-foreground">({suggestion.licenciaHours.toFixed(1)} h)</span>
+                            </div>
+                            {suggestion.description && (
+                              <div className="text-[10px] text-muted-foreground mt-1 italic">
+                                {suggestion.description}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="space-y-4">
+              <Label className="text-sm font-semibold">O especifica manualmente:</Label>
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="licenciaStartTime">Hora de inicio de licencia</Label>
+                  <Input
+                    id="licenciaStartTime"
+                    type="time"
+                    value={licenciaStartTime}
+                    onChange={(e) => {
+                      setLicenciaStartTime(e.target.value)
+                      setSelectedSuggestion(null) // Limpiar selección si se edita manualmente
+                    }}
+                    min={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.startTime || selectedShiftForLicencia.shift.startTime || "") : undefined}
+                    max={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.endTime || selectedShiftForLicencia.shift.endTime || "") : undefined}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="licenciaEndTime">Hora de fin de licencia</Label>
+                  <Input
+                    id="licenciaEndTime"
+                    type="time"
+                    value={licenciaEndTime}
+                    onChange={(e) => {
+                      setLicenciaEndTime(e.target.value)
+                      setSelectedSuggestion(null) // Limpiar selección si se edita manualmente
+                    }}
+                    min={licenciaStartTime || (selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.startTime || selectedShiftForLicencia.shift.startTime || "") : undefined)}
+                    max={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.endTime || selectedShiftForLicencia.shift.endTime || "") : undefined}
+                  />
+                </div>
+              </div>
             </div>
             {licenciaStartTime && licenciaEndTime && selectedShiftForLicencia && (() => {
               const shift = selectedShiftForLicencia.shift
@@ -859,25 +1222,27 @@ export function ScheduleCell({
               const shiftStartTime2 = assignment.startTime2 || shift.startTime2
               const shiftEndTime2 = assignment.endTime2 || shift.endTime2
 
-              const licenciaStart = timeToMinutes(licenciaStartTime)
-              const licenciaEnd = timeToMinutes(licenciaEndTime)
-              const shiftStart = timeToMinutes(shiftStartTime)
-              const shiftEnd = timeToMinutes(shiftEndTime)
-
               let isValid = false
               let errorMessage = ""
 
-              if (licenciaStart >= licenciaEnd) {
+              // Verificar que inicio < fin (considerando cruce de medianoche)
+              const licenciaDuration = calculateDuration(licenciaStartTime, licenciaEndTime)
+              if (licenciaDuration <= 0) {
                 errorMessage = "La hora de inicio debe ser anterior a la hora de fin"
               } else if (shiftStartTime2 && shiftEndTime2) {
-                const shiftStart2 = timeToMinutes(shiftStartTime2)
-                const shiftEnd2 = timeToMinutes(shiftEndTime2)
-                isValid = (licenciaStart >= shiftStart && licenciaEnd <= shiftEnd) || (licenciaStart >= shiftStart2 && licenciaEnd <= shiftEnd2)
+                // Turno cortado: validar en cualquiera de las dos franjas
+                const inFirstRange = isTimeInRange(licenciaStartTime, shiftStartTime, shiftEndTime) && 
+                                     isTimeInRange(licenciaEndTime, shiftStartTime, shiftEndTime)
+                const inSecondRange = isTimeInRange(licenciaStartTime, shiftStartTime2, shiftEndTime2) && 
+                                      isTimeInRange(licenciaEndTime, shiftStartTime2, shiftEndTime2)
+                isValid = inFirstRange || inSecondRange
                 if (!isValid) {
                   errorMessage = `El rango debe estar contenido en ${shiftStartTime} - ${shiftEndTime} o en ${shiftStartTime2} - ${shiftEndTime2}`
                 }
               } else {
-                isValid = licenciaStart >= shiftStart && licenciaEnd <= shiftEnd
+                // Turno continuo: validar rango (considerando cruce de medianoche)
+                isValid = isTimeInRange(licenciaStartTime, shiftStartTime, shiftEndTime) && 
+                          isTimeInRange(licenciaEndTime, shiftStartTime, shiftEndTime)
                 if (!isValid) {
                   errorMessage = `El rango debe estar contenido en ${shiftStartTime} - ${shiftEndTime}`
                 }
@@ -891,10 +1256,9 @@ export function ScheduleCell({
                 )
               }
 
-              const duration = licenciaEnd - licenciaStart
               return (
                 <div className="text-sm text-muted-foreground">
-                  Duración: {Math.floor(duration / 60)}h {duration % 60}min
+                  Duración: {Math.floor(licenciaDuration / 60)}h {licenciaDuration % 60}min
                 </div>
               )
             })()}
@@ -914,18 +1278,20 @@ export function ScheduleCell({
                 const shiftStartTime2 = assignment.startTime2 || shift.startTime2
                 const shiftEndTime2 = assignment.endTime2 || shift.endTime2
 
-                const licenciaStart = timeToMinutes(licenciaStartTime)
-                const licenciaEnd = timeToMinutes(licenciaEndTime)
-                const shiftStart = timeToMinutes(shiftStartTime)
-                const shiftEnd = timeToMinutes(shiftEndTime)
-
-                if (licenciaStart >= licenciaEnd) return true
+                // Validar duración
+                const licenciaDuration = calculateDuration(licenciaStartTime, licenciaEndTime)
+                if (licenciaDuration <= 0) return true
+                
+                // Validar rango
                 if (shiftStartTime2 && shiftEndTime2) {
-                  const shiftStart2 = timeToMinutes(shiftStartTime2)
-                  const shiftEnd2 = timeToMinutes(shiftEndTime2)
-                  return !((licenciaStart >= shiftStart && licenciaEnd <= shiftEnd) || (licenciaStart >= shiftStart2 && licenciaEnd <= shiftEnd2))
+                  const inFirstRange = isTimeInRange(licenciaStartTime, shiftStartTime, shiftEndTime) && 
+                                       isTimeInRange(licenciaEndTime, shiftStartTime, shiftEndTime)
+                  const inSecondRange = isTimeInRange(licenciaStartTime, shiftStartTime2, shiftEndTime2) && 
+                                        isTimeInRange(licenciaEndTime, shiftStartTime2, shiftEndTime2)
+                  return !(inFirstRange || inSecondRange)
                 }
-                return !(licenciaStart >= shiftStart && licenciaEnd <= shiftEnd)
+                return !(isTimeInRange(licenciaStartTime, shiftStartTime, shiftEndTime) && 
+                         isTimeInRange(licenciaEndTime, shiftStartTime, shiftEndTime))
               })()}
             >
               Guardar
