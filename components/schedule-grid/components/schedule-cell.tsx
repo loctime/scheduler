@@ -339,11 +339,34 @@ export function ScheduleCell({
   }
 
   const handleOpenLicenciaEmbarazoDialog = (shiftAssignment: ShiftAssignment, shift: Turno) => {
+    // Si es medio_franco con horario completo, asignar licencia directamente sin abrir diálogo
+    if (shiftAssignment.type === "medio_franco" && shiftAssignment.startTime && shiftAssignment.endTime && !shiftAssignment.startTime2) {
+      handleAssignLicenciaToMedioFranco(shiftAssignment)
+      return
+    }
+    
     setSelectedShiftForLicencia({ assignment: shiftAssignment, shift })
     setLicenciaStartTime("")
     setLicenciaEndTime("")
     setSelectedSuggestion(null)
     setLicenciaEmbarazoDialogOpen(true)
+  }
+
+  // Asignar licencia directamente a medio_franco completo (reemplaza todo el medio_franco)
+  const handleAssignLicenciaToMedioFranco = (medioFrancoAssignment: ShiftAssignment) => {
+    if (!onAssignmentUpdate || !medioFrancoAssignment.startTime || !medioFrancoAssignment.endTime) return
+
+    const licenciaAssignment: ShiftAssignment = {
+      type: "licencia_embarazo",
+      startTime: medioFrancoAssignment.startTime,
+      endTime: medioFrancoAssignment.endTime,
+    }
+
+    // Filtrar el medio_franco original y agregar la licencia
+    const otherAssignments = assignments.filter((a) => a.type !== "medio_franco")
+    const finalAssignments = [...otherAssignments, licenciaAssignment]
+
+    onAssignmentUpdate(date, employeeId, finalAssignments, { scheduleId })
   }
 
   // Calcular sugerencias automáticas de licencia - Generalizado para cualquier turno
@@ -780,12 +803,16 @@ export function ScheduleCell({
         
         if (licenciaStartIsAfter && trimmedStartTime !== shiftStartTime) {
           // Mantener tipo original (shift o medio_franco)
-          newAssignments.push({
-            shiftId: shiftAssignment.shiftId,
+          const partialAssignment: ShiftAssignment = {
             type: isMedioFranco ? "medio_franco" : "shift",
             startTime: shiftStartTime,
             endTime: trimmedStartTime,
-          })
+          }
+          // Solo agregar shiftId si existe (medio_franco puede no tenerlo)
+          if (shiftAssignment.shiftId && !isMedioFranco) {
+            partialAssignment.shiftId = shiftAssignment.shiftId
+          }
+          newAssignments.push(partialAssignment)
         }
 
         // Tramo de licencia
@@ -802,12 +829,16 @@ export function ScheduleCell({
         
         if (licenciaEndIsBefore && trimmedEndTime !== shiftEndTime) {
           // Mantener tipo original (shift o medio_franco)
-          newAssignments.push({
-            shiftId: shiftAssignment.shiftId,
+          const partialAssignment: ShiftAssignment = {
             type: isMedioFranco ? "medio_franco" : "shift",
             startTime: trimmedEndTime,
             endTime: shiftEndTime,
-          })
+          }
+          // Solo agregar shiftId si existe (medio_franco puede no tenerlo)
+          if (shiftAssignment.shiftId && !isMedioFranco) {
+            partialAssignment.shiftId = shiftAssignment.shiftId
+          }
+          newAssignments.push(partialAssignment)
         }
       }
     }

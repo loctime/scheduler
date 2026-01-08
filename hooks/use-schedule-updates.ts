@@ -384,10 +384,22 @@ export function useScheduleUpdates({
             currentAssignments[date] = {}
           }
           
+          // Limpiar campos undefined de los assignments antes de guardar (Firestore no acepta undefined)
+          const cleanedAssignments = assignments.map((assignment) => {
+            const cleaned: ShiftAssignment = { type: assignment.type || "shift" }
+            if (assignment.shiftId) cleaned.shiftId = assignment.shiftId
+            if (assignment.startTime) cleaned.startTime = assignment.startTime
+            if (assignment.endTime) cleaned.endTime = assignment.endTime
+            if (assignment.startTime2) cleaned.startTime2 = assignment.startTime2
+            if (assignment.endTime2) cleaned.endTime2 = assignment.endTime2
+            if (assignment.texto) cleaned.texto = assignment.texto
+            return cleaned
+          })
+          
           // Nota: En horarios nuevos no hay medio_franco previo que proteger,
           // así que se usa assignments directamente
-          currentAssignments[date][employeeId] = assignments
-          finalAssignments = assignments
+          currentAssignments[date][employeeId] = cleanedAssignments
+          finalAssignments = cleanedAssignments
 
           const newScheduleData = {
             nombre: scheduleNombre,
@@ -423,6 +435,7 @@ export function useScheduleUpdates({
           await saveHistoryEntry(historyEntry)
 
           // Proteger medio_franco: si existe en asignaciones actuales, asegurarse de que no se elimine
+          // PERO solo si el usuario no está limpiando explícitamente la celda o asignando un turno nuevo
           const currentEmployeeAssignments = normalizeAssignments(
             weekSchedule.assignments[date]?.[employeeId]
           )
@@ -430,18 +443,65 @@ export function useScheduleUpdates({
             (a) => a.type === "medio_franco"
           )
           
-          // Si existe medio_franco actual y no está en las nuevas asignaciones, preservarlo
+          // Si existe medio_franco actual y no está en las nuevas asignaciones:
+          // - NO preservarlo si assignments está vacío (usuario está limpiando)
+          // - NO preservarlo si el usuario está asignando un turno nuevo explícitamente (sin medio_franco)
+          // - Solo preservarlo si hay otras asignaciones (como franco, nota) que sugieren que el usuario
+          //   solo está modificando parcialmente el día, no reemplazando todo
           finalAssignments = [...assignments]
-          if (existingMedioFranco && !assignments.some((a) => a.type === "medio_franco")) {
-            finalAssignments.push(existingMedioFranco)
+          
+          // Verificar si el usuario está limpiando explícitamente (array vacío) o asignando solo un turno nuevo
+          const isClearingCell = assignments.length === 0
+          const isAssigningOnlyNewShift = assignments.length > 0 && 
+                                          assignments.every(a => a.type === "shift" && a.shiftId) &&
+                                          !assignments.some(a => a.type === "medio_franco")
+          
+          // Solo preservar medio_franco si NO se está limpiando y NO se está asignando solo un turno nuevo
+          // Además, asegurarse de que el medio_franco preservado no tenga shiftId de turnos nuevos
+          if (existingMedioFranco && 
+              !assignments.some((a) => a.type === "medio_franco") &&
+              !isClearingCell &&
+              !isAssigningOnlyNewShift) {
+            // Crear una copia limpia del medio_franco sin shiftId para evitar confusiones
+            // El medio_franco debe usar solo sus propios horarios (startTime/endTime), no los de un turno
+            const preservedMedioFranco: ShiftAssignment = {
+              type: "medio_franco",
+            }
+            // Solo agregar campos que tienen valor (no undefined ni null)
+            if (existingMedioFranco.startTime) {
+              preservedMedioFranco.startTime = existingMedioFranco.startTime
+            }
+            if (existingMedioFranco.endTime) {
+              preservedMedioFranco.endTime = existingMedioFranco.endTime
+            }
+            if (existingMedioFranco.startTime2) {
+              preservedMedioFranco.startTime2 = existingMedioFranco.startTime2
+            }
+            if (existingMedioFranco.endTime2) {
+              preservedMedioFranco.endTime2 = existingMedioFranco.endTime2
+            }
+            // No preservar shiftId para evitar que se mezcle con turnos
+            finalAssignments.push(preservedMedioFranco)
           }
+
+          // Limpiar campos undefined de los assignments antes de guardar (Firestore no acepta undefined)
+          const cleanedFinalAssignments = finalAssignments.map((assignment) => {
+            const cleaned: ShiftAssignment = { type: assignment.type || "shift" }
+            if (assignment.shiftId) cleaned.shiftId = assignment.shiftId
+            if (assignment.startTime) cleaned.startTime = assignment.startTime
+            if (assignment.endTime) cleaned.endTime = assignment.endTime
+            if (assignment.startTime2) cleaned.startTime2 = assignment.startTime2
+            if (assignment.endTime2) cleaned.endTime2 = assignment.endTime2
+            if (assignment.texto) cleaned.texto = assignment.texto
+            return cleaned
+          })
 
           // Actualizar assignments usando helper
           currentAssignments = updateAssignmentInAssignments(
             weekSchedule.assignments as any,
             date,
             employeeId,
-            finalAssignments
+            cleanedFinalAssignments
           )
         }
         
