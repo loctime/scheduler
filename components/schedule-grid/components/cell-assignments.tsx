@@ -146,7 +146,7 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
                 key={`licencia-embarazo-${idx}`} 
                 className="block text-center text-xs sm:text-sm md:text-base font-semibold mb-0.5"
               >
-                <span className="text-amber-600 dark:text-amber-400 font-bold text-[10px] sm:text-xs mr-1">LICENCIA</span>
+                <span className="text-amber-600 dark:text-amber-400 font-bold text-[10px] sm:text-xs mr-1">Lic.</span>
                 <span className="text-foreground mx-1">·</span>
                 <span className="text-foreground font-semibold">{timeText}</span>
               </span>
