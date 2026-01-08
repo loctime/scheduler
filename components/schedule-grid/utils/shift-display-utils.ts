@@ -57,10 +57,28 @@ export function getShiftDisplayTime(
 
   // Si hay asignación con horarios ajustados, usar esos
   if (assignment) {
-    const start = assignment.startTime || shift.startTime
-    const end = assignment.endTime || shift.endTime
-    const start2 = assignment.startTime2 || shift.startTime2
-    const end2 = assignment.endTime2 || shift.endTime2
+    // Para turnos con ajustes, usar los valores del assignment
+    // CRÍTICO: Si el assignment tiene startTime/endTime explícitos, solo mostrar segunda franja
+    // si también está explícitamente definida en el assignment (no usar la del turno base como fallback)
+    // Esto evita mostrar franjas no deseadas cuando se divide un turno cortado
+    const start = assignment.startTime !== undefined ? assignment.startTime : shift.startTime
+    const end = assignment.endTime !== undefined ? assignment.endTime : shift.endTime
+    
+    // Para la segunda franja: solo usar si está explícitamente en el assignment
+    // Si el assignment tiene startTime/endTime pero NO tiene startTime2/endTime2, no mostrar segunda franja
+    let start2: string | undefined = undefined
+    let end2: string | undefined = undefined
+    
+    // Si el assignment tiene startTime2/endTime2 explícitos, usarlos
+    if (assignment.startTime2 !== undefined || assignment.endTime2 !== undefined) {
+      start2 = assignment.startTime2 || shift.startTime2
+      end2 = assignment.endTime2 || shift.endTime2
+    } else if (assignment.startTime === undefined && assignment.endTime === undefined) {
+      // Si el assignment no tiene primera franja explícita, puede usar la segunda del turno base
+      start2 = shift.startTime2
+      end2 = shift.endTime2
+    }
+    // Si el assignment tiene primera franja pero no segunda, start2/end2 quedan undefined
 
     if (start && end) {
       const first = formatTimeRange(start, end)

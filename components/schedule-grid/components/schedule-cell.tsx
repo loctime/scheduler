@@ -272,7 +272,10 @@ export function ScheduleCell({
   }
 
   const timeToMinutes = (time: string): number => {
-    const [hours, minutes] = time.split(":").map(Number)
+    if (!time) return 0
+    // Normalizar formato: si no tiene ":", asumir que son solo horas (ej: "11" -> "11:00")
+    const normalizedTime = time.includes(":") ? time : `${time}:00`
+    const [hours, minutes] = normalizedTime.split(":").map(Number)
     return hours * 60 + minutes
   }
 
@@ -571,11 +574,34 @@ export function ScheduleCell({
     // Crear los tramos divididos
     const newAssignments: ShiftAssignment[] = []
 
-    // Convertir a minutos para comparaciones (necesario para determinar dónde está la licencia)
+    // Convertir a minutos para comparaciones
     const licenciaStart = timeToMinutes(trimmedStartTime)
     const licenciaEnd = timeToMinutes(trimmedEndTime)
     const shiftStart = timeToMinutes(shiftStartTime)
     const shiftEnd = timeToMinutes(shiftEndTime)
+
+    // Verificar si la licencia coincide EXACTAMENTE con alguna franja completa
+    // Normalizar tiempos antes de comparar para manejar diferentes formatos
+    const normalizeTimeForComparison = (time: string): string => {
+      if (!time) return ""
+      // Si no tiene ":", agregar ":00"
+      return time.includes(":") ? time : `${time}:00`
+    }
+    
+    const licenciaStartNorm = normalizeTimeForComparison(trimmedStartTime)
+    const licenciaEndNorm = normalizeTimeForComparison(trimmedEndTime)
+    const shiftStartTimeNorm = shiftStartTime ? normalizeTimeForComparison(shiftStartTime) : ""
+    const shiftEndTimeNorm = shiftEndTime ? normalizeTimeForComparison(shiftEndTime) : ""
+    const shiftStartTime2Norm = shiftStartTime2 ? normalizeTimeForComparison(shiftStartTime2) : ""
+    const shiftEndTime2Norm = shiftEndTime2 ? normalizeTimeForComparison(shiftEndTime2) : ""
+    
+    const licenciaCoincideConPrimeraFranja = shiftStartTime && shiftEndTime && 
+      licenciaStartNorm === shiftStartTimeNorm && 
+      licenciaEndNorm === shiftEndTimeNorm
+    
+    const licenciaCoincideConSegundaFranja = shiftStartTime2 && shiftEndTime2 && 
+      licenciaStartNorm === shiftStartTime2Norm && 
+      licenciaEndNorm === shiftEndTime2Norm
 
     // Si el turno tiene segunda franja (turno cortado)
     if (shiftStartTime2 && shiftEndTime2) {
@@ -583,7 +609,6 @@ export function ScheduleCell({
       const shiftEnd2 = timeToMinutes(shiftEndTime2)
 
       // Determinar en qué franja está la licencia
-      // Para turnos que cruzan medianoche, necesitamos comparar considerando ese caso
       const licenciaInFirst = isTimeInRange(trimmedStartTime, shiftStartTime, shiftEndTime) && 
                               isTimeInRange(trimmedEndTime, shiftStartTime, shiftEndTime)
       const licenciaInSecond = isTimeInRange(trimmedStartTime, shiftStartTime2, shiftEndTime2) && 
@@ -591,65 +616,145 @@ export function ScheduleCell({
       
       if (licenciaInSecond) {
         // Licencia está en la segunda franja
-        // Mantener primera franja completa
-        const firstPart: ShiftAssignment = {
-          shiftId: shiftAssignment.shiftId,
-          type: "shift",
-          startTime: shiftStartTime,
-          endTime: shiftEndTime,
-        }
-        newAssignments.push(firstPart)
-
-        // Tramo antes de licencia en segunda franja (si existe)
-        // Comparar tiempos considerando cruce de medianoche
-        const shiftStart2Minutes = timeToMinutes(shiftStartTime2)
-        const licenciaStartMinutes = timeToMinutes(trimmedStartTime)
-        // Si no cruza medianoche, comparación normal. Si cruza, ajustar
-        const crossesMidnight = shiftEnd2 < shiftStart2
-        const licenciaStartIsAfter = crossesMidnight 
-          ? (licenciaStartMinutes >= shiftStart2Minutes || licenciaStartMinutes <= shiftEnd2)
-          : (licenciaStartMinutes > shiftStart2Minutes)
         
-        if (licenciaStartIsAfter && trimmedStartTime !== shiftStartTime2) {
+        // Si la licencia coincide EXACTAMENTE con la segunda franja completa
+        if (licenciaCoincideConSegundaFranja) {
+          // Solo crear assignment con la primera franja (sin segunda franja)
           newAssignments.push({
             shiftId: shiftAssignment.shiftId,
             type: "shift",
-            startTime2: shiftStartTime2,
-            endTime2: trimmedStartTime,
+            startTime: shiftStartTime,
+            endTime: shiftEndTime,
           })
+        } else {
+          // Licencia está parcialmente en la segunda franja - dividir
+          // Mantener primera franja completa
+          newAssignments.push({
+            shiftId: shiftAssignment.shiftId,
+            type: "shift",
+            startTime: shiftStartTime,
+            endTime: shiftEndTime,
+          })
+
+          // Tramo antes de licencia en segunda franja (si existe)
+          const crossesMidnight = shiftEnd2 < shiftStart2
+          const licenciaStartMinutes = timeToMinutes(trimmedStartTime)
+          const licenciaStartIsAfter = crossesMidnight 
+            ? (licenciaStartMinutes >= shiftStart2 || licenciaStartMinutes <= shiftEnd2)
+            : (licenciaStartMinutes > shiftStart2)
+          
+          if (licenciaStartIsAfter && trimmedStartTime !== shiftStartTime2) {
+            newAssignments.push({
+              shiftId: shiftAssignment.shiftId,
+              type: "shift",
+              startTime2: shiftStartTime2,
+              endTime2: trimmedStartTime,
+            })
+          }
+
+          // Tramo después de licencia en segunda franja (si existe)
+          const licenciaEndMinutes = timeToMinutes(trimmedEndTime)
+          const licenciaEndIsBefore = crossesMidnight
+            ? (licenciaEndMinutes < shiftEnd2 || licenciaEndMinutes >= shiftStart2)
+            : (licenciaEndMinutes < shiftEnd2)
+          
+          if (licenciaEndIsBefore && trimmedEndTime !== shiftEndTime2) {
+            newAssignments.push({
+              shiftId: shiftAssignment.shiftId,
+              type: "shift",
+              startTime2: trimmedEndTime,
+              endTime2: shiftEndTime2,
+            })
+          }
         }
 
-        // Tramo de licencia
+        // Siempre agregar la licencia
         newAssignments.push({
           type: "licencia_embarazo",
           startTime: trimmedStartTime,
           endTime: trimmedEndTime,
         })
-
-        // Tramo después de licencia en segunda franja (si existe)
-        const shiftEnd2Minutes = timeToMinutes(shiftEndTime2)
-        const licenciaEndMinutes = timeToMinutes(trimmedEndTime)
-        const licenciaEndIsBefore = crossesMidnight
-          ? (licenciaEndMinutes < shiftEnd2Minutes || licenciaEndMinutes >= shiftStart2Minutes)
-          : (licenciaEndMinutes < shiftEnd2Minutes)
         
-        if (licenciaEndIsBefore && trimmedEndTime !== shiftEndTime2) {
+      } else if (licenciaInFirst) {
+        // Licencia está en la primera franja
+        
+        // Si la licencia coincide EXACTAMENTE con la primera franja completa
+        if (licenciaCoincideConPrimeraFranja) {
+          // Solo crear assignment con la segunda franja (sin primera franja)
           newAssignments.push({
             shiftId: shiftAssignment.shiftId,
             type: "shift",
-            startTime2: trimmedEndTime,
+            startTime2: shiftStartTime2,
+            endTime2: shiftEndTime2,
+          })
+        } else {
+          // Licencia está parcialmente en la primera franja - dividir
+          // Tramo antes de licencia en primera franja (si existe)
+          const firstCrossesMidnight = shiftEnd < shiftStart
+          const licenciaStartIsAfterFirst = firstCrossesMidnight
+            ? (licenciaStart > shiftStart || licenciaStart <= shiftEnd)
+            : (licenciaStart > shiftStart)
+          
+          if (licenciaStartIsAfterFirst && trimmedStartTime !== shiftStartTime) {
+            newAssignments.push({
+              shiftId: shiftAssignment.shiftId,
+              type: "shift",
+              startTime: shiftStartTime,
+              endTime: trimmedStartTime,
+            })
+          }
+
+          // Tramo después de licencia en primera franja (si existe)
+          const licenciaEndIsBeforeFirst = firstCrossesMidnight
+            ? (licenciaEnd < shiftEnd || licenciaEnd >= shiftStart)
+            : (licenciaEnd < shiftEnd)
+          
+          if (licenciaEndIsBeforeFirst && trimmedEndTime !== shiftEndTime) {
+            newAssignments.push({
+              shiftId: shiftAssignment.shiftId,
+              type: "shift",
+              startTime: trimmedEndTime,
+              endTime: shiftEndTime,
+            })
+          }
+
+          // Mantener segunda franja completa
+          newAssignments.push({
+            shiftId: shiftAssignment.shiftId,
+            type: "shift",
+            startTime2: shiftStartTime2,
             endTime2: shiftEndTime2,
           })
         }
-      } else if (licenciaInFirst) {
-        // Licencia está en la primera franja
-        // Tramo antes de licencia en primera franja (si existe)
-        const firstCrossesMidnight = shiftEnd < shiftStart
-        const licenciaStartIsAfterFirst = firstCrossesMidnight
+
+        // Siempre agregar la licencia
+        newAssignments.push({
+          type: "licencia_embarazo",
+          startTime: trimmedStartTime,
+          endTime: trimmedEndTime,
+        })
+      }
+    } else {
+      // Turno continuo (una sola franja)
+      
+      // Si la licencia coincide EXACTAMENTE con el turno completo, solo crear la licencia
+      if (licenciaCoincideConPrimeraFranja) {
+        // Solo agregar licencia, no crear assignment de shift
+        newAssignments.push({
+          type: "licencia_embarazo",
+          startTime: trimmedStartTime,
+          endTime: trimmedEndTime,
+        })
+      } else {
+        // Licencia está parcialmente en el turno - dividir
+        const crossesMidnight = shiftEnd < shiftStart
+        
+        // Tramo antes de licencia (si existe)
+        const licenciaStartIsAfter = crossesMidnight
           ? (licenciaStart > shiftStart || licenciaStart <= shiftEnd)
           : (licenciaStart > shiftStart)
         
-        if (licenciaStartIsAfterFirst && trimmedStartTime !== shiftStartTime) {
+        if (licenciaStartIsAfter && trimmedStartTime !== shiftStartTime) {
           newAssignments.push({
             shiftId: shiftAssignment.shiftId,
             type: "shift",
@@ -665,12 +770,12 @@ export function ScheduleCell({
           endTime: trimmedEndTime,
         })
 
-        // Tramo después de licencia en primera franja (si existe)
-        const licenciaEndIsBeforeFirst = firstCrossesMidnight
+        // Tramo después de licencia (si existe)
+        const licenciaEndIsBefore = crossesMidnight
           ? (licenciaEnd < shiftEnd || licenciaEnd >= shiftStart)
           : (licenciaEnd < shiftEnd)
         
-        if (licenciaEndIsBeforeFirst && trimmedEndTime !== shiftEndTime) {
+        if (licenciaEndIsBefore && trimmedEndTime !== shiftEndTime) {
           newAssignments.push({
             shiftId: shiftAssignment.shiftId,
             type: "shift",
@@ -678,52 +783,6 @@ export function ScheduleCell({
             endTime: shiftEndTime,
           })
         }
-
-        // Mantener segunda franja completa
-        newAssignments.push({
-          shiftId: shiftAssignment.shiftId,
-          type: "shift",
-          startTime2: shiftStartTime2,
-          endTime2: shiftEndTime2,
-        })
-      }
-    } else {
-      // Turno continuo (una sola franja)
-      const crossesMidnight = shiftEnd < shiftStart
-      
-      // Tramo antes de licencia (si existe)
-      const licenciaStartIsAfter = crossesMidnight
-        ? (licenciaStart > shiftStart || licenciaStart <= shiftEnd)
-        : (licenciaStart > shiftStart)
-      
-      if (licenciaStartIsAfter && trimmedStartTime !== shiftStartTime) {
-        newAssignments.push({
-          shiftId: shiftAssignment.shiftId,
-          type: "shift",
-          startTime: shiftStartTime,
-          endTime: trimmedStartTime,
-        })
-      }
-
-      // Tramo de licencia
-      newAssignments.push({
-        type: "licencia_embarazo",
-        startTime: trimmedStartTime,
-        endTime: trimmedEndTime,
-      })
-
-      // Tramo después de licencia (si existe)
-      const licenciaEndIsBefore = crossesMidnight
-        ? (licenciaEnd < shiftEnd || licenciaEnd >= shiftStart)
-        : (licenciaEnd < shiftEnd)
-      
-      if (licenciaEndIsBefore && trimmedEndTime !== shiftEndTime) {
-        newAssignments.push({
-          shiftId: shiftAssignment.shiftId,
-          type: "shift",
-          startTime: trimmedEndTime,
-          endTime: shiftEndTime,
-        })
       }
     }
 
