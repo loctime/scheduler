@@ -94,88 +94,40 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
           const displayTimeLines = getShiftDisplayTime(assignment.shiftId || "", shift, assignment)
           const hasTime = assignment.startTime && assignment.endTime
 
-          // Determinar si el medio franco es temprano o tarde
-          const medioStart = assignment.startTime ? timeToMinutes(assignment.startTime) : null
-          const isEarly = medioStart !== null && medioStart < 14 * 60
-
           if (hasTime) {
             if (hasShifts) {
-              // Cuando hay turno, mostrar como bloque visual pequeño
+              // Cuando hay turno, mostrar solo texto
               return (
-                <div 
+                <span 
                   key={`medio-franco-${idx}`} 
-                  className="w-full px-1 py-0.5 rounded text-center text-[10px] sm:text-xs md:text-sm font-bold mb-0.5"
-                  style={{
-                    backgroundColor: "rgba(34, 197, 94, 0.2)", // green-500 con opacidad
-                    color: "rgb(22, 163, 74)", // green-600
-                  }}
+                  className="block text-center text-xs sm:text-sm md:text-base font-bold text-[#22c55e] mb-0.5"
                 >
                   (1/2 Franco)
-                </div>
+                </span>
               )
             } else {
-              // Cuando es solo medio franco, mostrar como bloque visual apilado
-              if (isEarly) {
-                return (
-                  <div key={`medio-franco-${idx}`} className="w-full space-y-0.5">
-                    <div 
-                      className="w-full px-1 py-0.5 rounded text-center text-[10px] sm:text-xs md:text-sm font-semibold"
-                      style={{
-                        backgroundColor: "rgba(34, 197, 94, 0.2)",
-                        color: "rgb(22, 163, 74)",
-                      }}
-                    >
-                      {displayTimeLines[0]}
-                    </div>
-                    <div 
-                      className="w-full px-1 py-0.5 rounded text-center text-[10px] sm:text-xs md:text-sm font-bold"
-                      style={{
-                        backgroundColor: "rgba(34, 197, 94, 0.2)",
-                        color: "rgb(22, 163, 74)",
-                      }}
-                    >
-                      (1/2 Franco)
-                    </div>
-                  </div>
-                )
-              } else {
-                return (
-                  <div key={`medio-franco-${idx}`} className="w-full space-y-0.5">
-                    <div 
-                      className="w-full px-1 py-0.5 rounded text-center text-[10px] sm:text-xs md:text-sm font-bold"
-                      style={{
-                        backgroundColor: "rgba(34, 197, 94, 0.2)",
-                        color: "rgb(22, 163, 74)",
-                      }}
-                    >
-                      (1/2 Franco)
-                    </div>
-                    <div 
-                      className="w-full px-1 py-0.5 rounded text-center text-[10px] sm:text-xs md:text-sm font-semibold"
-                      style={{
-                        backgroundColor: "rgba(34, 197, 94, 0.2)",
-                        color: "rgb(22, 163, 74)",
-                      }}
-                    >
-                      {displayTimeLines[0]}
-                    </div>
-                  </div>
-                )
-              }
+              // Cuando es solo medio franco, mostrar horario y texto
+              const timeText = displayTimeLines[0] || `${assignment.startTime} - ${assignment.endTime}`
+              return (
+                <div key={`medio-franco-${idx}`} className="w-full space-y-0.5">
+                  <span className="block text-center text-xs sm:text-sm md:text-base font-semibold text-foreground mb-0.5">
+                    {timeText}
+                  </span>
+                  <span className="block text-center text-xs sm:text-sm md:text-base font-bold text-[#22c55e] mb-0.5">
+                    1/2 Franco
+                  </span>
+                </div>
+              )
             }
           } else {
-            // Sin horario, mostrar como bloque simple
+            // Sin horario, mostrar solo texto
             return (
-              <div 
+              <span 
                 key={`medio-franco-${idx}`} 
-                className="w-full px-1 py-0.5 rounded text-center text-[10px] sm:text-xs md:text-sm font-semibold mb-0.5"
-                style={{
-                  backgroundColor: "rgba(34, 197, 94, 0.2)",
-                  color: "rgb(22, 163, 74)",
-                }}
+                className="block text-center text-xs sm:text-sm md:text-base font-bold text-[#22c55e] mb-0.5"
               >
                 1/2 Franco
-              </div>
+              </span>
             )
           }
         }

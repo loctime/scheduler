@@ -128,15 +128,35 @@ export function ScheduleCell({
     (a) => a.type === "shift" && !a.shiftId && (a.startTime || a.endTime)
   )
 
-  // Encontrar turnos (shifts) disponibles para asignar licencia
+  // Encontrar turnos (shifts) y medios francos disponibles para asignar licencia
   const availableShifts = React.useMemo(() => {
-    return assignments
+    const shifts = assignments
       .filter((a) => a.type === "shift" && a.shiftId)
       .map((a) => {
         const shift = getShiftInfo(a.shiftId!)
         return shift ? { assignment: a, shift } : null
       })
       .filter((item): item is { assignment: ShiftAssignment; shift: Turno } => item !== null)
+    
+    // Agregar medios francos que tengan horario (startTime/endTime)
+    const mediosFrancos = assignments
+      .filter((a) => a.type === "medio_franco" && a.startTime && a.endTime)
+      .map((a) => {
+        // Crear un Turno virtual para medio_franco
+        const virtualShift: Turno = {
+          id: "medio_franco_virtual",
+          name: "1/2 Franco",
+          startTime: a.startTime!,
+          endTime: a.endTime!,
+          startTime2: a.startTime2,
+          endTime2: a.endTime2,
+          color: "#22c55e",
+          userId: "", // Campo requerido pero no relevante para virtual
+        }
+        return { assignment: a, shift: virtualShift }
+      })
+    
+    return [...shifts, ...mediosFrancos]
   }, [assignments, getShiftInfo])
 
   // Obtener colores únicos de los turnos disponibles
@@ -537,6 +557,9 @@ export function ScheduleCell({
     }
 
     const { assignment: shiftAssignment, shift } = selectedShiftForLicencia
+    
+    // Verificar si es medio_franco
+    const isMedioFranco = shiftAssignment.type === "medio_franco"
 
     // Obtener el horario base del turno (considerando ajustes)
     const shiftStartTime = shiftAssignment.startTime || shift.startTime || ""
@@ -739,7 +762,8 @@ export function ScheduleCell({
       
       // Si la licencia coincide EXACTAMENTE con el turno completo, solo crear la licencia
       if (licenciaCoincideConPrimeraFranja) {
-        // Solo agregar licencia, no crear assignment de shift
+        // Solo agregar licencia, no crear assignment de shift o medio_franco
+        // (el medio_franco o shift original se eliminará en otherAssignments)
         newAssignments.push({
           type: "licencia_embarazo",
           startTime: trimmedStartTime,
@@ -755,9 +779,10 @@ export function ScheduleCell({
           : (licenciaStart > shiftStart)
         
         if (licenciaStartIsAfter && trimmedStartTime !== shiftStartTime) {
+          // Mantener tipo original (shift o medio_franco)
           newAssignments.push({
             shiftId: shiftAssignment.shiftId,
-            type: "shift",
+            type: isMedioFranco ? "medio_franco" : "shift",
             startTime: shiftStartTime,
             endTime: trimmedStartTime,
           })
@@ -776,9 +801,10 @@ export function ScheduleCell({
           : (licenciaEnd < shiftEnd)
         
         if (licenciaEndIsBefore && trimmedEndTime !== shiftEndTime) {
+          // Mantener tipo original (shift o medio_franco)
           newAssignments.push({
             shiftId: shiftAssignment.shiftId,
-            type: "shift",
+            type: isMedioFranco ? "medio_franco" : "shift",
             startTime: trimmedEndTime,
             endTime: shiftEndTime,
           })
@@ -787,15 +813,31 @@ export function ScheduleCell({
     }
 
     // Mantener todas las demás asignaciones (francos, notas, otros turnos, etc.)
-    const otherAssignments = assignments.filter(
-      (a) => !(a.type === "shift" && a.shiftId === shiftAssignment.shiftId)
-    )
+    // Si es medio_franco, filtrarlo también; si es shift, filtrar por shiftId
+    const otherAssignments = assignments.filter((a) => {
+      if (isMedioFranco) {
+        // Para medio_franco, eliminar el medio_franco original si la licencia coincide exactamente
+        if (a.type === "medio_franco" && a.startTime && a.endTime) {
+          const aStartNorm = normalizeTimeForComparison(a.startTime)
+          const aEndNorm = normalizeTimeForComparison(a.endTime)
+          // Si coincide exactamente, no incluir (se reemplaza por licencia)
+          if (licenciaStartNorm === aStartNorm && licenciaEndNorm === aEndNorm) {
+            return false
+          }
+        }
+        // Mantener el medio_franco si no coincide exactamente (licencia parcial)
+        return true
+      } else {
+        // Para shift, filtrar por shiftId
+        return !(a.type === "shift" && a.shiftId === shiftAssignment.shiftId)
+      }
+    })
 
     // Separar por tipo para ordenar correctamente
-    const turnAssignments = newAssignments.filter((a) => a.type === "shift")
+    const turnAssignments = newAssignments.filter((a) => a.type === "shift" || a.type === "medio_franco")
     const licenciaAssignments = newAssignments.filter((a) => a.type === "licencia_embarazo")
-    const otherTurnAssignments = otherAssignments.filter((a) => a.type === "shift")
-    const otherSpecialAssignments = otherAssignments.filter((a) => a.type !== "shift")
+    const otherTurnAssignments = otherAssignments.filter((a) => a.type === "shift" || a.type === "medio_franco")
+    const otherSpecialAssignments = otherAssignments.filter((a) => a.type !== "shift" && a.type !== "medio_franco")
 
     // Ordenar: turnos (del mismo shift, otros shifts), licencia, otros (francos, notas, etc.)
     const finalAssignments = [
@@ -1152,27 +1194,55 @@ export function ScheduleCell({
             <DialogDescription>
               {selectedShiftForLicencia && (
                 <>
-                  Turno: <strong>{selectedShiftForLicencia.shift.name}</strong>
-                  <br />
-                  <span className="text-xs">
-                    {(() => {
-                      const shift = selectedShiftForLicencia.shift
-                      const assignment = selectedShiftForLicencia.assignment
-                      const startTime = assignment.startTime || shift.startTime || ""
-                      const endTime = assignment.endTime || shift.endTime || ""
-                      const startTime2 = assignment.startTime2 || shift.startTime2
-                      const endTime2 = assignment.endTime2 || shift.endTime2
-                      
-                      if (startTime2 && endTime2) {
-                        return `Horario completo: ${startTime} - ${endTime} y ${startTime2} - ${endTime2}`
-                      }
-                      return `Horario completo: ${startTime} - ${endTime}`
-                    })()}
-                    <br />
-                    <span className="text-muted-foreground">
-                      El empleado trabajará 4 horas efectivas. El resto será licencia por embarazo.
-                    </span>
-                  </span>
+                  {selectedShiftForLicencia.assignment.type === "medio_franco" ? (
+                    <>
+                      1/2 Franco: <strong>{selectedShiftForLicencia.shift.name}</strong>
+                      <br />
+                      <span className="text-xs">
+                        {(() => {
+                          const shift = selectedShiftForLicencia.shift
+                          const assignment = selectedShiftForLicencia.assignment
+                          const startTime = assignment.startTime || shift.startTime || ""
+                          const endTime = assignment.endTime || shift.endTime || ""
+                          const startTime2 = assignment.startTime2 || shift.startTime2
+                          const endTime2 = assignment.endTime2 || shift.endTime2
+                          
+                          if (startTime2 && endTime2) {
+                            return `Horario completo: ${startTime} - ${endTime} y ${startTime2} - ${endTime2}`
+                          }
+                          return `Horario completo: ${startTime} - ${endTime}`
+                        })()}
+                        <br />
+                        <span className="text-muted-foreground">
+                          Asigne la licencia por embarazo sobre este medio franco. Si la licencia cubre todo el medio franco, este será reemplazado completamente por la licencia.
+                        </span>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      Turno: <strong>{selectedShiftForLicencia.shift.name}</strong>
+                      <br />
+                      <span className="text-xs">
+                        {(() => {
+                          const shift = selectedShiftForLicencia.shift
+                          const assignment = selectedShiftForLicencia.assignment
+                          const startTime = assignment.startTime || shift.startTime || ""
+                          const endTime = assignment.endTime || shift.endTime || ""
+                          const startTime2 = assignment.startTime2 || shift.startTime2
+                          const endTime2 = assignment.endTime2 || shift.endTime2
+                          
+                          if (startTime2 && endTime2) {
+                            return `Horario completo: ${startTime} - ${endTime} y ${startTime2} - ${endTime2}`
+                          }
+                          return `Horario completo: ${startTime} - ${endTime}`
+                        })()}
+                        <br />
+                        <span className="text-muted-foreground">
+                          El empleado trabajará 4 horas efectivas. El resto será licencia por embarazo.
+                        </span>
+                      </span>
+                    </>
+                  )}
                 </>
               )}
             </DialogDescription>
