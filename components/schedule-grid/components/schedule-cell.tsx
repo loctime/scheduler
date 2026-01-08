@@ -108,6 +108,10 @@ export function ScheduleCell({
   const [licenciaEndTime, setLicenciaEndTime] = useState("")
   const [selectedShiftForLicencia, setSelectedShiftForLicencia] = useState<{ assignment: ShiftAssignment; shift: Turno } | null>(null)
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null)
+  const [editarHorarioDialogOpen, setEditarHorarioDialogOpen] = useState(false)
+  const [selectedShiftForEdit, setSelectedShiftForEdit] = useState<{ assignment: ShiftAssignment; shift: Turno } | null>(null)
+  const [editStartTime, setEditStartTime] = useState("")
+  const [editEndTime, setEditEndTime] = useState("")
   
   const hasBackgroundStyle = !!backgroundStyle
   const dayOfWeek = getDay(parseISO(date))
@@ -127,6 +131,15 @@ export function ScheduleCell({
   const existingHorarioEspecial = assignments.find(
     (a) => a.type === "shift" && !a.shiftId && (a.startTime || a.endTime)
   )
+
+  // Encontrar el primer turno asignado para edición
+  const firstShiftAssignment = React.useMemo(() => {
+    const shiftAssignment = assignments.find((a) => a.type === "shift" && a.shiftId)
+    if (!shiftAssignment || !shiftAssignment.shiftId) return null
+    const shift = getShiftInfo(shiftAssignment.shiftId)
+    if (!shift) return null
+    return { assignment: shiftAssignment, shift }
+  }, [assignments, getShiftInfo])
 
   // Encontrar turnos (shifts) y medios francos disponibles para asignar licencia
   const availableShifts = React.useMemo(() => {
@@ -568,6 +581,70 @@ export function ScheduleCell({
 
     return suggestions
   }, [selectedShiftForLicencia])
+
+  const handleOpenEditarHorarioDialog = () => {
+    if (!firstShiftAssignment) {
+      // Si no hay turno asignado, usar el comportamiento actual (abrir selector)
+      onCellClick(date, employeeId)
+      return
+    }
+    
+    const { assignment, shift } = firstShiftAssignment
+    setSelectedShiftForEdit({ assignment, shift })
+    
+    // Precargar los horarios actuales (del assignment o del turno base)
+    setEditStartTime(assignment.startTime || shift.startTime || "")
+    setEditEndTime(assignment.endTime || shift.endTime || "")
+    
+    setEditarHorarioDialogOpen(true)
+  }
+
+  const handleSaveEditarHorario = () => {
+    if (!onAssignmentUpdate || !selectedShiftForEdit) return
+
+    const trimmedStartTime = editStartTime.trim()
+    const trimmedEndTime = editEndTime.trim()
+
+    if (!trimmedStartTime || !trimmedEndTime) {
+      return // Validación básica
+    }
+
+    const { assignment } = selectedShiftForEdit
+    
+    // Actualizar el assignment existente manteniendo shiftId y otros campos
+    // Actualizar el primer assignment que coincida con el shiftId (normalmente solo hay uno)
+    const updatedAssignments = assignments.map((a) => {
+      // Buscar el assignment exacto (por shiftId y tipo)
+      // Comparar también por startTime/endTime para identificar el assignment específico
+      if (a.type === "shift" && a.shiftId === assignment.shiftId) {
+        // Verificar si es el mismo assignment comparando campos clave
+        const isSameAssignment = 
+          a.startTime === assignment.startTime &&
+          a.endTime === assignment.endTime &&
+          a.startTime2 === assignment.startTime2 &&
+          a.endTime2 === assignment.endTime2
+        
+        // Actualizar solo si es el mismo assignment o si solo hay uno con este shiftId
+        if (isSameAssignment) {
+          // Mantener todos los campos existentes y actualizar solo startTime/endTime
+          return {
+            ...a,
+            startTime: trimmedStartTime,
+            endTime: trimmedEndTime,
+            // Mantener startTime2 y endTime2 si existen (para turnos cortados)
+          }
+        }
+      }
+      return a
+    })
+
+    onAssignmentUpdate(date, employeeId, updatedAssignments, { scheduleId })
+
+    setEditarHorarioDialogOpen(false)
+    setEditStartTime("")
+    setEditEndTime("")
+    setSelectedShiftForEdit(null)
+  }
 
   const handleSaveLicenciaEmbarazo = () => {
     if (!onAssignmentUpdate || !selectedShiftForLicencia) return
@@ -1019,8 +1096,8 @@ export function ScheduleCell({
         <ContextMenuContent>
           {!readonly && (
             <>
-              <ContextMenuItem onClick={() => onCellClick(date, employeeId)}>
-                Editar turno
+              <ContextMenuItem onClick={handleOpenEditarHorarioDialog}>
+                {firstShiftAssignment ? "Editar horario" : "Editar turno"}
               </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem onClick={handleOpenNotaDialog}>
@@ -1453,6 +1530,69 @@ export function ScheduleCell({
                 return !(isTimeInRange(licenciaStartTime, shiftStartTime, shiftEndTime) && 
                          isTimeInRange(licenciaEndTime, shiftStartTime, shiftEndTime))
               })()}
+            >
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo para editar horario asignado */}
+      <Dialog open={editarHorarioDialogOpen} onOpenChange={setEditarHorarioDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar horario</DialogTitle>
+            <DialogDescription>
+              {selectedShiftForEdit && (
+                <>
+                  Turno: <strong>{selectedShiftForEdit.shift.name}</strong>
+                  <br />
+                  <span className="text-xs text-muted-foreground">
+                    Modifique las horas de inicio y fin del horario asignado.
+                  </span>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="editStartTime">Hora de inicio</Label>
+              <Input
+                id="editStartTime"
+                type="time"
+                value={editStartTime}
+                onChange={(e) => setEditStartTime(e.target.value)}
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="editEndTime">Hora de fin</Label>
+              <Input
+                id="editEndTime"
+                type="time"
+                value={editEndTime}
+                onChange={(e) => setEditEndTime(e.target.value)}
+                required
+              />
+            </div>
+            {editStartTime && editEndTime && (() => {
+              const start = timeToMinutes(editStartTime)
+              const end = timeToMinutes(editEndTime)
+              const duration = calculateDuration(editStartTime, editEndTime)
+              return (
+                <div className="text-sm text-muted-foreground">
+                  Duración: {Math.floor(duration / 60)}h {duration % 60}min
+                </div>
+              )
+            })()}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditarHorarioDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveEditarHorario}
+              disabled={!editStartTime || !editEndTime}
             >
               Guardar
             </Button>
