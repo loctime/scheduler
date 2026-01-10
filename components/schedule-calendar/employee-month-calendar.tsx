@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button"
 import { ChevronUp, ChevronDown } from "lucide-react"
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns"
 import { es } from "date-fns/locale"
-import type { Empleado, Turno, Horario, MedioTurno, ShiftAssignmentValue } from "@/lib/types"
+import type { Empleado, Turno, Horario, MedioTurno, ShiftAssignmentValue, ShiftAssignment } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { getShiftDisplayTime } from "@/components/schedule-grid/utils/shift-display-utils"
+import { normalizeAssignmentFromShift } from "@/lib/assignment-utils"
 
 interface EmployeeMonthCalendarProps {
   selectedEmployeeId: string
@@ -20,15 +22,47 @@ interface EmployeeMonthCalendarProps {
   weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6
 }
 
-const normalizeAssignments = (value: ShiftAssignmentValue | null | undefined): Array<{ shiftId?: string; type?: string; texto?: string }> => {
+// CONTRATO v1.0: Normalizar preservando TODOS los campos del assignment
+// Si los datos están en formato legacy (strings), normalizarlos desde el turno base
+const normalizeAssignments = (
+  value: ShiftAssignmentValue | null | undefined,
+  shifts: Turno[]
+): ShiftAssignment[] => {
   if (!value || !Array.isArray(value) || value.length === 0) return []
+  
+  // Formato legacy: array de strings (solo shiftId)
   if (typeof value[0] === "string") {
-    return (value as string[]).map((shiftId) => ({ shiftId, type: "shift" }))
+    return (value as string[]).map((shiftId) => {
+      const shift = shifts.find((s) => s.id === shiftId)
+      if (!shift) {
+        // Si no existe el turno, retornar assignment incompleto
+        return { shiftId, type: "shift" as const }
+      }
+      // Normalizar desde el turno base para datos legacy
+      return normalizeAssignmentFromShift(
+        { shiftId, type: "shift" as const },
+        shift
+      )
+    })
   }
-  return (value as Array<{ shiftId?: string; type?: string; texto?: string }>).map((assignment) => ({
-    ...assignment,
-    type: assignment.type || "shift",
-  }))
+  
+  // Formato nuevo: array de ShiftAssignment
+  return (value as ShiftAssignment[]).map((assignment) => {
+    const normalized = {
+      ...assignment,
+      type: assignment.type || "shift",
+    }
+    
+    // Si el assignment está incompleto y tiene shiftId, normalizarlo desde el turno base
+    if (normalized.shiftId && normalized.type === "shift") {
+      const shift = shifts.find((s) => s.id === normalized.shiftId)
+      if (shift && (!normalized.startTime || !normalized.endTime)) {
+        return normalizeAssignmentFromShift(normalized, shift)
+      }
+    }
+    
+    return normalized
+  })
 }
 
 export function EmployeeMonthCalendar({
@@ -64,14 +98,9 @@ export function EmployeeMonthCalendar({
     return weekSchedule.assignments[dateStr]?.[selectedEmployeeId] || null
   }
 
-  // Función para obtener el nombre del turno
-  const getShiftName = (shiftId: string) => {
-    return shifts.find((s) => s.id === shiftId)?.name || shiftId
-  }
-
-  // Función para obtener el color del turno
-  const getShiftColor = (shiftId: string) => {
-    return shifts.find((s) => s.id === shiftId)?.color || "#6b7280"
+  // Función para obtener información del turno (solo para color, no para display)
+  const getShiftInfo = (shiftId: string): Turno | undefined => {
+    return shifts.find((s) => s.id === shiftId)
   }
 
   // Organizar días en semanas
@@ -161,7 +190,7 @@ export function EmployeeMonthCalendar({
                   const isToday = isSameDay(day, new Date())
                   const isSelected = selectedDate && isSameDay(day, selectedDate)
                   const assignments = getDateAssignments(day)
-                  const normalizedAssignments = normalizeAssignments(assignments)
+                  const normalizedAssignments = normalizeAssignments(assignments, shifts)
 
                   return (
                     <button
@@ -210,18 +239,56 @@ export function EmployeeMonthCalendar({
                               </div>
                             )
                           }
+                          
+                          // Medio franco con horario (CONTRATO v1.0)
                           if (assignment.type === "medio_franco") {
+                            const displayTimeLines = getShiftDisplayTime("", undefined, assignment)
+                            const displayText = displayTimeLines.length > 0 && displayTimeLines[0] 
+                              ? displayTimeLines[0]
+                              : "1/2"
+                            
                             return (
                               <div
                                 key={idx}
-                                className="text-[10px] px-1 py-0.5 rounded bg-green-100 dark:bg-green-900 text-center truncate"
+                                className="text-[10px] px-1 py-0.5 rounded bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-center truncate font-medium"
+                                title={displayText}
                               >
-                                1/2
+                                {displayText}
                               </div>
                             )
                           }
-                          if (assignment.shiftId) {
-                            const shift = shifts.find((s) => s.id === assignment.shiftId)
+                          
+                          // Licencia con horario (CONTRATO v1.0)
+                          if (assignment.type === "licencia") {
+                            const displayTimeLines = getShiftDisplayTime("", undefined, assignment)
+                            const displayText = displayTimeLines.length > 0 && displayTimeLines[0] 
+                              ? displayTimeLines[0]
+                              : "Licencia"
+                            
+                            return (
+                              <div
+                                key={idx}
+                                className="text-[10px] px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 text-center truncate font-medium"
+                                title={displayText}
+                              >
+                                {displayText}
+                              </div>
+                            )
+                          }
+                          
+                          // Turnos (CONTRATO v1.0)
+                          if (assignment.shiftId && assignment.type === "shift") {
+                            // CONTRATO v1.0: Usar getShiftDisplayTime para mostrar horarios desde el assignment
+                            const shift = getShiftInfo(assignment.shiftId)
+                            const displayTimeLines = getShiftDisplayTime(assignment.shiftId, shift, assignment)
+                            
+                            // Si hay horarios, mostrarlos; si no, mostrar "Horario incompleto"
+                            const displayText = displayTimeLines.length > 0 && displayTimeLines[0] 
+                              ? (displayTimeLines.length === 2 
+                                  ? `${displayTimeLines[0]} / ${displayTimeLines[1]}` 
+                                  : displayTimeLines[0])
+                              : "Horario incompleto"
+                            
                             return (
                               <div
                                 key={idx}
@@ -232,11 +299,13 @@ export function EmployeeMonthCalendar({
                                     : undefined,
                                   color: shift?.color || undefined,
                                 }}
+                                title={displayTimeLines.length === 2 ? displayTimeLines.join(" / ") : displayText}
                               >
-                                {shift?.name || assignment.shiftId}
+                                {displayText}
                               </div>
                             )
                           }
+                          
                           return null
                         })}
                         {normalizedAssignments.length > 2 && (

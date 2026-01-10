@@ -418,6 +418,26 @@ export default function EmpleadosPage() {
   const handleShiftSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    // Validar que los horarios estén presentes
+    if (!shiftFormData.startTime || !shiftFormData.endTime) {
+      toast({
+        title: "Error de validación",
+        description: "Los horarios de inicio y fin son obligatorios para mostrar correctamente los turnos en el calendario.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validar segunda franja si está activada
+    if (hasSecondShift && (!shiftFormData.startTime2 || !shiftFormData.endTime2)) {
+      toast({
+        title: "Error de validación",
+        description: "Si activas el turno cortado, debes especificar los horarios de la segunda franja.",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (!db) {
       toast({
         title: "Error",
@@ -432,11 +452,10 @@ export default function EmpleadosPage() {
         const updateData: any = {
           name: shiftFormData.name,
           color: shiftFormData.color,
+          startTime: shiftFormData.startTime,
+          endTime: shiftFormData.endTime,
           updatedAt: serverTimestamp(),
         }
-        
-        if (shiftFormData.startTime) updateData.startTime = shiftFormData.startTime
-        if (shiftFormData.endTime) updateData.endTime = shiftFormData.endTime
         
         if (hasSecondShift) {
           if (shiftFormData.startTime2) updateData.startTime2 = shiftFormData.startTime2
@@ -457,13 +476,12 @@ export default function EmpleadosPage() {
         const newShiftData: any = {
           name: shiftFormData.name,
           color: shiftFormData.color,
+          startTime: shiftFormData.startTime,
+          endTime: shiftFormData.endTime,
           userId: user.uid,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         }
-        
-        if (shiftFormData.startTime) newShiftData.startTime = shiftFormData.startTime
-        if (shiftFormData.endTime) newShiftData.endTime = shiftFormData.endTime
         
         if (hasSecondShift) {
           if (shiftFormData.startTime2) newShiftData.startTime2 = shiftFormData.startTime2
@@ -878,11 +896,16 @@ export default function EmpleadosPage() {
                   />
                 </div>
                 <div className="space-y-3">
-                  <Label className="text-base font-medium text-foreground">Primera Franja Horaria</Label>
+                  <Label className="text-base font-medium text-foreground">
+                    Primera Franja Horaria *
+                    <span className="text-sm font-normal text-muted-foreground ml-2">
+                      (Obligatorio para mostrar horarios correctamente)
+                    </span>
+                  </Label>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="startTime" className="text-foreground">
-                        Hora Inicio
+                        Hora Inicio *
                       </Label>
                       <Input
                         id="startTime"
@@ -890,11 +913,12 @@ export default function EmpleadosPage() {
                         value={shiftFormData.startTime}
                         onChange={(e) => setShiftFormData({ ...shiftFormData, startTime: e.target.value })}
                         className="border-input bg-background text-foreground"
+                        required
                       />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="endTime" className="text-foreground">
-                        Hora Fin
+                        Hora Fin *
                       </Label>
                       <Input
                         id="endTime"
@@ -902,6 +926,7 @@ export default function EmpleadosPage() {
                         value={shiftFormData.endTime}
                         onChange={(e) => setShiftFormData({ ...shiftFormData, endTime: e.target.value })}
                         className="border-input bg-background text-foreground"
+                        required
                       />
                     </div>
                   </div>
