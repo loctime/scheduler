@@ -257,7 +257,7 @@ export function EmployeeRow({
             cellKey={cellKey}
             hasExtraBefore={hasExtraBefore}
             hasExtraAfter={hasExtraAfter}
-            onToggleExtra={(type) => handleToggleExtra(employee.id, dateStr, type)}
+            onToggleExtra={(type, segment) => handleToggleExtra(employee.id, dateStr, type, segment)}
             onExtraMenuOpenChange={(open) => setExtraMenuOpenKey(open ? cellKey : null)}
             quickShifts={shifts}
             mediosTurnos={mediosTurnos}

@@ -27,6 +27,8 @@ import { CellAssignments } from "./cell-assignments"
 import { QuickShiftSelector } from "./quick-shift-selector"
 import { getDay, parseISO } from "date-fns"
 import type { PatternSuggestion } from "@/lib/pattern-learning"
+import { validateCellAssignments } from "@/lib/assignment-validators"
+import { useToast } from "@/hooks/use-toast"
 
 interface ScheduleCellProps {
   date: string
@@ -42,7 +44,7 @@ interface ScheduleCellProps {
   cellKey: string
   hasExtraBefore: boolean
   hasExtraAfter: boolean
-  onToggleExtra: (type: "before" | "after") => void
+  onToggleExtra: (type: "before" | "after", segment?: "first" | "second") => void
   onExtraMenuOpenChange: (open: boolean) => void
   quickShifts: Turno[]
   mediosTurnos?: MedioTurno[]
@@ -114,6 +116,9 @@ export function ScheduleCell({
   const [selectedShiftForEdit, setSelectedShiftForEdit] = useState<{ assignment: ShiftAssignment; shift: Turno } | null>(null)
   const [editStartTime, setEditStartTime] = useState("")
   const [editEndTime, setEditEndTime] = useState("")
+  const [editStartTime2, setEditStartTime2] = useState("")
+  const [editEndTime2, setEditEndTime2] = useState("")
+  const [hasSecondSegment, setHasSecondSegment] = useState(false)
   
   const hasBackgroundStyle = !!backgroundStyle
   const dayOfWeek = getDay(parseISO(date))
@@ -144,6 +149,12 @@ export function ScheduleCell({
     if (!shift) return null
     return { assignment: shiftAssignment, shift }
   }, [assignments, getShiftInfo])
+
+  // Detectar si es turno cortado (tiene segunda franja explícita)
+  const isTurnoCortado = React.useMemo(() => {
+    if (!firstShiftAssignment) return false
+    return !!(firstShiftAssignment.assignment.startTime2 && firstShiftAssignment.assignment.endTime2)
+  }, [firstShiftAssignment])
 
   // Encontrar turnos (shifts) y medios francos disponibles para asignar licencia
   const availableShifts = React.useMemo(() => {
@@ -597,9 +608,16 @@ export function ScheduleCell({
     const { assignment, shift } = firstShiftAssignment
     setSelectedShiftForEdit({ assignment, shift })
     
-    // Precargar los horarios actuales (del assignment o del turno base)
-    setEditStartTime(assignment.startTime || shift.startTime || "")
-    setEditEndTime(assignment.endTime || shift.endTime || "")
+    // Precargar los horarios actuales SOLO del assignment (autosuficiencia)
+    // NO usar el turno base como fallback
+    setEditStartTime(assignment.startTime || "")
+    setEditEndTime(assignment.endTime || "")
+    
+    // Cargar segunda franja si existe explícitamente en el assignment
+    const hasSecond = !!(assignment.startTime2 && assignment.endTime2)
+    setHasSecondSegment(hasSecond)
+    setEditStartTime2(assignment.startTime2 || "")
+    setEditEndTime2(assignment.endTime2 || "")
     
     setEditarHorarioDialogOpen(true)
   }
@@ -631,24 +649,56 @@ export function ScheduleCell({
         
         // Actualizar solo si es el mismo assignment o si solo hay uno con este shiftId
         if (isSameAssignment) {
-          // Mantener todos los campos existentes y actualizar solo startTime/endTime
-          return {
+          // CRÍTICO: Preservar explícitamente startTime2/endTime2 según el estado del diálogo
+          const updated: ShiftAssignment = {
             ...a,
             startTime: trimmedStartTime,
             endTime: trimmedEndTime,
-            // Mantener startTime2 y endTime2 si existen (para turnos cortados)
           }
+          
+          // Si hay segunda franja en el diálogo, incluirla explícitamente
+          if (hasSecondSegment && editStartTime2.trim() && editEndTime2.trim()) {
+            updated.startTime2 = editStartTime2.trim()
+            updated.endTime2 = editEndTime2.trim()
+          } else {
+            // Si no hay segunda franja, eliminar explícitamente (convertir a turno simple)
+            delete updated.startTime2
+            delete updated.endTime2
+          }
+          
+          return updated
         }
       }
       return a
     })
+
+    // Validar assignments de la celda antes de guardar (validación global)
+    const validationResult = validateCellAssignments(updatedAssignments)
+    if (!validationResult.valid) {
+      toast({
+        title: "Error de validación",
+        description: validationResult.errors.join(". "),
+        variant: "destructive",
+      })
+      return
+    }
 
     onAssignmentUpdate(date, employeeId, updatedAssignments, { scheduleId })
 
     setEditarHorarioDialogOpen(false)
     setEditStartTime("")
     setEditEndTime("")
+    setEditStartTime2("")
+    setEditEndTime2("")
+    setHasSecondSegment(false)
     setSelectedShiftForEdit(null)
+  }
+
+  const handleConvertToSimpleShift = () => {
+    // Convertir turno cortado a simple eliminando segunda franja
+    setHasSecondSegment(false)
+    setEditStartTime2("")
+    setEditEndTime2("")
   }
 
   const handleSaveLicenciaEmbarazo = () => {
@@ -964,6 +1014,18 @@ export function ScheduleCell({
       ...otherSpecialAssignments,
     ]
 
+    // CRÍTICO: Validar assignments de la celda antes de guardar (validación global)
+    // Esto previene solapamientos entre todos los tipos de assignments
+    const validationResult = validateCellAssignments(finalAssignments)
+    if (!validationResult.valid) {
+      toast({
+        title: "Error de validación",
+        description: validationResult.errors.join(". "),
+        variant: "destructive",
+      })
+      return
+    }
+
     onAssignmentUpdate(date, employeeId, finalAssignments, { scheduleId })
 
     setLicenciaEmbarazoDialogOpen(false)
@@ -1038,29 +1100,89 @@ export function ScheduleCell({
                   +Extra
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44 text-xs">
-                <DropdownMenuItem
-                  onSelect={(event) => {
-                    event.preventDefault()
-                    onToggleExtra("before")
-                    onExtraMenuOpenChange(false)
-                  }}
-                  className="flex items-center gap-2 text-xs"
-                >
-                  <span className="flex-1">+30 min antes</span>
-                  {hasExtraBefore && <Check className="h-4 w-4 text-primary" />}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={(event) => {
-                    event.preventDefault()
-                    onToggleExtra("after")
-                    onExtraMenuOpenChange(false)
-                  }}
-                  className="flex items-center gap-2 text-xs"
-                >
-                  <span className="flex-1">+30 min después</span>
-                  {hasExtraAfter && <Check className="h-4 w-4 text-primary" />}
-                </DropdownMenuItem>
+              <DropdownMenuContent align="end" className="w-56 text-xs">
+                {isTurnoCortado ? (
+                  <>
+                    {/* Opciones para primera franja */}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                      Primera franja
+                    </div>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        onToggleExtra("before", "first")
+                        onExtraMenuOpenChange(false)
+                      }}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <span className="flex-1">+30 min antes (1ra)</span>
+                      {hasExtraBefore && <Check className="h-4 w-4 text-primary" />}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        onToggleExtra("after", "first")
+                        onExtraMenuOpenChange(false)
+                      }}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <span className="flex-1">+30 min después (1ra)</span>
+                      {hasExtraAfter && <Check className="h-4 w-4 text-primary" />}
+                    </DropdownMenuItem>
+                    {/* Separador */}
+                    <div className="my-1 border-t border-border" />
+                    {/* Opciones para segunda franja */}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                      Segunda franja
+                    </div>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        onToggleExtra("before", "second")
+                        onExtraMenuOpenChange(false)
+                      }}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <span className="flex-1">+30 min antes (2da)</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        onToggleExtra("after", "second")
+                        onExtraMenuOpenChange(false)
+                      }}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <span className="flex-1">+30 min después (2da)</span>
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
+                    {/* Opciones para turno simple */}
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        onToggleExtra("before", "first")
+                        onExtraMenuOpenChange(false)
+                      }}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <span className="flex-1">+30 min antes</span>
+                      {hasExtraBefore && <Check className="h-4 w-4 text-primary" />}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        onToggleExtra("after", "first")
+                        onExtraMenuOpenChange(false)
+                      }}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <span className="flex-1">+30 min después</span>
+                      {hasExtraAfter && <Check className="h-4 w-4 text-primary" />}
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -1559,7 +1681,7 @@ export function ScheduleCell({
 
       {/* Diálogo para editar horario asignado */}
       <Dialog open={editarHorarioDialogOpen} onOpenChange={setEditarHorarioDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Editar horario</DialogTitle>
             <DialogDescription>
@@ -1569,50 +1691,126 @@ export function ScheduleCell({
                   <br />
                   <span className="text-xs text-muted-foreground">
                     Modifique las horas de inicio y fin del horario asignado.
+                    {hasSecondSegment && " Puede editar ambas franjas independientemente."}
                   </span>
                 </>
               )}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="editStartTime">Hora de inicio</Label>
-              <Input
-                id="editStartTime"
-                type="time"
-                value={editStartTime}
-                onChange={(e) => setEditStartTime(e.target.value)}
-                required
-              />
+            {/* Primera franja */}
+            <div className="space-y-3">
+              <div className="text-sm font-medium">Primera franja</div>
+              <div className="grid gap-2">
+                <Label htmlFor="editStartTime">Hora de inicio</Label>
+                <Input
+                  id="editStartTime"
+                  type="time"
+                  value={editStartTime}
+                  onChange={(e) => setEditStartTime(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="editEndTime">Hora de fin</Label>
+                <Input
+                  id="editEndTime"
+                  type="time"
+                  value={editEndTime}
+                  onChange={(e) => setEditEndTime(e.target.value)}
+                  required
+                />
+              </div>
+              {editStartTime && editEndTime && (() => {
+                const duration = calculateDuration(editStartTime, editEndTime)
+                return (
+                  <div className="text-sm text-muted-foreground">
+                    Duración: {Math.floor(duration / 60)}h {duration % 60}min
+                  </div>
+                )
+              })()}
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="editEndTime">Hora de fin</Label>
-              <Input
-                id="editEndTime"
-                type="time"
-                value={editEndTime}
-                onChange={(e) => setEditEndTime(e.target.value)}
-                required
-              />
-            </div>
-            {editStartTime && editEndTime && (() => {
-              const start = timeToMinutes(editStartTime)
-              const end = timeToMinutes(editEndTime)
-              const duration = calculateDuration(editStartTime, editEndTime)
-              return (
-                <div className="text-sm text-muted-foreground">
-                  Duración: {Math.floor(duration / 60)}h {duration % 60}min
+
+            {/* Segunda franja (si existe o se puede agregar) */}
+            {hasSecondSegment && (
+              <div className="space-y-3 border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium">Segunda franja</div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleConvertToSimpleShift}
+                    className="text-xs text-destructive hover:text-destructive"
+                  >
+                    Convertir a turno simple
+                  </Button>
                 </div>
-              )
-            })()}
+                <div className="grid gap-2">
+                  <Label htmlFor="editStartTime2">Hora de inicio (segunda franja)</Label>
+                  <Input
+                    id="editStartTime2"
+                    type="time"
+                    value={editStartTime2}
+                    onChange={(e) => setEditStartTime2(e.target.value)}
+                    required={hasSecondSegment}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="editEndTime2">Hora de fin (segunda franja)</Label>
+                  <Input
+                    id="editEndTime2"
+                    type="time"
+                    value={editEndTime2}
+                    onChange={(e) => setEditEndTime2(e.target.value)}
+                    required={hasSecondSegment}
+                  />
+                </div>
+                {editStartTime2 && editEndTime2 && (() => {
+                  const duration = calculateDuration(editStartTime2, editEndTime2)
+                  return (
+                    <div className="text-sm text-muted-foreground">
+                      Duración: {Math.floor(duration / 60)}h {duration % 60}min
+                    </div>
+                  )
+                })()}
+              </div>
+            )}
+
+            {/* Botón para agregar segunda franja si no existe */}
+            {!hasSecondSegment && selectedShiftForEdit && (
+              <div className="border-t pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setHasSecondSegment(true)
+                    setEditStartTime2("")
+                    setEditEndTime2("")
+                  }}
+                  className="w-full"
+                >
+                  Agregar segunda franja (turno cortado)
+                </Button>
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditarHorarioDialogOpen(false)}>
+            <Button variant="outline" onClick={() => {
+              setEditarHorarioDialogOpen(false)
+              setEditStartTime("")
+              setEditEndTime("")
+              setEditStartTime2("")
+              setEditEndTime2("")
+              setHasSecondSegment(false)
+              setSelectedShiftForEdit(null)
+            }}>
               Cancelar
             </Button>
             <Button
               onClick={handleSaveEditarHorario}
-              disabled={!editStartTime || !editEndTime}
+              disabled={!editStartTime || !editEndTime || (hasSecondSegment && (!editStartTime2 || !editEndTime2))}
             >
               Guardar
             </Button>

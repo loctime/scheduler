@@ -11,7 +11,7 @@ import { updateAssignmentInAssignments, normalizeAssignments } from "@/lib/sched
 import { logger } from "@/lib/logger"
 import { getSuggestionForDay } from "@/lib/pattern-learning"
 import { isAssignmentIncomplete } from "@/lib/assignment-utils"
-import { validateBeforePersist } from "@/lib/assignment-validators"
+import { validateBeforePersist, validateCellAssignments } from "@/lib/assignment-validators"
 
 interface UseScheduleUpdatesProps {
   user: any
@@ -526,17 +526,6 @@ export function useScheduleUpdates({
             return
           }
 
-          // Validar assignments antes de guardar
-          const validationResult = validateBeforePersist(finalAssignments)
-          if (!validationResult.valid) {
-            toast({
-              title: "Error de validación",
-              description: validationResult.errors.join(". "),
-              variant: "destructive",
-            })
-            return
-          }
-
           // Limpiar campos undefined de los assignments antes de guardar (Firestore no acepta undefined)
           const cleanedFinalAssignments = finalAssignments.map((assignment) => {
             const cleaned: ShiftAssignment = { type: assignment.type || "shift" }
@@ -558,7 +547,20 @@ export function useScheduleUpdates({
           )
         }
         
-        // Validar solapamientos (filtrar francos, medio francos y licencias)
+        // CRÍTICO: Validar assignments usando validación global por celda
+        // Esto valida solapamientos entre TODOS los tipos (shifts, licencias, medio_francos)
+        const cellValidationResult = validateCellAssignments(cleanedFinalAssignments)
+        if (!cellValidationResult.valid) {
+          toast({
+            title: "Error de validación",
+            description: cellValidationResult.errors.join(". "),
+            variant: "destructive",
+          })
+          return
+        }
+        
+        // Validación adicional usando validateScheduleAssignments para compatibilidad
+        // (solo valida shifts, no licencias ni medio_francos)
         const shiftIds = finalAssignments
           .filter((a) => a.type !== "franco" && a.type !== "medio_franco" && a.type !== "licencia" && a.shiftId)
           .map((a) => a.shiftId!)
