@@ -108,7 +108,7 @@ export function EmployeeMonthCalendar({
   return (
     <Card className="p-4 md:p-6">
       <div className="space-y-4">
-        {/* Encabezado del calendario */}
+        {/* Encabezado del calendario. */}
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold capitalize flex items-center gap-2">
             {monthLabel}
