@@ -1,4 +1,4 @@
-import { ShiftAssignment, Horario } from "./types"
+import { ShiftAssignment, Horario, Turno } from "./types"
 
 export interface IncompleteAssignment {
   date: string
@@ -188,4 +188,49 @@ function normalizeAssignments(
 
   // Ya es ShiftAssignment[]
   return assignments as ShiftAssignment[]
+}
+
+/**
+ * Normaliza un assignment desde un turno base
+ * 
+ * CRÍTICO: Esta función copia TODA la estructura del turno base al assignment,
+ * asegurando que el assignment sea autosuficiente desde su creación.
+ * 
+ * Uso: Solo para migración/normalización explícita de datos existentes.
+ * NO usar en flujo normal de creación (ya se hace en buildAssignmentFromShift).
+ * 
+ * @param assignment - Assignment a normalizar (puede estar incompleto)
+ * @param shift - Turno base del cual copiar la estructura completa
+ * @returns Assignment normalizado con toda la estructura copiada
+ */
+export function normalizeAssignmentFromShift(
+  assignment: ShiftAssignment,
+  shift: Turno
+): ShiftAssignment {
+  // Si el assignment no tiene shiftId o no coincide, no normalizar
+  if (!assignment.shiftId || assignment.shiftId !== shift.id) {
+    return assignment
+  }
+
+  // Crear assignment normalizado copiando TODA la estructura del turno
+  const normalized: ShiftAssignment = {
+    ...assignment,
+    type: "shift",
+    shiftId: shift.id,
+    // CRÍTICO: Copiar siempre startTime y endTime del turno base
+    startTime: assignment.startTime || shift.startTime || "",
+    endTime: assignment.endTime || shift.endTime || "",
+  }
+
+  // Si el turno tiene segunda franja, copiarla también
+  if (shift.startTime2 && shift.endTime2) {
+    normalized.startTime2 = assignment.startTime2 || shift.startTime2
+    normalized.endTime2 = assignment.endTime2 || shift.endTime2
+  } else {
+    // Si el turno NO tiene segunda franja, asegurar que el assignment tampoco la tenga
+    delete normalized.startTime2
+    delete normalized.endTime2
+  }
+
+  return normalized
 }
