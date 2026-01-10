@@ -1086,7 +1086,7 @@ export function useExportSchedule() {
                 config?.minutosDescanso ?? 30,
                 config?.horasMinimasParaDescanso ?? 6
               )
-              totalLicenciaEmbarazo += hoursBreakdown.licencia_embarazo
+              totalLicenciaEmbarazo += hoursBreakdown.licencia
               totalMedioFranco += hoursBreakdown.medio_franco
 
               // Contar francos y medio francos

@@ -110,10 +110,10 @@ export function ScheduleCell({
   const [licenciaEmbarazoDialogOpen, setLicenciaEmbarazoDialogOpen] = useState(false)
   const [licenciaStartTime, setLicenciaStartTime] = useState("")
   const [licenciaEndTime, setLicenciaEndTime] = useState("")
-  const [selectedShiftForLicencia, setSelectedShiftForLicencia] = useState<{ assignment: ShiftAssignment; shift: Turno } | null>(null)
+  const [selectedShiftForLicencia, setSelectedShiftForLicencia] = useState<{ assignment: ShiftAssignment; shift?: Turno } | null>(null)
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null)
   const [editarHorarioDialogOpen, setEditarHorarioDialogOpen] = useState(false)
-  const [selectedShiftForEdit, setSelectedShiftForEdit] = useState<{ assignment: ShiftAssignment; shift: Turno } | null>(null)
+  const [selectedShiftForEdit, setSelectedShiftForEdit] = useState<{ assignment: ShiftAssignment; shift?: Turno } | null>(null)
   const [editStartTime, setEditStartTime] = useState("")
   const [editEndTime, setEditEndTime] = useState("")
   const [editStartTime2, setEditStartTime2] = useState("")
@@ -142,13 +142,22 @@ export function ScheduleCell({
   )
 
   // Encontrar el primer turno asignado para edición
+  // Obtener el primer assignment de turno (shift) para edición
+  // CRÍTICO: Permitir assignments con shiftId huérfano (turno base eliminado)
   const firstShiftAssignment = React.useMemo(() => {
     const shiftAssignment = assignments.find((a) => a.type === "shift" && a.shiftId)
     if (!shiftAssignment || !shiftAssignment.shiftId) return null
     const shift = getShiftInfo(shiftAssignment.shiftId)
-    if (!shift) return null
-    return { assignment: shiftAssignment, shift }
+    // Permitir edición incluso si el turno base no existe (shift undefined)
+    // El assignment es autosuficiente y puede editarse con sus propios datos
+    return { assignment: shiftAssignment, shift: shift || undefined }
   }, [assignments, getShiftInfo])
+  
+  // Detectar si el turno base está huérfano (eliminado)
+  const isOrphanShift = React.useMemo(() => {
+    if (!firstShiftAssignment) return false
+    return firstShiftAssignment.assignment.shiftId && !firstShiftAssignment.shift
+  }, [firstShiftAssignment])
 
   // Detectar si es turno cortado (tiene segunda franja explícita)
   const isTurnoCortado = React.useMemo(() => {
@@ -157,14 +166,20 @@ export function ScheduleCell({
   }, [firstShiftAssignment])
 
   // Encontrar turnos (shifts) y medios francos disponibles para asignar licencia
+  // CRÍTICO: Permitir turnos huérfanos (shift puede ser undefined)
   const availableShifts = React.useMemo(() => {
     const shifts = assignments
       .filter((a) => a.type === "shift" && a.shiftId)
       .map((a) => {
         const shift = getShiftInfo(a.shiftId!)
-        return shift ? { assignment: a, shift } : null
+        // Permitir assignments con turno base eliminado (shift undefined)
+        // Solo incluir si el assignment tiene datos suficientes (startTime/endTime)
+        if (!shift && (!a.startTime || !a.endTime)) {
+          return null // Assignment incompleto sin turno base - no puede usarse para licencia
+        }
+        return { assignment: a, shift: shift || undefined }
       })
-      .filter((item): item is { assignment: ShiftAssignment; shift: Turno } => item !== null)
+      .filter((item): item is { assignment: ShiftAssignment; shift?: Turno } => item !== null)
     
     // Agregar medios francos que tengan horario (startTime/endTime)
     const mediosFrancos = assignments
@@ -366,10 +381,20 @@ export function ScheduleCell({
     return timeMinutes >= rangeStartMinutes && timeMinutes <= rangeEndMinutes
   }
 
-  const handleOpenLicenciaEmbarazoDialog = (shiftAssignment: ShiftAssignment, shift: Turno) => {
+  const handleOpenLicenciaEmbarazoDialog = (shiftAssignment: ShiftAssignment, shift?: Turno) => {
     // Si es medio_franco con horario completo, asignar licencia directamente sin abrir diálogo
     if (shiftAssignment.type === "medio_franco" && shiftAssignment.startTime && shiftAssignment.endTime && !shiftAssignment.startTime2) {
       handleAssignLicenciaToMedioFranco(shiftAssignment)
+      return
+    }
+    
+    // CRÍTICO: Validar que el assignment tenga datos suficientes si el turno base no existe
+    if (!shift && (!shiftAssignment.startTime || !shiftAssignment.endTime)) {
+      toast({
+        title: "Error",
+        description: "El assignment está incompleto y el turno base fue eliminado. No se puede asignar licencia.",
+        variant: "destructive",
+      })
       return
     }
     
@@ -716,11 +741,21 @@ export function ScheduleCell({
     // Verificar si es medio_franco
     const isMedioFranco = shiftAssignment.type === "medio_franco"
 
-    // Obtener el horario base del turno (considerando ajustes)
-    const shiftStartTime = shiftAssignment.startTime || shift.startTime || ""
-    const shiftEndTime = shiftAssignment.endTime || shift.endTime || ""
-    const shiftStartTime2 = shiftAssignment.startTime2 || shift.startTime2
-    const shiftEndTime2 = shiftAssignment.endTime2 || shift.endTime2
+    // CRÍTICO: Usar SOLO valores explícitos del assignment (autosuficiencia)
+    // No usar turno base como fallback - el assignment debe tener todos los datos necesarios
+    if (!shiftAssignment.startTime || !shiftAssignment.endTime) {
+      toast({
+        title: "Error",
+        description: "El assignment está incompleto. No se puede dividir.",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    const shiftStartTime = shiftAssignment.startTime
+    const shiftEndTime = shiftAssignment.endTime
+    const shiftStartTime2 = shiftAssignment.startTime2 // Puede ser undefined si es turno simple
+    const shiftEndTime2 = shiftAssignment.endTime2 // Puede ser undefined si es turno simple
 
     // Validar duración de licencia (considerando cruce de medianoche)
     const licenciaDuration = calculateDuration(trimmedStartTime, trimmedEndTime)
@@ -1470,16 +1505,27 @@ export function ScheduleCell({
                     </>
                   ) : (
                     <>
-                      Turno: <strong>{selectedShiftForLicencia.shift.name}</strong>
-                      <br />
+                      {selectedShiftForLicencia.shift ? (
+                        <>
+                          Turno: <strong>{selectedShiftForLicencia.shift.name}</strong>
+                          <br />
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-destructive font-semibold">⚠️ Advertencia: El turno base fue eliminado</span>
+                          <br />
+                        </>
+                      )}
                       <span className="text-xs">
                         {(() => {
                           const shift = selectedShiftForLicencia.shift
                           const assignment = selectedShiftForLicencia.assignment
-                          const startTime = assignment.startTime || shift.startTime || ""
-                          const endTime = assignment.endTime || shift.endTime || ""
-                          const startTime2 = assignment.startTime2 || shift.startTime2
-                          const endTime2 = assignment.endTime2 || shift.endTime2
+                          // CRÍTICO: Usar SOLO valores del assignment (autosuficiencia)
+                          // Si no hay turno base, solo usar assignment
+                          const startTime = assignment.startTime || (shift?.startTime || "")
+                          const endTime = assignment.endTime || (shift?.endTime || "")
+                          const startTime2 = assignment.startTime2 || shift?.startTime2
+                          const endTime2 = assignment.endTime2 || shift?.endTime2
                           
                           if (startTime2 && endTime2) {
                             return `Horario completo: ${startTime} - ${endTime} y ${startTime2} - ${endTime2}`
@@ -1573,8 +1619,8 @@ export function ScheduleCell({
                       setLicenciaStartTime(e.target.value)
                       setSelectedSuggestion(null) // Limpiar selección si se edita manualmente
                     }}
-                    min={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.startTime || selectedShiftForLicencia.shift.startTime || "") : undefined}
-                    max={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.endTime || selectedShiftForLicencia.shift.endTime || "") : undefined}
+                    min={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.startTime || selectedShiftForLicencia.shift?.startTime || "") : undefined}
+                    max={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.endTime || selectedShiftForLicencia.shift?.endTime || "") : undefined}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -1587,8 +1633,8 @@ export function ScheduleCell({
                       setLicenciaEndTime(e.target.value)
                       setSelectedSuggestion(null) // Limpiar selección si se edita manualmente
                     }}
-                    min={licenciaStartTime || (selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.startTime || selectedShiftForLicencia.shift.startTime || "") : undefined)}
-                    max={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.endTime || selectedShiftForLicencia.shift.endTime || "") : undefined}
+                    min={licenciaStartTime || (selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.startTime || selectedShiftForLicencia.shift?.startTime || "") : undefined)}
+                    max={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.endTime || selectedShiftForLicencia.shift?.endTime || "") : undefined}
                   />
                 </div>
               </div>
@@ -1687,8 +1733,21 @@ export function ScheduleCell({
             <DialogDescription>
               {selectedShiftForEdit && (
                 <>
-                  Turno: <strong>{selectedShiftForEdit.shift.name}</strong>
-                  <br />
+                  {selectedShiftForEdit.shift ? (
+                    <>
+                      Turno: <strong>{selectedShiftForEdit.shift.name}</strong>
+                      <br />
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-destructive font-semibold">⚠️ Advertencia: El turno base fue eliminado</span>
+                      <br />
+                      <span className="text-xs text-muted-foreground">
+                        Puede editar el horario usando los datos del assignment. El shiftId se mantendrá pero el turno base ya no existe.
+                      </span>
+                      <br />
+                    </>
+                  )}
                   <span className="text-xs text-muted-foreground">
                     Modifique las horas de inicio y fin del horario asignado.
                     {hasSecondSegment && " Puede editar ambas franjas independientemente."}

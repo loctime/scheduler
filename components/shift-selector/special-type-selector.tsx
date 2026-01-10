@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input"
 import { MedioTurno } from "@/lib/types"
 
 interface SpecialTypeSelectorProps {
-  specialType: "shift" | "franco" | "medio_franco" | "licencia_embarazo" | null
-  onTypeChange: (type: "shift" | "franco" | "medio_franco" | "licencia_embarazo") => void
+  specialType: "shift" | "franco" | "medio_franco" | "licencia" | null
+  onTypeChange: (type: "shift" | "franco" | "medio_franco" | "licencia") => void
   medioFrancoTime: { startTime: string; endTime: string }
   onMedioFrancoTimeChange: (time: { startTime: string; endTime: string }) => void
   selectedMedioTurnoId: string | null
@@ -54,9 +54,9 @@ export function SpecialTypeSelector({
         </Button>
         <Button
           type="button"
-          variant={specialType === "licencia_embarazo" ? "default" : "outline"}
+          variant={specialType === "licencia" ? "default" : "outline"}
           onClick={() => {
-            onTypeChange("licencia_embarazo")
+            onTypeChange("licencia")
           }}
           className="w-full"
         >
@@ -144,7 +144,7 @@ export function SpecialTypeSelector({
         </div>
       )}
 
-      {specialType === "licencia_embarazo" && onLicenciaEmbarazoTimeChange && (
+      {specialType === "licencia" && onLicenciaEmbarazoTimeChange && (
         <div className="space-y-3 pt-2">
           <Label className="text-xs font-medium">Ingresa el horario de licencia por embarazo:</Label>
           <div className="grid grid-cols-2 gap-2">
