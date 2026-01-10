@@ -29,12 +29,23 @@ export function isAssignmentIncomplete(assignment: ShiftAssignment): boolean {
 
   switch (assignment.type) {
     case "shift":
-      // Turno debe tener shiftId, startTime y endTime
-      if (!assignment.shiftId || !assignment.startTime || !assignment.endTime) {
+      // Turno debe tener shiftId
+      if (!assignment.shiftId) {
         return true
       }
       
-      // Si tiene startTime2 o endTime2, debe tener ambos
+      // CONTRATO v1.0: Un assignment parcial es válido si tiene al menos una franja completa
+      // Esto permite assignments con solo primera franja O solo segunda franja
+      // (casos válidos: licencia divide turno cortado, extras, etc.)
+      const hasFirstSegment = assignment.startTime && assignment.endTime
+      const hasSecondSegment = assignment.startTime2 && assignment.endTime2
+      
+      // Debe tener al menos una franja completa
+      if (!hasFirstSegment && !hasSecondSegment) {
+        return true
+      }
+      
+      // Si tiene alguna parte de la segunda franja, debe tener ambas partes
       const hasPartialSecond = 
         (assignment.startTime2 !== undefined && assignment.endTime2 === undefined) ||
         (assignment.startTime2 === undefined && assignment.endTime2 !== undefined)
@@ -128,8 +139,10 @@ export function getIncompletenessReason(assignment: ShiftAssignment): string {
       if (!assignment.shiftId) {
         return "Falta shiftId"
       }
-      if (!assignment.startTime || !assignment.endTime) {
-        return "Faltan startTime o endTime"
+      const hasFirstSegment = assignment.startTime && assignment.endTime
+      const hasSecondSegment = assignment.startTime2 && assignment.endTime2
+      if (!hasFirstSegment && !hasSecondSegment) {
+        return "Falta al menos una franja completa (startTime+endTime o startTime2+endTime2)"
       }
       const hasPartialSecond = 
         (assignment.startTime2 !== undefined && assignment.endTime2 === undefined) ||

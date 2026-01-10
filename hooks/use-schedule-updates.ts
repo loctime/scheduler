@@ -387,15 +387,11 @@ export function useScheduleUpdates({
           }
           
           // Limpiar campos undefined de los assignments antes de guardar (Firestore no acepta undefined)
+          // CRÍTICO: NUNCA reconstruir assignments, solo eliminar undefined para preservar autosuficiencia
           const cleanedAssignments = assignments.map((assignment) => {
-            const cleaned: ShiftAssignment = { type: assignment.type || "shift" }
-            if (assignment.shiftId) cleaned.shiftId = assignment.shiftId
-            if (assignment.startTime) cleaned.startTime = assignment.startTime
-            if (assignment.endTime) cleaned.endTime = assignment.endTime
-            if (assignment.startTime2) cleaned.startTime2 = assignment.startTime2
-            if (assignment.endTime2) cleaned.endTime2 = assignment.endTime2
-            if (assignment.texto) cleaned.texto = assignment.texto
-            return cleaned
+            return Object.fromEntries(
+              Object.entries(assignment).filter(([, v]) => v !== undefined)
+            ) as ShiftAssignment
           })
           
           // CRÍTICO: Validar assignments SOLO si están completos
@@ -506,15 +502,11 @@ export function useScheduleUpdates({
           }
 
           // Limpiar campos undefined de los assignments antes de guardar (Firestore no acepta undefined)
+          // CRÍTICO: NUNCA reconstruir assignments, solo eliminar undefined para preservar autosuficiencia
           const cleanedFinalAssignments = finalAssignments.map((assignment) => {
-            const cleaned: ShiftAssignment = { type: assignment.type || "shift" }
-            if (assignment.shiftId) cleaned.shiftId = assignment.shiftId
-            if (assignment.startTime) cleaned.startTime = assignment.startTime
-            if (assignment.endTime) cleaned.endTime = assignment.endTime
-            if (assignment.startTime2) cleaned.startTime2 = assignment.startTime2
-            if (assignment.endTime2) cleaned.endTime2 = assignment.endTime2
-            if (assignment.texto) cleaned.texto = assignment.texto
-            return cleaned
+            return Object.fromEntries(
+              Object.entries(assignment).filter(([, v]) => v !== undefined)
+            ) as ShiftAssignment
           })
 
           // CRÍTICO: Validar assignments SOLO si están completos
