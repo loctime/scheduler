@@ -121,6 +121,8 @@ export function ScheduleCell({
   const [editEndTime2, setEditEndTime2] = useState("")
   const [hasSecondSegment, setHasSecondSegment] = useState(false)
   
+  const { toast } = useToast()
+  
   const hasBackgroundStyle = !!backgroundStyle
   const dayOfWeek = getDay(parseISO(date))
   const hoverClass = hasBackgroundStyle
@@ -180,7 +182,7 @@ export function ScheduleCell({
         }
         return { assignment: a, shift: shift || undefined }
       })
-      .filter((item): item is { assignment: ShiftAssignment; shift?: Turno } => item !== null)
+      .filter((item): item is { assignment: ShiftAssignment; shift: Turno | undefined } => item !== null)
     
     // Agregar medios francos que tengan horario (startTime/endTime)
     const mediosFrancos = assignments
@@ -433,10 +435,10 @@ export function ScheduleCell({
     const maxWorkMinutes = MAX_WORK_HOURS * 60
 
     // Obtener horarios del turno (considerando ajustes del assignment)
-    const shiftStartTime = assignment.startTime || shift.startTime || ""
-    const shiftEndTime = assignment.endTime || shift.endTime || ""
-    const shiftStartTime2 = assignment.startTime2 || shift.startTime2
-    const shiftEndTime2 = assignment.endTime2 || shift.endTime2
+    const shiftStartTime = assignment.startTime || shift?.startTime || ""
+    const shiftEndTime = assignment.endTime || shift?.endTime || ""
+    const shiftStartTime2 = assignment.startTime2 || shift?.startTime2
+    const shiftEndTime2 = assignment.endTime2 || shift?.endTime2
 
     if (!shiftStartTime || !shiftEndTime) return []
 
@@ -1316,7 +1318,7 @@ export function ScheduleCell({
                             key={index}
                             onClick={() => handleOpenLicenciaEmbarazoDialog(assignment, shift)}
                           >
-                            {shift.name || `Turno ${index + 1}`}
+                            {shift?.name || `Turno ${index + 1}`}
                           </DropdownMenuItem>
                         ))}
                       </DropdownMenuContent>
@@ -1488,16 +1490,16 @@ export function ScheduleCell({
                 <>
                   {selectedShiftForLicencia.assignment.type === "medio_franco" ? (
                     <>
-                      1/2 Franco: <strong>{selectedShiftForLicencia.shift.name}</strong>
+                      1/2 Franco: <strong>{selectedShiftForLicencia.shift?.name || "Medio Franco"}</strong>
                       <br />
                       <span className="text-xs">
                         {(() => {
                           const shift = selectedShiftForLicencia.shift
                           const assignment = selectedShiftForLicencia.assignment
-                          const startTime = assignment.startTime || shift.startTime || ""
-                          const endTime = assignment.endTime || shift.endTime || ""
-                          const startTime2 = assignment.startTime2 || shift.startTime2
-                          const endTime2 = assignment.endTime2 || shift.endTime2
+                          const startTime = assignment.startTime || shift?.startTime || ""
+                          const endTime = assignment.endTime || shift?.endTime || ""
+                          const startTime2 = assignment.startTime2 || shift?.startTime2
+                          const endTime2 = assignment.endTime2 || shift?.endTime2
                           
                           if (startTime2 && endTime2) {
                             return `Horario completo: ${startTime} - ${endTime} y ${startTime2} - ${endTime2}`
@@ -1649,10 +1651,10 @@ export function ScheduleCell({
             {licenciaStartTime && licenciaEndTime && selectedShiftForLicencia && (() => {
               const shift = selectedShiftForLicencia.shift
               const assignment = selectedShiftForLicencia.assignment
-              const shiftStartTime = assignment.startTime || shift.startTime || ""
-              const shiftEndTime = assignment.endTime || shift.endTime || ""
-              const shiftStartTime2 = assignment.startTime2 || shift.startTime2
-              const shiftEndTime2 = assignment.endTime2 || shift.endTime2
+              const shiftStartTime = assignment.startTime || shift?.startTime || ""
+              const shiftEndTime = assignment.endTime || shift?.endTime || ""
+              const shiftStartTime2 = assignment.startTime2 || shift?.startTime2
+              const shiftEndTime2 = assignment.endTime2 || shift?.endTime2
 
               let isValid = false
               let errorMessage = ""
@@ -1705,10 +1707,10 @@ export function ScheduleCell({
                 if (!selectedShiftForLicencia || !licenciaStartTime || !licenciaEndTime) return true
                 const shift = selectedShiftForLicencia.shift
                 const assignment = selectedShiftForLicencia.assignment
-                const shiftStartTime = assignment.startTime || shift.startTime || ""
-                const shiftEndTime = assignment.endTime || shift.endTime || ""
-                const shiftStartTime2 = assignment.startTime2 || shift.startTime2
-                const shiftEndTime2 = assignment.endTime2 || shift.endTime2
+                const shiftStartTime = assignment.startTime || shift?.startTime || ""
+                const shiftEndTime = assignment.endTime || shift?.endTime || ""
+                const shiftStartTime2 = assignment.startTime2 || shift?.startTime2
+                const shiftEndTime2 = assignment.endTime2 || shift?.endTime2
 
                 // Validar duración
                 const licenciaDuration = calculateDuration(licenciaStartTime, licenciaEndTime)

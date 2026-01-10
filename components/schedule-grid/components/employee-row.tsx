@@ -35,7 +35,7 @@ interface EmployeeRowProps {
   onDrop: (e: React.DragEvent, targetId: string) => void
   // Extra actions props
   extraMenuOpenKey: string | null
-  handleToggleExtra: (employeeId: string, date: string, type: "before" | "after") => void
+  handleToggleExtra: (employeeId: string, date: string, type: "before" | "after", segment?: "first" | "second") => void
   setExtraMenuOpenKey: (key: string | null) => void
   adjustTime: (time: string, minutes: number) => string | null
   onAssignmentUpdate?: (
@@ -104,6 +104,7 @@ export function EmployeeRow({
   onToggleFixed,
   onCloseSelector,
   config,
+  hasIncompleteAssignments,
 }: EmployeeRowProps) {
   return (
     <tr

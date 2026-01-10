@@ -538,6 +538,18 @@ export function useScheduleUpdates({
             return cleaned
           })
 
+          // CRÍTICO: Validar assignments usando validación global por celda
+          // Esto valida solapamientos entre TODOS los tipos (shifts, licencias, medio_francos)
+          const cellValidationResult = validateCellAssignments(cleanedFinalAssignments)
+          if (!cellValidationResult.valid) {
+            toast({
+              title: "Error de validación",
+              description: cellValidationResult.errors.join(". "),
+              variant: "destructive",
+            })
+            return
+          }
+
           // Actualizar assignments usando helper
           currentAssignments = updateAssignmentInAssignments(
             weekSchedule.assignments as any,
@@ -545,18 +557,6 @@ export function useScheduleUpdates({
             employeeId,
             cleanedFinalAssignments
           )
-        }
-        
-        // CRÍTICO: Validar assignments usando validación global por celda
-        // Esto valida solapamientos entre TODOS los tipos (shifts, licencias, medio_francos)
-        const cellValidationResult = validateCellAssignments(cleanedFinalAssignments)
-        if (!cellValidationResult.valid) {
-          toast({
-            title: "Error de validación",
-            description: cellValidationResult.errors.join(". "),
-            variant: "destructive",
-          })
-          return
         }
         
         // Validación adicional usando validateScheduleAssignments para compatibilidad

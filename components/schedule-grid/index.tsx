@@ -254,6 +254,15 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     [schedule, onAssignmentUpdate, cellUndoHistory],
   )
 
+  // Función para verificar si una celda tiene assignments incompletos
+  const hasIncompleteAssignments = useCallback(
+    (employeeId: string, date: string): boolean => {
+      const assignments = getEmployeeAssignments(employeeId, date)
+      return assignments.some(a => isAssignmentIncomplete(a))
+    },
+    [getEmployeeAssignments]
+  )
+
   // Handlers
   const handleCellClick = useCallback(
     (date: string, employeeId: string) => {
@@ -569,15 +578,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
       return undefined
     },
     [orderedItems]
-  )
-
-  // Función para verificar si una celda tiene assignments incompletos
-  const hasIncompleteAssignments = useCallback(
-    (employeeId: string, date: string): boolean => {
-      const assignments = getEmployeeAssignments(employeeId, date)
-      return assignments.some(a => isAssignmentIncomplete(a))
-    },
-    [getEmployeeAssignments]
   )
 
   const isClickable = !readonly && !!(onShiftUpdate || onAssignmentUpdate)
