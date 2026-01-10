@@ -10,6 +10,8 @@ import { createHistoryEntry, saveHistoryEntry, updateSchedulePreservingFields } 
 import { updateAssignmentInAssignments, normalizeAssignments } from "@/lib/schedule-utils"
 import { logger } from "@/lib/logger"
 import { getSuggestionForDay } from "@/lib/pattern-learning"
+import { isAssignmentIncomplete } from "@/lib/assignment-utils"
+import { validateBeforePersist } from "@/lib/assignment-validators"
 
 interface UseScheduleUpdatesProps {
   user: any
@@ -287,6 +289,24 @@ export function useScheduleUpdates({
           weekSchedule = getWeekSchedule(weekStartDate)
         }
 
+        // Verificar si hay assignments incompletos en la celda actual antes de permitir edición
+        if (weekSchedule) {
+          const dateAssignments = weekSchedule.assignments[date]?.[employeeId]
+          if (dateAssignments) {
+            const normalizedAssignments = normalizeAssignments(dateAssignments)
+            const hasIncomplete = normalizedAssignments.some(a => isAssignmentIncomplete(a))
+            
+            if (hasIncomplete) {
+              toast({
+                title: "Edición bloqueada",
+                description: "Esta celda contiene assignments incompletos. Debe normalizarlos antes de editar.",
+                variant: "destructive",
+              })
+              return
+            }
+          }
+        }
+
         // Verificar si la semana está completada y mostrar diálogo de confirmación
         if (weekSchedule?.completada === true) {
           return new Promise<void>((resolve, reject) => {
@@ -382,6 +402,17 @@ export function useScheduleUpdates({
           // Luego agregar/sobrescribir con la asignación actual
           if (!currentAssignments[date]) {
             currentAssignments[date] = {}
+          }
+          
+          // Validar assignments antes de guardar
+          const validationResult = validateBeforePersist(assignments)
+          if (!validationResult.valid) {
+            toast({
+              title: "Error de validación",
+              description: validationResult.errors.join(". "),
+              variant: "destructive",
+            })
+            return
           }
           
           // Limpiar campos undefined de los assignments antes de guardar (Firestore no acepta undefined)
@@ -484,6 +515,28 @@ export function useScheduleUpdates({
             finalAssignments.push(preservedMedioFranco)
           }
 
+          // Validar assignments antes de guardar
+          const validationResult = validateBeforePersist(finalAssignments)
+          if (!validationResult.valid) {
+            toast({
+              title: "Error de validación",
+              description: validationResult.errors.join(". "),
+              variant: "destructive",
+            })
+            return
+          }
+
+          // Validar assignments antes de guardar
+          const validationResult = validateBeforePersist(finalAssignments)
+          if (!validationResult.valid) {
+            toast({
+              title: "Error de validación",
+              description: validationResult.errors.join(". "),
+              variant: "destructive",
+            })
+            return
+          }
+
           // Limpiar campos undefined de los assignments antes de guardar (Firestore no acepta undefined)
           const cleanedFinalAssignments = finalAssignments.map((assignment) => {
             const cleaned: ShiftAssignment = { type: assignment.type || "shift" }
@@ -505,9 +558,9 @@ export function useScheduleUpdates({
           )
         }
         
-        // Validar solapamientos (filtrar francos, medio francos y licencia_embarazo)
+        // Validar solapamientos (filtrar francos, medio francos y licencias)
         const shiftIds = finalAssignments
-          .filter((a) => a.type !== "franco" && a.type !== "medio_franco" && a.type !== "licencia_embarazo" && a.shiftId)
+          .filter((a) => a.type !== "franco" && a.type !== "medio_franco" && a.type !== "licencia" && a.shiftId)
           .map((a) => a.shiftId!)
         if (shiftIds.length > 0) {
           // Si la semana está completada, usar empleados del snapshot para la validación

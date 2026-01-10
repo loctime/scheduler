@@ -26,6 +26,7 @@ import { usePatternSuggestions } from "@/hooks/use-pattern-suggestions"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
+import { isAssignmentIncomplete } from "@/lib/assignment-utils"
 
 export interface EmployeeMonthlyStats {
   francos: number
@@ -257,11 +258,20 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   const handleCellClick = useCallback(
     (date: string, employeeId: string) => {
       if (!readonly && (onShiftUpdate || onAssignmentUpdate)) {
+        // Verificar si hay assignments incompletos antes de permitir edición
+        if (hasIncompleteAssignments(employeeId, date)) {
+          toast({
+            title: "Edición bloqueada",
+            description: "Esta celda contiene assignments incompletos. Debe normalizarlos antes de editar.",
+            variant: "destructive",
+          })
+          return
+        }
         saveCellState(date, employeeId)
         setSelectedCell({ date, employeeId })
       }
     },
-    [readonly, onShiftUpdate, onAssignmentUpdate, saveCellState]
+    [readonly, onShiftUpdate, onAssignmentUpdate, saveCellState, hasIncompleteAssignments, toast]
   )
 
   const handleShiftUpdate = useCallback(
@@ -465,6 +475,15 @@ export const ScheduleGrid = memo(function ScheduleGrid({
       return undefined
     },
     [orderedItems]
+  )
+
+  // Función para verificar si una celda tiene assignments incompletos
+  const hasIncompleteAssignments = useCallback(
+    (employeeId: string, date: string): boolean => {
+      const assignments = getEmployeeAssignments(employeeId, date)
+      return assignments.some(a => isAssignmentIncomplete(a))
+    },
+    [getEmployeeAssignments]
   )
 
   const isClickable = !readonly && !!(onShiftUpdate || onAssignmentUpdate)
@@ -674,6 +693,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                         onToggleFixed={handleToggleFixed}
                         onCloseSelector={() => setSelectedCell(null)}
                         config={config}
+                        hasIncompleteAssignments={hasIncompleteAssignments}
                       />
                     )}
                   </React.Fragment>

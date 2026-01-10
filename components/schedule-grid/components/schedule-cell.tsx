@@ -63,6 +63,7 @@ interface ScheduleCellProps {
   onToggleFixed?: (date: string, employeeId: string, dayOfWeek: number) => void
   suggestion?: PatternSuggestion | null
   config?: Configuracion | null
+  hasIncompleteAssignments?: boolean
 }
 
 export function ScheduleCell({
@@ -95,6 +96,7 @@ export function ScheduleCell({
   onToggleFixed,
   suggestion,
   config,
+  hasIncompleteAssignments = false,
 }: ScheduleCellProps) {
   const [notaDialogOpen, setNotaDialogOpen] = useState(false)
   const [notaTexto, setNotaTexto] = useState("")
@@ -123,6 +125,8 @@ export function ScheduleCell({
     ? "hover:bg-muted/50"
     : ""
   const selectedClass = hasBackgroundStyle ? "ring-2 ring-primary/30" : isSelected ? "bg-primary/10" : ""
+  const incompleteClass = hasIncompleteAssignments ? "ring-2 ring-destructive/50 opacity-75" : ""
+  const incompleteIndicator = hasIncompleteAssignments ? "relative" : ""
 
   // Verificar si ya hay una nota en esta celda
   const existingNota = assignments.find((a) => a.type === "nota")
@@ -370,7 +374,8 @@ export function ScheduleCell({
     if (!onAssignmentUpdate || !medioFrancoAssignment.startTime || !medioFrancoAssignment.endTime) return
 
     const licenciaAssignment: ShiftAssignment = {
-      type: "licencia_embarazo",
+      type: "licencia",
+      licenciaType: "embarazo",
       startTime: medioFrancoAssignment.startTime,
       endTime: medioFrancoAssignment.endTime,
     }
@@ -793,7 +798,8 @@ export function ScheduleCell({
 
         // Siempre agregar la licencia
         newAssignments.push({
-          type: "licencia_embarazo",
+          type: "licencia",
+          licenciaType: "embarazo",
           startTime: trimmedStartTime,
           endTime: trimmedEndTime,
         })
@@ -852,7 +858,8 @@ export function ScheduleCell({
 
         // Siempre agregar la licencia
         newAssignments.push({
-          type: "licencia_embarazo",
+          type: "licencia",
+          licenciaType: "embarazo",
           startTime: trimmedStartTime,
           endTime: trimmedEndTime,
         })
@@ -865,7 +872,8 @@ export function ScheduleCell({
         // Solo agregar licencia, no crear assignment de shift o medio_franco
         // (el medio_franco o shift original se eliminará en otherAssignments)
         newAssignments.push({
-          type: "licencia_embarazo",
+          type: "licencia",
+          licenciaType: "embarazo",
           startTime: trimmedStartTime,
           endTime: trimmedEndTime,
         })
@@ -894,7 +902,8 @@ export function ScheduleCell({
 
         // Tramo de licencia
         newAssignments.push({
-          type: "licencia_embarazo",
+          type: "licencia",
+          licenciaType: "embarazo",
           startTime: trimmedStartTime,
           endTime: trimmedEndTime,
         })
@@ -943,7 +952,7 @@ export function ScheduleCell({
 
     // Separar por tipo para ordenar correctamente
     const turnAssignments = newAssignments.filter((a) => a.type === "shift" || a.type === "medio_franco")
-    const licenciaAssignments = newAssignments.filter((a) => a.type === "licencia_embarazo")
+    const licenciaAssignments = newAssignments.filter((a) => a.type === "licencia")
     const otherTurnAssignments = otherAssignments.filter((a) => a.type === "shift" || a.type === "medio_franco")
     const otherSpecialAssignments = otherAssignments.filter((a) => a.type !== "shift" && a.type !== "medio_franco")
 
@@ -970,7 +979,7 @@ export function ScheduleCell({
           <td
             className={`border-r-2 border-black px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 md:py-2 last:border-r-0 relative group ${
               isClickable ? `cursor-pointer transition-all ${hoverClass} active:brightness-90 touch-manipulation` : ""
-            } ${selectedClass} ${
+            } ${selectedClass} ${incompleteClass} ${
               isSelected && isClickable && onQuickAssignments ? "min-h-[140px] py-2 sm:py-2.5 md:py-3" : ""
             }`}
             style={backgroundStyle}
@@ -1008,6 +1017,17 @@ export function ScheduleCell({
               >
                 <Lock className="h-3 w-3 text-primary" />
                 <span className="text-xs font-semibold text-primary">{suggestionWeeks}</span>
+              </div>
+            )}
+            {/* Indicador de assignments incompletos */}
+            {hasIncompleteAssignments && (
+              <div
+                className="absolute top-1 right-1 z-10 flex items-center gap-1 bg-destructive/20 border border-destructive/40 rounded px-1.5 py-0.5"
+                title="Esta celda contiene assignments incompletos. Debe normalizarlos antes de editar."
+                aria-label="Assignments incompletos"
+              >
+                <Lock className="h-3 w-3 text-destructive" />
+                <span className="text-xs font-semibold text-destructive">!</span>
               </div>
             )}
         {showExtraActions && (

@@ -258,12 +258,12 @@ export function calculateHoursBreakdown(
   horasMinimasParaDescanso: number = 6
 ): {
   trabajo: number
-  licencia_embarazo: number
+  licencia: number
   medio_franco: number
 } {
   const shiftMap = new Map(shifts.map((s) => [s.id, s]))
   let horasTrabajo = 0
-  let horasLicenciaEmbarazo = 0
+  let horasLicencia = 0
   let horasMedioFranco = 0
 
   // Si es array de ShiftAssignment
@@ -288,15 +288,15 @@ export function calculateHoursBreakdown(
         return
       }
 
-      // Calcular horas de licencia embarazo
-      if (assignment.type === "licencia_embarazo") {
+      // Calcular horas de licencia
+      if (assignment.type === "licencia") {
         if (assignment.startTime && assignment.endTime) {
           const [hStart, mStart] = assignment.startTime.split(":").map(Number)
           const [hEnd, mEnd] = assignment.endTime.split(":").map(Number)
           const start = hStart * 60 + mStart
           const end = hEnd * 60 + mEnd
           const totalMinutes = end - start
-          horasLicenciaEmbarazo += totalMinutes / 60
+          horasLicencia += totalMinutes / 60
         }
         return
       }
@@ -333,7 +333,7 @@ export function calculateHoursBreakdown(
     })
     return {
       trabajo: horasTrabajo,
-      licencia_embarazo: horasLicenciaEmbarazo,
+      licencia: horasLicencia,
       medio_franco: horasMedioFranco
     }
   }
@@ -348,7 +348,7 @@ export function calculateHoursBreakdown(
 
   return {
     trabajo: horasTrabajo,
-    licencia_embarazo: 0,
+      licencia: 0,
     medio_franco: 0
   }
 }

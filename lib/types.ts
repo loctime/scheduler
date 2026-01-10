@@ -167,12 +167,13 @@ export interface Turno {
 
 export interface ShiftAssignment {
   shiftId?: string
-  type?: "shift" | "franco" | "medio_franco" | "licencia_embarazo" | "nota"
+  type?: "shift" | "franco" | "medio_franco" | "licencia" | "nota"
   startTime?: string
   endTime?: string
   startTime2?: string
   endTime2?: string
   texto?: string
+  licenciaType?: "embarazo" | "vacaciones" | "otro"
 }
 
 export type ShiftAssignmentValue = ShiftAssignment | ShiftAssignment[] | string[]

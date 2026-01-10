@@ -61,7 +61,7 @@ export function ShiftSelectorPopover({
   // Inicializar licencia embarazo time si hay asignación existente
   useEffect(() => {
     if (open) {
-      const existingLicencia = selectedAssignments.find(a => a.type === "licencia_embarazo")
+      const existingLicencia = selectedAssignments.find(a => a.type === "licencia" && a.licenciaType === "embarazo")
       if (existingLicencia) {
         setLicenciaEmbarazoTime({
           startTime: existingLicencia.startTime || "",
@@ -196,8 +196,8 @@ export function ShiftSelectorPopover({
       return
     }
 
-    // Si es licencia embarazo, validar que tenga horario
-    if (specialType === "licencia_embarazo") {
+    // Si es licencia, validar que tenga horario
+    if (specialType === "licencia") {
       if (!licenciaEmbarazoTime.startTime || !licenciaEmbarazoTime.endTime) {
         toast({
           title: "Error",
@@ -208,7 +208,8 @@ export function ShiftSelectorPopover({
       }
       finalizeAssignments([
         {
-          type: "licencia_embarazo",
+          type: "licencia",
+          licenciaType: "embarazo",
           startTime: licenciaEmbarazoTime.startTime,
           endTime: licenciaEmbarazoTime.endTime,
         },
@@ -226,9 +227,9 @@ export function ShiftSelectorPopover({
     onOpenChange(false)
   }
 
-  const handleSpecialTypeChange = (type: "shift" | "franco" | "medio_franco" | "licencia_embarazo") => {
+  const handleSpecialTypeChange = (type: "shift" | "franco" | "medio_franco" | "licencia") => {
     setSpecialType(type)
-    if (type === "franco" || type === "medio_franco" || type === "licencia_embarazo") {
+    if (type === "franco" || type === "medio_franco" || type === "licencia") {
       // Limpiar turnos seleccionados cuando se cambia a tipo especial
       setTempSelected([])
     }
@@ -236,7 +237,7 @@ export function ShiftSelectorPopover({
       setSelectedMedioTurnoId(null)
       setMedioFrancoTime({ startTime: "", endTime: "" })
     }
-    if (type === "licencia_embarazo") {
+    if (type === "licencia") {
       setLicenciaEmbarazoTime({ startTime: "", endTime: "" })
     }
     if (type === "shift") {

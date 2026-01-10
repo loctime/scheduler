@@ -104,8 +104,8 @@ export function useCellBackgroundStyles({
         return { backgroundColor: hexToRgba(especialColor, 0.35) }
       }
 
-      // Buscar licencia embarazo
-      const licenciaEmbarazo = assignments.find((a) => a.type === "licencia_embarazo")
+      // Buscar licencia
+      const licencia = assignments.find((a) => a.type === "licencia")
 
       // Buscar medio franco
       const medioFranco = assignments.find((a) => a.type === "medio_franco")
@@ -113,22 +113,22 @@ export function useCellBackgroundStyles({
       // Buscar turnos normales
       const shiftAssignments = assignments.filter((a) => a.type === "shift" && a.shiftId)
       
-      // Color para licencia embarazo (naranja/amarillo)
-      const licenciaEmbarazoColor = "rgba(245, 158, 11, 0.35)" // amber-500 con opacidad
+      // Color para licencia (naranja/amarillo)
+      const licenciaColor = "rgba(245, 158, 11, 0.35)" // amber-500 con opacidad
 
-      // Si hay licencia embarazo, solo aplicar color si NO hay turnos
+      // Si hay licencia, solo aplicar color si NO hay turnos
       // Si hay turnos, mantener el color normal del turno (la licencia solo se indica en el texto)
-      if (licenciaEmbarazo) {
-        // Solo aplicar color naranja si SOLO hay licencia embarazo (sin turnos ni medio franco)
+      if (licencia) {
+        // Solo aplicar color naranja si SOLO hay licencia (sin turnos ni medio franco)
         if (shiftAssignments.length === 0 && !medioFranco) {
-          return { backgroundColor: licenciaEmbarazoColor }
+          return { backgroundColor: licenciaColor }
         }
         // Si hay turnos, NO cambiar el color - seguir con la lógica normal de turnos
         // La licencia se indicará solo en el texto del tramo correspondiente
       }
 
       // Si solo hay medio franco (sin turnos), crear gradiente vertical como turno cortado
-      if (medioFranco && shiftAssignments.length === 0 && !licenciaEmbarazo) {
+      if (medioFranco && shiftAssignments.length === 0 && !licencia) {
         if (medioFranco.startTime && medioFranco.endTime) {
           // Buscar un turno que coincida con el horario del medio franco para obtener su color
           const matchingShift = findMatchingShift(medioFranco.startTime, medioFranco.endTime)

@@ -22,7 +22,7 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
 
     const hasMedioFranco = assignments.some((a) => a.type === "medio_franco")
     const hasShifts = assignments.some((a) => a.type === "shift" && a.shiftId)
-    const hasLicencia = assignments.some((a) => a.type === "licencia_embarazo")
+    const hasLicencia = assignments.some((a) => a.type === "licencia")
 
     // Si hay licencia y turnos, ordenar por horario
     if (hasLicencia && hasShifts) {
@@ -132,7 +132,7 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
           }
         }
 
-        if (assignment.type === "licencia_embarazo") {
+        if (assignment.type === "licencia") {
           const displayTimeLines = getShiftDisplayTime("", undefined, assignment)
           const hasTime = assignment.startTime && assignment.endTime
           

@@ -61,6 +61,7 @@ interface EmployeeRowProps {
   // Close selector
   onCloseSelector?: () => void
   config?: Configuracion | null
+  hasIncompleteAssignments?: (employeeId: string, date: string) => boolean
 }
 
 export function EmployeeRow({
@@ -276,6 +277,7 @@ export function EmployeeRow({
             onToggleFixed={onToggleFixed}
             suggestion={suggestion}
             config={config}
+            hasIncompleteAssignments={hasIncompleteAssignments ? hasIncompleteAssignments(employee.id, dateStr) : false}
           />
         )
       })}
