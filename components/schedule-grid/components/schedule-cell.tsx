@@ -29,6 +29,7 @@ import { getDay, parseISO } from "date-fns"
 import type { PatternSuggestion } from "@/lib/pattern-learning"
 import { validateCellAssignments } from "@/lib/assignment-validators"
 import { useToast } from "@/hooks/use-toast"
+import { isAssignmentIncomplete, getIncompletenessReason } from "@/lib/assignment-utils"
 
 interface ScheduleCellProps {
   date: string
@@ -1273,8 +1274,14 @@ export function ScheduleCell({
         <ContextMenuContent>
           {!readonly && (
             <>
-              <ContextMenuItem onClick={handleOpenEditarHorarioDialog}>
+              {/* FASE 11: Guard rails - Deshabilitar opciones de edición si hay incompletos */}
+              <ContextMenuItem 
+                onClick={handleOpenEditarHorarioDialog}
+                disabled={hasIncompleteAssignments}
+                className={hasIncompleteAssignments ? "opacity-50 cursor-not-allowed" : ""}
+              >
                 {firstShiftAssignment ? "Editar horario" : "Editar turno"}
+                {hasIncompleteAssignments && " (Bloqueado - Assignments incompletos)"}
               </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem onClick={handleOpenNotaDialog}>

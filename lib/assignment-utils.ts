@@ -1,4 +1,5 @@
 import { ShiftAssignment, Horario, Turno } from "./types"
+import { logger } from "./logger"
 
 export interface IncompleteAssignment {
   date: string
@@ -114,8 +115,10 @@ export function detectIncompleteAssignments(schedule: Horario): IncompleteAssign
 
 /**
  * Obtiene razón legible de por qué un assignment está incompleto
+ * 
+ * EXPORTADO para uso en UI y logging
  */
-function getIncompletenessReason(assignment: ShiftAssignment): string {
+export function getIncompletenessReason(assignment: ShiftAssignment): string {
   if (!assignment.type) {
     return "Falta el tipo de assignment"
   }
@@ -212,6 +215,13 @@ export function normalizeAssignmentFromShift(
     return assignment
   }
 
+  // Detectar si se está normalizando (copiando datos del turno base)
+  const wasIncomplete = isAssignmentIncomplete(assignment)
+  const needsNormalization = 
+    !assignment.startTime || 
+    !assignment.endTime ||
+    (shift.startTime2 && shift.endTime2 && (!assignment.startTime2 || !assignment.endTime2))
+
   // Crear assignment normalizado copiando TODA la estructura del turno
   const normalized: ShiftAssignment = {
     ...assignment,
@@ -230,6 +240,28 @@ export function normalizeAssignmentFromShift(
     // Si el turno NO tiene segunda franja, asegurar que el assignment tampoco la tenga
     delete normalized.startTime2
     delete normalized.endTime2
+  }
+
+  // FASE 12: Observabilidad - Log cuando se normaliza automáticamente
+  if (wasIncomplete || needsNormalization) {
+    logger.info("[Normalización] Assignment normalizado desde turno base", {
+      shiftId: shift.id,
+      shiftName: shift.name,
+      wasIncomplete,
+      needsNormalization,
+      before: {
+        startTime: assignment.startTime,
+        endTime: assignment.endTime,
+        startTime2: assignment.startTime2,
+        endTime2: assignment.endTime2,
+      },
+      after: {
+        startTime: normalized.startTime,
+        endTime: normalized.endTime,
+        startTime2: normalized.startTime2,
+        endTime2: normalized.endTime2,
+      },
+    })
   }
 
   return normalized

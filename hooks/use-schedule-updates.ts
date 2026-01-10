@@ -10,7 +10,7 @@ import { createHistoryEntry, saveHistoryEntry, updateSchedulePreservingFields } 
 import { updateAssignmentInAssignments, normalizeAssignments } from "@/lib/schedule-utils"
 import { logger } from "@/lib/logger"
 import { getSuggestionForDay } from "@/lib/pattern-learning"
-import { isAssignmentIncomplete } from "@/lib/assignment-utils"
+import { isAssignmentIncomplete, getIncompletenessReason } from "@/lib/assignment-utils"
 import { validateBeforePersist, validateCellAssignments } from "@/lib/assignment-validators"
 
 interface UseScheduleUpdatesProps {
