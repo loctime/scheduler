@@ -20,7 +20,7 @@ import { Empleado, Turno, Horario, ShiftAssignmentValue, ShiftAssignment } from 
 interface CreateScheduleDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: { nombre: string; assignments: Record<string, Record<string, string[]>> }) => void
+  onSubmit: (data: { nombre: string; assignments: Record<string, Record<string, ShiftAssignment[]>> }) => void
   weekDays: Date[]
   employees: Empleado[]
   shifts: Turno[]
@@ -36,32 +36,62 @@ export function CreateScheduleDialog({
   shifts,
   existingSchedule,
 }: CreateScheduleDialogProps) {
-  const [assignments, setAssignments] = useState<Record<string, Record<string, string[]>>>({})
+  const [assignments, setAssignments] = useState<Record<string, Record<string, ShiftAssignment[]>>>({})
   const [nombre, setNombre] = useState("")
 
-  // Función para convertir ShiftAssignmentValue a string[]
-  const convertToStringArray = (value: ShiftAssignmentValue): string[] => {
+  /**
+   * Construye un assignment completo desde un turno base
+   * Copia TODA la estructura del turno (autosuficiencia)
+   */
+  const buildAssignmentFromShift = (shiftId: string): ShiftAssignment => {
+    const shift = shifts.find((s) => s.id === shiftId)
+    if (!shift) {
+      return { shiftId, type: "shift" }
+    }
+
+    // CRÍTICO: Copiar TODA la estructura del turno siempre
+    const result: ShiftAssignment = { shiftId, type: "shift" }
+
+    // Turno simple: copiar primera franja
+    if (shift.startTime) {
+      result.startTime = shift.startTime
+    }
+    if (shift.endTime) {
+      result.endTime = shift.endTime
+    }
+
+    // Turno cortado: copiar segunda franja también
+    if (shift.startTime2) {
+      result.startTime2 = shift.startTime2
+    }
+    if (shift.endTime2) {
+      result.endTime2 = shift.endTime2
+    }
+
+    return result
+  }
+
+  // Función para convertir ShiftAssignmentValue a ShiftAssignment[]
+  const convertToAssignments = (value: ShiftAssignmentValue): ShiftAssignment[] => {
     if (Array.isArray(value) && value.length > 0) {
-      // Si el primer elemento es string, es string[]
+      // Si el primer elemento es string, es string[] - convertir a assignments completos
       if (typeof value[0] === "string") {
-        return value as string[]
+        return (value as string[]).map((shiftId) => buildAssignmentFromShift(shiftId))
       }
-      // Si es ShiftAssignment[], extraer shiftId
-      return (value as ShiftAssignment[])
-        .map((assignment) => assignment.shiftId)
-        .filter((id): id is string => id !== undefined)
+      // Si ya es ShiftAssignment[], usarlo directamente
+      return value as ShiftAssignment[]
     }
     return []
   }
 
   useEffect(() => {
     if (existingSchedule?.assignments) {
-      // Convertir ShiftAssignmentValue a string[] para cada asignación
-      const convertedAssignments: Record<string, Record<string, string[]>> = {}
+      // Convertir ShiftAssignmentValue a ShiftAssignment[] completos para cada asignación
+      const convertedAssignments: Record<string, Record<string, ShiftAssignment[]>> = {}
       Object.keys(existingSchedule.assignments).forEach((date) => {
         convertedAssignments[date] = {}
         Object.keys(existingSchedule.assignments[date]).forEach((employeeId) => {
-          convertedAssignments[date][employeeId] = convertToStringArray(
+          convertedAssignments[date][employeeId] = convertToAssignments(
             existingSchedule.assignments[date][employeeId]
           )
         })
@@ -75,7 +105,7 @@ export function CreateScheduleDialog({
     } else {
       setNombre("")
     }
-  }, [existingSchedule])
+  }, [existingSchedule, shifts])
 
   const toggleShift = (date: string, employeeId: string, shiftId: string) => {
     setAssignments((prev) => {
@@ -87,13 +117,16 @@ export function CreateScheduleDialog({
         newAssignments[date][employeeId] = []
       }
 
-      const employeeShifts = newAssignments[date][employeeId]
-      const shiftIndex = employeeShifts.indexOf(shiftId)
+      const employeeAssignments = newAssignments[date][employeeId]
+      const shiftIndex = employeeAssignments.findIndex((a) => a.shiftId === shiftId)
 
       if (shiftIndex > -1) {
-        newAssignments[date][employeeId] = employeeShifts.filter((id) => id !== shiftId)
+        // Remover assignment
+        newAssignments[date][employeeId] = employeeAssignments.filter((a) => a.shiftId !== shiftId)
       } else {
-        newAssignments[date][employeeId] = [...employeeShifts, shiftId]
+        // Agregar assignment completo
+        const newAssignment = buildAssignmentFromShift(shiftId)
+        newAssignments[date][employeeId] = [...employeeAssignments, newAssignment]
       }
 
       return newAssignments
@@ -101,7 +134,7 @@ export function CreateScheduleDialog({
   }
 
   const isShiftAssigned = (date: string, employeeId: string, shiftId: string) => {
-    return assignments[date]?.[employeeId]?.includes(shiftId) || false
+    return assignments[date]?.[employeeId]?.some((a) => a.shiftId === shiftId) || false
   }
 
   const handleSubmit = () => {

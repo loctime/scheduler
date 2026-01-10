@@ -111,29 +111,40 @@ export function ShiftSelectorPopover({
     open,
   })
 
+  /**
+   * Construye un assignment completo desde un turno base
+   * 
+   * CRÍTICO: Copia TODA la estructura del turno siempre (autosuficiencia).
+   * Luego aplica ajustes si existen.
+   * 
+   * Turno simple: copia startTime, endTime
+   * Turno cortado: copia startTime, endTime, startTime2, endTime2
+   */
   const buildAssignmentFromShift = (shiftId: string): ShiftAssignment => {
     const shift = shifts.find((s) => s.id === shiftId)
     const adjusted = adjustedTimes[shiftId] || {}
     const result: ShiftAssignment = { shiftId, type: "shift" }
 
     if (!shift) {
+      // Si no hay turno base, solo usar ajustes si existen
       return { ...result, ...adjusted }
     }
 
-    if (adjusted.startTime !== undefined && adjusted.startTime !== shift.startTime) {
-      result.startTime = adjusted.startTime
+    // CRÍTICO: Copiar TODA la estructura del turno siempre
+    // Turno simple: copiar primera franja
+    if (shift.startTime) {
+      result.startTime = adjusted.startTime !== undefined ? adjusted.startTime : shift.startTime
+    }
+    if (shift.endTime) {
+      result.endTime = adjusted.endTime !== undefined ? adjusted.endTime : shift.endTime
     }
 
-    if (adjusted.endTime !== undefined && adjusted.endTime !== shift.endTime) {
-      result.endTime = adjusted.endTime
+    // Turno cortado: copiar segunda franja también
+    if (shift.startTime2) {
+      result.startTime2 = adjusted.startTime2 !== undefined ? adjusted.startTime2 : shift.startTime2
     }
-
-    if (adjusted.startTime2 !== undefined && adjusted.startTime2 !== shift.startTime2) {
-      result.startTime2 = adjusted.startTime2
-    }
-
-    if (adjusted.endTime2 !== undefined && adjusted.endTime2 !== shift.endTime2) {
-      result.endTime2 = adjusted.endTime2
+    if (shift.endTime2) {
+      result.endTime2 = adjusted.endTime2 !== undefined ? adjusted.endTime2 : shift.endTime2
     }
 
     return result

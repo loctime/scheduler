@@ -9,6 +9,17 @@ export interface IncompleteAssignment {
 
 /**
  * Verifica si un assignment está incompleto según el contrato
+ * 
+ * IMPORTANTE: "Incompleto" ≠ "Inválido"
+ * - Incompleto: Faltan datos requeridos (ej: falta startTime, falta licenciaType)
+ * - Inválido: Los datos están presentes pero son incorrectos (ej: startTime === endTime, solapamientos)
+ * 
+ * Esta función solo detecta incompletitud (falta de datos).
+ * Para validar corrección de datos, usar validateAssignmentComplete().
+ * 
+ * Uso:
+ * - Bloqueo de edición: usar isAssignmentIncomplete() (bloquea si falta datos)
+ * - Validación antes de guardar: usar validateAssignmentComplete() (valida datos presentes)
  */
 export function isAssignmentIncomplete(assignment: ShiftAssignment): boolean {
   if (!assignment.type) {

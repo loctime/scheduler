@@ -58,46 +58,41 @@ export function getShiftDisplayTime(
   // Comportamiento normal para turnos
   if (!shift) return [""]
 
-  // Si hay asignación con horarios ajustados, usar esos
-  if (assignment) {
-    // Para turnos con ajustes, usar los valores del assignment
-    // CRÍTICO: Si el assignment tiene startTime/endTime explícitos, solo mostrar segunda franja
-    // si también está explícitamente definida en el assignment (no usar la del turno base como fallback)
-    // Esto evita mostrar franjas no deseadas cuando se divide un turno cortado
-    const start = assignment.startTime !== undefined ? assignment.startTime : shift.startTime
-    const end = assignment.endTime !== undefined ? assignment.endTime : shift.endTime
-    
-    // Para la segunda franja: solo usar si está explícitamente en el assignment
-    // Si el assignment tiene startTime/endTime pero NO tiene startTime2/endTime2, no mostrar segunda franja
-    let start2: string | undefined = undefined
-    let end2: string | undefined = undefined
-    
-    // Si el assignment tiene startTime2/endTime2 explícitos, usarlos
-    if (assignment.startTime2 !== undefined || assignment.endTime2 !== undefined) {
-      start2 = assignment.startTime2 || shift.startTime2
-      end2 = assignment.endTime2 || shift.endTime2
-    } else if (assignment.startTime === undefined && assignment.endTime === undefined) {
-      // Si el assignment no tiene primera franja explícita, puede usar la segunda del turno base
-      start2 = shift.startTime2
-      end2 = shift.endTime2
-    }
-    // Si el assignment tiene primera franja pero no segunda, start2/end2 quedan undefined
+  // Si hay asignación, usar SOLO los valores explícitos del assignment (autosuficiencia)
+  // NO usar el turno base como fallback - el assignment debe contener todos los datos necesarios
+  if (assignment && assignment.type === "shift") {
+    // Solo usar valores explícitos del assignment
+    const start = assignment.startTime
+    const end = assignment.endTime
+    const start2 = assignment.startTime2
+    const end2 = assignment.endTime2
 
+    // Si tiene primera franja, mostrarla
     if (start && end) {
       const first = formatTimeRange(start, end)
+      // Si también tiene segunda franja explícita, mostrarla
       if (start2 && end2) {
-        // Retornar en dos líneas separadas
         return [first, formatTimeRange(start2, end2)]
       }
       return [first]
     }
+    
+    // Si no tiene primera franja pero tiene segunda, mostrar solo la segunda
+    // (caso raro pero posible si el assignment está incompleto)
+    if (start2 && end2) {
+      return [formatTimeRange(start2, end2)]
+    }
+    
+    // Si no tiene ninguna franja explícita, el assignment está incompleto
+    // Retornar string vacío (se mostrará como celda vacía o con indicador de incompleto)
+    return [""]
   }
 
-  // Usar horarios del turno base
-  if (shift.startTime && shift.endTime) {
+  // Si NO hay assignment, mostrar el turno base directamente
+  // (esto solo ocurre en casos de visualización inicial antes de crear el assignment)
+  if (shift?.startTime && shift?.endTime) {
     const first = formatTimeRange(shift.startTime, shift.endTime)
     if (shift.startTime2 && shift.endTime2) {
-      // Retornar en dos líneas separadas
       return [first, formatTimeRange(shift.startTime2, shift.endTime2)]
     }
     return [first]

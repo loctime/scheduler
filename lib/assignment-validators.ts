@@ -8,6 +8,16 @@ export interface ValidationResult {
 
 /**
  * Valida que un assignment esté completo según su tipo
+ * 
+ * IMPORTANTE: Esta función valida CORRECCIÓN de datos, no solo completitud.
+ * - Verifica que los datos requeridos estén presentes (completitud)
+ * - Verifica que los datos sean válidos (ej: startTime < endTime, no solapamientos)
+ * 
+ * Para solo detectar si faltan datos (sin validar corrección), usar isAssignmentIncomplete().
+ * 
+ * Uso:
+ * - Validación antes de persistir: usar esta función (valida completitud + corrección)
+ * - Bloqueo de edición: usar isAssignmentIncomplete() (solo verifica presencia de datos)
  */
 export function validateAssignmentComplete(assignment: ShiftAssignment): ValidationResult {
   const errors: string[] = []
@@ -327,6 +337,9 @@ function isValidTimeRange(startTime: string, endTime: string): boolean {
 
 /**
  * Valida que dos segmentos no se solapen (considerando cruce de medianoche)
+ * 
+ * Usa el mismo algoritmo de normalización que hasTimeOverlap para consistencia.
+ * No asume orden fijo de las franjas.
  */
 function validateNoOverlapBetweenSegments(
   start1: string,
@@ -334,19 +347,17 @@ function validateNoOverlapBetweenSegments(
   start2: string,
   end2: string
 ): boolean {
-  // Para turnos cortados, end1 debe ser <= start2 (pueden ser iguales si son consecutivos)
-  const end1Minutes = timeToMinutes(end1)
-  const start2Minutes = timeToMinutes(start2)
-  
-  // Normalizar considerando cruce de medianoche
-  const normalizedEnd1 = end1Minutes < timeToMinutes(start1) ? end1Minutes + 24 * 60 : end1Minutes
-  const normalizedStart2 = start2Minutes < timeToMinutes(start1) ? start2Minutes + 24 * 60 : start2Minutes
-  
-  return normalizedEnd1 <= normalizedStart2
+  // Usar la misma lógica de hasTimeOverlap pero invertida
+  // Si NO hay solapamiento, entonces no se solapan
+  return !hasTimeOverlap(start1, end1, start2, end2)
 }
 
 /**
  * Verifica si dos rangos de tiempo se solapan (considerando cruce de medianoche)
+ * 
+ * Estrategia: Normalizar SIEMPRE a una línea de tiempo expandida
+ * - Si cruza medianoche → expandir a [start, end + 1440]
+ * - Comparar todos los rangos posibles en la línea expandida
  */
 function hasTimeOverlap(
   start1: string,
@@ -359,23 +370,43 @@ function hasTimeOverlap(
   const s2 = timeToMinutes(start2)
   const e2 = timeToMinutes(end2)
 
-  // Si alguno cruza medianoche, normalizar
+  const MINUTES_PER_DAY = 24 * 60
+
+  // Normalizar rangos a línea de tiempo expandida
+  // Si cruza medianoche, crear dos rangos: [start, end] y [start, end + 1440]
+  const ranges1: Array<[number, number]> = []
+  const ranges2: Array<[number, number]> = []
+
   const crossesMidnight1 = e1 < s1
   const crossesMidnight2 = e2 < s2
 
-  if (crossesMidnight1 && crossesMidnight2) {
-    // Ambos cruzan medianoche - comparar directamente
-    return true // Simplificación: si ambos cruzan, asumimos solapamiento
-  } else if (crossesMidnight1) {
-    // Solo el primero cruza medianoche
-    return s2 <= e1 || s2 >= s1 || e2 >= s1
-  } else if (crossesMidnight2) {
-    // Solo el segundo cruza medianoche
-    return s1 <= e2 || s1 >= s2 || e1 >= s2
-  } else {
-    // Ninguno cruza medianoche - comparación normal
-    return s1 < e2 && s2 < e1
+  // Rango 1: siempre incluir rango normal
+  ranges1.push([s1, crossesMidnight1 ? e1 + MINUTES_PER_DAY : e1])
+  
+  // Si cruza medianoche, también incluir rango expandido para comparación
+  if (crossesMidnight1) {
+    ranges1.push([s1 + MINUTES_PER_DAY, e1 + MINUTES_PER_DAY])
   }
+
+  // Rango 2: siempre incluir rango normal
+  ranges2.push([s2, crossesMidnight2 ? e2 + MINUTES_PER_DAY : e2])
+  
+  // Si cruza medianoche, también incluir rango expandido para comparación
+  if (crossesMidnight2) {
+    ranges2.push([s2 + MINUTES_PER_DAY, e2 + MINUTES_PER_DAY])
+  }
+
+  // Comparar todos los rangos posibles
+  for (const [r1Start, r1End] of ranges1) {
+    for (const [r2Start, r2End] of ranges2) {
+      // Dos rangos se solapan si: r1Start < r2End && r2Start < r1End
+      if (r1Start < r2End && r2Start < r1End) {
+        return true
+      }
+    }
+  }
+
+  return false
 }
 
 /**
