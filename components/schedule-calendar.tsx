@@ -41,7 +41,7 @@ const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAss
 }
 
 export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
-  const { employees, shifts, loading: dataLoading } = useData()
+  const { employees, shifts, loading: dataLoading, userData } = useData()
   const { config } = useConfig(user)
   const { toast } = useToast()
   const { exporting, exportImage, exportPDF, exportExcel, exportMonthPDF } = useExportSchedule()
@@ -112,11 +112,15 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
   const handleExportWeekImage = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
     const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
+    const ownerId = userData?.role === "invited" && userData?.ownerId 
+      ? userData.ownerId 
+      : user?.uid
     await exportImage(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.png`, {
       nombreEmpresa: config?.nombreEmpresa,
       colorEmpresa: config?.colorEmpresa,
+      ownerId,
     })
-  }, [exportImage, config])
+  }, [exportImage, config, userData, user])
 
   const handleExportWeekExcel = useCallback(async (weekStartDate: Date, weekDays: Date[], weekSchedule: Horario | null) => {
     await exportExcel(

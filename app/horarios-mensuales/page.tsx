@@ -381,8 +381,9 @@ function HorariosMensualesContent() {
     await exportImage(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.png`, {
       nombreEmpresa: config?.nombreEmpresa,
       colorEmpresa: config?.colorEmpresa,
+      ownerId: userId || undefined,
     })
-  }, [exportImage, config])
+  }, [exportImage, config, userId])
 
   const handleExportEmployeeImage = useCallback(async (employeeId: string, employeeName: string, weekStartDate: Date) => {
     const employeeCardId = `employee-card-${employeeId}-${format(weekStartDate, "yyyy-MM-dd")}`

@@ -51,7 +51,7 @@ interface WeekGroup {
 
 export default function HorariosMensualesPage() {
   const [schedules, setSchedules] = useState<Horario[]>([])
-  const { employees, shifts, loading: dataLoading, user } = useData()
+  const { employees, shifts, loading: dataLoading, user, userData } = useData()
   const { config } = useConfig(user)
   const { toast } = useToast()
   const { exporting, exportImage, exportPDF, exportExcel } = useExportSchedule()
@@ -263,11 +263,15 @@ export default function HorariosMensualesPage() {
 
   const handleExportWeekImage = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
     const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
+    const ownerId = userData?.role === "invited" && userData?.ownerId 
+      ? userData.ownerId 
+      : user?.uid
     await exportImage(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.png`, {
       nombreEmpresa: config?.nombreEmpresa,
       colorEmpresa: config?.colorEmpresa,
+      ownerId,
     })
-  }, [exportImage, config])
+  }, [exportImage, config, userData, user])
 
   const handleExportWeekPDF = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
     const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
