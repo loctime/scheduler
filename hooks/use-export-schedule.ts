@@ -316,11 +316,8 @@ export function useExportSchedule() {
         el.style.margin = styles.margin
       })
 
-      // Subir al backend solo si es exportación de semana completa (schedule-week-)
-      if (
-        elementId.startsWith("schedule-week-") &&
-        config?.ownerId
-      ) {
+      // Subir al backend siempre que haya ownerId (indica exportación de semana completa)
+      if (config?.ownerId) {
         try {
           const ownerId = config.ownerId
 
