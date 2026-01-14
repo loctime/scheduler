@@ -4,14 +4,12 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import type { Empleado, Turno, Horario, ShiftAssignment, Separador, MedioTurno, ShiftAssignmentValue } from "@/lib/types"
 import { calculateDailyHours, calculateHoursBreakdown } from "@/lib/validations"
-import { useData } from "@/contexts/data-context"
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
 export function useExportSchedule() {
   const [exporting, setExporting] = useState(false)
   const { toast } = useToast()
-  const { userData, user } = useData()
 
   // Desactiva todos los pseudo-elementos que generan los "cuadritos"
   const disablePseudoElements = () => {
@@ -183,7 +181,7 @@ export function useExportSchedule() {
   const exportImage = useCallback(async (
     elementId: string, 
     filename: string,
-    config?: { nombreEmpresa?: string; colorEmpresa?: string }
+    config?: { nombreEmpresa?: string; colorEmpresa?: string; ownerId?: string }
   ) => {
     const element = document.getElementById(elementId)
     if (!element) {
@@ -319,33 +317,26 @@ export function useExportSchedule() {
       })
 
       // Subir al backend solo si es exportación de semana completa (schedule-week-)
-      if (elementId.startsWith('schedule-week-') && user?.uid) {
+      if (
+        elementId.startsWith("schedule-week-") &&
+        config?.ownerId
+      ) {
         try {
-          // Obtener userId efectivo (si es invitado, usar ownerId)
-          const ownerId = userData?.role === "invited" && userData?.ownerId 
-            ? userData.ownerId 
-            : user.uid
+          const ownerId = config.ownerId
 
-          // Convertir dataUrl a Blob
           const response = await fetch(dataUrl)
           const blob = await response.blob()
 
-          // Crear FormData
           const formData = new FormData()
-          formData.append('file', blob, 'semana-actual.png')
+          formData.append("file", blob, "semana-actual.png")
 
-          // Subir al backend
-          const uploadResponse = await fetch(
-            `${BACKEND_URL}/api/horarios/semana-actual?ownerId=${ownerId}`,
+          await fetch(
+            `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/horarios/semana-actual?ownerId=${ownerId}`,
             {
-              method: 'POST',
+              method: "POST",
               body: formData,
             }
           )
-
-          if (!uploadResponse.ok) {
-            console.warn('No se pudo subir la imagen al backend:', uploadResponse.status)
-          }
         } catch (error) {
           console.warn('Error al subir imagen al backend:', error)
         }
