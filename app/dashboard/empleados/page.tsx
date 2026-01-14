@@ -89,6 +89,8 @@ export default function EmpleadosPage() {
     startTime2: "",
     endTime2: "",
     color: PRESET_COLORS[0],
+    colorPrimeraFranja: PRESET_COLORS[0],
+    colorSegundaFranja: PRESET_COLORS[1],
   })
   const [hasSecondShift, setHasSecondShift] = useState(false)
 
@@ -399,6 +401,8 @@ export default function EmpleadosPage() {
         startTime2: shift.startTime2 || "",
         endTime2: shift.endTime2 || "",
         color: shift.color,
+        colorPrimeraFranja: shift.colorPrimeraFranja || shift.color || PRESET_COLORS[0],
+        colorSegundaFranja: shift.colorSegundaFranja || shift.color || PRESET_COLORS[1],
       })
     } else {
       setEditingShift(null)
@@ -410,6 +414,8 @@ export default function EmpleadosPage() {
         startTime2: "",
         endTime2: "",
         color: PRESET_COLORS[0],
+        colorPrimeraFranja: PRESET_COLORS[0],
+        colorSegundaFranja: PRESET_COLORS[1],
       })
     }
     setShiftDialogOpen(true)
@@ -438,6 +444,16 @@ export default function EmpleadosPage() {
       return
     }
 
+    // Validar color de segunda franja si está activada
+    if (hasSecondShift && !shiftFormData.colorSegundaFranja) {
+      toast({
+        title: "Error de validación",
+        description: "Si activas el turno cortado, debes especificar el color de la segunda franja.",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (!db) {
       toast({
         title: "Error",
@@ -460,9 +476,13 @@ export default function EmpleadosPage() {
         if (hasSecondShift) {
           if (shiftFormData.startTime2) updateData.startTime2 = shiftFormData.startTime2
           if (shiftFormData.endTime2) updateData.endTime2 = shiftFormData.endTime2
+          if (shiftFormData.colorPrimeraFranja) updateData.colorPrimeraFranja = shiftFormData.colorPrimeraFranja
+          if (shiftFormData.colorSegundaFranja) updateData.colorSegundaFranja = shiftFormData.colorSegundaFranja
         } else {
           updateData.startTime2 = deleteField()
           updateData.endTime2 = deleteField()
+          updateData.colorPrimeraFranja = deleteField()
+          updateData.colorSegundaFranja = deleteField()
         }
         
         const shiftRef = doc(db, COLLECTIONS.SHIFTS, editingShift.id)
@@ -486,6 +506,8 @@ export default function EmpleadosPage() {
         if (hasSecondShift) {
           if (shiftFormData.startTime2) newShiftData.startTime2 = shiftFormData.startTime2
           if (shiftFormData.endTime2) newShiftData.endTime2 = shiftFormData.endTime2
+          if (shiftFormData.colorPrimeraFranja) newShiftData.colorPrimeraFranja = shiftFormData.colorPrimeraFranja
+          if (shiftFormData.colorSegundaFranja) newShiftData.colorSegundaFranja = shiftFormData.colorSegundaFranja
         }
         
         await addDoc(collection(db, COLLECTIONS.SHIFTS), newShiftData)
@@ -947,7 +969,13 @@ export default function EmpleadosPage() {
                     onCheckedChange={(checked) => {
                       setHasSecondShift(checked)
                       if (!checked) {
-                        setShiftFormData({ ...shiftFormData, startTime2: "", endTime2: "" })
+                        setShiftFormData({ 
+                          ...shiftFormData, 
+                          startTime2: "", 
+                          endTime2: "",
+                          colorPrimeraFranja: PRESET_COLORS[0],
+                          colorSegundaFranja: PRESET_COLORS[1]
+                        })
                       }
                     }}
                   />
@@ -985,22 +1013,59 @@ export default function EmpleadosPage() {
                   </div>
                 )}
                 
-                <div className="space-y-2">
-                  <Label className="text-foreground">Color *</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {PRESET_COLORS.map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        className={`h-10 w-10 rounded-full border-2 transition-all ${
-                          shiftFormData.color === color ? "border-foreground scale-110" : "border-transparent"
-                        }`}
-                        style={{ backgroundColor: color }}
-                        onClick={() => setShiftFormData({ ...shiftFormData, color })}
-                      />
-                    ))}
+                {hasSecondShift ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-foreground">Color Primera Franja *</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {PRESET_COLORS.map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            className={`h-10 w-10 rounded-full border-2 transition-all ${
+                              shiftFormData.colorPrimeraFranja === color ? "border-foreground scale-110" : "border-transparent"
+                            }`}
+                            style={{ backgroundColor: color }}
+                            onClick={() => setShiftFormData({ ...shiftFormData, colorPrimeraFranja: color, color: color })}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-foreground">Color Segunda Franja *</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {PRESET_COLORS.map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            className={`h-10 w-10 rounded-full border-2 transition-all ${
+                              shiftFormData.colorSegundaFranja === color ? "border-foreground scale-110" : "border-transparent"
+                            }`}
+                            style={{ backgroundColor: color }}
+                            onClick={() => setShiftFormData({ ...shiftFormData, colorSegundaFranja: color })}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <Label className="text-foreground">Color *</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {PRESET_COLORS.map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          className={`h-10 w-10 rounded-full border-2 transition-all ${
+                            shiftFormData.color === color ? "border-foreground scale-110" : "border-transparent"
+                          }`}
+                          style={{ backgroundColor: color }}
+                          onClick={() => setShiftFormData({ ...shiftFormData, color })}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setShiftDialogOpen(false)}>

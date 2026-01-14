@@ -222,7 +222,16 @@ export function useCellBackgroundStyles({
           // Opacidad más alta para turnos cortados (mejor contraste)
           const cutShiftOpacity = 0.35
 
-          // Buscar turnos que coincidan con cada franja para obtener sus colores
+          // Prioridad 1: Usar colores específicos del turno si están definidos
+          if (firstShift.colorPrimeraFranja && firstShift.colorSegundaFranja) {
+            const morningColor = hexToRgba(firstShift.colorPrimeraFranja, cutShiftOpacity)
+            const nightColor = hexToRgba(firstShift.colorSegundaFranja, cutShiftOpacity)
+            return {
+              background: `linear-gradient(to bottom, ${morningColor} 50%, ${nightColor} 50%)`,
+            }
+          }
+
+          // Prioridad 2: Buscar turnos que coincidan con cada franja para obtener sus colores
           const morningShift = findMatchingShift(startTime, endTime, firstShift.id)
           const nightShift = findMatchingShift(startTime2, endTime2, firstShift.id)
 

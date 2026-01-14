@@ -160,6 +160,8 @@ export interface Turno {
   startTime2?: string
   endTime2?: string
   color: string
+  colorPrimeraFranja?: string
+  colorSegundaFranja?: string
   userId: string
   createdAt?: any
   updatedAt?: any
