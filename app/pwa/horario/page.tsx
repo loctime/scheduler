@@ -34,7 +34,7 @@ function HorarioContent({ ownerIdFromQuery }: { ownerIdFromQuery: string | null 
     }
 
     // Construir URL de la imagen del horario
-    const url = `https://api.example.com/horarios/${userId}/semana-actual.png`
+    const url = `/api/horarios/semana-actual?ownerId=${userId}`
     setImageUrl(url)
     setLoading(false)
   }, [userId])
@@ -47,7 +47,7 @@ function HorarioContent({ ownerIdFromQuery }: { ownerIdFromQuery: string | null 
     
     // La URL no cambia - el SW (Network First) traerá la versión nueva si existe
     // No usar querystring para evitar cachear infinitas versiones
-    const url = `https://api.example.com/horarios/${userId}/semana-actual.png`
+    const url = `/api/horarios/semana-actual?ownerId=${userId}`
     setImageUrl(url)
     
     // El estado de carga se manejará automáticamente cuando la imagen cargue
@@ -134,7 +134,7 @@ function HorarioContent({ ownerIdFromQuery }: { ownerIdFromQuery: string | null 
 
       {/* Componentes PWA */}
       <PWAInstallPrompt />
-      <PWAUpdateNotification swPath="/sw-horario.js" />
+      <PWAUpdateNotification swPath="/pwa/horario/sw.js" />
     </div>
   )
 }
