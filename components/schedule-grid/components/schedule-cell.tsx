@@ -114,7 +114,7 @@ export function ScheduleCell({
   const [selectedShiftForLicencia, setSelectedShiftForLicencia] = useState<{ assignment: ShiftAssignment; shift?: Turno } | null>(null)
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null)
   const [editarHorarioDialogOpen, setEditarHorarioDialogOpen] = useState(false)
-  const [selectedShiftForEdit, setSelectedShiftForEdit] = useState<{ assignment: ShiftAssignment; shift?: Turno } | null>(null)
+  const [selectedShiftForEdit, setSelectedShiftForEdit] = useState<{ assignment: ShiftAssignment; shift?: Turno; assignmentIndex: number } | null>(null)
   const [editStartTime, setEditStartTime] = useState("")
   const [editEndTime, setEditEndTime] = useState("")
   const [editStartTime2, setEditStartTime2] = useState("")
@@ -628,13 +628,27 @@ export function ScheduleCell({
 
   const handleOpenEditarHorarioDialog = () => {
     if (!firstShiftAssignment) {
-      // Si no hay turno asignado, usar el comportamiento actual (abrir selector)
-      onCellClick(date, employeeId)
+      // Si no hay turno asignado, no hacer nada (no crear turnos)
+      return
+    }
+    
+    // Encontrar el índice del assignment en el array para referencia directa
+    const assignmentIndex = assignments.findIndex(
+      (a) => a.type === "shift" && 
+             a.shiftId === firstShiftAssignment.assignment.shiftId &&
+             a.startTime === firstShiftAssignment.assignment.startTime &&
+             a.endTime === firstShiftAssignment.assignment.endTime &&
+             a.startTime2 === firstShiftAssignment.assignment.startTime2 &&
+             a.endTime2 === firstShiftAssignment.assignment.endTime2
+    )
+    
+    if (assignmentIndex === -1) {
+      // No se encontró el assignment, no hacer nada
       return
     }
     
     const { assignment, shift } = firstShiftAssignment
-    setSelectedShiftForEdit({ assignment, shift })
+    setSelectedShiftForEdit({ assignment, shift, assignmentIndex })
     
     // Precargar los horarios actuales SOLO del assignment (autosuficiencia)
     // NO usar el turno base como fallback
@@ -660,42 +674,41 @@ export function ScheduleCell({
       return // Validación básica
     }
 
-    const { assignment } = selectedShiftForEdit
+    const { assignment, assignmentIndex } = selectedShiftForEdit
     
-    // Actualizar el assignment existente manteniendo shiftId y otros campos
-    // Actualizar el primer assignment que coincida con el shiftId (normalmente solo hay uno)
-    const updatedAssignments = assignments.map((a) => {
-      // Buscar el assignment exacto (por shiftId y tipo)
-      // Comparar también por startTime/endTime para identificar el assignment específico
-      if (a.type === "shift" && a.shiftId === assignment.shiftId) {
-        // Verificar si es el mismo assignment comparando campos clave
-        const isSameAssignment = 
-          a.startTime === assignment.startTime &&
-          a.endTime === assignment.endTime &&
-          a.startTime2 === assignment.startTime2 &&
-          a.endTime2 === assignment.endTime2
-        
-        // Actualizar solo si es el mismo assignment o si solo hay uno con este shiftId
-        if (isSameAssignment) {
-          // CRÍTICO: Preservar explícitamente startTime2/endTime2 según el estado del diálogo
-          const updated: ShiftAssignment = {
-            ...a,
-            startTime: trimmedStartTime,
-            endTime: trimmedEndTime,
-          }
-          
-          // Si hay segunda franja en el diálogo, incluirla explícitamente
-          if (hasSecondSegment && editStartTime2.trim() && editEndTime2.trim()) {
-            updated.startTime2 = editStartTime2.trim()
-            updated.endTime2 = editEndTime2.trim()
-          } else {
-            // Si no hay segunda franja, eliminar explícitamente (convertir a turno simple)
-            delete updated.startTime2
-            delete updated.endTime2
-          }
-          
-          return updated
+    // Validar que el índice sea válido
+    if (assignmentIndex === -1 || assignmentIndex >= assignments.length) {
+      toast({
+        title: "Error",
+        description: "No se pudo encontrar el assignment a editar.",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    // Actualizar el assignment existente usando el índice directo
+    // Mantener shiftId, empleado y día (no modificar estos campos)
+    const updatedAssignments = assignments.map((a, index) => {
+      // Editar exactamente el assignment seleccionado usando el índice
+      if (index === assignmentIndex) {
+        // CRÍTICO: Preservar explícitamente shiftId y otros campos, solo modificar horarios
+        const updated: ShiftAssignment = {
+          ...a,
+          startTime: trimmedStartTime,
+          endTime: trimmedEndTime,
         }
+        
+        // Si hay segunda franja en el diálogo, incluirla explícitamente
+        if (hasSecondSegment && editStartTime2.trim() && editEndTime2.trim()) {
+          updated.startTime2 = editStartTime2.trim()
+          updated.endTime2 = editEndTime2.trim()
+        } else {
+          // Si no hay segunda franja, eliminar explícitamente (convertir a turno simple)
+          delete updated.startTime2
+          delete updated.endTime2
+        }
+        
+        return updated
       }
       return a
     })
@@ -1277,15 +1290,18 @@ export function ScheduleCell({
           {!readonly && (
             <>
               {/* FASE 11: Guard rails - Deshabilitar opciones de edición si hay incompletos */}
-              <ContextMenuItem 
-                onClick={handleOpenEditarHorarioDialog}
-                disabled={hasIncompleteAssignments}
-                className={hasIncompleteAssignments ? "opacity-50 cursor-not-allowed" : ""}
-              >
-                {firstShiftAssignment ? "Editar horario" : "Editar turno"}
-                {hasIncompleteAssignments && " (Bloqueado - Assignments incompletos)"}
-              </ContextMenuItem>
-              <ContextMenuSeparator />
+              {/* Solo mostrar "Editar horario" si hay un assignment existente */}
+              {firstShiftAssignment && (
+                <ContextMenuItem 
+                  onClick={handleOpenEditarHorarioDialog}
+                  disabled={hasIncompleteAssignments}
+                  className={hasIncompleteAssignments ? "opacity-50 cursor-not-allowed" : ""}
+                >
+                  Editar horario
+                  {hasIncompleteAssignments && " (Bloqueado - Assignments incompletos)"}
+                </ContextMenuItem>
+              )}
+              {firstShiftAssignment && <ContextMenuSeparator />}
               <ContextMenuItem onClick={handleOpenNotaDialog}>
                 <FileText className="mr-2 h-4 w-4" />
                 {existingNota ? "Editar nota" : "Agregar nota"}
