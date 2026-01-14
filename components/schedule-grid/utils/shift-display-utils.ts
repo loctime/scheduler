@@ -28,13 +28,14 @@ function formatTimeRange(start: string, end: string): string {
  * Obtener horario para mostrar desde el assignment (CONTRATO v1.0)
  * 
  * REGLAS:
- * - ShiftAssignment es autosuficiente
- * - El horario visible DEBE salir del assignment
- * - El turno base (Turno) NO debe usarse para render
- * - No se permiten fallbacks visuales al turno base
+ * - ShiftAssignment es autosuficiente para validación
+ * - Prioridad: usar horarios del assignment si existen
+ * - Fallback de display: si es placeholder { type:"shift", shiftId } sin horarios,
+ *   usar horarios del turno base SOLO para mostrar (NO modifica, NO valida, NO normaliza)
+ * - El turno base solo se usa para display, nunca como fuente de validación
  * 
- * @param shiftId - ID del turno (solo para referencia, no se usa para display)
- * @param shift - Turno base (solo para referencia, NO se usa para display)
+ * @param shiftId - ID del turno (para referencia y fallback de display)
+ * @param shift - Turno base (para fallback de display cuando el assignment es placeholder)
  * @param assignment - Assignment del cual extraer el horario
  * @returns Array de líneas de texto con el horario a mostrar
  */
@@ -67,9 +68,8 @@ export function getShiftDisplayTime(
     return ["FRANCO"]
   }
 
-  // CONTRATO v1.0: Assignment autosuficiente
-  // Si hay asignación, usar SOLO los valores explícitos del assignment
-  // NUNCA usar el turno base como fallback
+  // CONTRATO v1.0: Assignment autosuficiente para validación
+  // Para display: usar horarios del assignment si existen, sino usar turno base SOLO para mostrar
   if (assignment && assignment.type === "shift") {
     // Solo usar valores explícitos del assignment
     const start = assignment.startTime
@@ -98,13 +98,34 @@ export function getShiftDisplayTime(
     
     // CRÍTICO: Solo mostrar "Horario incompleto" si realmente está incompleto
     // Los placeholders { type: "shift", shiftId } sin horarios NO son incompletos
-    // Son válidos pero pendientes de hidratar
     if (isAssignmentIncomplete(assignment)) {
       return ["Horario incompleto"]
     }
     
-    // Si es un placeholder válido, no mostrar nada (o mostrar el nombre del turno si está disponible)
-    // Por ahora, retornar array vacío para que no se muestre nada
+    // FALLBACK DE DISPLAY: Si es un placeholder válido sin horarios, usar turno base SOLO para mostrar
+    // Esto NO modifica el assignment, NO valida, NO normaliza
+    // Es solo para que la UI muestre algo útil mientras el assignment está pendiente de hidratar
+    if (assignment.shiftId && shift) {
+      const shiftStart = shift.startTime
+      const shiftEnd = shift.endTime
+      const shiftStart2 = shift.startTime2
+      const shiftEnd2 = shift.endTime2
+
+      // Turno cortado: mostrar ambas franjas del turno base
+      if (shiftStart && shiftEnd && shiftStart2 && shiftEnd2) {
+        return [
+          formatTimeRange(shiftStart, shiftEnd),
+          formatTimeRange(shiftStart2, shiftEnd2)
+        ]
+      }
+
+      // Turno simple: mostrar primera franja del turno base
+      if (shiftStart && shiftEnd) {
+        return [formatTimeRange(shiftStart, shiftEnd)]
+      }
+    }
+    
+    // Si no hay turno base o no tiene horarios, no mostrar nada
     return []
   }
 
