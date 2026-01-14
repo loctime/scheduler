@@ -5,7 +5,9 @@ import { useSearchParams } from "next/navigation"
 import { collection, query, orderBy, onSnapshot, where, doc } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { Card, CardContent } from "@/components/ui/card"
-import { Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Loader2, Smartphone } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { Horario, Empleado, Turno, Configuracion } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { format, parseISO, addDays } from "date-fns"
@@ -61,6 +63,7 @@ const defaultConfig: Configuracion = {
 
 function HorariosMensualesContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const userId = searchParams.get("userId")
   
   const [schedules, setSchedules] = useState<Horario[]>([])
@@ -70,6 +73,11 @@ function HorariosMensualesContent() {
   const { toast } = useToast()
   const { exporting, exportImage, exportPDF, exportExcel } = useExportSchedule()
   const [config, setConfig] = useState<Configuracion>(defaultConfig)
+
+  const handleInstallPWA = () => {
+    if (!userId) return
+    router.push(`/pwa/horario?ownerId=${userId}`)
+  }
 
   // Cargar configuración del usuario
   useEffect(() => {
@@ -410,15 +418,29 @@ function HorariosMensualesContent() {
         <div className="container mx-auto py-8 px-4">
           <div className="space-y-4 sm:space-y-6">
             <div>
-              {config?.nombreEmpresa && (
-                <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground mb-1">
-                  {config.nombreEmpresa}
-                </h1>
-              )}
-              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">Horarios Mensuales</h2>
-              <p className="text-sm sm:text-base text-muted-foreground">
-                Vista jerárquica de todos los horarios organizados por mes y semana
-              </p>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
+                <div>
+                  {config?.nombreEmpresa && (
+                    <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground mb-1">
+                      {config.nombreEmpresa}
+                    </h1>
+                  )}
+                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">Horarios Mensuales</h2>
+                  <p className="text-sm sm:text-base text-muted-foreground">
+                    Vista jerárquica de todos los horarios organizados por mes y semana
+                  </p>
+                </div>
+                {userId && (
+                  <Button
+                    onClick={handleInstallPWA}
+                    className="gap-2 shrink-0"
+                    variant="outline"
+                  >
+                    <Smartphone className="h-4 w-4" />
+                    <span className="text-sm sm:text-base">Agregar horario al celular</span>
+                  </Button>
+                )}
+              </div>
             </div>
 
             {loading ? (
