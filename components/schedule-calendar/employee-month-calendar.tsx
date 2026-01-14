@@ -9,7 +9,7 @@ import { es } from "date-fns/locale"
 import type { Empleado, Turno, Horario, MedioTurno, ShiftAssignmentValue, ShiftAssignment } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { getShiftDisplayTime } from "@/components/schedule-grid/utils/shift-display-utils"
-import { normalizeAssignmentFromShift } from "@/lib/assignment-utils"
+import { normalizeAssignmentFromShift, isAssignmentIncomplete } from "@/lib/assignment-utils"
 
 interface EmployeeMonthCalendarProps {
   selectedEmployeeId: string
@@ -282,12 +282,13 @@ export function EmployeeMonthCalendar({
                             const shift = getShiftInfo(assignment.shiftId)
                             const displayTimeLines = getShiftDisplayTime(assignment.shiftId, shift, assignment)
                             
-                            // Si hay horarios, mostrarlos; si no, mostrar "Horario incompleto"
+                            // CRÍTICO: Solo mostrar "Horario incompleto" si realmente está incompleto
+                            // Los placeholders { type: "shift", shiftId } sin horarios NO son incompletos
                             const displayText = displayTimeLines.length > 0 && displayTimeLines[0] 
                               ? (displayTimeLines.length === 2 
                                   ? `${displayTimeLines[0]} / ${displayTimeLines[1]}` 
                                   : displayTimeLines[0])
-                              : "Horario incompleto"
+                              : (isAssignmentIncomplete(assignment) ? "Horario incompleto" : "")
                             
                             return (
                               <div

@@ -1,4 +1,5 @@
 import { ShiftAssignment, Turno } from "@/lib/types"
+import { isAssignmentIncomplete } from "@/lib/assignment-utils"
 
 /**
  * Formatea una hora omitiendo :00 si los minutos son 0
@@ -95,14 +96,21 @@ export function getShiftDisplayTime(
       return [formatTimeRange(start2, end2)]
     }
     
-    // CONTRATO v1.0: Si falta horario, mostrar "Horario incompleto"
-    // Nunca mostrar shift.name ni leer horarios desde Turno
-    return ["Horario incompleto"]
+    // CRÍTICO: Solo mostrar "Horario incompleto" si realmente está incompleto
+    // Los placeholders { type: "shift", shiftId } sin horarios NO son incompletos
+    // Son válidos pero pendientes de hidratar
+    if (isAssignmentIncomplete(assignment)) {
+      return ["Horario incompleto"]
+    }
+    
+    // Si es un placeholder válido, no mostrar nada (o mostrar el nombre del turno si está disponible)
+    // Por ahora, retornar array vacío para que no se muestre nada
+    return []
   }
 
   // Si NO hay assignment, no hay nada que mostrar
   // (esto no debería ocurrir en el flujo normal, pero por seguridad)
-  return ["Horario incompleto"]
+  return []
 }
 
 /**

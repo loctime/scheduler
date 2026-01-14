@@ -62,6 +62,21 @@ function validateShiftAssignment(assignment: ShiftAssignment): ValidationResult 
     errors.push("Un turno debe tener shiftId")
   }
 
+  // CRÍTICO: Guard clause para placeholders pendientes de hidratar
+  // Un assignment { type: "shift", shiftId } sin horarios NO debe validarse
+  // Estos son placeholders creados por normalizeAssignments() desde string[]
+  // NO son incompletos, NO son inválidos, simplemente NO deben validarse
+  if (
+    assignment.type === "shift" &&
+    assignment.shiftId &&
+    !assignment.startTime &&
+    !assignment.endTime &&
+    !assignment.startTime2 &&
+    !assignment.endTime2
+  ) {
+    return { valid: true, errors: [] } // placeholder, no validar
+  }
+
   if (!assignment.startTime || !assignment.endTime) {
     errors.push("Un turno simple debe tener startTime y endTime")
     return { valid: false, errors }

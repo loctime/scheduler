@@ -34,18 +34,28 @@ export function isAssignmentIncomplete(assignment: ShiftAssignment): boolean {
         return true
       }
       
-      // CONTRATO v1.0: Un assignment parcial es válido si tiene al menos una franja completa
-      // Esto permite assignments con solo primera franja O solo segunda franja
-      // (casos válidos: licencia divide turno cortado, extras, etc.)
+      // CONTRATO v1.0: La validación se basa EXCLUSIVAMENTE en el assignment real
+      // NO se compara con el turno base
+      // Un horario simple es válido con solo startTime y endTime
       const hasFirstSegment = assignment.startTime && assignment.endTime
       const hasSecondSegment = assignment.startTime2 && assignment.endTime2
       
-      // Debe tener al menos una franja completa
+      // CRÍTICO: Un assignment { type: "shift", shiftId } sin horarios NO es incompleto
+      // Es un "placeholder pendiente de hidratar" (normalizado desde string[])
+      // No debe marcarse como error, sino como válido pero sin expandir
       if (!hasFirstSegment && !hasSecondSegment) {
-        return true
+        // Si tiene shiftId pero no horarios, es un placeholder válido (no incompleto)
+        // Estos se crean cuando normalizeAssignments() convierte string[] a ShiftAssignment[]
+        // Ya sabemos que shiftId existe porque pasamos la verificación anterior
+        logger.debug("[Assignment] Placeholder sin hidratar detectado", {
+          shiftId: assignment.shiftId,
+          type: assignment.type
+        })
+        return false // No es incompleto, solo pendiente de hidratar
       }
       
       // Si tiene alguna parte de la segunda franja, debe tener ambas partes
+      // (pero la segunda franja NO es obligatoria si no existe)
       const hasPartialSecond = 
         (assignment.startTime2 !== undefined && assignment.endTime2 === undefined) ||
         (assignment.startTime2 === undefined && assignment.endTime2 !== undefined)
@@ -54,6 +64,9 @@ export function isAssignmentIncomplete(assignment: ShiftAssignment): boolean {
         return true
       }
       
+      // Un assignment con solo primera franja es válido (turno simple)
+      // Un assignment con ambas franjas es válido (turno cortado)
+      // La validación NO debe exigir la segunda franja si no existe en el assignment
       return false
 
     case "medio_franco":
@@ -128,8 +141,16 @@ export function detectIncompleteAssignments(schedule: Horario): IncompleteAssign
  * Obtiene razón legible de por qué un assignment está incompleto
  * 
  * EXPORTADO para uso en UI y logging
+ * 
+ * GUARD DEFENSIVO: Si el assignment NO está incompleto, retornar ""
+ * Esto previene falsos positivos cuando se usa sin validar primero isAssignmentIncomplete()
  */
 export function getIncompletenessReason(assignment: ShiftAssignment): string {
+  // Guard defensivo: si no está incompleto, retornar ""
+  if (!isAssignmentIncomplete(assignment)) {
+    return ""
+  }
+
   if (!assignment.type) {
     return "Falta el tipo de assignment"
   }
@@ -148,7 +169,7 @@ export function getIncompletenessReason(assignment: ShiftAssignment): string {
         (assignment.startTime2 !== undefined && assignment.endTime2 === undefined) ||
         (assignment.startTime2 === undefined && assignment.endTime2 !== undefined)
       if (hasPartialSecond) {
-        return "Turno cortado incompleto: falta startTime2 o endTime2"
+        return "Segunda franja incompleta: falta startTime2 o endTime2"
       }
       return "Assignment incompleto"
 
