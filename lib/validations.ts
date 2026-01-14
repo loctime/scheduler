@@ -192,45 +192,29 @@ export function calculateDailyHours(
         return
       }
       
-      // Turno normal
-      if (assignment.shiftId) {
-        const shift = shiftMap.get(assignment.shiftId)
-        if (shift) {
-          // Usar horarios ajustados si existen, sino usar los del turno base
-          // Esto permite que las horas extras (30 min antes/después) se calculen correctamente
-          const tempShift: any = { ...shift }
-          
-          // CRÍTICO: Usar los valores ajustados del assignment si existen y son válidos
-          // Verificar si el assignment tiene valores ajustados
-          // Si el campo tiene un valor string válido, usarlo (indica que fue ajustado)
-          
-          // Para startTime: si tiene un valor válido, usarlo
-          if (assignment.startTime && typeof assignment.startTime === 'string' && assignment.startTime.trim() !== '') {
-            tempShift.startTime = assignment.startTime
-          }
-          
-          // Para endTime: si tiene un valor válido, usarlo (CRÍTICO para horas extras después)
-          // Esto es lo más importante: si endTime tiene un valor, DEBE usarse para el cálculo
-          // Verificar explícitamente si el campo existe y tiene valor
-          // IMPORTANTE: Si assignment.endTime existe (incluso si es igual al turno base), usarlo
-          // porque podría haber sido ajustado y luego restaurado, pero aún así debe usarse
-          if (assignment.endTime !== undefined && assignment.endTime !== null) {
-            const endTimeStr = String(assignment.endTime).trim()
-            if (endTimeStr !== '') {
-              tempShift.endTime = endTimeStr
-            }
-          }
-          
-          if (assignment.startTime2 && typeof assignment.startTime2 === 'string' && assignment.startTime2.trim() !== '') {
-            tempShift.startTime2 = assignment.startTime2
-          }
-          
-          if (assignment.endTime2 && typeof assignment.endTime2 === 'string' && assignment.endTime2.trim() !== '') {
-            tempShift.endTime2 = assignment.endTime2
-          }
-          
-          totalHours += calculateShiftHours(tempShift, minutosDescanso, horasMinimasParaDescanso)
+      // Turno normal - usar SOLO valores explícitos del assignment (autosuficiencia)
+      if (assignment.shiftId && assignment.type === "shift") {
+        // El assignment debe tener startTime y endTime explícitos
+        // Si no los tiene, está incompleto y no podemos calcular horas
+        if (!assignment.startTime || !assignment.endTime) {
+          // Assignment incompleto - no calcular horas basándose en turno base
+          // Esto fuerza a completar el assignment antes de calcular
+          return // Saltar este assignment incompleto
         }
+        
+        // Crear un turno temporal solo con los valores explícitos del assignment
+        const tempShift: any = {
+          startTime: assignment.startTime,
+          endTime: assignment.endTime,
+        }
+        
+        // Si tiene segunda franja explícita, incluirla
+        if (assignment.startTime2 && assignment.endTime2) {
+          tempShift.startTime2 = assignment.startTime2
+          tempShift.endTime2 = assignment.endTime2
+        }
+        
+        totalHours += calculateShiftHours(tempShift, minutosDescanso, horasMinimasParaDescanso)
       }
     })
     return totalHours
@@ -258,12 +242,12 @@ export function calculateHoursBreakdown(
   horasMinimasParaDescanso: number = 6
 ): {
   trabajo: number
-  licencia_embarazo: number
+  licencia: number
   medio_franco: number
 } {
   const shiftMap = new Map(shifts.map((s) => [s.id, s]))
   let horasTrabajo = 0
-  let horasLicenciaEmbarazo = 0
+  let horasLicencia = 0
   let horasMedioFranco = 0
 
   // Si es array de ShiftAssignment
@@ -288,52 +272,46 @@ export function calculateHoursBreakdown(
         return
       }
 
-      // Calcular horas de licencia embarazo
-      if (assignment.type === "licencia_embarazo") {
+      // Calcular horas de licencia
+      if (assignment.type === "licencia") {
         if (assignment.startTime && assignment.endTime) {
           const [hStart, mStart] = assignment.startTime.split(":").map(Number)
           const [hEnd, mEnd] = assignment.endTime.split(":").map(Number)
           const start = hStart * 60 + mStart
           const end = hEnd * 60 + mEnd
           const totalMinutes = end - start
-          horasLicenciaEmbarazo += totalMinutes / 60
+          horasLicencia += totalMinutes / 60
         }
         return
       }
       
-      // Turno normal (trabajo)
-      if (assignment.shiftId) {
-        const shift = shiftMap.get(assignment.shiftId)
-        if (shift) {
-          // Usar horarios ajustados si existen, sino usar los del turno base
-          const tempShift: any = { ...shift }
-          
-          if (assignment.startTime && typeof assignment.startTime === 'string' && assignment.startTime.trim() !== '') {
-            tempShift.startTime = assignment.startTime
-          }
-          
-          if (assignment.endTime !== undefined && assignment.endTime !== null) {
-            const endTimeStr = String(assignment.endTime).trim()
-            if (endTimeStr !== '') {
-              tempShift.endTime = endTimeStr
-            }
-          }
-          
-          if (assignment.startTime2 && typeof assignment.startTime2 === 'string' && assignment.startTime2.trim() !== '') {
-            tempShift.startTime2 = assignment.startTime2
-          }
-          
-          if (assignment.endTime2 && typeof assignment.endTime2 === 'string' && assignment.endTime2.trim() !== '') {
-            tempShift.endTime2 = assignment.endTime2
-          }
-          
-          horasTrabajo += calculateShiftHours(tempShift, minutosDescanso, horasMinimasParaDescanso)
+      // Turno normal (trabajo) - usar SOLO valores explícitos del assignment (autosuficiencia)
+      if (assignment.shiftId && assignment.type === "shift") {
+        // El assignment debe tener startTime y endTime explícitos
+        // Si no los tiene, está incompleto y no podemos calcular horas
+        if (!assignment.startTime || !assignment.endTime) {
+          // Assignment incompleto - no calcular horas basándose en turno base
+          return // Saltar este assignment incompleto
         }
+        
+        // Crear un turno temporal solo con los valores explícitos del assignment
+        const tempShift: any = {
+          startTime: assignment.startTime,
+          endTime: assignment.endTime,
+        }
+        
+        // Si tiene segunda franja explícita, incluirla
+        if (assignment.startTime2 && assignment.endTime2) {
+          tempShift.startTime2 = assignment.startTime2
+          tempShift.endTime2 = assignment.endTime2
+        }
+        
+        horasTrabajo += calculateShiftHours(tempShift, minutosDescanso, horasMinimasParaDescanso)
       }
     })
     return {
       trabajo: horasTrabajo,
-      licencia_embarazo: horasLicenciaEmbarazo,
+      licencia: horasLicencia,
       medio_franco: horasMedioFranco
     }
   }
@@ -348,7 +326,7 @@ export function calculateHoursBreakdown(
 
   return {
     trabajo: horasTrabajo,
-    licencia_embarazo: 0,
+      licencia: 0,
     medio_franco: 0
   }
 }

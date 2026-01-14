@@ -27,6 +27,9 @@ import { CellAssignments } from "./cell-assignments"
 import { QuickShiftSelector } from "./quick-shift-selector"
 import { getDay, parseISO } from "date-fns"
 import type { PatternSuggestion } from "@/lib/pattern-learning"
+import { validateCellAssignments } from "@/lib/assignment-validators"
+import { useToast } from "@/hooks/use-toast"
+import { isAssignmentIncomplete, getIncompletenessReason } from "@/lib/assignment-utils"
 
 interface ScheduleCellProps {
   date: string
@@ -42,7 +45,7 @@ interface ScheduleCellProps {
   cellKey: string
   hasExtraBefore: boolean
   hasExtraAfter: boolean
-  onToggleExtra: (type: "before" | "after") => void
+  onToggleExtra: (type: "before" | "after", segment?: "first" | "second") => void
   onExtraMenuOpenChange: (open: boolean) => void
   quickShifts: Turno[]
   mediosTurnos?: MedioTurno[]
@@ -63,6 +66,7 @@ interface ScheduleCellProps {
   onToggleFixed?: (date: string, employeeId: string, dayOfWeek: number) => void
   suggestion?: PatternSuggestion | null
   config?: Configuracion | null
+  hasIncompleteAssignments?: boolean
 }
 
 export function ScheduleCell({
@@ -95,6 +99,7 @@ export function ScheduleCell({
   onToggleFixed,
   suggestion,
   config,
+  hasIncompleteAssignments = false,
 }: ScheduleCellProps) {
   const [notaDialogOpen, setNotaDialogOpen] = useState(false)
   const [notaTexto, setNotaTexto] = useState("")
@@ -106,12 +111,17 @@ export function ScheduleCell({
   const [licenciaEmbarazoDialogOpen, setLicenciaEmbarazoDialogOpen] = useState(false)
   const [licenciaStartTime, setLicenciaStartTime] = useState("")
   const [licenciaEndTime, setLicenciaEndTime] = useState("")
-  const [selectedShiftForLicencia, setSelectedShiftForLicencia] = useState<{ assignment: ShiftAssignment; shift: Turno } | null>(null)
+  const [selectedShiftForLicencia, setSelectedShiftForLicencia] = useState<{ assignment: ShiftAssignment; shift?: Turno } | null>(null)
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null)
   const [editarHorarioDialogOpen, setEditarHorarioDialogOpen] = useState(false)
-  const [selectedShiftForEdit, setSelectedShiftForEdit] = useState<{ assignment: ShiftAssignment; shift: Turno } | null>(null)
+  const [selectedShiftForEdit, setSelectedShiftForEdit] = useState<{ assignment: ShiftAssignment; shift?: Turno; assignmentIndex: number } | null>(null)
   const [editStartTime, setEditStartTime] = useState("")
   const [editEndTime, setEditEndTime] = useState("")
+  const [editStartTime2, setEditStartTime2] = useState("")
+  const [editEndTime2, setEditEndTime2] = useState("")
+  const [hasSecondSegment, setHasSecondSegment] = useState(false)
+  
+  const { toast } = useToast()
   
   const hasBackgroundStyle = !!backgroundStyle
   const dayOfWeek = getDay(parseISO(date))
@@ -123,6 +133,8 @@ export function ScheduleCell({
     ? "hover:bg-muted/50"
     : ""
   const selectedClass = hasBackgroundStyle ? "ring-2 ring-primary/30" : isSelected ? "bg-primary/10" : ""
+  const incompleteClass = hasIncompleteAssignments ? "ring-2 ring-destructive/50 opacity-75" : ""
+  const incompleteIndicator = hasIncompleteAssignments ? "relative" : ""
 
   // Verificar si ya hay una nota en esta celda
   const existingNota = assignments.find((a) => a.type === "nota")
@@ -133,23 +145,44 @@ export function ScheduleCell({
   )
 
   // Encontrar el primer turno asignado para edición
+  // Obtener el primer assignment de turno (shift) para edición
+  // CRÍTICO: Permitir assignments con shiftId huérfano (turno base eliminado)
   const firstShiftAssignment = React.useMemo(() => {
     const shiftAssignment = assignments.find((a) => a.type === "shift" && a.shiftId)
     if (!shiftAssignment || !shiftAssignment.shiftId) return null
     const shift = getShiftInfo(shiftAssignment.shiftId)
-    if (!shift) return null
-    return { assignment: shiftAssignment, shift }
+    // Permitir edición incluso si el turno base no existe (shift undefined)
+    // El assignment es autosuficiente y puede editarse con sus propios datos
+    return { assignment: shiftAssignment, shift: shift || undefined }
   }, [assignments, getShiftInfo])
+  
+  // Detectar si el turno base está huérfano (eliminado)
+  const isOrphanShift = React.useMemo(() => {
+    if (!firstShiftAssignment) return false
+    return firstShiftAssignment.assignment.shiftId && !firstShiftAssignment.shift
+  }, [firstShiftAssignment])
+
+  // Detectar si es turno cortado (tiene segunda franja explícita)
+  const isTurnoCortado = React.useMemo(() => {
+    if (!firstShiftAssignment) return false
+    return !!(firstShiftAssignment.assignment.startTime2 && firstShiftAssignment.assignment.endTime2)
+  }, [firstShiftAssignment])
 
   // Encontrar turnos (shifts) y medios francos disponibles para asignar licencia
+  // CRÍTICO: Permitir turnos huérfanos (shift puede ser undefined)
   const availableShifts = React.useMemo(() => {
     const shifts = assignments
       .filter((a) => a.type === "shift" && a.shiftId)
       .map((a) => {
         const shift = getShiftInfo(a.shiftId!)
-        return shift ? { assignment: a, shift } : null
+        // Permitir assignments con turno base eliminado (shift undefined)
+        // Solo incluir si el assignment tiene datos suficientes (startTime/endTime)
+        if (!shift && (!a.startTime || !a.endTime)) {
+          return null // Assignment incompleto sin turno base - no puede usarse para licencia
+        }
+        return { assignment: a, shift: shift || undefined }
       })
-      .filter((item): item is { assignment: ShiftAssignment; shift: Turno } => item !== null)
+      .filter((item): item is { assignment: ShiftAssignment; shift: Turno | undefined } => item !== null)
     
     // Agregar medios francos que tengan horario (startTime/endTime)
     const mediosFrancos = assignments
@@ -351,10 +384,20 @@ export function ScheduleCell({
     return timeMinutes >= rangeStartMinutes && timeMinutes <= rangeEndMinutes
   }
 
-  const handleOpenLicenciaEmbarazoDialog = (shiftAssignment: ShiftAssignment, shift: Turno) => {
+  const handleOpenLicenciaEmbarazoDialog = (shiftAssignment: ShiftAssignment, shift?: Turno) => {
     // Si es medio_franco con horario completo, asignar licencia directamente sin abrir diálogo
     if (shiftAssignment.type === "medio_franco" && shiftAssignment.startTime && shiftAssignment.endTime && !shiftAssignment.startTime2) {
       handleAssignLicenciaToMedioFranco(shiftAssignment)
+      return
+    }
+    
+    // CRÍTICO: Validar que el assignment tenga datos suficientes si el turno base no existe
+    if (!shift && (!shiftAssignment.startTime || !shiftAssignment.endTime)) {
+      toast({
+        title: "Error",
+        description: "El assignment está incompleto y el turno base fue eliminado. No se puede asignar licencia.",
+        variant: "destructive",
+      })
       return
     }
     
@@ -370,7 +413,8 @@ export function ScheduleCell({
     if (!onAssignmentUpdate || !medioFrancoAssignment.startTime || !medioFrancoAssignment.endTime) return
 
     const licenciaAssignment: ShiftAssignment = {
-      type: "licencia_embarazo",
+      type: "licencia",
+      licenciaType: "embarazo",
       startTime: medioFrancoAssignment.startTime,
       endTime: medioFrancoAssignment.endTime,
     }
@@ -391,10 +435,10 @@ export function ScheduleCell({
     const maxWorkMinutes = MAX_WORK_HOURS * 60
 
     // Obtener horarios del turno (considerando ajustes del assignment)
-    const shiftStartTime = assignment.startTime || shift.startTime || ""
-    const shiftEndTime = assignment.endTime || shift.endTime || ""
-    const shiftStartTime2 = assignment.startTime2 || shift.startTime2
-    const shiftEndTime2 = assignment.endTime2 || shift.endTime2
+    const shiftStartTime = assignment.startTime || shift?.startTime || ""
+    const shiftEndTime = assignment.endTime || shift?.endTime || ""
+    const shiftStartTime2 = assignment.startTime2 || shift?.startTime2
+    const shiftEndTime2 = assignment.endTime2 || shift?.endTime2
 
     if (!shiftStartTime || !shiftEndTime) return []
 
@@ -584,17 +628,38 @@ export function ScheduleCell({
 
   const handleOpenEditarHorarioDialog = () => {
     if (!firstShiftAssignment) {
-      // Si no hay turno asignado, usar el comportamiento actual (abrir selector)
-      onCellClick(date, employeeId)
+      // Si no hay turno asignado, no hacer nada (no crear turnos)
+      return
+    }
+    
+    // Encontrar el índice del assignment en el array para referencia directa
+    const assignmentIndex = assignments.findIndex(
+      (a) => a.type === "shift" && 
+             a.shiftId === firstShiftAssignment.assignment.shiftId &&
+             a.startTime === firstShiftAssignment.assignment.startTime &&
+             a.endTime === firstShiftAssignment.assignment.endTime &&
+             a.startTime2 === firstShiftAssignment.assignment.startTime2 &&
+             a.endTime2 === firstShiftAssignment.assignment.endTime2
+    )
+    
+    if (assignmentIndex === -1) {
+      // No se encontró el assignment, no hacer nada
       return
     }
     
     const { assignment, shift } = firstShiftAssignment
-    setSelectedShiftForEdit({ assignment, shift })
+    setSelectedShiftForEdit({ assignment, shift, assignmentIndex })
     
-    // Precargar los horarios actuales (del assignment o del turno base)
-    setEditStartTime(assignment.startTime || shift.startTime || "")
-    setEditEndTime(assignment.endTime || shift.endTime || "")
+    // Precargar los horarios actuales SOLO del assignment (autosuficiencia)
+    // NO usar el turno base como fallback
+    setEditStartTime(assignment.startTime || "")
+    setEditEndTime(assignment.endTime || "")
+    
+    // Cargar segunda franja si existe explícitamente en el assignment
+    const hasSecond = !!(assignment.startTime2 && assignment.endTime2)
+    setHasSecondSegment(hasSecond)
+    setEditStartTime2(assignment.startTime2 || "")
+    setEditEndTime2(assignment.endTime2 || "")
     
     setEditarHorarioDialogOpen(true)
   }
@@ -609,41 +674,72 @@ export function ScheduleCell({
       return // Validación básica
     }
 
-    const { assignment } = selectedShiftForEdit
+    const { assignment, assignmentIndex } = selectedShiftForEdit
     
-    // Actualizar el assignment existente manteniendo shiftId y otros campos
-    // Actualizar el primer assignment que coincida con el shiftId (normalmente solo hay uno)
-    const updatedAssignments = assignments.map((a) => {
-      // Buscar el assignment exacto (por shiftId y tipo)
-      // Comparar también por startTime/endTime para identificar el assignment específico
-      if (a.type === "shift" && a.shiftId === assignment.shiftId) {
-        // Verificar si es el mismo assignment comparando campos clave
-        const isSameAssignment = 
-          a.startTime === assignment.startTime &&
-          a.endTime === assignment.endTime &&
-          a.startTime2 === assignment.startTime2 &&
-          a.endTime2 === assignment.endTime2
-        
-        // Actualizar solo si es el mismo assignment o si solo hay uno con este shiftId
-        if (isSameAssignment) {
-          // Mantener todos los campos existentes y actualizar solo startTime/endTime
-          return {
-            ...a,
-            startTime: trimmedStartTime,
-            endTime: trimmedEndTime,
-            // Mantener startTime2 y endTime2 si existen (para turnos cortados)
-          }
+    // Validar que el índice sea válido
+    if (assignmentIndex === -1 || assignmentIndex >= assignments.length) {
+      toast({
+        title: "Error",
+        description: "No se pudo encontrar el assignment a editar.",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    // Actualizar el assignment existente usando el índice directo
+    // Mantener shiftId, empleado y día (no modificar estos campos)
+    const updatedAssignments = assignments.map((a, index) => {
+      // Editar exactamente el assignment seleccionado usando el índice
+      if (index === assignmentIndex) {
+        // CRÍTICO: Preservar explícitamente shiftId y otros campos, solo modificar horarios
+        const updated: ShiftAssignment = {
+          ...a,
+          startTime: trimmedStartTime,
+          endTime: trimmedEndTime,
         }
+        
+        // Si hay segunda franja en el diálogo, incluirla explícitamente
+        if (hasSecondSegment && editStartTime2.trim() && editEndTime2.trim()) {
+          updated.startTime2 = editStartTime2.trim()
+          updated.endTime2 = editEndTime2.trim()
+        } else {
+          // Si no hay segunda franja, eliminar explícitamente (convertir a turno simple)
+          delete updated.startTime2
+          delete updated.endTime2
+        }
+        
+        return updated
       }
       return a
     })
+
+    // Validar assignments de la celda antes de guardar (validación global)
+    const validationResult = validateCellAssignments(updatedAssignments)
+    if (!validationResult.valid) {
+      toast({
+        title: "Error de validación",
+        description: validationResult.errors.join(". "),
+        variant: "destructive",
+      })
+      return
+    }
 
     onAssignmentUpdate(date, employeeId, updatedAssignments, { scheduleId })
 
     setEditarHorarioDialogOpen(false)
     setEditStartTime("")
     setEditEndTime("")
+    setEditStartTime2("")
+    setEditEndTime2("")
+    setHasSecondSegment(false)
     setSelectedShiftForEdit(null)
+  }
+
+  const handleConvertToSimpleShift = () => {
+    // Convertir turno cortado a simple eliminando segunda franja
+    setHasSecondSegment(false)
+    setEditStartTime2("")
+    setEditEndTime2("")
   }
 
   const handleSaveLicenciaEmbarazo = () => {
@@ -661,11 +757,21 @@ export function ScheduleCell({
     // Verificar si es medio_franco
     const isMedioFranco = shiftAssignment.type === "medio_franco"
 
-    // Obtener el horario base del turno (considerando ajustes)
-    const shiftStartTime = shiftAssignment.startTime || shift.startTime || ""
-    const shiftEndTime = shiftAssignment.endTime || shift.endTime || ""
-    const shiftStartTime2 = shiftAssignment.startTime2 || shift.startTime2
-    const shiftEndTime2 = shiftAssignment.endTime2 || shift.endTime2
+    // CRÍTICO: Usar SOLO valores explícitos del assignment (autosuficiencia)
+    // No usar turno base como fallback - el assignment debe tener todos los datos necesarios
+    if (!shiftAssignment.startTime || !shiftAssignment.endTime) {
+      toast({
+        title: "Error",
+        description: "El assignment está incompleto. No se puede dividir.",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    const shiftStartTime = shiftAssignment.startTime
+    const shiftEndTime = shiftAssignment.endTime
+    const shiftStartTime2 = shiftAssignment.startTime2 // Puede ser undefined si es turno simple
+    const shiftEndTime2 = shiftAssignment.endTime2 // Puede ser undefined si es turno simple
 
     // Validar duración de licencia (considerando cruce de medianoche)
     const licenciaDuration = calculateDuration(trimmedStartTime, trimmedEndTime)
@@ -793,7 +899,8 @@ export function ScheduleCell({
 
         // Siempre agregar la licencia
         newAssignments.push({
-          type: "licencia_embarazo",
+          type: "licencia",
+          licenciaType: "embarazo",
           startTime: trimmedStartTime,
           endTime: trimmedEndTime,
         })
@@ -852,7 +959,8 @@ export function ScheduleCell({
 
         // Siempre agregar la licencia
         newAssignments.push({
-          type: "licencia_embarazo",
+          type: "licencia",
+          licenciaType: "embarazo",
           startTime: trimmedStartTime,
           endTime: trimmedEndTime,
         })
@@ -865,7 +973,8 @@ export function ScheduleCell({
         // Solo agregar licencia, no crear assignment de shift o medio_franco
         // (el medio_franco o shift original se eliminará en otherAssignments)
         newAssignments.push({
-          type: "licencia_embarazo",
+          type: "licencia",
+          licenciaType: "embarazo",
           startTime: trimmedStartTime,
           endTime: trimmedEndTime,
         })
@@ -894,7 +1003,8 @@ export function ScheduleCell({
 
         // Tramo de licencia
         newAssignments.push({
-          type: "licencia_embarazo",
+          type: "licencia",
+          licenciaType: "embarazo",
           startTime: trimmedStartTime,
           endTime: trimmedEndTime,
         })
@@ -943,7 +1053,7 @@ export function ScheduleCell({
 
     // Separar por tipo para ordenar correctamente
     const turnAssignments = newAssignments.filter((a) => a.type === "shift" || a.type === "medio_franco")
-    const licenciaAssignments = newAssignments.filter((a) => a.type === "licencia_embarazo")
+    const licenciaAssignments = newAssignments.filter((a) => a.type === "licencia")
     const otherTurnAssignments = otherAssignments.filter((a) => a.type === "shift" || a.type === "medio_franco")
     const otherSpecialAssignments = otherAssignments.filter((a) => a.type !== "shift" && a.type !== "medio_franco")
 
@@ -954,6 +1064,18 @@ export function ScheduleCell({
       ...licenciaAssignments,
       ...otherSpecialAssignments,
     ]
+
+    // CRÍTICO: Validar assignments de la celda antes de guardar (validación global)
+    // Esto previene solapamientos entre todos los tipos de assignments
+    const validationResult = validateCellAssignments(finalAssignments)
+    if (!validationResult.valid) {
+      toast({
+        title: "Error de validación",
+        description: validationResult.errors.join(". "),
+        variant: "destructive",
+      })
+      return
+    }
 
     onAssignmentUpdate(date, employeeId, finalAssignments, { scheduleId })
 
@@ -970,7 +1092,7 @@ export function ScheduleCell({
           <td
             className={`border-r-2 border-black px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 md:py-2 last:border-r-0 relative group ${
               isClickable ? `cursor-pointer transition-all ${hoverClass} active:brightness-90 touch-manipulation` : ""
-            } ${selectedClass} ${
+            } ${selectedClass} ${incompleteClass} ${
               isSelected && isClickable && onQuickAssignments ? "min-h-[140px] py-2 sm:py-2.5 md:py-3" : ""
             }`}
             style={backgroundStyle}
@@ -1010,6 +1132,17 @@ export function ScheduleCell({
                 <span className="text-xs font-semibold text-primary">{suggestionWeeks}</span>
               </div>
             )}
+            {/* Indicador de assignments incompletos */}
+            {hasIncompleteAssignments && (
+              <div
+                className="absolute top-1 right-1 z-10 flex items-center gap-1 bg-destructive/20 border border-destructive/40 rounded px-1.5 py-0.5"
+                title="Esta celda contiene assignments incompletos. Debe normalizarlos antes de editar."
+                aria-label="Assignments incompletos"
+              >
+                <Lock className="h-3 w-3 text-destructive" />
+                <span className="text-xs font-semibold text-destructive">!</span>
+              </div>
+            )}
         {showExtraActions && (
           <div className="absolute -top-1 right-1" onClick={(event) => event.stopPropagation()}>
             <DropdownMenu open={extraMenuOpenKey === cellKey} onOpenChange={onExtraMenuOpenChange}>
@@ -1018,29 +1151,89 @@ export function ScheduleCell({
                   +Extra
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44 text-xs">
-                <DropdownMenuItem
-                  onSelect={(event) => {
-                    event.preventDefault()
-                    onToggleExtra("before")
-                    onExtraMenuOpenChange(false)
-                  }}
-                  className="flex items-center gap-2 text-xs"
-                >
-                  <span className="flex-1">+30 min antes</span>
-                  {hasExtraBefore && <Check className="h-4 w-4 text-primary" />}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={(event) => {
-                    event.preventDefault()
-                    onToggleExtra("after")
-                    onExtraMenuOpenChange(false)
-                  }}
-                  className="flex items-center gap-2 text-xs"
-                >
-                  <span className="flex-1">+30 min después</span>
-                  {hasExtraAfter && <Check className="h-4 w-4 text-primary" />}
-                </DropdownMenuItem>
+              <DropdownMenuContent align="end" className="w-56 text-xs">
+                {isTurnoCortado ? (
+                  <>
+                    {/* Opciones para primera franja */}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                      Primera franja
+                    </div>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        onToggleExtra("before", "first")
+                        onExtraMenuOpenChange(false)
+                      }}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <span className="flex-1">+30 min antes (1ra)</span>
+                      {hasExtraBefore && <Check className="h-4 w-4 text-primary" />}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        onToggleExtra("after", "first")
+                        onExtraMenuOpenChange(false)
+                      }}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <span className="flex-1">+30 min después (1ra)</span>
+                      {hasExtraAfter && <Check className="h-4 w-4 text-primary" />}
+                    </DropdownMenuItem>
+                    {/* Separador */}
+                    <div className="my-1 border-t border-border" />
+                    {/* Opciones para segunda franja */}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                      Segunda franja
+                    </div>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        onToggleExtra("before", "second")
+                        onExtraMenuOpenChange(false)
+                      }}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <span className="flex-1">+30 min antes (2da)</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        onToggleExtra("after", "second")
+                        onExtraMenuOpenChange(false)
+                      }}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <span className="flex-1">+30 min después (2da)</span>
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
+                    {/* Opciones para turno simple */}
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        onToggleExtra("before", "first")
+                        onExtraMenuOpenChange(false)
+                      }}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <span className="flex-1">+30 min antes</span>
+                      {hasExtraBefore && <Check className="h-4 w-4 text-primary" />}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        onToggleExtra("after", "first")
+                        onExtraMenuOpenChange(false)
+                      }}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <span className="flex-1">+30 min después</span>
+                      {hasExtraAfter && <Check className="h-4 w-4 text-primary" />}
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -1096,10 +1289,19 @@ export function ScheduleCell({
         <ContextMenuContent>
           {!readonly && (
             <>
-              <ContextMenuItem onClick={handleOpenEditarHorarioDialog}>
-                {firstShiftAssignment ? "Editar horario" : "Editar turno"}
-              </ContextMenuItem>
-              <ContextMenuSeparator />
+              {/* FASE 11: Guard rails - Deshabilitar opciones de edición si hay incompletos */}
+              {/* Solo mostrar "Editar horario" si hay un assignment existente */}
+              {firstShiftAssignment && (
+                <ContextMenuItem 
+                  onClick={handleOpenEditarHorarioDialog}
+                  disabled={hasIncompleteAssignments}
+                  className={hasIncompleteAssignments ? "opacity-50 cursor-not-allowed" : ""}
+                >
+                  Editar horario
+                  {hasIncompleteAssignments && " (Bloqueado - Assignments incompletos)"}
+                </ContextMenuItem>
+              )}
+              {firstShiftAssignment && <ContextMenuSeparator />}
               <ContextMenuItem onClick={handleOpenNotaDialog}>
                 <FileText className="mr-2 h-4 w-4" />
                 {existingNota ? "Editar nota" : "Agregar nota"}
@@ -1132,7 +1334,7 @@ export function ScheduleCell({
                             key={index}
                             onClick={() => handleOpenLicenciaEmbarazoDialog(assignment, shift)}
                           >
-                            {shift.name || `Turno ${index + 1}`}
+                            {shift?.name || `Turno ${index + 1}`}
                           </DropdownMenuItem>
                         ))}
                       </DropdownMenuContent>
@@ -1304,16 +1506,16 @@ export function ScheduleCell({
                 <>
                   {selectedShiftForLicencia.assignment.type === "medio_franco" ? (
                     <>
-                      1/2 Franco: <strong>{selectedShiftForLicencia.shift.name}</strong>
+                      1/2 Franco: <strong>{selectedShiftForLicencia.shift?.name || "Medio Franco"}</strong>
                       <br />
                       <span className="text-xs">
                         {(() => {
                           const shift = selectedShiftForLicencia.shift
                           const assignment = selectedShiftForLicencia.assignment
-                          const startTime = assignment.startTime || shift.startTime || ""
-                          const endTime = assignment.endTime || shift.endTime || ""
-                          const startTime2 = assignment.startTime2 || shift.startTime2
-                          const endTime2 = assignment.endTime2 || shift.endTime2
+                          const startTime = assignment.startTime || shift?.startTime || ""
+                          const endTime = assignment.endTime || shift?.endTime || ""
+                          const startTime2 = assignment.startTime2 || shift?.startTime2
+                          const endTime2 = assignment.endTime2 || shift?.endTime2
                           
                           if (startTime2 && endTime2) {
                             return `Horario completo: ${startTime} - ${endTime} y ${startTime2} - ${endTime2}`
@@ -1328,16 +1530,27 @@ export function ScheduleCell({
                     </>
                   ) : (
                     <>
-                      Turno: <strong>{selectedShiftForLicencia.shift.name}</strong>
-                      <br />
+                      {selectedShiftForLicencia.shift ? (
+                        <>
+                          Turno: <strong>{selectedShiftForLicencia.shift.name}</strong>
+                          <br />
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-destructive font-semibold">⚠️ Advertencia: El turno base fue eliminado</span>
+                          <br />
+                        </>
+                      )}
                       <span className="text-xs">
                         {(() => {
                           const shift = selectedShiftForLicencia.shift
                           const assignment = selectedShiftForLicencia.assignment
-                          const startTime = assignment.startTime || shift.startTime || ""
-                          const endTime = assignment.endTime || shift.endTime || ""
-                          const startTime2 = assignment.startTime2 || shift.startTime2
-                          const endTime2 = assignment.endTime2 || shift.endTime2
+                          // CRÍTICO: Usar SOLO valores del assignment (autosuficiencia)
+                          // Si no hay turno base, solo usar assignment
+                          const startTime = assignment.startTime || (shift?.startTime || "")
+                          const endTime = assignment.endTime || (shift?.endTime || "")
+                          const startTime2 = assignment.startTime2 || shift?.startTime2
+                          const endTime2 = assignment.endTime2 || shift?.endTime2
                           
                           if (startTime2 && endTime2) {
                             return `Horario completo: ${startTime} - ${endTime} y ${startTime2} - ${endTime2}`
@@ -1431,8 +1644,8 @@ export function ScheduleCell({
                       setLicenciaStartTime(e.target.value)
                       setSelectedSuggestion(null) // Limpiar selección si se edita manualmente
                     }}
-                    min={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.startTime || selectedShiftForLicencia.shift.startTime || "") : undefined}
-                    max={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.endTime || selectedShiftForLicencia.shift.endTime || "") : undefined}
+                    min={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.startTime || selectedShiftForLicencia.shift?.startTime || "") : undefined}
+                    max={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.endTime || selectedShiftForLicencia.shift?.endTime || "") : undefined}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -1445,8 +1658,8 @@ export function ScheduleCell({
                       setLicenciaEndTime(e.target.value)
                       setSelectedSuggestion(null) // Limpiar selección si se edita manualmente
                     }}
-                    min={licenciaStartTime || (selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.startTime || selectedShiftForLicencia.shift.startTime || "") : undefined)}
-                    max={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.endTime || selectedShiftForLicencia.shift.endTime || "") : undefined}
+                    min={licenciaStartTime || (selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.startTime || selectedShiftForLicencia.shift?.startTime || "") : undefined)}
+                    max={selectedShiftForLicencia ? (selectedShiftForLicencia.assignment.endTime || selectedShiftForLicencia.shift?.endTime || "") : undefined}
                   />
                 </div>
               </div>
@@ -1454,10 +1667,10 @@ export function ScheduleCell({
             {licenciaStartTime && licenciaEndTime && selectedShiftForLicencia && (() => {
               const shift = selectedShiftForLicencia.shift
               const assignment = selectedShiftForLicencia.assignment
-              const shiftStartTime = assignment.startTime || shift.startTime || ""
-              const shiftEndTime = assignment.endTime || shift.endTime || ""
-              const shiftStartTime2 = assignment.startTime2 || shift.startTime2
-              const shiftEndTime2 = assignment.endTime2 || shift.endTime2
+              const shiftStartTime = assignment.startTime || shift?.startTime || ""
+              const shiftEndTime = assignment.endTime || shift?.endTime || ""
+              const shiftStartTime2 = assignment.startTime2 || shift?.startTime2
+              const shiftEndTime2 = assignment.endTime2 || shift?.endTime2
 
               let isValid = false
               let errorMessage = ""
@@ -1510,10 +1723,10 @@ export function ScheduleCell({
                 if (!selectedShiftForLicencia || !licenciaStartTime || !licenciaEndTime) return true
                 const shift = selectedShiftForLicencia.shift
                 const assignment = selectedShiftForLicencia.assignment
-                const shiftStartTime = assignment.startTime || shift.startTime || ""
-                const shiftEndTime = assignment.endTime || shift.endTime || ""
-                const shiftStartTime2 = assignment.startTime2 || shift.startTime2
-                const shiftEndTime2 = assignment.endTime2 || shift.endTime2
+                const shiftStartTime = assignment.startTime || shift?.startTime || ""
+                const shiftEndTime = assignment.endTime || shift?.endTime || ""
+                const shiftStartTime2 = assignment.startTime2 || shift?.startTime2
+                const shiftEndTime2 = assignment.endTime2 || shift?.endTime2
 
                 // Validar duración
                 const licenciaDuration = calculateDuration(licenciaStartTime, licenciaEndTime)
@@ -1539,60 +1752,149 @@ export function ScheduleCell({
 
       {/* Diálogo para editar horario asignado */}
       <Dialog open={editarHorarioDialogOpen} onOpenChange={setEditarHorarioDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Editar horario</DialogTitle>
             <DialogDescription>
               {selectedShiftForEdit && (
                 <>
-                  Turno: <strong>{selectedShiftForEdit.shift.name}</strong>
-                  <br />
+                  {selectedShiftForEdit.shift ? (
+                    <>
+                      Turno: <strong>{selectedShiftForEdit.shift.name}</strong>
+                      <br />
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-destructive font-semibold">⚠️ Advertencia: El turno base fue eliminado</span>
+                      <br />
+                      <span className="text-xs text-muted-foreground">
+                        Puede editar el horario usando los datos del assignment. El shiftId se mantendrá pero el turno base ya no existe.
+                      </span>
+                      <br />
+                    </>
+                  )}
                   <span className="text-xs text-muted-foreground">
                     Modifique las horas de inicio y fin del horario asignado.
+                    {hasSecondSegment && " Puede editar ambas franjas independientemente."}
                   </span>
                 </>
               )}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="editStartTime">Hora de inicio</Label>
-              <Input
-                id="editStartTime"
-                type="time"
-                value={editStartTime}
-                onChange={(e) => setEditStartTime(e.target.value)}
-                required
-              />
+            {/* Primera franja */}
+            <div className="space-y-3">
+              <div className="text-sm font-medium">Primera franja</div>
+              <div className="grid gap-2">
+                <Label htmlFor="editStartTime">Hora de inicio</Label>
+                <Input
+                  id="editStartTime"
+                  type="time"
+                  value={editStartTime}
+                  onChange={(e) => setEditStartTime(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="editEndTime">Hora de fin</Label>
+                <Input
+                  id="editEndTime"
+                  type="time"
+                  value={editEndTime}
+                  onChange={(e) => setEditEndTime(e.target.value)}
+                  required
+                />
+              </div>
+              {editStartTime && editEndTime && (() => {
+                const duration = calculateDuration(editStartTime, editEndTime)
+                return (
+                  <div className="text-sm text-muted-foreground">
+                    Duración: {Math.floor(duration / 60)}h {duration % 60}min
+                  </div>
+                )
+              })()}
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="editEndTime">Hora de fin</Label>
-              <Input
-                id="editEndTime"
-                type="time"
-                value={editEndTime}
-                onChange={(e) => setEditEndTime(e.target.value)}
-                required
-              />
-            </div>
-            {editStartTime && editEndTime && (() => {
-              const start = timeToMinutes(editStartTime)
-              const end = timeToMinutes(editEndTime)
-              const duration = calculateDuration(editStartTime, editEndTime)
-              return (
-                <div className="text-sm text-muted-foreground">
-                  Duración: {Math.floor(duration / 60)}h {duration % 60}min
+
+            {/* Segunda franja (si existe o se puede agregar) */}
+            {hasSecondSegment && (
+              <div className="space-y-3 border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium">Segunda franja</div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleConvertToSimpleShift}
+                    className="text-xs text-destructive hover:text-destructive"
+                  >
+                    Convertir a turno simple
+                  </Button>
                 </div>
-              )
-            })()}
+                <div className="grid gap-2">
+                  <Label htmlFor="editStartTime2">Hora de inicio (segunda franja)</Label>
+                  <Input
+                    id="editStartTime2"
+                    type="time"
+                    value={editStartTime2}
+                    onChange={(e) => setEditStartTime2(e.target.value)}
+                    required={hasSecondSegment}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="editEndTime2">Hora de fin (segunda franja)</Label>
+                  <Input
+                    id="editEndTime2"
+                    type="time"
+                    value={editEndTime2}
+                    onChange={(e) => setEditEndTime2(e.target.value)}
+                    required={hasSecondSegment}
+                  />
+                </div>
+                {editStartTime2 && editEndTime2 && (() => {
+                  const duration = calculateDuration(editStartTime2, editEndTime2)
+                  return (
+                    <div className="text-sm text-muted-foreground">
+                      Duración: {Math.floor(duration / 60)}h {duration % 60}min
+                    </div>
+                  )
+                })()}
+              </div>
+            )}
+
+            {/* Botón para agregar segunda franja si no existe */}
+            {!hasSecondSegment && selectedShiftForEdit && (
+              <div className="border-t pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setHasSecondSegment(true)
+                    setEditStartTime2("")
+                    setEditEndTime2("")
+                  }}
+                  className="w-full"
+                >
+                  Agregar segunda franja (turno cortado)
+                </Button>
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditarHorarioDialogOpen(false)}>
+            <Button variant="outline" onClick={() => {
+              setEditarHorarioDialogOpen(false)
+              setEditStartTime("")
+              setEditEndTime("")
+              setEditStartTime2("")
+              setEditEndTime2("")
+              setHasSecondSegment(false)
+              setSelectedShiftForEdit(null)
+            }}>
               Cancelar
             </Button>
             <Button
               onClick={handleSaveEditarHorario}
-              disabled={!editStartTime || !editEndTime}
+              disabled={!editStartTime || !editEndTime || (hasSecondSegment && (!editStartTime2 || !editEndTime2))}
             >
               Guardar
             </Button>

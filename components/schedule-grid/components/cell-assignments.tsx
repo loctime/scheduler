@@ -22,7 +22,7 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
 
     const hasMedioFranco = assignments.some((a) => a.type === "medio_franco")
     const hasShifts = assignments.some((a) => a.type === "shift" && a.shiftId)
-    const hasLicencia = assignments.some((a) => a.type === "licencia_embarazo")
+    const hasLicencia = assignments.some((a) => a.type === "licencia")
 
     // Si hay licencia y turnos, ordenar por horario
     if (hasLicencia && hasShifts) {
@@ -132,7 +132,7 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
           }
         }
 
-        if (assignment.type === "licencia_embarazo") {
+        if (assignment.type === "licencia") {
           const displayTimeLines = getShiftDisplayTime("", undefined, assignment)
           const hasTime = assignment.startTime && assignment.endTime
           
@@ -187,38 +187,36 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
           )
         }
 
+        // CONTRATO v1.0: El turno base NO se usa para render
+        // Solo se obtiene para referencia, pero el display viene del assignment
         const shift = getShiftInfo(assignment.shiftId || "")
-        if (!shift) return null
 
         // Crear key única para cada assignment (puede haber múltiples segmentos del mismo turno)
         const uniqueKey = `${assignment.shiftId}-${idx}-${assignment.startTime || ''}-${assignment.endTime || ''}-${assignment.startTime2 || ''}-${assignment.endTime2 || ''}`
 
-        // Renderizar turnos normales (incluye turnos cortados) - solo texto, sin recuadros
+        // CONTRATO v1.0: Renderizar turnos usando SOLO datos del assignment
+        // getShiftDisplayTime ya maneja el caso de horario incompleto
         const displayTimeLines = getShiftDisplayTime(assignment.shiftId || "", shift, assignment)
 
-        if (!displayTimeLines || displayTimeLines.length === 0 || (displayTimeLines.length === 1 && !displayTimeLines[0])) {
-          // Sin horario, mostrar nombre del turno
-          return (
-            <span 
-              key={uniqueKey} 
-              className="block text-center text-xs sm:text-sm md:text-base font-semibold text-foreground mb-0.5"
-            >
-              {shift.name}
-            </span>
-          )
-        }
-
-        // Renderizar solo texto, sin recuadros - texto negro bien visible
+        // Renderizar horarios desde el assignment (puede incluir "Horario incompleto")
         return (
           <div key={uniqueKey} className="w-full space-y-0.5">
-            {displayTimeLines.map((line, lineIdx) => (
-              <span 
-                key={lineIdx} 
-                className="block text-center text-xs sm:text-sm md:text-base font-semibold text-foreground mb-0.5"
-              >
-                {line}
-              </span>
-            ))}
+            {displayTimeLines.map((line, lineIdx) => {
+              // Si es "Horario incompleto", usar estilo de advertencia
+              const isIncomplete = line === "Horario incompleto"
+              return (
+                <span 
+                  key={lineIdx} 
+                  className={`block text-center text-xs sm:text-sm md:text-base font-semibold mb-0.5 ${
+                    isIncomplete 
+                      ? "text-amber-600 dark:text-amber-400 italic" 
+                      : "text-foreground"
+                  }`}
+                >
+                  {line}
+                </span>
+              )
+            })}
           </div>
         )
       })}

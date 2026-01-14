@@ -4,10 +4,14 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import type { Empleado, Turno, Horario, ShiftAssignment, Separador, MedioTurno, ShiftAssignmentValue } from "@/lib/types"
 import { calculateDailyHours, calculateHoursBreakdown } from "@/lib/validations"
+import { useData } from "@/contexts/data-context"
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
 export function useExportSchedule() {
   const [exporting, setExporting] = useState(false)
   const { toast } = useToast()
+  const { userData, user } = useData()
 
   // Desactiva todos los pseudo-elementos que generan los "cuadritos"
   const disablePseudoElements = () => {
@@ -314,6 +318,39 @@ export function useExportSchedule() {
         el.style.margin = styles.margin
       })
 
+      // Subir al backend solo si es exportación de semana completa (schedule-week-)
+      if (elementId.startsWith('schedule-week-') && user?.uid) {
+        try {
+          // Obtener userId efectivo (si es invitado, usar ownerId)
+          const ownerId = userData?.role === "invited" && userData?.ownerId 
+            ? userData.ownerId 
+            : user.uid
+
+          // Convertir dataUrl a Blob
+          const response = await fetch(dataUrl)
+          const blob = await response.blob()
+
+          // Crear FormData
+          const formData = new FormData()
+          formData.append('file', blob, 'semana-actual.png')
+
+          // Subir al backend
+          const uploadResponse = await fetch(
+            `${BACKEND_URL}/api/horarios/semana-actual?ownerId=${ownerId}`,
+            {
+              method: 'POST',
+              body: formData,
+            }
+          )
+
+          if (!uploadResponse.ok) {
+            console.warn('No se pudo subir la imagen al backend:', uploadResponse.status)
+          }
+        } catch (error) {
+          console.warn('Error al subir imagen al backend:', error)
+        }
+      }
+
       toast({
         title: "OK",
         description: "Imagen exportada correctamente.",
@@ -558,11 +595,16 @@ export function useExportSchedule() {
       })
       data.push(headerRow)
 
-      // Función helper para obtener el texto del turno (con formato de líneas)
+      // Función helper para obtener el texto del turno (CONTRATO v1.0)
+      // Usa SOLO datos del assignment, nunca el turno base como fallback
       const getShiftText = (assignment: ShiftAssignment | string, shiftMap: Map<string, Turno>): { text: string, color?: string } => {
+        // Caso legacy: assignment como string (shiftId)
+        // En este caso, no tenemos datos del assignment, solo el ID
+        // Por contrato, deberíamos mostrar "Horario incompleto", pero para compatibilidad
+        // mostramos el nombre del turno (esto debería migrarse eventualmente)
         if (typeof assignment === "string") {
           const shift = shiftMap.get(assignment)
-          return { text: shift?.name || "", color: shift?.color }
+          return { text: shift?.name || "Horario incompleto", color: shift?.color }
         }
         
         if (assignment.type === "franco") {
@@ -576,26 +618,60 @@ export function useExportSchedule() {
           return { text: "1/2 Franco", color: "#22c55e" } // Verde por defecto - hardcodeado
         }
         
-        if (assignment.shiftId) {
-          const shift = shiftMap.get(assignment.shiftId)
-          if (!shift) return { text: "" }
-          
-          const start = assignment.startTime || shift.startTime
-          const end = assignment.endTime || shift.endTime
-          const start2 = assignment.startTime2 || shift.startTime2
-          const end2 = assignment.endTime2 || shift.endTime2
-          
-          if (start && end) {
-            if (start2 && end2) {
-              // Turno cortado: una línea arriba, otra abajo
-              return { text: `${start} - ${end}\n${start2} - ${end2}`, color: shift.color }
-            }
-            return { text: `${start} - ${end}`, color: shift.color }
+        if (assignment.type === "licencia") {
+          if (assignment.startTime && assignment.endTime) {
+            const licenciaTypeLabel = assignment.licenciaType === "embarazo" ? "Lic. Embarazo" : 
+                                     assignment.licenciaType === "vacaciones" ? "Lic. Vacaciones" :
+                                     "Licencia"
+            return { text: `${licenciaTypeLabel}\n${assignment.startTime} - ${assignment.endTime}`, color: "#f59e0b" } // Ámbar
           }
-          return { text: shift.name, color: shift.color }
+          const licenciaTypeLabel = assignment.licenciaType === "embarazo" ? "LICENCIA EMBARAZO" : 
+                                   assignment.licenciaType === "vacaciones" ? "LICENCIA VACACIONES" :
+                                   "LICENCIA"
+          return { text: licenciaTypeLabel, color: "#f59e0b" }
         }
         
-        return { text: "" }
+        // CONTRATO v1.0: Assignment autosuficiente
+        // Usar SOLO valores explícitos del assignment
+        if (assignment.shiftId && assignment.type === "shift") {
+          const shift = shiftMap.get(assignment.shiftId)
+          const color = shift?.color || "#808080" // Color por defecto si no hay turno
+          
+          // Solo usar valores explícitos del assignment
+          const start = assignment.startTime
+          const end = assignment.endTime
+          const start2 = assignment.startTime2
+          const end2 = assignment.endTime2
+          
+          // Turno cortado: mostrar ambas franjas
+          if (start && end && start2 && end2) {
+            return { text: `${start} - ${end}\n${start2} - ${end2}`, color }
+          }
+          
+          // Turno simple: mostrar primera franja
+          if (start && end) {
+            return { text: `${start} - ${end}`, color }
+          }
+          
+          // Si no tiene primera franja pero tiene segunda, mostrar solo la segunda
+          if (start2 && end2) {
+            return { text: `${start2} - ${end2}`, color }
+          }
+          
+          // CONTRATO v1.0: Si falta horario, mostrar "Horario incompleto"
+          // Nunca mostrar shift.name ni leer horarios desde Turno
+          return { text: "Horario incompleto", color }
+        }
+        
+        // Horario especial (sin shiftId pero con startTime/endTime)
+        if (assignment.type === "shift" && !assignment.shiftId && (assignment.startTime || assignment.endTime)) {
+          if (assignment.startTime && assignment.endTime) {
+            return { text: `${assignment.startTime} - ${assignment.endTime}`, color: "#808080" }
+          }
+          return { text: "Horario incompleto", color: "#808080" }
+        }
+        
+        return { text: "Horario incompleto", color: "#808080" }
       }
 
       // Crear mapa de turnos para búsqueda rápida
@@ -1086,7 +1162,7 @@ export function useExportSchedule() {
                 config?.minutosDescanso ?? 30,
                 config?.horasMinimasParaDescanso ?? 6
               )
-              totalLicenciaEmbarazo += hoursBreakdown.licencia_embarazo
+              totalLicenciaEmbarazo += hoursBreakdown.licencia
               totalMedioFranco += hoursBreakdown.medio_franco
 
               // Contar francos y medio francos

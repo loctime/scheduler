@@ -35,7 +35,7 @@ interface EmployeeRowProps {
   onDrop: (e: React.DragEvent, targetId: string) => void
   // Extra actions props
   extraMenuOpenKey: string | null
-  handleToggleExtra: (employeeId: string, date: string, type: "before" | "after") => void
+  handleToggleExtra: (employeeId: string, date: string, type: "before" | "after", segment?: "first" | "second") => void
   setExtraMenuOpenKey: (key: string | null) => void
   adjustTime: (time: string, minutes: number) => string | null
   onAssignmentUpdate?: (
@@ -61,6 +61,7 @@ interface EmployeeRowProps {
   // Close selector
   onCloseSelector?: () => void
   config?: Configuracion | null
+  hasIncompleteAssignments?: (employeeId: string, date: string) => boolean
 }
 
 export function EmployeeRow({
@@ -103,6 +104,7 @@ export function EmployeeRow({
   onToggleFixed,
   onCloseSelector,
   config,
+  hasIncompleteAssignments,
 }: EmployeeRowProps) {
   return (
     <tr
@@ -256,7 +258,7 @@ export function EmployeeRow({
             cellKey={cellKey}
             hasExtraBefore={hasExtraBefore}
             hasExtraAfter={hasExtraAfter}
-            onToggleExtra={(type) => handleToggleExtra(employee.id, dateStr, type)}
+            onToggleExtra={(type, segment) => handleToggleExtra(employee.id, dateStr, type, segment)}
             onExtraMenuOpenChange={(open) => setExtraMenuOpenKey(open ? cellKey : null)}
             quickShifts={shifts}
             mediosTurnos={mediosTurnos}
@@ -276,6 +278,7 @@ export function EmployeeRow({
             onToggleFixed={onToggleFixed}
             suggestion={suggestion}
             config={config}
+            hasIncompleteAssignments={hasIncompleteAssignments ? hasIncompleteAssignments(employee.id, dateStr) : false}
           />
         )
       })}

@@ -10,6 +10,8 @@ import { createHistoryEntry, saveHistoryEntry, updateSchedulePreservingFields } 
 import { updateAssignmentInAssignments, normalizeAssignments } from "@/lib/schedule-utils"
 import { logger } from "@/lib/logger"
 import { getSuggestionForDay } from "@/lib/pattern-learning"
+import { isAssignmentIncomplete, getIncompletenessReason } from "@/lib/assignment-utils"
+import { validateBeforePersist, validateCellAssignments } from "@/lib/assignment-validators"
 
 interface UseScheduleUpdatesProps {
   user: any
@@ -385,16 +387,31 @@ export function useScheduleUpdates({
           }
           
           // Limpiar campos undefined de los assignments antes de guardar (Firestore no acepta undefined)
+          // CRÍTICO: NUNCA reconstruir assignments, solo eliminar undefined para preservar autosuficiencia
           const cleanedAssignments = assignments.map((assignment) => {
-            const cleaned: ShiftAssignment = { type: assignment.type || "shift" }
-            if (assignment.shiftId) cleaned.shiftId = assignment.shiftId
-            if (assignment.startTime) cleaned.startTime = assignment.startTime
-            if (assignment.endTime) cleaned.endTime = assignment.endTime
-            if (assignment.startTime2) cleaned.startTime2 = assignment.startTime2
-            if (assignment.endTime2) cleaned.endTime2 = assignment.endTime2
-            if (assignment.texto) cleaned.texto = assignment.texto
-            return cleaned
+            return Object.fromEntries(
+              Object.entries(assignment).filter(([, v]) => v !== undefined)
+            ) as ShiftAssignment
           })
+          
+          // CRÍTICO: Validar assignments SOLO si están completos
+          // Según el contrato: assignments pueden estar incompletos durante creación/edición (draft)
+          // pero deben validarse cuando están completos antes de persistir
+          const hasIncompleteAssignments = cleanedAssignments.some(a => isAssignmentIncomplete(a))
+          
+          if (!hasIncompleteAssignments) {
+            // Solo validar si todos los assignments están completos
+            const validationResult = validateCellAssignments(cleanedAssignments)
+            if (!validationResult.valid) {
+              toast({
+                title: "Error de validación",
+                description: validationResult.errors.join(". "),
+                variant: "destructive",
+              })
+              return
+            }
+          }
+          // Si hay assignments incompletos, permitir guardar como draft sin validación estricta
           
           // Nota: En horarios nuevos no hay medio_franco previo que proteger,
           // así que se usa assignments directamente
@@ -485,16 +502,32 @@ export function useScheduleUpdates({
           }
 
           // Limpiar campos undefined de los assignments antes de guardar (Firestore no acepta undefined)
+          // CRÍTICO: NUNCA reconstruir assignments, solo eliminar undefined para preservar autosuficiencia
           const cleanedFinalAssignments = finalAssignments.map((assignment) => {
-            const cleaned: ShiftAssignment = { type: assignment.type || "shift" }
-            if (assignment.shiftId) cleaned.shiftId = assignment.shiftId
-            if (assignment.startTime) cleaned.startTime = assignment.startTime
-            if (assignment.endTime) cleaned.endTime = assignment.endTime
-            if (assignment.startTime2) cleaned.startTime2 = assignment.startTime2
-            if (assignment.endTime2) cleaned.endTime2 = assignment.endTime2
-            if (assignment.texto) cleaned.texto = assignment.texto
-            return cleaned
+            return Object.fromEntries(
+              Object.entries(assignment).filter(([, v]) => v !== undefined)
+            ) as ShiftAssignment
           })
+
+          // CRÍTICO: Validar assignments SOLO si están completos
+          // Según el contrato: assignments pueden estar incompletos durante creación/edición (draft)
+          // pero deben validarse cuando están completos antes de persistir
+          const hasIncompleteAssignments = cleanedFinalAssignments.some(a => isAssignmentIncomplete(a))
+          
+          if (!hasIncompleteAssignments) {
+            // Solo validar si todos los assignments están completos
+            // Esto valida solapamientos entre TODOS los tipos (shifts, licencias, medio_francos)
+            const cellValidationResult = validateCellAssignments(cleanedFinalAssignments)
+            if (!cellValidationResult.valid) {
+              toast({
+                title: "Error de validación",
+                description: cellValidationResult.errors.join(". "),
+                variant: "destructive",
+              })
+              return
+            }
+          }
+          // Si hay assignments incompletos, permitir guardar como draft sin validación estricta
 
           // Actualizar assignments usando helper
           currentAssignments = updateAssignmentInAssignments(
@@ -505,9 +538,10 @@ export function useScheduleUpdates({
           )
         }
         
-        // Validar solapamientos (filtrar francos, medio francos y licencia_embarazo)
+        // Validación adicional usando validateScheduleAssignments para compatibilidad
+        // (solo valida shifts, no licencias ni medio_francos)
         const shiftIds = finalAssignments
-          .filter((a) => a.type !== "franco" && a.type !== "medio_franco" && a.type !== "licencia_embarazo" && a.shiftId)
+          .filter((a) => a.type !== "franco" && a.type !== "medio_franco" && a.type !== "licencia" && a.shiftId)
           .map((a) => a.shiftId!)
         if (shiftIds.length > 0) {
           // Si la semana está completada, usar empleados del snapshot para la validación

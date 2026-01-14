@@ -61,7 +61,7 @@ export function ShiftSelectorPopover({
   // Inicializar licencia embarazo time si hay asignación existente
   useEffect(() => {
     if (open) {
-      const existingLicencia = selectedAssignments.find(a => a.type === "licencia_embarazo")
+      const existingLicencia = selectedAssignments.find(a => a.type === "licencia" && a.licenciaType === "embarazo")
       if (existingLicencia) {
         setLicenciaEmbarazoTime({
           startTime: existingLicencia.startTime || "",
@@ -111,29 +111,40 @@ export function ShiftSelectorPopover({
     open,
   })
 
+  /**
+   * Construye un assignment completo desde un turno base
+   * 
+   * CRÍTICO: Copia TODA la estructura del turno siempre (autosuficiencia).
+   * Luego aplica ajustes si existen.
+   * 
+   * Turno simple: copia startTime, endTime
+   * Turno cortado: copia startTime, endTime, startTime2, endTime2
+   */
   const buildAssignmentFromShift = (shiftId: string): ShiftAssignment => {
     const shift = shifts.find((s) => s.id === shiftId)
     const adjusted = adjustedTimes[shiftId] || {}
     const result: ShiftAssignment = { shiftId, type: "shift" }
 
     if (!shift) {
+      // Si no hay turno base, solo usar ajustes si existen
       return { ...result, ...adjusted }
     }
 
-    if (adjusted.startTime !== undefined && adjusted.startTime !== shift.startTime) {
-      result.startTime = adjusted.startTime
+    // CRÍTICO: Copiar TODA la estructura del turno siempre
+    // Turno simple: copiar primera franja
+    if (shift.startTime) {
+      result.startTime = adjusted.startTime !== undefined ? adjusted.startTime : shift.startTime
+    }
+    if (shift.endTime) {
+      result.endTime = adjusted.endTime !== undefined ? adjusted.endTime : shift.endTime
     }
 
-    if (adjusted.endTime !== undefined && adjusted.endTime !== shift.endTime) {
-      result.endTime = adjusted.endTime
+    // Turno cortado: copiar segunda franja también
+    if (shift.startTime2) {
+      result.startTime2 = adjusted.startTime2 !== undefined ? adjusted.startTime2 : shift.startTime2
     }
-
-    if (adjusted.startTime2 !== undefined && adjusted.startTime2 !== shift.startTime2) {
-      result.startTime2 = adjusted.startTime2
-    }
-
-    if (adjusted.endTime2 !== undefined && adjusted.endTime2 !== shift.endTime2) {
-      result.endTime2 = adjusted.endTime2
+    if (shift.endTime2) {
+      result.endTime2 = adjusted.endTime2 !== undefined ? adjusted.endTime2 : shift.endTime2
     }
 
     return result
@@ -196,8 +207,8 @@ export function ShiftSelectorPopover({
       return
     }
 
-    // Si es licencia embarazo, validar que tenga horario
-    if (specialType === "licencia_embarazo") {
+    // Si es licencia, validar que tenga horario
+    if (specialType === "licencia") {
       if (!licenciaEmbarazoTime.startTime || !licenciaEmbarazoTime.endTime) {
         toast({
           title: "Error",
@@ -208,7 +219,8 @@ export function ShiftSelectorPopover({
       }
       finalizeAssignments([
         {
-          type: "licencia_embarazo",
+          type: "licencia",
+          licenciaType: "embarazo",
           startTime: licenciaEmbarazoTime.startTime,
           endTime: licenciaEmbarazoTime.endTime,
         },
@@ -226,9 +238,9 @@ export function ShiftSelectorPopover({
     onOpenChange(false)
   }
 
-  const handleSpecialTypeChange = (type: "shift" | "franco" | "medio_franco" | "licencia_embarazo") => {
+  const handleSpecialTypeChange = (type: "shift" | "franco" | "medio_franco" | "licencia") => {
     setSpecialType(type)
-    if (type === "franco" || type === "medio_franco" || type === "licencia_embarazo") {
+    if (type === "franco" || type === "medio_franco" || type === "licencia") {
       // Limpiar turnos seleccionados cuando se cambia a tipo especial
       setTempSelected([])
     }
@@ -236,7 +248,7 @@ export function ShiftSelectorPopover({
       setSelectedMedioTurnoId(null)
       setMedioFrancoTime({ startTime: "", endTime: "" })
     }
-    if (type === "licencia_embarazo") {
+    if (type === "licencia") {
       setLicenciaEmbarazoTime({ startTime: "", endTime: "" })
     }
     if (type === "shift") {

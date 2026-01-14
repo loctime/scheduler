@@ -269,8 +269,8 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
             minutosDescanso,
             horasMinimasParaDescanso
           )
-          if (hoursBreakdown.licencia_embarazo > 0) {
-            stats[employeeId].horasLicenciaEmbarazo = (stats[employeeId].horasLicenciaEmbarazo || 0) + hoursBreakdown.licencia_embarazo
+          if (hoursBreakdown.licencia > 0) {
+            stats[employeeId].horasLicenciaEmbarazo = (stats[employeeId].horasLicenciaEmbarazo || 0) + hoursBreakdown.licencia
           }
           if (hoursBreakdown.medio_franco > 0) {
             stats[employeeId].horasMedioFranco = (stats[employeeId].horasMedioFranco || 0) + hoursBreakdown.medio_franco

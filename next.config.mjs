@@ -39,6 +39,15 @@ const nextConfig = {
         ],
       },
       {
+        source: '/manifest-horario.json',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'application/manifest+json',
+          },
+        ],
+      },
+      {
         source: '/sw.js',
         headers: [
           {
@@ -74,6 +83,19 @@ const nextConfig = {
           {
             key: 'Service-Worker-Allowed',
             value: '/',
+          },
+        ],
+      },
+      {
+        source: '/sw-horario.js',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'application/javascript',
+          },
+          {
+            key: 'Service-Worker-Allowed',
+            value: '/pwa/horario',
           },
         ],
       },

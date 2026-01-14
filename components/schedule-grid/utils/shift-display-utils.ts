@@ -24,7 +24,18 @@ function formatTimeRange(start: string, end: string): string {
 }
 
 /**
- * Obtener horario para mostrar (ajustado o base) - retorna array de líneas
+ * Obtener horario para mostrar desde el assignment (CONTRATO v1.0)
+ * 
+ * REGLAS:
+ * - ShiftAssignment es autosuficiente
+ * - El horario visible DEBE salir del assignment
+ * - El turno base (Turno) NO debe usarse para render
+ * - No se permiten fallbacks visuales al turno base
+ * 
+ * @param shiftId - ID del turno (solo para referencia, no se usa para display)
+ * @param shift - Turno base (solo para referencia, NO se usa para display)
+ * @param assignment - Assignment del cual extraer el horario
+ * @returns Array de líneas de texto con el horario a mostrar
  */
 export function getShiftDisplayTime(
   shiftId: string,
@@ -39,12 +50,15 @@ export function getShiftDisplayTime(
     return ["1/2 Franco"]
   }
 
-  // Si es licencia embarazo, usar sus horarios directamente
-  if (assignment?.type === "licencia_embarazo") {
+  // Si es licencia, usar sus horarios directamente
+  if (assignment?.type === "licencia") {
     if (assignment.startTime && assignment.endTime) {
       return [formatTimeRange(assignment.startTime, assignment.endTime)]
     }
-    return ["LICENCIA EMBARAZO"]
+    const licenciaTypeLabel = assignment.licenciaType === "embarazo" ? "LICENCIA EMBARAZO" : 
+                               assignment.licenciaType === "vacaciones" ? "LICENCIA VACACIONES" :
+                               "LICENCIA"
+    return [licenciaTypeLabel]
   }
 
   // Si es franco, no debería llegar aquí, pero por seguridad:
@@ -52,55 +66,43 @@ export function getShiftDisplayTime(
     return ["FRANCO"]
   }
 
-  // Comportamiento normal para turnos
-  if (!shift) return [""]
+  // CONTRATO v1.0: Assignment autosuficiente
+  // Si hay asignación, usar SOLO los valores explícitos del assignment
+  // NUNCA usar el turno base como fallback
+  if (assignment && assignment.type === "shift") {
+    // Solo usar valores explícitos del assignment
+    const start = assignment.startTime
+    const end = assignment.endTime
+    const start2 = assignment.startTime2
+    const end2 = assignment.endTime2
 
-  // Si hay asignación con horarios ajustados, usar esos
-  if (assignment) {
-    // Para turnos con ajustes, usar los valores del assignment
-    // CRÍTICO: Si el assignment tiene startTime/endTime explícitos, solo mostrar segunda franja
-    // si también está explícitamente definida en el assignment (no usar la del turno base como fallback)
-    // Esto evita mostrar franjas no deseadas cuando se divide un turno cortado
-    const start = assignment.startTime !== undefined ? assignment.startTime : shift.startTime
-    const end = assignment.endTime !== undefined ? assignment.endTime : shift.endTime
-    
-    // Para la segunda franja: solo usar si está explícitamente en el assignment
-    // Si el assignment tiene startTime/endTime pero NO tiene startTime2/endTime2, no mostrar segunda franja
-    let start2: string | undefined = undefined
-    let end2: string | undefined = undefined
-    
-    // Si el assignment tiene startTime2/endTime2 explícitos, usarlos
-    if (assignment.startTime2 !== undefined || assignment.endTime2 !== undefined) {
-      start2 = assignment.startTime2 || shift.startTime2
-      end2 = assignment.endTime2 || shift.endTime2
-    } else if (assignment.startTime === undefined && assignment.endTime === undefined) {
-      // Si el assignment no tiene primera franja explícita, puede usar la segunda del turno base
-      start2 = shift.startTime2
-      end2 = shift.endTime2
+    // Turno cortado: mostrar ambas franjas
+    if (start && end && start2 && end2) {
+      return [
+        formatTimeRange(start, end),
+        formatTimeRange(start2, end2)
+      ]
     }
-    // Si el assignment tiene primera franja pero no segunda, start2/end2 quedan undefined
 
+    // Turno simple: mostrar primera franja
     if (start && end) {
-      const first = formatTimeRange(start, end)
-      if (start2 && end2) {
-        // Retornar en dos líneas separadas
-        return [first, formatTimeRange(start2, end2)]
-      }
-      return [first]
+      return [formatTimeRange(start, end)]
     }
+    
+    // Si no tiene primera franja pero tiene segunda, mostrar solo la segunda
+    // (caso raro pero posible si el assignment está incompleto)
+    if (start2 && end2) {
+      return [formatTimeRange(start2, end2)]
+    }
+    
+    // CONTRATO v1.0: Si falta horario, mostrar "Horario incompleto"
+    // Nunca mostrar shift.name ni leer horarios desde Turno
+    return ["Horario incompleto"]
   }
 
-  // Usar horarios del turno base
-  if (shift.startTime && shift.endTime) {
-    const first = formatTimeRange(shift.startTime, shift.endTime)
-    if (shift.startTime2 && shift.endTime2) {
-      // Retornar en dos líneas separadas
-      return [first, formatTimeRange(shift.startTime2, shift.endTime2)]
-    }
-    return [first]
-  }
-
-  return [""]
+  // Si NO hay assignment, no hay nada que mostrar
+  // (esto no debería ocurrir en el flujo normal, pero por seguridad)
+  return ["Horario incompleto"]
 }
 
 /**

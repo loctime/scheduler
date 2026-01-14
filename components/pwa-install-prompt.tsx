@@ -15,6 +15,9 @@ export function PWAInstallPrompt() {
   
   // Determinar el nombre de la app según la ruta
   const getAppName = () => {
+    if (pathname?.startsWith('/pwa/horario')) {
+      return 'Horario'
+    }
     if (pathname?.startsWith('/dashboard/pedidos')) {
       return 'Pedidos'
     }

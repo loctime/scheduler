@@ -26,6 +26,7 @@ import { usePatternSuggestions } from "@/hooks/use-pattern-suggestions"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
+import { isAssignmentIncomplete } from "@/lib/assignment-utils"
 
 export interface EmployeeMonthlyStats {
   francos: number
@@ -253,15 +254,33 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     [schedule, onAssignmentUpdate, cellUndoHistory],
   )
 
+  // Función para verificar si una celda tiene assignments incompletos
+  const hasIncompleteAssignments = useCallback(
+    (employeeId: string, date: string): boolean => {
+      const assignments = getEmployeeAssignments(employeeId, date)
+      return assignments.some(a => isAssignmentIncomplete(a))
+    },
+    [getEmployeeAssignments]
+  )
+
   // Handlers
   const handleCellClick = useCallback(
     (date: string, employeeId: string) => {
       if (!readonly && (onShiftUpdate || onAssignmentUpdate)) {
+        // Verificar si hay assignments incompletos antes de permitir edición
+        if (hasIncompleteAssignments(employeeId, date)) {
+          toast({
+            title: "Edición bloqueada",
+            description: "Esta celda contiene assignments incompletos. Debe normalizarlos antes de editar.",
+            variant: "destructive",
+          })
+          return
+        }
         saveCellState(date, employeeId)
         setSelectedCell({ date, employeeId })
       }
     },
-    [readonly, onShiftUpdate, onAssignmentUpdate, saveCellState]
+    [readonly, onShiftUpdate, onAssignmentUpdate, saveCellState, hasIncompleteAssignments, toast]
   )
 
   const handleShiftUpdate = useCallback(
@@ -287,7 +306,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   )
 
   const handleToggleExtra = useCallback(
-    (employeeId: string, date: string, type: "before" | "after") => {
+    (employeeId: string, date: string, type: "before" | "after", segment?: "first" | "second") => {
       if (!onAssignmentUpdate) return
       
       saveCellState(date, employeeId)
@@ -302,41 +321,129 @@ export const ScheduleGrid = memo(function ScheduleGrid({
 
       const assignment = { ...assignments[targetIndex] }
       const shift = assignment.shiftId ? getShiftInfo(assignment.shiftId) : undefined
-      if (!shift || !shift.startTime || !shift.endTime) return
+      if (!shift) return
 
-      // Usar los valores actuales del assignment (si existen) o los del turno base
-      const currentStartTime = assignment.startTime || shift.startTime
-      const currentEndTime = assignment.endTime || shift.endTime
+      // CRÍTICO: Preservar explícitamente startTime2/endTime2 siempre
+      const preservedStartTime2 = assignment.startTime2
+      const preservedEndTime2 = assignment.endTime2
+      const isTurnoCortado = !!(preservedStartTime2 && preservedEndTime2)
 
-      // Calcular los horarios extendidos desde los valores actuales
-      const extendedStart = adjustTime(currentStartTime, -30)
-      const extendedEnd = adjustTime(currentEndTime, 30)
+      // Determinar qué franja modificar
+      // Si es turno cortado y no se especifica segmento, usar la primera por defecto
+      const targetSegment = segment || (isTurnoCortado ? "first" : "first")
 
-      // Calcular los horarios extendidos desde el turno base (para comparar)
-      const baseExtendedStart = adjustTime(shift.startTime, -30)
-      const baseExtendedEnd = adjustTime(shift.endTime, 30)
+      if (targetSegment === "first") {
+        // Modificar primera franja
+        if (!shift.startTime || !shift.endTime) return
 
-      if (type === "before") {
-        if (!extendedStart || !baseExtendedStart) return
-        // Si ya tiene el horario extendido (30 min antes del turno base), eliminarlo
-        // Si el valor actual es igual al extendido desde el turno base, significa que ya tiene la hora extra
-        if (assignment.startTime === baseExtendedStart) {
-          // Ya tiene la hora extra, eliminarla para restaurar al horario base
-          delete assignment.startTime
+        // Usar SOLO valores explícitos del assignment (autosuficiencia)
+        const currentStartTime = assignment.startTime || shift.startTime
+        const currentEndTime = assignment.endTime || shift.endTime
+
+        // Calcular los horarios extendidos desde los valores actuales
+        const extendedStart = adjustTime(currentStartTime, -30)
+        const extendedEnd = adjustTime(currentEndTime, 30)
+
+        // Calcular los horarios extendidos desde el turno base (para comparar)
+        const baseExtendedStart = adjustTime(shift.startTime, -30)
+        const baseExtendedEnd = adjustTime(shift.endTime, 30)
+
+        if (type === "before") {
+          if (!extendedStart || !baseExtendedStart) return
+          // Si ya tiene el horario extendido, eliminarlo
+          if (assignment.startTime === baseExtendedStart) {
+            // Restaurar al horario base del turno
+            assignment.startTime = shift.startTime
+          } else {
+            // Aplicar hora extra
+            assignment.startTime = baseExtendedStart
+          }
         } else {
-          // No tiene la hora extra o tiene un valor diferente, aplicar el extendido desde el turno base
-          assignment.startTime = baseExtendedStart
+          if (!extendedEnd || !baseExtendedEnd) return
+          // Si ya tiene el horario extendido, eliminarlo
+          if (assignment.endTime === baseExtendedEnd) {
+            // Restaurar al horario base del turno
+            assignment.endTime = shift.endTime
+          } else {
+            // Aplicar hora extra
+            assignment.endTime = baseExtendedEnd
+          }
+        }
+
+        // Validar si las franjas se unen después del ajuste
+        if (isTurnoCortado && preservedStartTime2 && preservedEndTime2) {
+          const finalEndTime = assignment.endTime || shift.endTime
+          const finalStartTime2 = preservedStartTime2
+          
+          const endTimeMinutes = timeToMinutes(finalEndTime)
+          const startTime2Minutes = timeToMinutes(finalStartTime2)
+          
+          // Si endTime >= startTime2, las franjas se unen
+          if (endTimeMinutes >= startTime2Minutes) {
+            toast({
+              title: "Franjas unidas",
+              description: "Las horas extras han unido las franjas del turno cortado. Se convertirá en turno simple.",
+              variant: "destructive",
+            })
+            // Convertir a turno simple eliminando segunda franja
+            delete assignment.startTime2
+            delete assignment.endTime2
+          } else {
+            // CRÍTICO: Preservar explícitamente startTime2/endTime2 si no se unen
+            assignment.startTime2 = preservedStartTime2
+            assignment.endTime2 = preservedEndTime2
+          }
         }
       } else {
-        if (!extendedEnd || !baseExtendedEnd) return
-        // Si ya tiene el horario extendido (30 min después del turno base), eliminarlo
-        // Si el valor actual es igual al extendido desde el turno base, significa que ya tiene la hora extra
-        if (assignment.endTime === baseExtendedEnd) {
-          // Ya tiene la hora extra, eliminarla para restaurar al horario base
-          delete assignment.endTime
+        // Modificar segunda franja (solo si es turno cortado)
+        if (!isTurnoCortado || !shift.startTime2 || !shift.endTime2) return
+
+        // Usar SOLO valores explícitos del assignment
+        const currentStartTime2 = assignment.startTime2 || shift.startTime2
+        const currentEndTime2 = assignment.endTime2 || shift.endTime2
+
+        // Calcular los horarios extendidos
+        const extendedStart2 = adjustTime(currentStartTime2, -30)
+        const extendedEnd2 = adjustTime(currentEndTime2, 30)
+
+        // Calcular desde el turno base
+        const baseExtendedStart2 = adjustTime(shift.startTime2, -30)
+        const baseExtendedEnd2 = adjustTime(shift.endTime2, 30)
+
+        if (type === "before") {
+          if (!extendedStart2 || !baseExtendedStart2) return
+          if (assignment.startTime2 === baseExtendedStart2) {
+            assignment.startTime2 = shift.startTime2
+          } else {
+            assignment.startTime2 = baseExtendedStart2
+          }
         } else {
-          // No tiene la hora extra o tiene un valor diferente, aplicar el extendido desde el turno base
-          assignment.endTime = baseExtendedEnd
+          if (!extendedEnd2 || !baseExtendedEnd2) return
+          if (assignment.endTime2 === baseExtendedEnd2) {
+            assignment.endTime2 = shift.endTime2
+          } else {
+            assignment.endTime2 = baseExtendedEnd2
+          }
+        }
+
+        // CRÍTICO: Primera franja ya está preservada (solo modificamos startTime2/endTime2)
+
+        // Validar si las franjas se unen después del ajuste
+        const finalEndTime = assignment.endTime || shift.endTime
+        const finalStartTime2 = assignment.startTime2 || shift.startTime2
+        
+        const endTimeMinutes = timeToMinutes(finalEndTime)
+        const startTime2Minutes = timeToMinutes(finalStartTime2)
+        
+        if (endTimeMinutes >= startTime2Minutes) {
+          toast({
+            title: "Franjas unidas",
+            description: "Las horas extras han unido las franjas del turno cortado. Se convertirá en turno simple.",
+            variant: "destructive",
+          })
+          // Convertir a turno simple
+          delete assignment.startTime2
+          delete assignment.endTime2
         }
       }
 
@@ -344,8 +451,14 @@ export const ScheduleGrid = memo(function ScheduleGrid({
 
       onAssignmentUpdate(date, employeeId, updatedAssignments, { scheduleId: schedule?.id })
     },
-    [getEmployeeAssignments, getShiftInfo, onAssignmentUpdate, schedule?.id, saveCellState]
+    [getEmployeeAssignments, getShiftInfo, onAssignmentUpdate, schedule?.id, saveCellState, toast]
   )
+
+  // Función auxiliar para convertir tiempo a minutos
+  const timeToMinutes = useCallback((time: string): number => {
+    const [hours, minutes] = time.split(":").map(Number)
+    return hours * 60 + minutes
+  }, [])
 
   const handleQuickAssignments = useCallback(
     (date: string, employeeId: string, assignments: ShiftAssignment[]) => {
@@ -674,6 +787,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                         onToggleFixed={handleToggleFixed}
                         onCloseSelector={() => setSelectedCell(null)}
                         config={config}
+                        hasIncompleteAssignments={hasIncompleteAssignments}
                       />
                     )}
                   </React.Fragment>
