@@ -81,19 +81,21 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Cachear imagen del horario desde /api/horarios/semana-actual
-  // Patrón: /api/horarios/semana-actual?ownerId=XXX
+  // Cachear imágenes públicas del horario (URLs públicas devueltas por el backend)
+  // El frontend ahora hace fetch al endpoint para obtener la URL pública,
+  // luego usa esa URL directamente en <img>. No hay redirects.
   // Frontend rule: Nunca llamar /api/* de forma relativa. Siempre usar NEXT_PUBLIC_BACKEND_URL para ControlFile.
-  // El Service Worker debe manejar tanto rutas relativas (legacy) como absolutas del backend
-  const isHorarioImage = url.pathname === '/api/horarios/semana-actual' || 
-                         url.pathname.endsWith('/api/horarios/semana-actual')
+  // Detectar si es una imagen (por extensión o Content-Type)
+  const isImageRequest = url.pathname.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i) ||
+                        event.request.headers.get('accept')?.includes('image/')
 
-  if (isHorarioImage) {
+  // Cachear imágenes públicas del horario (Network First)
+  if (isImageRequest) {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          // Solo cachear si la respuesta es válida
-          if (response.status === 200) {
+          // Solo cachear si la respuesta es válida y es una imagen
+          if (response.status === 200 && response.headers.get('content-type')?.startsWith('image/')) {
             const responseToCache = response.clone()
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, responseToCache)

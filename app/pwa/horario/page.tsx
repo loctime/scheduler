@@ -40,27 +40,78 @@ function HorarioContent({ ownerIdFromQuery }: { ownerIdFromQuery: string | null 
     // Frontend rule:
     // Nunca llamar /api/* de forma relativa.
     // Siempre usar NEXT_PUBLIC_BACKEND_URL para ControlFile.
-    // Construir URL de la imagen del horario
-    const url = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/horarios/semana-actual?ownerId=${encodeURIComponent(userId)}`
-    setImageUrl(url)
-    setLoading(false)
+    // Primero hacer fetch al backend para obtener la URL pública
+    const fetchImageUrl = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/horarios/semana-actual?ownerId=${encodeURIComponent(userId)}`
+        )
+        
+        if (!response.ok) {
+          throw new Error(`Error al obtener horario: ${response.status}`)
+        }
+        
+        // El endpoint devuelve un JSON con la URL pública
+        const data = await response.json()
+        const publicUrl = data.url || data.imageUrl || data.publicUrl
+        
+        if (!publicUrl) {
+          throw new Error("No se recibió URL pública del backend")
+        }
+        
+        setImageUrl(publicUrl)
+        setLoading(false)
+      } catch (err) {
+        console.error("Error al obtener URL del horario:", err)
+        setError(err instanceof Error ? err.message : "No se pudo cargar el horario")
+        setLoading(false)
+        setImageUrl("")
+      }
+    }
+    
+    fetchImageUrl()
   }, [userId])
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     if (!userId) return
     setLoading(true)
     setError(null)
     setImageLoaded(false)
     
-    // Frontend rule:
-    // Nunca llamar /api/* de forma relativa.
-    // Siempre usar NEXT_PUBLIC_BACKEND_URL para ControlFile.
-    // La URL no cambia - el SW (Network First) traerá la versión nueva si existe
-    // No usar querystring para evitar cachear infinitas versiones
-    const url = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/horarios/semana-actual?ownerId=${encodeURIComponent(userId)}`
-    setImageUrl(url)
-    
-    // El estado de carga se manejará automáticamente cuando la imagen cargue
+    try {
+      // Frontend rule:
+      // Nunca llamar /api/* de forma relativa.
+      // Siempre usar NEXT_PUBLIC_BACKEND_URL para ControlFile.
+      // Hacer fetch al backend para obtener la URL pública actualizada
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/horarios/semana-actual?ownerId=${encodeURIComponent(userId)}`
+      )
+      
+      if (!response.ok) {
+        throw new Error(`Error al obtener horario: ${response.status}`)
+      }
+      
+      // El endpoint devuelve un JSON con la URL pública
+      const data = await response.json()
+      const publicUrl = data.url || data.imageUrl || data.publicUrl
+      
+      if (!publicUrl) {
+        throw new Error("No se recibió URL pública del backend")
+      }
+      
+      // Usar timestamp para forzar recarga de la imagen
+      const urlWithCacheBuster = `${publicUrl}${publicUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`
+      setImageUrl(urlWithCacheBuster)
+      
+      // El estado de carga se manejará automáticamente cuando la imagen cargue
+    } catch (err) {
+      console.error("Error al refrescar horario:", err)
+      setError(err instanceof Error ? err.message : "No se pudo actualizar el horario")
+      setLoading(false)
+    }
   }
 
   const handleImageLoad = () => {
