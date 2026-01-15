@@ -102,9 +102,8 @@ function HorarioContent({ ownerIdFromQuery }: { ownerIdFromQuery: string | null 
         throw new Error("No se recibió URL pública del backend")
       }
       
-      // Usar timestamp para forzar recarga de la imagen
-      const urlWithCacheBuster = `${publicUrl}${publicUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`
-      setImageUrl(urlWithCacheBuster)
+      // Usar la URL pública directamente sin modificaciones
+      setImageUrl(publicUrl)
       
       // El estado de carga se manejará automáticamente cuando la imagen cargue
     } catch (err) {
@@ -187,7 +186,6 @@ function HorarioContent({ ownerIdFromQuery }: { ownerIdFromQuery: string | null 
               }}
               onLoad={handleImageLoad}
               onError={handleImageError}
-              loading="lazy"
             />
           </div>
         )}
