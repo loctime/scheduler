@@ -1,5 +1,9 @@
 "use client"
 
+// Frontend rule:
+// Nunca llamar /api/* de forma relativa.
+// Siempre usar NEXT_PUBLIC_BACKEND_URL para ControlFile.
+
 import { useEffect, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { onAuthStateChanged } from "firebase/auth"
@@ -33,8 +37,11 @@ function HorarioContent({ ownerIdFromQuery }: { ownerIdFromQuery: string | null 
       return
     }
 
+    // Frontend rule:
+    // Nunca llamar /api/* de forma relativa.
+    // Siempre usar NEXT_PUBLIC_BACKEND_URL para ControlFile.
     // Construir URL de la imagen del horario
-    const url = `/api/horarios/semana-actual?ownerId=${userId}`
+    const url = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/horarios/semana-actual?ownerId=${encodeURIComponent(userId)}`
     setImageUrl(url)
     setLoading(false)
   }, [userId])
@@ -45,9 +52,12 @@ function HorarioContent({ ownerIdFromQuery }: { ownerIdFromQuery: string | null 
     setError(null)
     setImageLoaded(false)
     
+    // Frontend rule:
+    // Nunca llamar /api/* de forma relativa.
+    // Siempre usar NEXT_PUBLIC_BACKEND_URL para ControlFile.
     // La URL no cambia - el SW (Network First) traerá la versión nueva si existe
     // No usar querystring para evitar cachear infinitas versiones
-    const url = `/api/horarios/semana-actual?ownerId=${userId}`
+    const url = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/horarios/semana-actual?ownerId=${encodeURIComponent(userId)}`
     setImageUrl(url)
     
     // El estado de carga se manejará automáticamente cuando la imagen cargue

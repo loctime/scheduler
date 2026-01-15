@@ -83,7 +83,10 @@ self.addEventListener('fetch', (event) => {
 
   // Cachear imagen del horario desde /api/horarios/semana-actual
   // Patrón: /api/horarios/semana-actual?ownerId=XXX
-  const isHorarioImage = url.pathname === '/api/horarios/semana-actual'
+  // Frontend rule: Nunca llamar /api/* de forma relativa. Siempre usar NEXT_PUBLIC_BACKEND_URL para ControlFile.
+  // El Service Worker debe manejar tanto rutas relativas (legacy) como absolutas del backend
+  const isHorarioImage = url.pathname === '/api/horarios/semana-actual' || 
+                         url.pathname.endsWith('/api/horarios/semana-actual')
 
   if (isHorarioImage) {
     event.respondWith(
