@@ -317,18 +317,21 @@ export function useExportSchedule() {
       })
 
       // Subir al backend siempre que haya ownerId (indica exportación de semana completa)
-      if (config?.ownerId) {
+      // Validar que ownerId sea un string no vacío para evitar enviar valores inválidos
+      if (config?.ownerId && typeof config.ownerId === 'string' && config.ownerId.trim() !== '') {
         try {
-          const ownerId = config.ownerId
+          const ownerId = config.ownerId.trim()
 
           const response = await fetch(dataUrl)
           const blob = await response.blob()
 
           const formData = new FormData()
           formData.append("file", blob, "semana-actual.png")
+          // Agregar ownerId explícitamente al FormData para asegurar consistencia
+          formData.append("ownerId", ownerId)
 
           await fetch(
-            `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/horarios/semana-actual?ownerId=${ownerId}`,
+            `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/horarios/semana-actual?ownerId=${encodeURIComponent(ownerId)}`,
             {
               method: "POST",
               body: formData,
