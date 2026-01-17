@@ -7,7 +7,7 @@ import { EmptyStateCard, LoadingStateCard } from "@/components/schedule-calendar
 import type { Horario, Empleado, Turno, MedioTurno, ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { format } from "date-fns"
-import { calculateExtraHours } from "@/lib/validations"
+import { calculateTotalExtraHours } from "@/lib/validations"
 
 type AssignmentUpdateHandler = (
   date: string,
@@ -210,9 +210,14 @@ export function GeneralView({
                 }
 
                 // Calcular horas extras para este día
-                const extraHours = calculateExtraHours(normalizedAssignments, shifts)
-                if (extraHours > 0) {
-                  weekStats[employeeId].horasExtrasSemana += extraHours
+                const { horasExtra } = calculateTotalExtraHours(
+                  normalizedAssignments,
+                  shifts,
+                  30, // minutosDescanso por defecto
+                  6   // horasMinimasParaDescanso por defecto
+                )
+                if (horasExtra > 0) {
+                  weekStats[employeeId].horasExtrasSemana += horasExtra
                 }
               })
             })

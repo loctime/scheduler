@@ -18,7 +18,7 @@ import { getCustomMonthRange, getMonthWeeks } from "@/lib/utils"
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { ExportOverlay } from "@/components/export-overlay"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
-import { calculateDailyHours, calculateExtraHours, calculateHoursBreakdown } from "@/lib/validations"
+import { calculateDailyHours, calculateTotalExtraHours, calculateHoursBreakdown } from "@/lib/validations"
 import { ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Share2 } from "lucide-react"
@@ -240,13 +240,18 @@ export default function HorariosMensualesPage() {
             stats[employeeId].horasMedioFranco = (stats[employeeId].horasMedioFranco || 0) + hoursBreakdown.medio_franco
           }
 
-          // Calcular horas extras: simplemente contar los 30 minutos agregados
-          const extraHours = calculateExtraHours(normalizedAssignments, shifts)
-          if (extraHours > 0) {
+          // Calcular horas extras: comparar turno base con horario real
+          const { horasExtra } = calculateTotalExtraHours(
+            normalizedAssignments,
+            shifts,
+            config?.minutosDescanso || 30,
+            config?.horasMinimasParaDescanso || 6
+          )
+          if (horasExtra > 0) {
             // Acumular en el total del mes
-            stats[employeeId].horasExtrasMes += extraHours
+            stats[employeeId].horasExtrasMes += horasExtra
             // Acumular en la semana actual
-            weeklyExtras[weekStartStr][employeeId] = (weeklyExtras[weekStartStr][employeeId] || 0) + extraHours
+            weeklyExtras[weekStartStr][employeeId] = (weeklyExtras[weekStartStr][employeeId] || 0) + horasExtra
           }
         })
       })
@@ -405,9 +410,14 @@ export default function HorariosMensualesPage() {
                               }
 
                               // Calcular horas extras para este día
-                              const extraHours = calculateExtraHours(normalizedAssignments, shifts)
-                              if (extraHours > 0) {
-                                weekStats[employeeId].horasExtrasSemana += extraHours
+                              const { horasExtra } = calculateTotalExtraHours(
+                                normalizedAssignments,
+                                shifts,
+                                config?.minutosDescanso || 30,
+                                config?.horasMinimasParaDescanso || 6
+                              )
+                              if (horasExtra > 0) {
+                                weekStats[employeeId].horasExtrasSemana += horasExtra
                               }
                             })
                           })

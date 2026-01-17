@@ -140,6 +140,13 @@ export interface Configuracion {
   mensajePrevio?: string
   nombreFirma?: string
   firmaDigital?: string
+  // Reglas horarias (para cálculo de horas extra)
+  reglasHorarias?: {
+    horasNormalesPorDia?: number // Ej: 8 horas normales por día
+    horasNormalesPorSemana?: number // Ej: 48 horas normales por semana
+    inicioHorarioNocturno?: string // Ej: "21:00" - hora de inicio del horario nocturno
+    limiteDiarioRecomendado?: number // Límite diario recomendado de horas trabajadas
+  }
 }
 
 export interface Empleado {

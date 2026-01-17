@@ -119,15 +119,70 @@ export function calculateShiftHours(
 }
 
 /**
- * Calcula las horas extras basándose en los 30 minutos agregados (antes/después)
- * Retorna la cantidad de horas extras: 0.5 por cada 30 min antes + 0.5 por cada 30 min después
+ * Calcula las horas extras comparando el turno base con el horario real de la asignación
+ * Las horas extra se derivan automáticamente de la diferencia entre el turno teórico y el horario trabajado
+ * 
+ * @param assignment La asignación diaria con horario real
+ * @param shift El turno base (plantilla teórica)
+ * @param minutosDescanso Minutos de descanso a aplicar
+ * @param horasMinimasParaDescanso Horas mínimas para aplicar descanso
+ * @returns Objeto con horas normales y horas extra
  */
 export function calculateExtraHours(
+  assignment: any,
+  shift: Turno,
+  minutosDescanso: number = 30,
+  horasMinimasParaDescanso: number = 6
+): { horasNormales: number; horasExtra: number } {
+  // Si no hay turno base o asignación, retornar ceros
+  if (!shift || !assignment || assignment.type === "franco" || assignment.type === "medio_franco") {
+    return { horasNormales: 0, horasExtra: 0 }
+  }
+
+  // Calcular horas del turno base (horario teórico)
+  const horasTurnoBase = calculateShiftHours(shift, minutosDescanso, horasMinimasParaDescanso)
+
+  // Calcular horas del horario real (asignación)
+  // Si la asignación no tiene horarios explícitos, usar los del turno base
+  const startTimeReal = assignment.startTime || shift.startTime
+  const endTimeReal = assignment.endTime || shift.endTime
+  const startTime2Real = assignment.startTime2 || shift.startTime2
+  const endTime2Real = assignment.endTime2 || shift.endTime2
+
+  if (!startTimeReal || !endTimeReal) {
+    return { horasNormales: horasTurnoBase, horasExtra: 0 }
+  }
+
+  // Crear turno temporal con horario real
+  const turnoReal: any = {
+    startTime: startTimeReal,
+    endTime: endTimeReal,
+    startTime2: startTime2Real,
+    endTime2: endTime2Real,
+  }
+
+  const horasHorarioReal = calculateShiftHours(turnoReal, minutosDescanso, horasMinimasParaDescanso)
+
+  // Las horas extra son la diferencia positiva entre horario real y turno base
+  const horasExtra = Math.max(0, horasHorarioReal - horasTurnoBase)
+  const horasNormales = horasTurnoBase
+
+  return { horasNormales, horasExtra }
+}
+
+/**
+ * Calcula las horas extras totales de un array de asignaciones
+ * Útil para calcular horas extra de un día completo con múltiples turnos
+ */
+export function calculateTotalExtraHours(
   assignments: any[],
-  shifts: Turno[]
-): number {
+  shifts: Turno[],
+  minutosDescanso: number = 30,
+  horasMinimasParaDescanso: number = 6
+): { horasNormales: number; horasExtra: number } {
   const shiftMap = new Map(shifts.map((s) => [s.id, s]))
-  let extraHours = 0
+  let totalHorasNormales = 0
+  let totalHorasExtra = 0
 
   assignments.forEach((assignment) => {
     // Ignorar francos y medio francos
@@ -137,23 +192,20 @@ export function calculateExtraHours(
 
     if (assignment.shiftId) {
       const shift = shiftMap.get(assignment.shiftId)
-      if (shift && shift.startTime && shift.endTime) {
-        // Verificar si tiene 30 min antes (startTime ajustado 30 min antes del turno base)
-        const baseStart30MinBefore = adjustTime(shift.startTime, -30)
-        if (assignment.startTime && assignment.startTime === baseStart30MinBefore) {
-          extraHours += 0.5 // 30 minutos = 0.5 horas
-        }
-
-        // Verificar si tiene 30 min después (endTime ajustado 30 min después del turno base)
-        const baseEnd30MinAfter = adjustTime(shift.endTime, 30)
-        if (assignment.endTime && assignment.endTime === baseEnd30MinAfter) {
-          extraHours += 0.5 // 30 minutos = 0.5 horas
-        }
+      if (shift) {
+        const { horasNormales, horasExtra } = calculateExtraHours(
+          assignment,
+          shift,
+          minutosDescanso,
+          horasMinimasParaDescanso
+        )
+        totalHorasNormales += horasNormales
+        totalHorasExtra += horasExtra
       }
     }
   })
 
-  return extraHours
+  return { horasNormales: totalHorasNormales, horasExtra: totalHorasExtra }
 }
 
 /**

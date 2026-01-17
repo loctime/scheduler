@@ -18,7 +18,7 @@ import { getCustomMonthRange, getMonthWeeks } from "@/lib/utils"
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { ExportOverlay } from "@/components/export-overlay"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
-import { calculateExtraHours, calculateHoursBreakdown } from "@/lib/validations"
+import { calculateTotalExtraHours, calculateHoursBreakdown } from "@/lib/validations"
 import { ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
 
 const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAssignment[] => {
@@ -360,10 +360,15 @@ function HorariosMensualesContent() {
             stats[employeeId].horasMedioFranco = (stats[employeeId].horasMedioFranco || 0) + hoursBreakdown.medio_franco
           }
 
-          const extraHours = calculateExtraHours(normalizedAssignments, shifts)
-          if (extraHours > 0) {
-            stats[employeeId].horasExtrasMes += extraHours
-            weeklyExtras[weekStartStr][employeeId] = (weeklyExtras[weekStartStr][employeeId] || 0) + extraHours
+          const { horasExtra } = calculateTotalExtraHours(
+            normalizedAssignments,
+            shifts,
+            30, // minutosDescanso por defecto
+            6   // horasMinimasParaDescanso por defecto
+          )
+          if (horasExtra > 0) {
+            stats[employeeId].horasExtrasMes += horasExtra
+            weeklyExtras[weekStartStr][employeeId] = (weeklyExtras[weekStartStr][employeeId] || 0) + horasExtra
           }
         })
       })
@@ -511,9 +516,14 @@ function HorariosMensualesContent() {
                                     return
                                   }
 
-                                  const extraHours = calculateExtraHours(normalizedAssignments, shifts)
-                                  if (extraHours > 0) {
-                                    weekStats[employeeId].horasExtrasSemana += extraHours
+                                  const { horasExtra } = calculateTotalExtraHours(
+                                    normalizedAssignments,
+                                    shifts,
+                                    30, // minutosDescanso por defecto
+                                    6   // horasMinimasParaDescanso por defecto
+                                  )
+                                  if (horasExtra > 0) {
+                                    weekStats[employeeId].horasExtrasSemana += horasExtra
                                   }
                                 })
                               })

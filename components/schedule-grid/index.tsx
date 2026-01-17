@@ -83,7 +83,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   onExportEmployeeImage,
 }: ScheduleGridProps) {
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
-  const [extraMenuOpenKey, setExtraMenuOpenKey] = useState<string | null>(null)
   const [cellUndoHistory, setCellUndoHistory] = useState<Map<string, ShiftAssignment[]>>(new Map())
 
   // Intentar obtener user del contexto si no se proporciona como prop
@@ -305,160 +304,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     [selectedCell, onAssignmentUpdate, schedule?.id]
   )
 
-  const handleToggleExtra = useCallback(
-    (employeeId: string, date: string, type: "before" | "after", segment?: "first" | "second") => {
-      if (!onAssignmentUpdate) return
-      
-      saveCellState(date, employeeId)
-      
-      const assignments = getEmployeeAssignments(employeeId, date)
-      if (assignments.length === 0) return
-
-      const targetIndex = assignments.findIndex(
-        (assignment) => assignment.type !== "franco" && assignment.type !== "medio_franco" && assignment.shiftId
-      )
-      if (targetIndex === -1) return
-
-      const assignment = { ...assignments[targetIndex] }
-      const shift = assignment.shiftId ? getShiftInfo(assignment.shiftId) : undefined
-      if (!shift) return
-
-      // CRÍTICO: Preservar explícitamente startTime2/endTime2 siempre
-      const preservedStartTime2 = assignment.startTime2
-      const preservedEndTime2 = assignment.endTime2
-      const isTurnoCortado = !!(preservedStartTime2 && preservedEndTime2)
-
-      // Determinar qué franja modificar
-      // Si es turno cortado y no se especifica segmento, usar la primera por defecto
-      const targetSegment = segment || (isTurnoCortado ? "first" : "first")
-
-      if (targetSegment === "first") {
-        // Modificar primera franja
-        if (!shift.startTime || !shift.endTime) return
-
-        // Usar SOLO valores explícitos del assignment (autosuficiencia)
-        const currentStartTime = assignment.startTime || shift.startTime
-        const currentEndTime = assignment.endTime || shift.endTime
-
-        // Calcular los horarios extendidos desde los valores actuales
-        const extendedStart = adjustTime(currentStartTime, -30)
-        const extendedEnd = adjustTime(currentEndTime, 30)
-
-        // Calcular los horarios extendidos desde el turno base (para comparar)
-        const baseExtendedStart = adjustTime(shift.startTime, -30)
-        const baseExtendedEnd = adjustTime(shift.endTime, 30)
-
-        if (type === "before") {
-          if (!extendedStart || !baseExtendedStart) return
-          // Si ya tiene el horario extendido, eliminarlo
-          if (assignment.startTime === baseExtendedStart) {
-            // Restaurar al horario base del turno
-            assignment.startTime = shift.startTime
-          } else {
-            // Aplicar hora extra
-            assignment.startTime = baseExtendedStart
-          }
-        } else {
-          if (!extendedEnd || !baseExtendedEnd) return
-          // Si ya tiene el horario extendido, eliminarlo
-          if (assignment.endTime === baseExtendedEnd) {
-            // Restaurar al horario base del turno
-            assignment.endTime = shift.endTime
-          } else {
-            // Aplicar hora extra
-            assignment.endTime = baseExtendedEnd
-          }
-        }
-
-        // Validar si las franjas se unen después del ajuste
-        if (isTurnoCortado && preservedStartTime2 && preservedEndTime2) {
-          const finalEndTime = assignment.endTime || shift.endTime
-          const finalStartTime2 = preservedStartTime2
-          
-          const endTimeMinutes = timeToMinutes(finalEndTime)
-          const startTime2Minutes = timeToMinutes(finalStartTime2)
-          
-          // Si endTime >= startTime2, las franjas se unen
-          if (endTimeMinutes >= startTime2Minutes) {
-            toast({
-              title: "Franjas unidas",
-              description: "Las horas extras han unido las franjas del turno cortado. Se convertirá en turno simple.",
-              variant: "destructive",
-            })
-            // Convertir a turno simple eliminando segunda franja
-            delete assignment.startTime2
-            delete assignment.endTime2
-          } else {
-            // CRÍTICO: Preservar explícitamente startTime2/endTime2 si no se unen
-            assignment.startTime2 = preservedStartTime2
-            assignment.endTime2 = preservedEndTime2
-          }
-        }
-      } else {
-        // Modificar segunda franja (solo si es turno cortado)
-        if (!isTurnoCortado || !shift.startTime2 || !shift.endTime2) return
-
-        // Usar SOLO valores explícitos del assignment
-        const currentStartTime2 = assignment.startTime2 || shift.startTime2
-        const currentEndTime2 = assignment.endTime2 || shift.endTime2
-
-        // Calcular los horarios extendidos
-        const extendedStart2 = adjustTime(currentStartTime2, -30)
-        const extendedEnd2 = adjustTime(currentEndTime2, 30)
-
-        // Calcular desde el turno base
-        const baseExtendedStart2 = adjustTime(shift.startTime2, -30)
-        const baseExtendedEnd2 = adjustTime(shift.endTime2, 30)
-
-        if (type === "before") {
-          if (!extendedStart2 || !baseExtendedStart2) return
-          if (assignment.startTime2 === baseExtendedStart2) {
-            assignment.startTime2 = shift.startTime2
-          } else {
-            assignment.startTime2 = baseExtendedStart2
-          }
-        } else {
-          if (!extendedEnd2 || !baseExtendedEnd2) return
-          if (assignment.endTime2 === baseExtendedEnd2) {
-            assignment.endTime2 = shift.endTime2
-          } else {
-            assignment.endTime2 = baseExtendedEnd2
-          }
-        }
-
-        // CRÍTICO: Primera franja ya está preservada (solo modificamos startTime2/endTime2)
-
-        // Validar si las franjas se unen después del ajuste
-        const finalEndTime = assignment.endTime || shift.endTime
-        const finalStartTime2 = assignment.startTime2 || shift.startTime2
-        
-        const endTimeMinutes = timeToMinutes(finalEndTime)
-        const startTime2Minutes = timeToMinutes(finalStartTime2)
-        
-        if (endTimeMinutes >= startTime2Minutes) {
-          toast({
-            title: "Franjas unidas",
-            description: "Las horas extras han unido las franjas del turno cortado. Se convertirá en turno simple.",
-            variant: "destructive",
-          })
-          // Convertir a turno simple
-          delete assignment.startTime2
-          delete assignment.endTime2
-        }
-      }
-
-      const updatedAssignments = assignments.map((item, idx) => (idx === targetIndex ? assignment : item))
-
-      onAssignmentUpdate(date, employeeId, updatedAssignments, { scheduleId: schedule?.id })
-    },
-    [getEmployeeAssignments, getShiftInfo, onAssignmentUpdate, schedule?.id, saveCellState, toast]
-  )
-
-  // Función auxiliar para convertir tiempo a minutos
-  const timeToMinutes = useCallback((time: string): number => {
-    const [hours, minutes] = time.split(":").map(Number)
-    return hours * 60 + minutes
-  }, [])
 
   const handleQuickAssignments = useCallback(
     (date: string, employeeId: string, assignments: ShiftAssignment[]) => {
@@ -770,9 +615,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
                         onDrop={handleDrop}
-                        extraMenuOpenKey={extraMenuOpenKey}
-                        handleToggleExtra={handleToggleExtra}
-                        setExtraMenuOpenKey={setExtraMenuOpenKey}
                         adjustTime={adjustTime}
                         onAssignmentUpdate={onAssignmentUpdate}
                         scheduleId={schedule?.id}

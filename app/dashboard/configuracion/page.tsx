@@ -55,6 +55,12 @@ export default function ConfiguracionPage() {
     mediosTurnos: [],
     nombreFirma: undefined,
     firmaDigital: undefined,
+    reglasHorarias: {
+      horasNormalesPorDia: 8,
+      horasNormalesPorSemana: 48,
+      inicioHorarioNocturno: "21:00",
+      limiteDiarioRecomendado: 10,
+    },
   })
 
   const shiftColorOptions = useMemo(() => {
@@ -110,6 +116,12 @@ export default function ConfiguracionPage() {
             mediosTurnos: [],
             nombreFirma: undefined,
             firmaDigital: undefined,
+            reglasHorarias: {
+              horasNormalesPorDia: 8,
+              horasNormalesPorSemana: 48,
+              inicioHorarioNocturno: "21:00",
+              limiteDiarioRecomendado: 10,
+            },
           }
           
           // Limpiar undefined antes de guardar (Firestore no acepta undefined)
@@ -183,6 +195,7 @@ export default function ConfiguracionPage() {
         minutosDescanso: config.minutosDescanso,
         horasMinimasParaDescanso: config.horasMinimasParaDescanso,
         mediosTurnos: config.mediosTurnos || [],
+        reglasHorarias: config.reglasHorarias,
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
         updatedByName: user.displayName || user.email || "",
@@ -464,6 +477,110 @@ export default function ConfiguracionPage() {
               />
               <p className="text-sm text-muted-foreground">
                 Un turno continuo debe tener al menos esta cantidad de horas para aplicar el descanso. Los turnos cortados (con segunda franja horaria) no aplican descanso, independientemente de su duración.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Reglas Horarias</CardTitle>
+            <CardDescription>Configuración para el cálculo automático de horas extra</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="horasNormalesPorDia">Horas normales por día</Label>
+              <Input
+                id="horasNormalesPorDia"
+                type="number"
+                min="1"
+                max="24"
+                value={config.reglasHorarias?.horasNormalesPorDia || 8}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    reglasHorarias: {
+                      ...config.reglasHorarias,
+                      horasNormalesPorDia: Math.max(1, Math.min(24, parseInt(e.target.value) || 8)),
+                    },
+                  })
+                }
+              />
+              <p className="text-sm text-muted-foreground">
+                Horas normales de trabajo por día. Las horas trabajadas por encima de este valor se consideran horas extra.
+              </p>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <Label htmlFor="horasNormalesPorSemana">Horas normales por semana</Label>
+              <Input
+                id="horasNormalesPorSemana"
+                type="number"
+                min="1"
+                max="168"
+                value={config.reglasHorarias?.horasNormalesPorSemana || 48}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    reglasHorarias: {
+                      ...config.reglasHorarias,
+                      horasNormalesPorSemana: Math.max(1, Math.min(168, parseInt(e.target.value) || 48)),
+                    },
+                  })
+                }
+              />
+              <p className="text-sm text-muted-foreground">
+                Horas normales de trabajo por semana. Útil para cálculos semanales de horas extra.
+              </p>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <Label htmlFor="inicioHorarioNocturno">Inicio horario nocturno</Label>
+              <Input
+                id="inicioHorarioNocturno"
+                type="time"
+                value={config.reglasHorarias?.inicioHorarioNocturno || "21:00"}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    reglasHorarias: {
+                      ...config.reglasHorarias,
+                      inicioHorarioNocturno: e.target.value || "21:00",
+                    },
+                  })
+                }
+              />
+              <p className="text-sm text-muted-foreground">
+                Hora de inicio del horario nocturno (para futuros cálculos de horas extra nocturnas).
+              </p>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <Label htmlFor="limiteDiarioRecomendado">Límite diario recomendado de horas</Label>
+              <Input
+                id="limiteDiarioRecomendado"
+                type="number"
+                min="1"
+                max="24"
+                value={config.reglasHorarias?.limiteDiarioRecomendado || 10}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    reglasHorarias: {
+                      ...config.reglasHorarias,
+                      limiteDiarioRecomendado: Math.max(1, Math.min(24, parseInt(e.target.value) || 10)),
+                    },
+                  })
+                }
+              />
+              <p className="text-sm text-muted-foreground">
+                Límite diario recomendado de horas trabajadas (para alertas y validaciones futuras).
               </p>
             </div>
           </CardContent>

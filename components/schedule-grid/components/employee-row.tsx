@@ -33,11 +33,6 @@ interface EmployeeRowProps {
   onDragOver: (e: React.DragEvent, employeeId: string) => void
   onDragLeave: () => void
   onDrop: (e: React.DragEvent, targetId: string) => void
-  // Extra actions props
-  extraMenuOpenKey: string | null
-  handleToggleExtra: (employeeId: string, date: string, type: "before" | "after", segment?: "first" | "second") => void
-  setExtraMenuOpenKey: (key: string | null) => void
-  adjustTime: (time: string, minutes: number) => string | null
   onAssignmentUpdate?: (
     date: string,
     employeeId: string,
@@ -87,10 +82,6 @@ export function EmployeeRow({
   onDragOver,
   onDragLeave,
   onDrop,
-  extraMenuOpenKey,
-  handleToggleExtra,
-  setExtraMenuOpenKey,
-  adjustTime,
   onAssignmentUpdate,
   scheduleId,
   shifts,
@@ -206,31 +197,6 @@ export function EmployeeRow({
         const backgroundStyle = getCellBackgroundStyle(employee.id, dateStr)
         const assignments = getEmployeeAssignments(employee.id, dateStr)
 
-        const primaryShiftAssignment = assignments.find(
-          (assignment) => assignment.type !== "franco" && assignment.type !== "medio_franco" && assignment.shiftId
-        )
-        const primaryShift = primaryShiftAssignment && primaryShiftAssignment.shiftId ? getShiftInfo(primaryShiftAssignment.shiftId) : undefined
-        const extendedStart = primaryShift?.startTime ? adjustTime(primaryShift.startTime, -30) : undefined
-        const extendedEnd = primaryShift?.endTime ? adjustTime(primaryShift.endTime, 30) : undefined
-        // Verificar si tiene horas extras comparando con el horario base del turno
-        const hasExtraBefore = Boolean(
-          extendedStart && 
-          primaryShiftAssignment?.startTime && 
-          primaryShiftAssignment.startTime === extendedStart &&
-          primaryShiftAssignment.startTime !== primaryShift?.startTime
-        )
-        const hasExtraAfter = Boolean(
-          extendedEnd && 
-          primaryShiftAssignment?.endTime && 
-          primaryShiftAssignment.endTime === extendedEnd &&
-          primaryShiftAssignment.endTime !== primaryShift?.endTime
-        )
-        const showExtraActions =
-          isClickable &&
-          !!onAssignmentUpdate &&
-          !!primaryShiftAssignment &&
-          !!primaryShift?.startTime &&
-          !!primaryShift?.endTime
         const cellKey = `${employee.id}-${dateStr}`
 
         const undoCellKey = `${dateStr}-${employee.id}`
@@ -253,13 +219,7 @@ export function EmployeeRow({
             isClickable={isClickable}
             getShiftInfo={getShiftInfo}
             onCellClick={onCellClick}
-            showExtraActions={showExtraActions}
-            extraMenuOpenKey={extraMenuOpenKey}
             cellKey={cellKey}
-            hasExtraBefore={hasExtraBefore}
-            hasExtraAfter={hasExtraAfter}
-            onToggleExtra={(type, segment) => handleToggleExtra(employee.id, dateStr, type, segment)}
-            onExtraMenuOpenChange={(open) => setExtraMenuOpenKey(open ? cellKey : null)}
             quickShifts={shifts}
             mediosTurnos={mediosTurnos}
             onQuickAssignments={
