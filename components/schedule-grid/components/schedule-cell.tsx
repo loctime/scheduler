@@ -2084,13 +2084,24 @@ export function ScheduleCell({
                 return null
               })()}
               
-              {/* Mensaje si el turno es huérfano */}
-              {selectedShiftForEdit && !selectedShiftForEdit.shift && (
-                <div className="border-t pt-4">
-                  <div className="text-xs text-muted-foreground">
-                    ⚠️ Turno base eliminado. No se puede calcular horas extra.
-                  </div>
-                </div>
+              {/* Mensaje si el turno es huérfano o assignment incompleto */}
+              {selectedShiftForEdit && (
+                <>
+                  {!selectedShiftForEdit.shift && (
+                    <div className="border-t pt-4">
+                      <div className="text-xs text-muted-foreground">
+                        ⚠️ Turno base eliminado. No se puede calcular horas extra.
+                      </div>
+                    </div>
+                  )}
+                  {selectedShiftForEdit.shift && (!editStartTime || !editEndTime) && (
+                    <div className="border-t pt-4">
+                      <div className="text-xs text-muted-foreground">
+                        ℹ️ Complete el horario real para ver el cálculo de horas extra.
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

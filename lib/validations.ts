@@ -117,6 +117,16 @@ export function calculateShiftHours(
  * @param horasMinimasParaDescanso Horas mínimas para aplicar descanso
  * @returns Objeto con horas normales y horas extra
  */
+/**
+ * Calcula las horas extras comparando el turno base con el horario real de la asignación
+ * REGLA CRÍTICA: El assignment debe ser autosuficiente - nunca se infieren horarios desde el turno base
+ * 
+ * @param assignment La asignación diaria con horario real (DEBE tener startTime/endTime explícitos)
+ * @param shift El turno base (plantilla teórica)
+ * @param minutosDescanso Minutos de descanso a aplicar
+ * @param horasMinimasParaDescanso Horas mínimas para aplicar descanso
+ * @returns Objeto con horas normales y horas extra
+ */
 export function calculateExtraHours(
   assignment: any,
   shift: Turno,
@@ -128,26 +138,24 @@ export function calculateExtraHours(
     return { horasNormales: 0, horasExtra: 0 }
   }
 
+  // REGLA: Assignment autosuficiente - si no tiene horarios explícitos, NO calcular horas extra
+  // Esto fuerza a completar el assignment antes de calcular horas extra
+  if (!assignment.startTime || !assignment.endTime) {
+    // Assignment incompleto - retornar ceros (no inferir desde turno base)
+    return { horasNormales: 0, horasExtra: 0 }
+  }
+
   // Calcular horas del turno base (horario teórico)
   const horasTurnoBase = calculateShiftHours(shift, minutosDescanso, horasMinimasParaDescanso)
 
   // Calcular horas del horario real (asignación)
-  // Si la asignación no tiene horarios explícitos, usar los del turno base
-  const startTimeReal = assignment.startTime || shift.startTime
-  const endTimeReal = assignment.endTime || shift.endTime
-  const startTime2Real = assignment.startTime2 || shift.startTime2
-  const endTime2Real = assignment.endTime2 || shift.endTime2
-
-  if (!startTimeReal || !endTimeReal) {
-    return { horasNormales: horasTurnoBase, horasExtra: 0 }
-  }
-
-  // Crear turno temporal con horario real
+  // Usar SOLO valores explícitos del assignment (autosuficiencia)
   const turnoReal: any = {
-    startTime: startTimeReal,
-    endTime: endTimeReal,
-    startTime2: startTime2Real,
-    endTime2: endTime2Real,
+    startTime: assignment.startTime,
+    endTime: assignment.endTime,
+    // Segunda franja solo si existe explícitamente
+    startTime2: assignment.startTime2 || undefined,
+    endTime2: assignment.endTime2 || undefined,
   }
 
   const horasHorarioReal = calculateShiftHours(turnoReal, minutosDescanso, horasMinimasParaDescanso)
@@ -162,6 +170,7 @@ export function calculateExtraHours(
 /**
  * Calcula las horas extras totales de un array de asignaciones
  * Útil para calcular horas extra de un día completo con múltiples turnos
+ * REGLA: Solo calcula horas extra si el assignment tiene horarios explícitos Y existe el turno base
  */
 export function calculateTotalExtraHours(
   assignments: any[],
@@ -179,9 +188,11 @@ export function calculateTotalExtraHours(
       return
     }
 
+    // REGLA: Solo calcular si tiene shiftId Y el turno base existe
     if (assignment.shiftId) {
       const shift = shiftMap.get(assignment.shiftId)
       if (shift) {
+        // calculateExtraHours ya valida que el assignment tenga horarios explícitos
         const { horasNormales, horasExtra } = calculateExtraHours(
           assignment,
           shift,
@@ -191,6 +202,7 @@ export function calculateTotalExtraHours(
         totalHorasNormales += horasNormales
         totalHorasExtra += horasExtra
       }
+      // Si shift no existe (huérfano), no calcular horas extra (ya está manejado en calculateExtraHours)
     }
   })
 
