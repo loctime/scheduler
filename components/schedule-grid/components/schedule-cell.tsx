@@ -3,13 +3,16 @@
 import React, { useState, useMemo } from "react"
 import type { CSSProperties } from "react"
 import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu"
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
   ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
 } from "@/components/ui/context-menu"
 import {
   Dialog,
@@ -32,6 +35,7 @@ import { useToast } from "@/hooks/use-toast"
 import { isAssignmentIncomplete, getIncompletenessReason } from "@/lib/assignment-utils"
 import { calculateExtraHours } from "@/lib/validations"
 import { adjustTime } from "@/lib/utils"
+import { rangeDuration, rangesOverlap } from "@/lib/time-utils"
 
 interface ScheduleCellProps {
   date: string
@@ -105,6 +109,7 @@ export function ScheduleCell({
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null)
   const [editarHorarioDialogOpen, setEditarHorarioDialogOpen] = useState(false)
   const [selectedShiftForEdit, setSelectedShiftForEdit] = useState<{ assignment: ShiftAssignment; shift?: Turno; assignmentIndex: number } | null>(null)
+  const [editarHorarioSubmenuOpen, setEditarHorarioSubmenuOpen] = useState(false)
   const [editStartTime, setEditStartTime] = useState("")
   const [editEndTime, setEditEndTime] = useState("")
   const [editStartTime2, setEditStartTime2] = useState("")
@@ -134,17 +139,33 @@ export function ScheduleCell({
     (a) => a.type === "shift" && !a.shiftId && (a.startTime || a.endTime)
   )
 
-  // Encontrar el primer turno asignado para edición
-  // Obtener el primer assignment de turno (shift) para edición
+  // Encontrar todos los turnos asignados editables (con índice real)
   // CRÍTICO: Permitir assignments con shiftId huérfano (turno base eliminado)
-  const firstShiftAssignment = React.useMemo(() => {
-    const shiftAssignment = assignments.find((a) => a.type === "shift" && a.shiftId)
-    if (!shiftAssignment || !shiftAssignment.shiftId) return null
-    const shift = getShiftInfo(shiftAssignment.shiftId)
-    // Permitir edición incluso si el turno base no existe (shift undefined)
-    // El assignment es autosuficiente y puede editarse con sus propios datos
-    return { assignment: shiftAssignment, shift: shift || undefined }
+  const editableShiftAssignments = React.useMemo(() => {
+    return assignments
+      .map((assignment, index) => {
+        // Solo incluir assignments de tipo "shift" con shiftId
+        if (assignment.type !== "shift" || !assignment.shiftId) return null
+        
+        const shift = getShiftInfo(assignment.shiftId)
+        // Permitir edición incluso si el turno base no existe (shift undefined)
+        // El assignment es autosuficiente si tiene startTime/endTime
+        return {
+          assignment,
+          shift: shift || undefined,
+          index, // Índice real en el array
+        }
+      })
+      .filter((item): item is { assignment: ShiftAssignment; shift: Turno | undefined; index: number } => item !== null)
   }, [assignments, getShiftInfo])
+
+  // Mantener firstShiftAssignment para compatibilidad con código existente (licencia, etc.)
+  const firstShiftAssignment = React.useMemo(() => {
+    if (editableShiftAssignments.length === 0) return null
+    const first = editableShiftAssignments[0]
+    if (!first) return null
+    return { assignment: first.assignment, shift: first.shift }
+  }, [editableShiftAssignments])
   
   // Detectar si el turno base está huérfano (eliminado)
   const isOrphanShift = React.useMemo(() => {
@@ -327,12 +348,18 @@ export function ScheduleCell({
     onAssignmentUpdate(date, employeeId, [], { scheduleId })
   }
 
+  // Usar timeToMinutes de time-utils en lugar de función local
   const timeToMinutes = (time: string): number => {
     if (!time) return 0
     // Normalizar formato: si no tiene ":", asumir que son solo horas (ej: "11" -> "11:00")
     const normalizedTime = time.includes(":") ? time : `${time}:00`
     const [hours, minutes] = normalizedTime.split(":").map(Number)
-    return hours * 60 + minutes
+    return (hours * 60 + minutes) % 1440
+  }
+  
+  // Helper para calcular duración usando time-utils
+  const calculateDuration = (start: string, end: string): number => {
+    return rangeDuration(start, end)
   }
 
   const minutesToTime = (minutes: number): string => {
@@ -348,17 +375,6 @@ export function ScheduleCell({
     return `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`
   }
 
-  // Calcular duración de un turno considerando que puede cruzar medianoche
-  const calculateDuration = (startTime: string, endTime: string): number => {
-    const start = timeToMinutes(startTime)
-    const end = timeToMinutes(endTime)
-    
-    // Si el fin es menor que el inicio, cruza medianoche
-    if (end < start) {
-      return (24 * 60 - start) + end
-    }
-    return end - start
-  }
 
   // Verificar si un tiempo está dentro de un rango (considerando cruce de medianoche)
   const isTimeInRange = (time: string, rangeStart: string, rangeEnd: string): boolean => {
@@ -616,42 +632,57 @@ export function ScheduleCell({
     return suggestions
   }, [selectedShiftForLicencia])
 
-  const handleOpenEditarHorarioDialog = () => {
-    if (!firstShiftAssignment) {
-      // Si no hay turno asignado, no hacer nada (no crear turnos)
+  const handleOpenEditarHorarioDialog = (assignmentIndex?: number) => {
+    // Si se pasa un índice específico, abrir ese assignment
+    if (assignmentIndex !== undefined) {
+      const editableItem = editableShiftAssignments.find((item) => item && item.index === assignmentIndex)
+      if (!editableItem) return
+
+      const { assignment, shift, index } = editableItem
+      setSelectedShiftForEdit({ assignment, shift, assignmentIndex: index })
+      
+      // Precargar los horarios actuales SOLO del assignment (autosuficiencia)
+      setEditStartTime(assignment.startTime || "")
+      setEditEndTime(assignment.endTime || "")
+      
+      // Cargar segunda franja si existe explícitamente en el assignment
+      const hasSecond = !!(assignment.startTime2 && assignment.endTime2)
+      setHasSecondSegment(hasSecond)
+      setEditStartTime2(assignment.startTime2 || "")
+      setEditEndTime2(assignment.endTime2 || "")
+      
+      setEditarHorarioDialogOpen(true)
+      setEditarHorarioSubmenuOpen(false)
       return
     }
-    
-    // Encontrar el índice del assignment en el array para referencia directa
-    const assignmentIndex = assignments.findIndex(
-      (a) => a.type === "shift" && 
-             a.shiftId === firstShiftAssignment.assignment.shiftId &&
-             a.startTime === firstShiftAssignment.assignment.startTime &&
-             a.endTime === firstShiftAssignment.assignment.endTime &&
-             a.startTime2 === firstShiftAssignment.assignment.startTime2 &&
-             a.endTime2 === firstShiftAssignment.assignment.endTime2
-    )
-    
-    if (assignmentIndex === -1) {
-      // No se encontró el assignment, no hacer nada
+
+    // Si hay solo un turno, abrirlo directamente
+    if (editableShiftAssignments.length === 1) {
+      const first = editableShiftAssignments[0]
+      if (!first) return
+      
+      const { assignment, shift, index } = first
+      setSelectedShiftForEdit({ assignment, shift, assignmentIndex: index })
+      
+      setEditStartTime(assignment.startTime || "")
+      setEditEndTime(assignment.endTime || "")
+      
+      const hasSecond = !!(assignment.startTime2 && assignment.endTime2)
+      setHasSecondSegment(hasSecond)
+      setEditStartTime2(assignment.startTime2 || "")
+      setEditEndTime2(assignment.endTime2 || "")
+      
+      setEditarHorarioDialogOpen(true)
       return
     }
-    
-    const { assignment, shift } = firstShiftAssignment
-    setSelectedShiftForEdit({ assignment, shift, assignmentIndex })
-    
-    // Precargar los horarios actuales SOLO del assignment (autosuficiencia)
-    // NO usar el turno base como fallback
-    setEditStartTime(assignment.startTime || "")
-    setEditEndTime(assignment.endTime || "")
-    
-    // Cargar segunda franja si existe explícitamente en el assignment
-    const hasSecond = !!(assignment.startTime2 && assignment.endTime2)
-    setHasSecondSegment(hasSecond)
-    setEditStartTime2(assignment.startTime2 || "")
-    setEditEndTime2(assignment.endTime2 || "")
-    
-    setEditarHorarioDialogOpen(true)
+
+    // Si hay múltiples turnos, mostrar submenú
+    if (editableShiftAssignments.length > 1) {
+      setEditarHorarioSubmenuOpen(true)
+      return
+    }
+
+    // Si no hay turnos editables, no hacer nada
   }
 
   const handleSaveEditarHorario = () => {
@@ -661,10 +692,81 @@ export function ScheduleCell({
     const trimmedEndTime = editEndTime.trim()
 
     if (!trimmedStartTime || !trimmedEndTime) {
-      return // Validación básica
+      toast({
+        title: "Error",
+        description: "Debe especificar hora de inicio y fin.",
+        variant: "destructive",
+      })
+      return
     }
 
-    const { assignment, assignmentIndex } = selectedShiftForEdit
+    // Validar formato HH:MM
+    const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/
+    if (!timeRegex.test(trimmedStartTime) || !timeRegex.test(trimmedEndTime)) {
+      toast({
+        title: "Error",
+        description: "Formato de hora inválido. Use HH:MM (ej: 08:00).",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validar duración positiva considerando medianoche
+    const duration = rangeDuration(trimmedStartTime, trimmedEndTime)
+    if (duration <= 0) {
+      toast({
+        title: "Error",
+        description: "La hora de fin debe ser posterior a la hora de inicio.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validar segunda franja si existe
+    if (hasSecondSegment) {
+      const trimmedStartTime2 = editStartTime2.trim()
+      const trimmedEndTime2 = editEndTime2.trim()
+
+      if (!trimmedStartTime2 || !trimmedEndTime2) {
+        toast({
+          title: "Error",
+          description: "Si activa segunda franja, debe especificar ambas horas.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (!timeRegex.test(trimmedStartTime2) || !timeRegex.test(trimmedEndTime2)) {
+        toast({
+          title: "Error",
+          description: "Formato de hora inválido en segunda franja.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const duration2 = rangeDuration(trimmedStartTime2, trimmedEndTime2)
+      if (duration2 <= 0) {
+        toast({
+          title: "Error",
+          description: "La hora de fin de segunda franja debe ser posterior a la hora de inicio.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Validar que las franjas no se solapen
+      if (rangesOverlap(trimmedStartTime, trimmedEndTime, trimmedStartTime2, trimmedEndTime2)) {
+        toast({
+          title: "Error",
+          description: "Las dos franjas del turno no pueden solaparse.",
+          variant: "destructive",
+        })
+        return
+      }
+    }
+
+    const { assignmentIndex } = selectedShiftForEdit
     
     // Validar que el índice sea válido
     if (assignmentIndex === -1 || assignmentIndex >= assignments.length) {
@@ -1177,18 +1279,59 @@ export function ScheduleCell({
           {!readonly && (
             <>
               {/* FASE 11: Guard rails - Deshabilitar opciones de edición si hay incompletos */}
-              {/* Solo mostrar "Editar horario" si hay un assignment existente */}
-              {firstShiftAssignment && (
-                <ContextMenuItem 
-                  onClick={handleOpenEditarHorarioDialog}
-                  disabled={hasIncompleteAssignments}
-                  className={hasIncompleteAssignments ? "opacity-50 cursor-not-allowed" : ""}
-                >
-                  Editar horario
-                  {hasIncompleteAssignments && " (Bloqueado - Assignments incompletos)"}
-                </ContextMenuItem>
+              {/* Solo mostrar "Editar horario" si hay assignments editables */}
+              {editableShiftAssignments.length > 0 && (
+                <>
+                  {editableShiftAssignments.length === 1 ? (
+                    <ContextMenuItem 
+                      onClick={() => handleOpenEditarHorarioDialog()}
+                      disabled={hasIncompleteAssignments}
+                      className={hasIncompleteAssignments ? "opacity-50 cursor-not-allowed" : ""}
+                    >
+                      Editar horario
+                      {hasIncompleteAssignments && " (Bloqueado - Assignments incompletos)"}
+                    </ContextMenuItem>
+                  ) : (
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger 
+                        disabled={hasIncompleteAssignments}
+                        className={hasIncompleteAssignments ? "opacity-50 cursor-not-allowed" : ""}
+                      >
+                        Editar horario
+                        {hasIncompleteAssignments && " (Bloqueado - Assignments incompletos)"}
+                      </ContextMenuSubTrigger>
+                      <ContextMenuSubContent>
+                        {editableShiftAssignments.map((item) => {
+                          if (!item) return null
+                          const { assignment, shift, index } = item
+                          const shiftName = shift?.name || "Turno eliminado (huérfano)"
+                          const timeRange = assignment.startTime && assignment.endTime
+                            ? `${assignment.startTime} - ${assignment.endTime}`
+                            : "Sin horario"
+                          const secondRange = assignment.startTime2 && assignment.endTime2
+                            ? ` / ${assignment.startTime2} - ${assignment.endTime2}`
+                            : ""
+                          
+                          return (
+                            <ContextMenuItem
+                              key={index}
+                              onClick={() => handleOpenEditarHorarioDialog(index)}
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-medium">{shiftName}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {timeRange}{secondRange}
+                                </span>
+                              </div>
+                            </ContextMenuItem>
+                          )
+                        })}
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
+                  )}
+                  <ContextMenuSeparator />
+                </>
               )}
-              {firstShiftAssignment && <ContextMenuSeparator />}
               <ContextMenuItem onClick={handleOpenNotaDialog}>
                 <FileText className="mr-2 h-4 w-4" />
                 {existingNota ? "Editar nota" : "Agregar nota"}
@@ -1913,8 +2056,8 @@ export function ScheduleCell({
                   ...selectedShiftForEdit.assignment,
                   startTime: editStartTime,
                   endTime: editEndTime,
-                  startTime2: hasSecondSegment ? editStartTime2 : undefined,
-                  endTime2: hasSecondSegment ? editEndTime2 : undefined,
+                  startTime2: hasSecondSegment && editStartTime2 && editEndTime2 ? editStartTime2 : undefined,
+                  endTime2: hasSecondSegment && editStartTime2 && editEndTime2 ? editEndTime2 : undefined,
                 }
                 const { horasNormales, horasExtra } = calculateExtraHours(
                   tempAssignment,
@@ -1940,6 +2083,15 @@ export function ScheduleCell({
                 }
                 return null
               })()}
+              
+              {/* Mensaje si el turno es huérfano */}
+              {selectedShiftForEdit && !selectedShiftForEdit.shift && (
+                <div className="border-t pt-4">
+                  <div className="text-xs text-muted-foreground">
+                    ⚠️ Turno base eliminado. No se puede calcular horas extra.
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>

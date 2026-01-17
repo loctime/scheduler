@@ -1,27 +1,38 @@
-import { Turno, Empleado } from "@/lib/types"
+import { Turno, Empleado, ShiftAssignment } from "@/lib/types"
 import { ShiftOverlap } from "@/lib/types"
 import { adjustTime } from "@/lib/utils"
+import {
+  splitShiftIntoIntervals,
+  rangesOverlap,
+  calculateShiftDurationMinutes,
+  TimeInterval,
+} from "@/lib/time-utils"
 
 /**
  * Valida si dos turnos se solapan en horario
+ * Soporta cruce de medianoche y turnos cortados (dos franjas)
  */
 export function checkShiftOverlap(shift1: Turno, shift2: Turno): boolean {
-  if (!shift1.startTime || !shift1.endTime || !shift2.startTime || !shift2.endTime) {
+  // Obtener intervalos de ambos turnos
+  const intervals1 = splitShiftIntoIntervals(shift1)
+  const intervals2 = splitShiftIntoIntervals(shift2)
+
+  if (intervals1.length === 0 || intervals2.length === 0) {
     return false // Si no tienen horarios definidos, no hay solapamiento
   }
 
-  const [h1Start, m1Start] = shift1.startTime.split(":").map(Number)
-  const [h1End, m1End] = shift1.endTime.split(":").map(Number)
-  const [h2Start, m2Start] = shift2.startTime.split(":").map(Number)
-  const [h2End, m2End] = shift2.endTime.split(":").map(Number)
+  // Verificar si cualquier intervalo de shift1 se solapa con cualquier intervalo de shift2
+  for (const interval1 of intervals1) {
+    for (const interval2 of intervals2) {
+      // Comparación directa de intervalos normalizados
+      // Los intervalos ya están normalizados (end puede ser > 1440 si cruza medianoche)
+      if (interval1.start < interval2.end && interval2.start < interval1.end) {
+        return true
+      }
+    }
+  }
 
-  const start1 = h1Start * 60 + m1Start
-  const end1 = h1End * 60 + m1End
-  const start2 = h2Start * 60 + m2Start
-  const end2 = h2End * 60 + m2End
-
-  // Verificar solapamiento
-  return start1 < end2 && start2 < end1
+  return false
 }
 
 /**
@@ -69,47 +80,25 @@ export function validateScheduleAssignments(
 /**
  * Calcula las horas trabajadas de un turno, considerando el descanso de 30 minutos
  * Solo aplica descanso si el turno es continuo (no cortado) y tiene más de 6 horas
+ * Soporta cruce de medianoche y turnos cortados (dos franjas)
  */
 export function calculateShiftHours(
-  shift: Turno,
+  shift: Turno | { startTime?: string | null; endTime?: string | null; startTime2?: string | null; endTime2?: string | null },
   minutosDescanso: number = 30,
   horasMinimasParaDescanso: number = 6
 ): number {
   if (!shift.startTime || !shift.endTime) return 0
 
-  // Si tiene segunda franja (turno cortado), NO aplica descanso
-  if (shift.startTime2 || shift.endTime2) {
-    // Calcular ambas franjas sin descanso
-    let totalMinutes = 0
-    
-    // Primera franja
-    const [h1Start, m1Start] = shift.startTime.split(":").map(Number)
-    const [h1End, m1End] = shift.endTime.split(":").map(Number)
-    const start1 = h1Start * 60 + m1Start
-    const end1 = h1End * 60 + m1End
-    totalMinutes += end1 - start1
-    
-    // Segunda franja (si existe)
-    if (shift.startTime2 && shift.endTime2) {
-      const [h2Start, m2Start] = shift.startTime2.split(":").map(Number)
-      const [h2End, m2End] = shift.endTime2.split(":").map(Number)
-      const start2 = h2Start * 60 + m2Start
-      const end2 = h2End * 60 + m2End
-      totalMinutes += end2 - start2
-    }
-    
-    return totalMinutes / 60
-  }
-
-  // Turno continuo: calcular horas
-  const [hStart, mStart] = shift.startTime.split(":").map(Number)
-  const [hEnd, mEnd] = shift.endTime.split(":").map(Number)
-  const start = hStart * 60 + mStart
-  const end = hEnd * 60 + mEnd
-  const totalMinutes = end - start
+  // Calcular duración total usando utilidades de tiempo
+  const totalMinutes = calculateShiftDurationMinutes(shift)
   const totalHours = totalMinutes / 60
 
-  // Solo aplicar descanso si el turno es >= horasMinimasParaDescanso
+  // Si tiene segunda franja (turno cortado), NO aplica descanso
+  if (shift.startTime2 || shift.endTime2) {
+    return totalHours
+  }
+
+  // Turno continuo: aplicar descanso si cumple horas mínimas
   if (totalHours >= horasMinimasParaDescanso) {
     const horasConDescanso = (totalMinutes - minutosDescanso) / 60
     return Math.max(0, horasConDescanso) // No puede ser negativo
