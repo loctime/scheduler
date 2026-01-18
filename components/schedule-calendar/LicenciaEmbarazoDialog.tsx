@@ -110,12 +110,11 @@ export function LicenciaEmbarazoDialog({
     const MAX_WORK_HOURS = 4 // Máximo de 4 horas trabajables
     const maxWorkMinutes = MAX_WORK_HOURS * 60
 
-    // CRÍTICO: Usar SOLO valores explícitos del assignment (autosuficiencia)
-    // NO usar fallback al turno base
-    const shiftStartTime = assignment.startTime
-    const shiftEndTime = assignment.endTime
-    const shiftStartTime2 = assignment.startTime2
-    const shiftEndTime2 = assignment.endTime2
+    // Usar horario real del assignment si existe, sino usar turno base como referencia inicial
+    const shiftStartTime = assignment.startTime || shift?.startTime || ""
+    const shiftEndTime = assignment.endTime || shift?.endTime || ""
+    const shiftStartTime2 = assignment.startTime2 || shift?.startTime2
+    const shiftEndTime2 = assignment.endTime2 || shift?.endTime2
 
     if (!shiftStartTime || !shiftEndTime) return []
 
@@ -318,21 +317,22 @@ export function LicenciaEmbarazoDialog({
     // Verificar si es medio_franco
     const isMedioFranco = shiftAssignment.type === "medio_franco"
 
-    // CRÍTICO: Usar SOLO valores explícitos del assignment (autosuficiencia)
-    // No usar turno base como fallback - el assignment debe tener todos los datos necesarios
-    if (!shiftAssignment.startTime || !shiftAssignment.endTime) {
+    // Usar horarios de referencia (assignment real o turno base) para validación
+    // Al final, SIEMPRE crearemos assignments explícitos con los horarios elegidos por el usuario
+    const shiftStartTime = shiftAssignment.startTime || shift?.startTime || ""
+    const shiftEndTime = shiftAssignment.endTime || shift?.endTime || ""
+    const shiftStartTime2 = shiftAssignment.startTime2 || shift?.startTime2
+    const shiftEndTime2 = shiftAssignment.endTime2 || shift?.endTime2
+
+    // Validar que tengamos horarios de referencia
+    if (!shiftStartTime || !shiftEndTime) {
       toast({
         title: "Error",
-        description: "El assignment está incompleto. No se puede dividir.",
+        description: "No se puede determinar el horario de referencia del turno.",
         variant: "destructive",
       })
       return
     }
-
-    const shiftStartTime = shiftAssignment.startTime
-    const shiftEndTime = shiftAssignment.endTime
-    const shiftStartTime2 = shiftAssignment.startTime2 // Puede ser undefined si es turno simple
-    const shiftEndTime2 = shiftAssignment.endTime2 // Puede ser undefined si es turno simple
 
     // Validar duración de licencia (considerando cruce de medianoche)
     const licenciaDuration = calculateDuration(trimmedStartTime, trimmedEndTime)
@@ -600,22 +600,15 @@ export function LicenciaEmbarazoDialog({
     }
 
     // Mantener todas las demás asignaciones (francos, notas, otros turnos, etc.)
-    // Si es medio_franco, filtrarlo también; si es shift, filtrar por shiftId
+    // Eliminar el assignment original (se reemplaza por los nuevos assignments explícitos)
     const otherAssignments = assignments.filter((a) => {
       if (isMedioFranco) {
-        // Para medio_franco, eliminar el medio_franco original si la licencia coincide exactamente
-        if (a.type === "medio_franco" && a.startTime && a.endTime) {
-          const aStartNorm = normalizeTimeForComparison(a.startTime)
-          const aEndNorm = normalizeTimeForComparison(a.endTime)
-          // Si coincide exactamente, no incluir (se reemplaza por licencia)
-          if (licenciaStartNorm === aStartNorm && licenciaEndNorm === aEndNorm) {
-            return false
-          }
-        }
-        // Mantener el medio_franco si no coincide exactamente (licencia parcial)
-        return true
+        // Para medio_franco, eliminar el medio_franco original
+        // (se reemplaza por los nuevos assignments con horarios explícitos)
+        return a.type !== "medio_franco"
       } else {
-        // Para shift, filtrar por shiftId
+        // Para shift, filtrar por shiftId (eliminar el assignment original)
+        // Esto incluye tanto assignments con horario real como sin horario real
         return !(a.type === "shift" && a.shiftId === shiftAssignment.shiftId)
       }
     })
@@ -656,17 +649,24 @@ export function LicenciaEmbarazoDialog({
 
   if (!selectedShift) return null
 
-  // GUARD-RAIL: Bloqueo explícito si no hay horario real
   const assignment = selectedShift.assignment
+  const shift = selectedShift.shift
   const hasRealSchedule = assignment.startTime && assignment.endTime
+  
+  // Obtener horarios de referencia (assignment real o turno base)
+  const referenceStartTime = assignment.startTime || shift?.startTime || ""
+  const referenceEndTime = assignment.endTime || shift?.endTime || ""
+  const referenceStartTime2 = assignment.startTime2 || shift?.startTime2
+  const referenceEndTime2 = assignment.endTime2 || shift?.endTime2
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         {!hasRealSchedule && (
-          <Alert variant="destructive" className="mb-4">
+          <Alert className="mb-4">
             <AlertDescription>
-              Definí primero el horario trabajado desde "Editar horario".
+              El horario del turno se usa solo como referencia inicial.
+              Las horas reales se definirán al confirmar.
             </AlertDescription>
           </Alert>
         )}
@@ -679,17 +679,10 @@ export function LicenciaEmbarazoDialog({
                 <br />
                 <span className="text-xs">
                   {(() => {
-                    const assignment = selectedShift.assignment
-                    // CRÍTICO: Usar SOLO valores explícitos del assignment
-                    const startTime = assignment.startTime || ""
-                    const endTime = assignment.endTime || ""
-                    const startTime2 = assignment.startTime2
-                    const endTime2 = assignment.endTime2
-
-                    if (startTime2 && endTime2) {
-                      return `Horario completo: ${startTime} - ${endTime} y ${startTime2} - ${endTime2}`
+                    if (referenceStartTime2 && referenceEndTime2) {
+                      return `Horario completo: ${referenceStartTime} - ${referenceEndTime} y ${referenceStartTime2} - ${referenceEndTime2}`
                     }
-                    return `Horario completo: ${startTime} - ${endTime}`
+                    return `Horario completo: ${referenceStartTime} - ${referenceEndTime}`
                   })()}
                   <br />
                   <span className="text-muted-foreground">
@@ -713,17 +706,10 @@ export function LicenciaEmbarazoDialog({
                 )}
                 <span className="text-xs">
                   {(() => {
-                    const assignment = selectedShift.assignment
-                    // CRÍTICO: Usar SOLO valores explícitos del assignment (autosuficiencia)
-                    const startTime = assignment.startTime || ""
-                    const endTime = assignment.endTime || ""
-                    const startTime2 = assignment.startTime2
-                    const endTime2 = assignment.endTime2
-
-                    if (startTime2 && endTime2) {
-                      return `Horario completo: ${startTime} - ${endTime} y ${startTime2} - ${endTime2}`
+                    if (referenceStartTime2 && referenceEndTime2) {
+                      return `Horario completo: ${referenceStartTime} - ${referenceEndTime} y ${referenceStartTime2} - ${referenceEndTime2}`
                     }
-                    return `Horario completo: ${startTime} - ${endTime}`
+                    return `Horario completo: ${referenceStartTime} - ${referenceEndTime}`
                   })()}
                   <br />
                   <span className="text-muted-foreground">
@@ -732,18 +718,17 @@ export function LicenciaEmbarazoDialog({
                 </span>
               </>
             )}
-            <br />
-            <div className="mt-3 p-3 bg-muted/50 rounded-md border border-border">
-              <p className="text-xs text-foreground font-medium mb-1">
-                ℹ️ Información importante:
-              </p>
-              <p className="text-xs text-muted-foreground">
-                El día mantendrá su duración total. Las horas se dividirán entre trabajo y licencia por embarazo.
-                El sistema propone opciones válidas, pero tú decides cómo dividir el horario.
-              </p>
-            </div>
           </DialogDescription>
         </DialogHeader>
+        <div className="mt-3 p-3 bg-muted/50 rounded-md border border-border">
+          <p className="text-xs text-foreground font-medium mb-1">
+            ℹ️ Información importante:
+          </p>
+          <p className="text-xs text-muted-foreground">
+            El día mantendrá su duración total. Las horas se dividirán entre trabajo y licencia por embarazo.
+            El sistema propone opciones válidas, pero tú decides cómo dividir el horario.
+          </p>
+        </div>
         <div className="grid gap-4 py-4">
           {hasRealSchedule && (
             <div className="p-3 rounded-md bg-muted/60 border text-xs">
@@ -828,8 +813,8 @@ export function LicenciaEmbarazoDialog({
                       setLicenciaStartTime(e.target.value)
                       setSelectedSuggestion(null) // Limpiar selección si se edita manualmente
                     }}
-                    min={assignment.startTime || undefined}
-                    max={assignment.endTime || undefined}
+                    min={referenceStartTime || undefined}
+                    max={referenceEndTime || undefined}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -842,8 +827,8 @@ export function LicenciaEmbarazoDialog({
                       setLicenciaEndTime(e.target.value)
                       setSelectedSuggestion(null) // Limpiar selección si se edita manualmente
                     }}
-                    min={licenciaStartTime || assignment.startTime || undefined}
-                    max={assignment.endTime || undefined}
+                    min={licenciaStartTime || referenceStartTime || undefined}
+                    max={referenceEndTime || undefined}
                   />
                 </div>
               </div>
@@ -853,11 +838,11 @@ export function LicenciaEmbarazoDialog({
             licenciaStartTime &&
             licenciaEndTime &&
             (() => {
-              // CRÍTICO: Usar SOLO valores explícitos del assignment
-              const shiftStartTime = assignment.startTime || ""
-              const shiftEndTime = assignment.endTime || ""
-              const shiftStartTime2 = assignment.startTime2
-              const shiftEndTime2 = assignment.endTime2
+              // Usar horarios de referencia (assignment real o turno base)
+              const shiftStartTime = referenceStartTime
+              const shiftEndTime = referenceEndTime
+              const shiftStartTime2 = referenceStartTime2
+              const shiftEndTime2 = referenceEndTime2
 
               let isValid = false
               let errorMessage = ""
@@ -910,7 +895,8 @@ export function LicenciaEmbarazoDialog({
           <Button
             onClick={handleSaveLicenciaEmbarazo}
             disabled={
-              !hasRealSchedule ||
+              !referenceStartTime ||
+              !referenceEndTime ||
               !licenciaStartTime ||
               !licenciaEndTime ||
               calculateDuration(licenciaStartTime, licenciaEndTime) <= 0

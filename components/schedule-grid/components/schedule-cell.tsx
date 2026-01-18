@@ -171,43 +171,45 @@ export function ScheduleCell({
   }, [firstShiftAssignment])
 
   // Validar si se puede aplicar licencia por embarazo
-  // REQUISITO: Debe existir al menos un assignment de tipo "shift" o "medio_franco" con startTime y endTime explícitos
+  // REQUISITO: Debe existir al menos un assignment de tipo "shift" o "medio_franco"
+  // No se exige horario real explícito - se puede usar el turno base como referencia inicial
   const canApplyLicenciaEmbarazo = React.useMemo(() => {
     return assignments.some(
-      (a) =>
-        (a.type === "shift" || a.type === "medio_franco") &&
-        a.startTime &&
-        a.endTime
+      (a) => a.type === "shift" || a.type === "medio_franco"
     )
   }, [assignments])
 
   // Encontrar turnos (shifts) y medios francos disponibles para asignar licencia
-  // CRÍTICO: Permitir turnos huérfanos (shift puede ser undefined)
-  // IMPORTANTE: Solo incluir assignments que cumplan los requisitos (startTime y endTime explícitos)
+  // PERMITE turnos sin horario real - se usa el turno base como referencia inicial
   const availableShifts = React.useMemo(() => {
     const shifts = assignments
-      .filter((a) => a.type === "shift" && a.startTime && a.endTime)
+      .filter((a) => a.type === "shift")
       .map((a) => {
         const shift = a.shiftId ? getShiftInfo(a.shiftId) : undefined
-        // El assignment ya tiene startTime y endTime explícitos (validado en el filter)
+        // Incluir incluso si no tiene horario real - el turno base servirá como referencia
         return { assignment: a, shift: shift || undefined }
       })
-      .filter((item): item is { assignment: ShiftAssignment; shift: Turno | undefined } => item !== null)
+      .filter((item): item is { assignment: ShiftAssignment; shift: Turno | undefined } => {
+        // Solo incluir si tiene turno base o tiene horario real
+        const hasRealSchedule = !!(item.assignment.startTime && item.assignment.endTime)
+        return item.shift !== undefined || hasRealSchedule
+      })
     
-    // Agregar medios francos que tengan horario (startTime/endTime)
+    // Agregar medios francos (con o sin horario real)
     const mediosFrancos = assignments
-      .filter((a) => a.type === "medio_franco" && a.startTime && a.endTime)
+      .filter((a) => a.type === "medio_franco")
       .map((a) => {
-        // Crear un Turno virtual para medio_franco
+        // Si tiene horario real, crear turno virtual con esos horarios
+        // Si no, crear turno virtual genérico (aunque esto es raro para medio_franco)
         const virtualShift: Turno = {
           id: "medio_franco_virtual",
           name: "1/2 Franco",
-          startTime: a.startTime!,
-          endTime: a.endTime!,
+          startTime: a.startTime || "",
+          endTime: a.endTime || "",
           startTime2: a.startTime2,
           endTime2: a.endTime2,
           color: "#22c55e",
-          userId: "", // Campo requerido pero no relevante para virtual
+          userId: "",
         }
         return { assignment: a, shift: virtualShift }
       })
@@ -349,15 +351,8 @@ export function ScheduleCell({
 
 
   const handleOpenLicenciaEmbarazoDialog = (shiftAssignment: ShiftAssignment, shift?: Turno) => {
-    if (!shiftAssignment.startTime || !shiftAssignment.endTime) {
-      toast({
-        title: "Horario incompleto",
-        description: "Definí primero el horario trabajado (Editar horario).",
-        variant: "destructive",
-      })
-      return
-    }
-
+    // Permitir abrir el modal incluso si no hay horario real
+    // El turno base servirá como referencia inicial
     setSelectedShiftForLicencia({ assignment: shiftAssignment, shift })
     setLicenciaEmbarazoDialogOpen(true)
   }
