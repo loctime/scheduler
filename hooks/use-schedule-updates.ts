@@ -7,7 +7,7 @@ import { validateScheduleAssignments, validateDailyHours } from "@/lib/validatio
 import { useToast } from "@/hooks/use-toast"
 import { useConfig } from "@/hooks/use-config"
 import { createHistoryEntry, saveHistoryEntry, updateSchedulePreservingFields } from "@/lib/firestore-helpers"
-import { updateAssignmentInAssignments, normalizeAssignments } from "@/lib/schedule-utils"
+import { updateAssignmentInAssignments, normalizeAssignments, hydrateAssignmentsWithShiftTimes } from "@/lib/schedule-utils"
 import { logger } from "@/lib/logger"
 import { getSuggestionForDay } from "@/lib/pattern-learning"
 import { isAssignmentIncomplete, getIncompletenessReason } from "@/lib/assignment-utils"
@@ -355,7 +355,46 @@ export function useScheduleUpdates({
         let scheduleId: string
         let currentAssignments: Record<string, Record<string, any>> = {}
         let scheduleNombre = `Semana del ${weekStartStr}`
-        let finalAssignments: ShiftAssignment[] = assignments
+        
+        // CRÍTICO: Hidratar assignments con horarios del turno ANTES de cualquier procesamiento
+        // Crear Map de turnos para búsqueda rápida
+        const shiftsById = new Map(shifts.map((s) => [s.id, s]))
+        
+        // Log temporal: antes de hidratar
+        const assignmentsWithoutTimes = assignments.filter(
+          (a) => a.type === "shift" && a.shiftId && (!a.startTime || !a.endTime)
+        )
+        if (assignmentsWithoutTimes.length > 0) {
+          console.debug("[use-schedule-updates] Assignments sin horarios antes de hidratar:", {
+            count: assignmentsWithoutTimes.length,
+            assignments: assignmentsWithoutTimes.map((a) => ({
+              shiftId: a.shiftId,
+              hasStartTime: !!a.startTime,
+              hasEndTime: !!a.endTime,
+            })),
+          })
+        }
+        
+        // Hidratar assignments con horarios del turno
+        const hydratedAssignments = hydrateAssignmentsWithShiftTimes(assignments, shiftsById)
+        
+        // Log temporal: después de hidratar
+        const assignmentsStillWithoutTimes = hydratedAssignments.filter(
+          (a) => a.type === "shift" && a.shiftId && (!a.startTime || !a.endTime)
+        )
+        if (assignmentsStillWithoutTimes.length > 0) {
+          console.debug("[use-schedule-updates] Assignments aún sin horarios después de hidratar (huérfanos):", {
+            count: assignmentsStillWithoutTimes.length,
+            assignments: assignmentsStillWithoutTimes.map((a) => ({
+              shiftId: a.shiftId,
+              shiftExists: shiftsById.has(a.shiftId!),
+            })),
+          })
+        } else if (assignmentsWithoutTimes.length > 0) {
+          console.debug("[use-schedule-updates] Todos los assignments fueron hidratados correctamente")
+        }
+        
+        let finalAssignments: ShiftAssignment[] = hydratedAssignments
 
         // Obtener el horario de esa semana específica
         if (options?.scheduleId) {
@@ -389,7 +428,8 @@ export function useScheduleUpdates({
           
           // Limpiar campos undefined de los assignments antes de guardar (Firestore no acepta undefined)
           // CRÍTICO: NUNCA reconstruir assignments, solo eliminar undefined para preservar autosuficiencia
-          const cleanedAssignments = assignments.map((assignment) => {
+          // Usar hydratedAssignments en lugar de assignments originales
+          const cleanedAssignments = finalAssignments.map((assignment) => {
             return Object.fromEntries(
               Object.entries(assignment).filter(([, v]) => v !== undefined)
             ) as ShiftAssignment
@@ -468,7 +508,8 @@ export function useScheduleUpdates({
           // - NO preservarlo si el usuario está asignando un turno nuevo explícitamente (sin medio_franco)
           // - Solo preservarlo si hay otras asignaciones (como franco, nota) que sugieren que el usuario
           //   solo está modificando parcialmente el día, no reemplazando todo
-          finalAssignments = [...assignments]
+          // Usar hydratedAssignments en lugar de assignments originales
+          finalAssignments = [...finalAssignments]
           
           // Verificar si el usuario está limpiando explícitamente (array vacío) o asignando solo un turno nuevo
           const isClearingCell = assignments.length === 0

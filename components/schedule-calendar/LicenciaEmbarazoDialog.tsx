@@ -17,6 +17,7 @@ import { ShiftAssignment, Turno, Configuracion } from "@/lib/types"
 import { validateCellAssignments } from "@/lib/assignment-validators"
 import { useToast } from "@/hooks/use-toast"
 import { rangeDuration } from "@/lib/time-utils"
+import { hydrateAssignmentsWithShiftTimes } from "@/lib/schedule-utils"
 
 interface LicenciaEmbarazoDialogProps {
   open: boolean
@@ -652,24 +653,87 @@ export function LicenciaEmbarazoDialog({
   const assignment = selectedShift.assignment
   const shift = selectedShift.shift
   
-  // NUEVO MODELO SIMPLE: El assignment siempre tiene horario real desde su creación
-  // Solo usar turno base como fallback para datos legacy sin horarios
-  const hasRealSchedule = assignment.startTime && assignment.endTime
+  // CRITERIO DE LEGACY ACTUALIZADO:
+  // Considerar legacy solo si:
+  // - assignment.type==="shift" && assignment.shiftId && (!assignment.startTime || !assignment.endTime) && !shiftExiste
+  // Es decir: si el turno existe, el assignment debería venir hidratado; si no viene, es bug.
+  const isLegacy = 
+    assignment.type === "shift" && 
+    assignment.shiftId && 
+    (!assignment.startTime || !assignment.endTime) && 
+    !shift
   
-  // Obtener horarios: preferir assignment real, fallback a turno base solo para datos legacy
+  // Detectar datos inconsistentes: turno existe pero assignment no tiene horarios
+  const hasInconsistentData = 
+    assignment.type === "shift" && 
+    assignment.shiftId && 
+    (!assignment.startTime || !assignment.endTime) && 
+    !!shift
+  
+  // Función para normalizar datos inconsistentes
+  const handleNormalize = () => {
+    if (!shift || !assignment.shiftId) return
+    
+    // Crear Map de turnos para hidratación
+    const shiftsById = new Map<string, Turno>()
+    shiftsById.set(shift.id, shift)
+    
+    // Hidratar el assignment específico
+    const hydrated = hydrateAssignmentsWithShiftTimes([assignment], shiftsById)
+    if (hydrated.length > 0 && hydrated[0].startTime && hydrated[0].endTime) {
+      // Actualizar el assignment en la lista de assignments
+      const updatedAssignments = assignments.map((a) => 
+        a === assignment ? hydrated[0] : a
+      )
+      
+      // Guardar assignments normalizados
+      onApply(date, employeeId, updatedAssignments)
+      
+      toast({
+        title: "Datos normalizados",
+        description: "El assignment fue hidratado con los horarios del turno base. Por favor, vuelve a abrir el diálogo de licencia.",
+      })
+      
+      // Cerrar el diálogo para que el usuario pueda reabrirlo con datos normalizados
+      onOpenChange(false)
+    }
+  }
+  
+  // Obtener horarios: preferir assignment real, fallback a turno base solo para datos legacy/inconsistentes
   const referenceStartTime = assignment.startTime || shift?.startTime || ""
   const referenceEndTime = assignment.endTime || shift?.endTime || ""
   const referenceStartTime2 = assignment.startTime2 || shift?.startTime2
   const referenceEndTime2 = assignment.endTime2 || shift?.endTime2
+  
+  // hasRealSchedule: tiene horarios explícitos en el assignment
+  const hasRealSchedule = assignment.startTime && assignment.endTime
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        {!hasRealSchedule && (
+        {isLegacy && (
           <Alert className="mb-4">
             <AlertDescription>
               Este assignment no tiene horario definido (datos legacy). 
-              Se usa el horario del turno base como referencia.
+              El turno base fue eliminado, por lo que no se puede determinar el horario de referencia.
+            </AlertDescription>
+          </Alert>
+        )}
+        {hasInconsistentData && (
+          <Alert className="mb-4">
+            <AlertDescription className="space-y-2">
+              <div>
+                <strong>Datos inconsistentes detectados:</strong> El turno base existe pero el assignment no tiene horarios definidos.
+                Esto no debería ocurrir con assignments nuevos.
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNormalize}
+                className="mt-2"
+              >
+                Normalizar ahora
+              </Button>
             </AlertDescription>
           </Alert>
         )}

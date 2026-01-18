@@ -142,5 +142,61 @@ export function hasAssignmentsOnDate(
     assignments[date][employeeId].length > 0)
 }
 
+/**
+ * Hidrata assignments con los horarios del turno base cuando faltan.
+ * 
+ * Reglas:
+ * - Si a.type==="shift" y tiene shiftId:
+ *   - Si startTime/endTime faltan => copiarlos desde el turno correspondiente (si existe)
+ *   - Si existen, NO tocarlos (no pisar edición real)
+ *   - Copiar también startTime2/endTime2 si el turno lo tiene y el assignment no
+ * - Si no existe el turno (huérfano), NO inventar nada.
+ * 
+ * @param assignments - Array de assignments a hidratar
+ * @param shiftsById - Map de turnos por ID para búsqueda rápida
+ * @returns Array de assignments hidratados
+ */
+export function hydrateAssignmentsWithShiftTimes(
+  assignments: ShiftAssignment[],
+  shiftsById: Map<string, Turno>
+): ShiftAssignment[] {
+  return assignments.map((assignment) => {
+    // Solo procesar assignments de tipo "shift" con shiftId
+    if (assignment.type !== "shift" || !assignment.shiftId) {
+      return assignment
+    }
+
+    const shift = shiftsById.get(assignment.shiftId)
+    
+    // Si no existe el turno (huérfano), retornar sin cambios
+    if (!shift) {
+      return assignment
+    }
+
+    // Crear copia del assignment para no mutar el original
+    const hydrated: ShiftAssignment = { ...assignment }
+
+    // Si faltan startTime/endTime, copiarlos desde el turno
+    if (!hydrated.startTime && shift.startTime) {
+      hydrated.startTime = shift.startTime
+    }
+    if (!hydrated.endTime && shift.endTime) {
+      hydrated.endTime = shift.endTime
+    }
+
+    // Si el turno tiene segunda franja y el assignment no, copiarla
+    if (shift.startTime2 && shift.endTime2) {
+      if (!hydrated.startTime2) {
+        hydrated.startTime2 = shift.startTime2
+      }
+      if (!hydrated.endTime2) {
+        hydrated.endTime2 = shift.endTime2
+      }
+    }
+
+    return hydrated
+  })
+}
+
 
 

@@ -51,7 +51,30 @@ export function QuickShiftSelector({
   }
 
   const handleTurno = (shift: Turno) => {
-    onSelectAssignments([{ type: "shift", shiftId: shift.id }])
+    // CRÍTICO: Crear assignment completo con horarios desde el inicio
+    // Esto previene que se guarden assignments sin startTime/endTime
+    const assignment: ShiftAssignment = {
+      type: "shift",
+      shiftId: shift.id,
+    }
+    
+    // Copiar primera franja siempre
+    if (shift.startTime) {
+      assignment.startTime = shift.startTime
+    }
+    if (shift.endTime) {
+      assignment.endTime = shift.endTime
+    }
+    
+    // Copiar segunda franja si existe (turno cortado)
+    if (shift.startTime2) {
+      assignment.startTime2 = shift.startTime2
+    }
+    if (shift.endTime2) {
+      assignment.endTime2 = shift.endTime2
+    }
+    
+    onSelectAssignments([assignment])
     resetMode()
   }
 
