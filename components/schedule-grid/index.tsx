@@ -6,7 +6,6 @@ import { es } from "date-fns/locale"
 import { Card } from "@/components/ui/card"
 import { Empleado, Turno, Horario, HistorialItem, ShiftAssignment, MedioTurno } from "@/lib/types"
 import { ShiftSelectorPopover } from "../shift-selector-popover"
-import { adjustTime } from "@/lib/utils"
 import { useConfig } from "@/hooks/use-config"
 import { useEmployeeOrder } from "@/hooks/use-employee-order"
 import { useToast } from "@/hooks/use-toast"
@@ -615,7 +614,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
                         onDrop={handleDrop}
-                        adjustTime={adjustTime}
                         onAssignmentUpdate={onAssignmentUpdate}
                         scheduleId={schedule?.id}
                         shifts={shifts}

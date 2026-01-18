@@ -10,7 +10,7 @@ import { getCustomMonthRange, getMonthWeeks, getInitialMonthForRange } from "@/l
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { useScheduleUpdates } from "@/hooks/use-schedule-updates"
 import { useSchedulesListener } from "@/hooks/use-schedules-listener"
-import { calculateExtraHours, calculateHoursBreakdown } from "@/lib/validations"
+import { calculateTotalExtraHours, calculateHoursBreakdown } from "@/lib/validations"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { GeneralView } from "@/components/schedule-calendar/general-view"
 import { ExportOverlay } from "@/components/export-overlay"
@@ -281,7 +281,13 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
           }
 
           // Calcular horas extras: simplemente contar los 30 minutos agregados
-          const extraHours = calculateExtraHours(normalizedAssignments, shiftsToUse)
+          const { horasExtra } = calculateTotalExtraHours(
+            normalizedAssignments,
+            shiftsToUse,
+            minutosDescanso,
+            horasMinimasParaDescanso
+          )
+          const extraHours = horasExtra
           if (extraHours > 0) {
             // Acumular en el total del mes
             stats[employeeId].horasExtrasMes += extraHours
