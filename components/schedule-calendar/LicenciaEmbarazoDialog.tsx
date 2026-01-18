@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ShiftAssignment, Turno, Configuracion } from "@/lib/types"
 import { validateCellAssignments } from "@/lib/assignment-validators"
 import { useToast } from "@/hooks/use-toast"
@@ -109,11 +110,12 @@ export function LicenciaEmbarazoDialog({
     const MAX_WORK_HOURS = 4 // Máximo de 4 horas trabajables
     const maxWorkMinutes = MAX_WORK_HOURS * 60
 
-    // Obtener horarios del turno (considerando ajustes del assignment)
-    const shiftStartTime = assignment.startTime || shift?.startTime || ""
-    const shiftEndTime = assignment.endTime || shift?.endTime || ""
-    const shiftStartTime2 = assignment.startTime2 || shift?.startTime2
-    const shiftEndTime2 = assignment.endTime2 || shift?.endTime2
+    // CRÍTICO: Usar SOLO valores explícitos del assignment (autosuficiencia)
+    // NO usar fallback al turno base
+    const shiftStartTime = assignment.startTime
+    const shiftEndTime = assignment.endTime
+    const shiftStartTime2 = assignment.startTime2
+    const shiftEndTime2 = assignment.endTime2
 
     if (!shiftStartTime || !shiftEndTime) return []
 
@@ -654,9 +656,20 @@ export function LicenciaEmbarazoDialog({
 
   if (!selectedShift) return null
 
+  // GUARD-RAIL: Bloqueo explícito si no hay horario real
+  const assignment = selectedShift.assignment
+  const hasRealSchedule = assignment.startTime && assignment.endTime
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        {!hasRealSchedule && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>
+              Definí primero el horario trabajado desde "Editar horario".
+            </AlertDescription>
+          </Alert>
+        )}
         <DialogHeader>
           <DialogTitle>Asignar Licencia por Embarazo</DialogTitle>
           <DialogDescription>
@@ -666,12 +679,12 @@ export function LicenciaEmbarazoDialog({
                 <br />
                 <span className="text-xs">
                   {(() => {
-                    const shift = selectedShift.shift
                     const assignment = selectedShift.assignment
-                    const startTime = assignment.startTime || shift?.startTime || ""
-                    const endTime = assignment.endTime || shift?.endTime || ""
-                    const startTime2 = assignment.startTime2 || shift?.startTime2
-                    const endTime2 = assignment.endTime2 || shift?.endTime2
+                    // CRÍTICO: Usar SOLO valores explícitos del assignment
+                    const startTime = assignment.startTime || ""
+                    const endTime = assignment.endTime || ""
+                    const startTime2 = assignment.startTime2
+                    const endTime2 = assignment.endTime2
 
                     if (startTime2 && endTime2) {
                       return `Horario completo: ${startTime} - ${endTime} y ${startTime2} - ${endTime2}`
@@ -700,14 +713,12 @@ export function LicenciaEmbarazoDialog({
                 )}
                 <span className="text-xs">
                   {(() => {
-                    const shift = selectedShift.shift
                     const assignment = selectedShift.assignment
-                    // CRÍTICO: Usar SOLO valores del assignment (autosuficiencia)
-                    // Si no hay turno base, solo usar assignment
-                    const startTime = assignment.startTime || (shift?.startTime || "")
-                    const endTime = assignment.endTime || (shift?.endTime || "")
-                    const startTime2 = assignment.startTime2 || shift?.startTime2
-                    const endTime2 = assignment.endTime2 || shift?.endTime2
+                    // CRÍTICO: Usar SOLO valores explícitos del assignment (autosuficiencia)
+                    const startTime = assignment.startTime || ""
+                    const endTime = assignment.endTime || ""
+                    const startTime2 = assignment.startTime2
+                    const endTime2 = assignment.endTime2
 
                     if (startTime2 && endTime2) {
                       return `Horario completo: ${startTime} - ${endTime} y ${startTime2} - ${endTime2}`
@@ -721,12 +732,31 @@ export function LicenciaEmbarazoDialog({
                 </span>
               </>
             )}
+            <br />
+            <div className="mt-3 p-3 bg-muted/50 rounded-md border border-border">
+              <p className="text-xs text-foreground font-medium mb-1">
+                ℹ️ Información importante:
+              </p>
+              <p className="text-xs text-muted-foreground">
+                El día mantendrá su duración total. Las horas se dividirán entre trabajo y licencia por embarazo.
+                El sistema propone opciones válidas, pero tú decides cómo dividir el horario.
+              </p>
+            </div>
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          {calculateLicenciaSuggestions.length > 0 && (
+          {hasRealSchedule && (
+            <div className="p-3 rounded-md bg-muted/60 border text-xs">
+              El sistema propone opciones válidas, pero <strong>no aplica ningún cambio automáticamente</strong>.
+              Debes seleccionar una opción o definir el rango manualmente y confirmar.
+            </div>
+          )}
+          {hasRealSchedule && calculateLicenciaSuggestions.length > 0 && (
             <div className="space-y-3 pb-3 border-b">
-              <Label className="text-sm font-semibold">Sugerencias automáticas:</Label>
+              <Label className="text-sm font-semibold">Sugerencias automáticas (selecciona una opción):</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                El sistema propone opciones válidas. Selecciona una para prellenar los campos, o define manualmente.
+              </p>
               <div className="space-y-2">
                 {calculateLicenciaSuggestions.map((suggestion) => (
                   <div
@@ -784,62 +814,50 @@ export function LicenciaEmbarazoDialog({
               </div>
             </div>
           )}
-          <div className="space-y-4">
-            <Label className="text-sm font-semibold">O especifica manualmente:</Label>
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="licenciaStartTime">Hora de inicio de licencia</Label>
-                <Input
-                  id="licenciaStartTime"
-                  type="time"
-                  value={licenciaStartTime}
-                  onChange={(e) => {
-                    setLicenciaStartTime(e.target.value)
-                    setSelectedSuggestion(null) // Limpiar selección si se edita manualmente
-                  }}
-                  min={
-                    selectedShift
-                      ? selectedShift.assignment.startTime || selectedShift.shift?.startTime || ""
-                      : undefined
-                  }
-                  max={
-                    selectedShift ? selectedShift.assignment.endTime || selectedShift.shift?.endTime || "" : undefined
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="licenciaEndTime">Hora de fin de licencia</Label>
-                <Input
-                  id="licenciaEndTime"
-                  type="time"
-                  value={licenciaEndTime}
-                  onChange={(e) => {
-                    setLicenciaEndTime(e.target.value)
-                    setSelectedSuggestion(null) // Limpiar selección si se edita manualmente
-                  }}
-                  min={
-                    licenciaStartTime ||
-                    (selectedShift
-                      ? selectedShift.assignment.startTime || selectedShift.shift?.startTime || ""
-                      : undefined)
-                  }
-                  max={
-                    selectedShift ? selectedShift.assignment.endTime || selectedShift.shift?.endTime || "" : undefined
-                  }
-                />
+          {hasRealSchedule && (
+            <div className="space-y-4">
+              <Label className="text-sm font-semibold">O especifica manualmente:</Label>
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="licenciaStartTime">Hora de inicio de licencia</Label>
+                  <Input
+                    id="licenciaStartTime"
+                    type="time"
+                    value={licenciaStartTime}
+                    onChange={(e) => {
+                      setLicenciaStartTime(e.target.value)
+                      setSelectedSuggestion(null) // Limpiar selección si se edita manualmente
+                    }}
+                    min={assignment.startTime || undefined}
+                    max={assignment.endTime || undefined}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="licenciaEndTime">Hora de fin de licencia</Label>
+                  <Input
+                    id="licenciaEndTime"
+                    type="time"
+                    value={licenciaEndTime}
+                    onChange={(e) => {
+                      setLicenciaEndTime(e.target.value)
+                      setSelectedSuggestion(null) // Limpiar selección si se edita manualmente
+                    }}
+                    min={licenciaStartTime || assignment.startTime || undefined}
+                    max={assignment.endTime || undefined}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-          {licenciaStartTime &&
+          )}
+          {hasRealSchedule &&
+            licenciaStartTime &&
             licenciaEndTime &&
-            selectedShift &&
             (() => {
-              const shift = selectedShift.shift
-              const assignment = selectedShift.assignment
-              const shiftStartTime = assignment.startTime || shift?.startTime || ""
-              const shiftEndTime = assignment.endTime || shift?.endTime || ""
-              const shiftStartTime2 = assignment.startTime2 || shift?.startTime2
-              const shiftEndTime2 = assignment.endTime2 || shift?.endTime2
+              // CRÍTICO: Usar SOLO valores explícitos del assignment
+              const shiftStartTime = assignment.startTime || ""
+              const shiftEndTime = assignment.endTime || ""
+              const shiftStartTime2 = assignment.startTime2
+              const shiftEndTime2 = assignment.endTime2
 
               let isValid = false
               let errorMessage = ""
@@ -892,37 +910,10 @@ export function LicenciaEmbarazoDialog({
           <Button
             onClick={handleSaveLicenciaEmbarazo}
             disabled={
+              !hasRealSchedule ||
               !licenciaStartTime ||
               !licenciaEndTime ||
-              !selectedShift ||
-              (() => {
-                if (!selectedShift || !licenciaStartTime || !licenciaEndTime) return true
-                const shift = selectedShift.shift
-                const assignment = selectedShift.assignment
-                const shiftStartTime = assignment.startTime || shift?.startTime || ""
-                const shiftEndTime = assignment.endTime || shift?.endTime || ""
-                const shiftStartTime2 = assignment.startTime2 || shift?.startTime2
-                const shiftEndTime2 = assignment.endTime2 || shift?.endTime2
-
-                // Validar duración
-                const licenciaDuration = calculateDuration(licenciaStartTime, licenciaEndTime)
-                if (licenciaDuration <= 0) return true
-
-                // Validar rango
-                if (shiftStartTime2 && shiftEndTime2) {
-                  const inFirstRange =
-                    isTimeInRange(licenciaStartTime, shiftStartTime, shiftEndTime) &&
-                    isTimeInRange(licenciaEndTime, shiftStartTime, shiftEndTime)
-                  const inSecondRange =
-                    isTimeInRange(licenciaStartTime, shiftStartTime2, shiftEndTime2) &&
-                    isTimeInRange(licenciaEndTime, shiftStartTime2, shiftEndTime2)
-                  return !(inFirstRange || inSecondRange)
-                }
-                return !(
-                  isTimeInRange(licenciaStartTime, shiftStartTime, shiftEndTime) &&
-                  isTimeInRange(licenciaEndTime, shiftStartTime, shiftEndTime)
-                )
-              })()
+              calculateDuration(licenciaStartTime, licenciaEndTime) <= 0
             }
           >
             Guardar

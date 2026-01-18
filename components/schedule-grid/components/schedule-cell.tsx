@@ -170,18 +170,26 @@ export function ScheduleCell({
     return !!(firstShiftAssignment.assignment.startTime2 && firstShiftAssignment.assignment.endTime2)
   }, [firstShiftAssignment])
 
+  // Validar si se puede aplicar licencia por embarazo
+  // REQUISITO: Debe existir al menos un assignment de tipo "shift" o "medio_franco" con startTime y endTime explícitos
+  const canApplyLicenciaEmbarazo = React.useMemo(() => {
+    return assignments.some(
+      (a) =>
+        (a.type === "shift" || a.type === "medio_franco") &&
+        a.startTime &&
+        a.endTime
+    )
+  }, [assignments])
+
   // Encontrar turnos (shifts) y medios francos disponibles para asignar licencia
   // CRÍTICO: Permitir turnos huérfanos (shift puede ser undefined)
+  // IMPORTANTE: Solo incluir assignments que cumplan los requisitos (startTime y endTime explícitos)
   const availableShifts = React.useMemo(() => {
     const shifts = assignments
-      .filter((a) => a.type === "shift" && a.shiftId)
+      .filter((a) => a.type === "shift" && a.startTime && a.endTime)
       .map((a) => {
-        const shift = getShiftInfo(a.shiftId!)
-        // Permitir assignments con turno base eliminado (shift undefined)
-        // Solo incluir si el assignment tiene datos suficientes (startTime/endTime)
-        if (!shift && (!a.startTime || !a.endTime)) {
-          return null // Assignment incompleto sin turno base - no puede usarse para licencia
-        }
+        const shift = a.shiftId ? getShiftInfo(a.shiftId) : undefined
+        // El assignment ya tiene startTime y endTime explícitos (validado en el filter)
         return { assignment: a, shift: shift || undefined }
       })
       .filter((item): item is { assignment: ShiftAssignment; shift: Turno | undefined } => item !== null)
@@ -341,42 +349,17 @@ export function ScheduleCell({
 
 
   const handleOpenLicenciaEmbarazoDialog = (shiftAssignment: ShiftAssignment, shift?: Turno) => {
-    // Si es medio_franco con horario completo, asignar licencia directamente sin abrir diálogo
-    if (shiftAssignment.type === "medio_franco" && shiftAssignment.startTime && shiftAssignment.endTime && !shiftAssignment.startTime2) {
-      handleAssignLicenciaToMedioFranco(shiftAssignment)
-      return
-    }
-    
-    // CRÍTICO: Validar que el assignment tenga datos suficientes si el turno base no existe
-    if (!shift && (!shiftAssignment.startTime || !shiftAssignment.endTime)) {
+    if (!shiftAssignment.startTime || !shiftAssignment.endTime) {
       toast({
-        title: "Error",
-        description: "El assignment está incompleto y el turno base fue eliminado. No se puede asignar licencia.",
+        title: "Horario incompleto",
+        description: "Definí primero el horario trabajado (Editar horario).",
         variant: "destructive",
       })
       return
     }
-    
+
     setSelectedShiftForLicencia({ assignment: shiftAssignment, shift })
     setLicenciaEmbarazoDialogOpen(true)
-  }
-
-  // Asignar licencia directamente a medio_franco completo (reemplaza todo el medio_franco)
-  const handleAssignLicenciaToMedioFranco = (medioFrancoAssignment: ShiftAssignment) => {
-    if (!onAssignmentUpdate || !medioFrancoAssignment.startTime || !medioFrancoAssignment.endTime) return
-
-    const licenciaAssignment: ShiftAssignment = {
-      type: "licencia",
-      licenciaType: "embarazo",
-      startTime: medioFrancoAssignment.startTime,
-      endTime: medioFrancoAssignment.endTime,
-    }
-
-    // Filtrar el medio_franco original y agregar la licencia
-    const otherAssignments = assignments.filter((a) => a.type !== "medio_franco")
-    const finalAssignments = [...otherAssignments, licenciaAssignment]
-
-    onAssignmentUpdate(date, employeeId, finalAssignments, { scheduleId })
   }
 
 
@@ -576,38 +559,53 @@ export function ScheduleCell({
                 <Clock className="mr-2 h-4 w-4" />
                 {existingHorarioEspecial ? "Editar horario especial" : "Asignar horario especial"}
               </ContextMenuItem>
-              {availableShifts.length > 0 && (
-                <>
-                  <ContextMenuSeparator />
-                  {availableShifts.length === 1 ? (
-                    <ContextMenuItem
-                      onClick={() => handleOpenLicenciaEmbarazoDialog(availableShifts[0].assignment, availableShifts[0].shift)}
-                    >
-                      <Baby className="mr-2 h-4 w-4" />
-                      Asignar Licencia por Embarazo
-                    </ContextMenuItem>
-                  ) : (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <ContextMenuItem onSelect={(e) => e.preventDefault()}>
-                          <Baby className="mr-2 h-4 w-4" />
-                          Asignar Licencia por Embarazo
-                        </ContextMenuItem>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        {availableShifts.map(({ assignment, shift }, index) => (
-                          <DropdownMenuItem
-                            key={index}
-                            onClick={() => handleOpenLicenciaEmbarazoDialog(assignment, shift)}
-                          >
-                            {shift?.name || `Turno ${index + 1}`}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </>
-              )}
+              <>
+                <ContextMenuSeparator />
+                {availableShifts.length === 1 ? (
+                  <ContextMenuItem
+                    onClick={() => handleOpenLicenciaEmbarazoDialog(availableShifts[0].assignment, availableShifts[0].shift)}
+                    disabled={!canApplyLicenciaEmbarazo}
+                    className={!canApplyLicenciaEmbarazo ? "opacity-50 cursor-not-allowed" : ""}
+                    title={!canApplyLicenciaEmbarazo ? "Definí primero el horario trabajado (Editar horario)" : undefined}
+                  >
+                    <Baby className="mr-2 h-4 w-4" />
+                    Asignar licencia por embarazo
+                  </ContextMenuItem>
+                ) : availableShifts.length > 1 ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <ContextMenuItem 
+                        onSelect={(e) => e.preventDefault()}
+                        disabled={!canApplyLicenciaEmbarazo}
+                        className={!canApplyLicenciaEmbarazo ? "opacity-50 cursor-not-allowed" : ""}
+                        title={!canApplyLicenciaEmbarazo ? "Definí primero el horario trabajado (Editar horario)" : undefined}
+                      >
+                        <Baby className="mr-2 h-4 w-4" />
+                        Asignar licencia por embarazo
+                      </ContextMenuItem>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      {availableShifts.map(({ assignment, shift }, index) => (
+                        <DropdownMenuItem
+                          key={index}
+                          onClick={() => handleOpenLicenciaEmbarazoDialog(assignment, shift)}
+                        >
+                          {shift?.name || `Turno ${index + 1}`}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <ContextMenuItem
+                    disabled
+                    className="opacity-50 cursor-not-allowed"
+                    title="Definí primero el horario trabajado (Editar horario)"
+                  >
+                    <Baby className="mr-2 h-4 w-4" />
+                    Asignar licencia por embarazo
+                  </ContextMenuItem>
+                )}
+              </>
               {assignments.length > 0 && (
                 <>
                   <ContextMenuSeparator />
