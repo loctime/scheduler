@@ -18,13 +18,48 @@ export function toShiftIds(value: ShiftAssignmentValue | undefined): string[] {
 
 /**
  * Convertir ShiftAssignmentValue a ShiftAssignment[]
+ * 
+ * NUEVO MODELO SIMPLE: Cuando se convierte desde string[], copia automáticamente
+ * los horarios del turno base al assignment para que nazca con horario real explícito.
+ * 
+ * @param value - Valor a convertir (string[] o ShiftAssignment[])
+ * @param shifts - Array opcional de turnos para copiar horarios al convertir desde string[]
  */
-export function toAssignments(value: ShiftAssignmentValue | undefined): ShiftAssignment[] {
+export function toAssignments(
+  value: ShiftAssignmentValue | undefined,
+  shifts?: Turno[]
+): ShiftAssignment[] {
   if (!value || !Array.isArray(value)) return []
   if (value.length === 0) return []
-  // Si es string[] (formato antiguo), convertir
+  // Si es string[] (formato antiguo), convertir copiando horarios del turno
   if (typeof value[0] === "string") {
-    return (value as string[]).map((shiftId) => ({ shiftId, type: "shift" as const }))
+    return (value as string[]).map((shiftId) => {
+      const assignment: ShiftAssignment = { shiftId, type: "shift" as const }
+      
+      // NUEVO MODELO SIMPLE: Copiar horarios del turno si está disponible
+      if (shifts) {
+        const shift = shifts.find((s) => s.id === shiftId)
+        if (shift) {
+          // Copiar primera franja
+          if (shift.startTime) {
+            assignment.startTime = shift.startTime
+          }
+          if (shift.endTime) {
+            assignment.endTime = shift.endTime
+          }
+          
+          // Copiar segunda franja si existe (turno cortado)
+          if (shift.startTime2) {
+            assignment.startTime2 = shift.startTime2
+          }
+          if (shift.endTime2) {
+            assignment.endTime2 = shift.endTime2
+          }
+        }
+      }
+      
+      return assignment
+    })
   }
   // Si es ShiftAssignment[] (formato nuevo)
   return (value as ShiftAssignment[]).map((a) => ({

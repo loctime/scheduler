@@ -1,13 +1,49 @@
-import type { Horario, ShiftAssignment, ShiftAssignmentValue } from "./types"
+import type { Horario, ShiftAssignment, ShiftAssignmentValue, Turno } from "./types"
 
 /**
  * Normaliza asignaciones de turnos a formato ShiftAssignment[]
  * Soporta tanto formato antiguo (string[]) como nuevo (ShiftAssignment[])
+ * 
+ * NUEVO MODELO SIMPLE: Cuando se convierte desde string[], copia automáticamente
+ * los horarios del turno base al assignment para que nazca con horario real explícito.
+ * 
+ * @param value - Valor a normalizar (string[] o ShiftAssignment[])
+ * @param shifts - Array opcional de turnos para copiar horarios al convertir desde string[]
  */
-export function normalizeAssignments(value: ShiftAssignmentValue | undefined): ShiftAssignment[] {
+export function normalizeAssignments(
+  value: ShiftAssignmentValue | undefined,
+  shifts?: Turno[]
+): ShiftAssignment[] {
   if (!value || !Array.isArray(value) || value.length === 0) return []
   if (typeof value[0] === "string") {
-    return (value as string[]).map((shiftId) => ({ shiftId, type: "shift" as const }))
+    // Formato antiguo: convertir string[] a ShiftAssignment[] copiando horarios del turno
+    return (value as string[]).map((shiftId) => {
+      const assignment: ShiftAssignment = { shiftId, type: "shift" as const }
+      
+      // NUEVO MODELO SIMPLE: Copiar horarios del turno si está disponible
+      if (shifts) {
+        const shift = shifts.find((s) => s.id === shiftId)
+        if (shift) {
+          // Copiar primera franja
+          if (shift.startTime) {
+            assignment.startTime = shift.startTime
+          }
+          if (shift.endTime) {
+            assignment.endTime = shift.endTime
+          }
+          
+          // Copiar segunda franja si existe (turno cortado)
+          if (shift.startTime2) {
+            assignment.startTime2 = shift.startTime2
+          }
+          if (shift.endTime2) {
+            assignment.endTime2 = shift.endTime2
+          }
+        }
+      }
+      
+      return assignment
+    })
   }
   return (value as ShiftAssignment[]).map((assignment) => ({
     ...assignment,

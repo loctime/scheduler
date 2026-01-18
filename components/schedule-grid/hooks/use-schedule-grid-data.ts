@@ -186,9 +186,10 @@ export function useScheduleGridData({
       if (!schedule?.assignments) return []
       const dateAssignments = schedule.assignments[date] || {}
       const employeeShifts = dateAssignments[employeeId]
-      return toAssignments(employeeShifts)
+      // NUEVO MODELO SIMPLE: Pasar turnos para copiar horarios al convertir desde string[]
+      return toAssignments(employeeShifts, shifts)
     },
-    [schedule?.assignments]
+    [schedule?.assignments, shifts]
   )
 
   // Memoizar función de obtener info de turno

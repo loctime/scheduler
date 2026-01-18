@@ -95,7 +95,8 @@ export function useScheduleUpdates({
               
               const completedAssignments = completedSchedule.assignments[completedDateStr]
               if (completedAssignments && completedAssignments[fixed.employeeId]) {
-                const normalized = normalizeAssignments(completedAssignments[fixed.employeeId])
+                // NUEVO MODELO SIMPLE: Pasar turnos para copiar horarios al convertir desde string[]
+                const normalized = normalizeAssignments(completedAssignments[fixed.employeeId], shifts)
                 if (normalized.length > 0) {
                   assignmentsToApply = normalized
                   break // Usar la primera semana completada que tenga asignaciones
@@ -453,8 +454,10 @@ export function useScheduleUpdates({
 
           // Proteger medio_franco: si existe en asignaciones actuales, asegurarse de que no se elimine
           // PERO solo si el usuario no está limpiando explícitamente la celda o asignando un turno nuevo
+          // NUEVO MODELO SIMPLE: Pasar turnos para copiar horarios al convertir desde string[]
           const currentEmployeeAssignments = normalizeAssignments(
-            weekSchedule.assignments[date]?.[employeeId]
+            weekSchedule.assignments[date]?.[employeeId],
+            shifts
           )
           const existingMedioFranco = currentEmployeeAssignments.find(
             (a) => a.type === "medio_franco"

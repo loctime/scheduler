@@ -651,9 +651,12 @@ export function LicenciaEmbarazoDialog({
 
   const assignment = selectedShift.assignment
   const shift = selectedShift.shift
+  
+  // NUEVO MODELO SIMPLE: El assignment siempre tiene horario real desde su creación
+  // Solo usar turno base como fallback para datos legacy sin horarios
   const hasRealSchedule = assignment.startTime && assignment.endTime
   
-  // Obtener horarios de referencia (assignment real o turno base)
+  // Obtener horarios: preferir assignment real, fallback a turno base solo para datos legacy
   const referenceStartTime = assignment.startTime || shift?.startTime || ""
   const referenceEndTime = assignment.endTime || shift?.endTime || ""
   const referenceStartTime2 = assignment.startTime2 || shift?.startTime2
@@ -665,8 +668,8 @@ export function LicenciaEmbarazoDialog({
         {!hasRealSchedule && (
           <Alert className="mb-4">
             <AlertDescription>
-              El horario del turno se usa solo como referencia inicial.
-              Las horas reales se definirán al confirmar.
+              Este assignment no tiene horario definido (datos legacy). 
+              Se usa el horario del turno base como referencia.
             </AlertDescription>
           </Alert>
         )}
