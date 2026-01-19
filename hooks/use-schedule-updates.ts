@@ -638,7 +638,8 @@ export function useScheduleUpdates({
             shifts,
             horasMaximasPorDia,
             minutosDescanso,
-            horasMinimasParaDescanso
+            horasMinimasParaDescanso,
+            config
           )
 
           // Ya no mostramos toast cuando se exceden las horas máximas diarias, ya que ahora los

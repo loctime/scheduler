@@ -7,6 +7,19 @@ import {
   calculateShiftDurationMinutes,
   TimeInterval,
 } from "@/lib/time-utils"
+import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
+import type { Configuracion } from "@/lib/types"
+
+/**
+ * Configuración mínima requerida para cálculos (tipo interno)
+ */
+interface WorkingHoursConfig {
+  minutosDescanso: number
+  horasMinimasParaDescanso: number
+  reglasHorarias?: {
+    horasNormalesPorDia?: number
+  }
+}
 
 /**
  * Valida si dos turnos se solapan en horario
@@ -105,114 +118,6 @@ export function calculateShiftHours(
   }
 
   return totalHours
-}
-
-/**
- * @deprecated Usar calculateDailyHours de @/lib/domain/working-hours en su lugar
- * 
- * Calcula las horas extras comparando el turno base con el horario real de la asignación
- * Las horas extra se derivan automáticamente de la diferencia entre el turno teórico y el horario trabajado
- * 
- * @param assignment La asignación diaria con horario real
- * @param shift El turno base (plantilla teórica)
- * @param minutosDescanso Minutos de descanso a aplicar
- * @param horasMinimasParaDescanso Horas mínimas para aplicar descanso
- * @returns Objeto con horas normales y horas extra
- */
-/**
- * @deprecated Usar calculateDailyHours de @/lib/domain/working-hours en su lugar
- * 
- * Calcula las horas extras comparando el turno base con el horario real de la asignación
- * REGLA CRÍTICA: El assignment debe ser autosuficiente - nunca se infieren horarios desde el turno base
- * 
- * @param assignment La asignación diaria con horario real (DEBE tener startTime/endTime explícitos)
- * @param shift El turno base (plantilla teórica)
- * @param minutosDescanso Minutos de descanso a aplicar
- * @param horasMinimasParaDescanso Horas mínimas para aplicar descanso
- * @returns Objeto con horas normales y horas extra
- */
-export function calculateExtraHours(
-  assignment: any,
-  shift: Turno,
-  minutosDescanso: number = 30,
-  horasMinimasParaDescanso: number = 6
-): { horasNormales: number; horasExtra: number } {
-  // Si no hay turno base o asignación, retornar ceros
-  if (!shift || !assignment || assignment.type === "franco" || assignment.type === "medio_franco") {
-    return { horasNormales: 0, horasExtra: 0 }
-  }
-
-  // REGLA: Assignment autosuficiente - si no tiene horarios explícitos, NO calcular horas extra
-  // Esto fuerza a completar el assignment antes de calcular horas extra
-  if (!assignment.startTime || !assignment.endTime) {
-    // Assignment incompleto - retornar ceros (no inferir desde turno base)
-    return { horasNormales: 0, horasExtra: 0 }
-  }
-
-  // Calcular horas del turno base (horario teórico)
-  const horasTurnoBase = calculateShiftHours(shift, minutosDescanso, horasMinimasParaDescanso)
-
-  // Calcular horas del horario real (asignación)
-  // Usar SOLO valores explícitos del assignment (autosuficiencia)
-  const turnoReal: any = {
-    startTime: assignment.startTime,
-    endTime: assignment.endTime,
-    // Segunda franja solo si existe explícitamente
-    startTime2: assignment.startTime2 || undefined,
-    endTime2: assignment.endTime2 || undefined,
-  }
-
-  const horasHorarioReal = calculateShiftHours(turnoReal, minutosDescanso, horasMinimasParaDescanso)
-
-  // Las horas extra son la diferencia positiva entre horario real y turno base
-  const horasExtra = Math.max(0, horasHorarioReal - horasTurnoBase)
-  const horasNormales = horasTurnoBase
-
-  return { horasNormales, horasExtra }
-}
-
-/**
- * @deprecated Usar calculateTotalDailyHours de @/lib/domain/working-hours en su lugar
- * 
- * Calcula las horas extras totales de un array de asignaciones
- * Útil para calcular horas extra de un día completo con múltiples turnos
- * REGLA: Solo calcula horas extra si el assignment tiene horarios explícitos Y existe el turno base
- */
-export function calculateTotalExtraHours(
-  assignments: any[],
-  shifts: Turno[],
-  minutosDescanso: number = 30,
-  horasMinimasParaDescanso: number = 6
-): { horasNormales: number; horasExtra: number } {
-  const shiftMap = new Map(shifts.map((s) => [s.id, s]))
-  let totalHorasNormales = 0
-  let totalHorasExtra = 0
-
-  assignments.forEach((assignment) => {
-    // Ignorar francos y medio francos
-    if (assignment.type === "franco" || assignment.type === "medio_franco") {
-      return
-    }
-
-    // REGLA: Solo calcular si tiene shiftId Y el turno base existe
-    if (assignment.shiftId) {
-      const shift = shiftMap.get(assignment.shiftId)
-      if (shift) {
-        // calculateExtraHours ya valida que el assignment tenga horarios explícitos
-        const { horasNormales, horasExtra } = calculateExtraHours(
-          assignment,
-          shift,
-          minutosDescanso,
-          horasMinimasParaDescanso
-        )
-        totalHorasNormales += horasNormales
-        totalHorasExtra += horasExtra
-      }
-      // Si shift no existe (huérfano), no calcular horas extra (ya está manejado en calculateExtraHours)
-    }
-  })
-
-  return { horasNormales: totalHorasNormales, horasExtra: totalHorasExtra }
 }
 
 /**
@@ -391,8 +296,30 @@ export function calculateHoursBreakdown(
 }
 
 /**
+ * Normaliza string[] a ShiftAssignment[] para compatibilidad legacy
+ * Helper interno para validadores
+ */
+function normalizeToShiftAssignments(
+  shiftIds: string[] | any[],
+  shifts: Turno[]
+): ShiftAssignment[] {
+  // Si es array de ShiftAssignment, retornar tal cual
+  if (shiftIds.length > 0 && typeof shiftIds[0] === "object" && "type" in shiftIds[0]) {
+    return shiftIds as ShiftAssignment[]
+  }
+
+  // Si es string[], convertir a ShiftAssignment[]
+  return (shiftIds as string[]).map((shiftId) => ({
+    shiftId,
+    type: "shift" as const,
+    // Para string[], no tenemos horarios explícitos, pero el dominio manejará esto
+    // retornando 0 horas computables si no hay startTime/endTime
+  }))
+}
+
+/**
  * Valida que un empleado no tenga más de X horas por semana
- * Actualizado para considerar descansos
+ * Usa el dominio de working-hours como única fuente de verdad
  */
 export function validateWeeklyHours(
   assignments: {
@@ -404,13 +331,33 @@ export function validateWeeklyHours(
   shifts: Turno[],
   maxHours: number = 48,
   minutosDescanso: number = 30,
-  horasMinimasParaDescanso: number = 6
+  horasMinimasParaDescanso: number = 6,
+  config?: Configuracion | null
 ): { valid: boolean; hours: number; message?: string } {
+  // Crear configuración para el dominio
+  const workingConfig: WorkingHoursConfig = config
+    ? toWorkingHoursConfig(config)
+    : {
+        minutosDescanso,
+        horasMinimasParaDescanso,
+        reglasHorarias: {
+          horasNormalesPorDia: 8, // Default si no hay config
+        },
+      }
+
   let totalHours = 0
 
+  // Iterar por cada día y calcular horas computables usando el dominio
   Object.values(assignments).forEach((dateAssignments) => {
     const employeeShifts = dateAssignments[employeeId] || []
-    totalHours += calculateDailyHours(employeeShifts, shifts, minutosDescanso, horasMinimasParaDescanso)
+    if (employeeShifts.length === 0) return
+
+    // Normalizar a ShiftAssignment[]
+    const normalizedAssignments = normalizeToShiftAssignments(employeeShifts, shifts)
+
+    // Usar el dominio para calcular horas computables
+    const { horasComputables } = calculateTotalDailyHours(normalizedAssignments, workingConfig)
+    totalHours += horasComputables
   })
 
   const valid = totalHours <= maxHours
@@ -426,24 +373,41 @@ export function validateWeeklyHours(
 
 /**
  * Valida horas máximas por día considerando descansos
- * Soporta string[] o ShiftAssignment[] para manejar francos y medio francos
+ * Soporta string[] o ShiftAssignment[] para compatibilidad legacy
+ * Usa el dominio de working-hours como única fuente de verdad
  */
 export function validateDailyHours(
   shiftIds: string[] | any[],
   shifts: Turno[],
   maxHours: number,
   minutosDescanso: number = 30,
-  horasMinimasParaDescanso: number = 6
+  horasMinimasParaDescanso: number = 6,
+  config?: Configuracion | null
 ): { valid: boolean; hours: number; message?: string } {
-  const hours = calculateDailyHours(shiftIds, shifts, minutosDescanso, horasMinimasParaDescanso)
-  const valid = hours <= maxHours
+  // Crear configuración para el dominio
+  const workingConfig: WorkingHoursConfig = config
+    ? toWorkingHoursConfig(config)
+    : {
+        minutosDescanso,
+        horasMinimasParaDescanso,
+        reglasHorarias: {
+          horasNormalesPorDia: 8, // Default si no hay config
+        },
+      }
+
+  // Normalizar a ShiftAssignment[]
+  const normalizedAssignments = normalizeToShiftAssignments(shiftIds, shifts)
+
+  // Usar el dominio para calcular horas computables
+  const { horasComputables } = calculateTotalDailyHours(normalizedAssignments, workingConfig)
+  const valid = horasComputables <= maxHours
 
   return {
     valid,
-    hours,
+    hours: horasComputables,
     message: valid
       ? undefined
-      : `El empleado tiene ${hours.toFixed(1)} horas este día (máximo: ${maxHours}h)`,
+      : `El empleado tiene ${horasComputables.toFixed(1)} horas este día (máximo: ${maxHours}h)`,
   }
 }
 
