@@ -15,12 +15,15 @@ export function Toaster() {
 
   return (
     <ToastProvider>
-      {toasts.map(function ({ id, title, description, action, ...props }) {
+      {toasts.map(function ({ id, title, description, action, mode, ...props }) {
+        // Para toasts frecuentes, ocultar descripción para hacerlos más compactos
+        const showDescription = description && mode !== 'frequent'
+        
         return (
           <Toast key={id} {...props}>
-            <div className="grid gap-1">
+            <div className="grid gap-0.5">
               {title && <ToastTitle>{title}</ToastTitle>}
-              {description && (
+              {showDescription && (
                 <ToastDescription>{description}</ToastDescription>
               )}
             </div>
