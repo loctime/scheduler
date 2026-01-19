@@ -31,6 +31,7 @@ export interface EmployeeMonthlyStats {
   francos: number
   horasExtrasSemana: number
   horasExtrasMes: number
+  horasComputablesMes: number
   horasLicenciaEmbarazo?: number
   horasMedioFranco?: number
 }

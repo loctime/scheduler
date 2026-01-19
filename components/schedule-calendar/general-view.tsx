@@ -176,7 +176,7 @@ export function GeneralView({
           
           employeesForWeek.forEach((employee) => {
             weekStats[employee.id] = {
-              ...employeeMonthlyStats[employee.id] || { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0 },
+              ...employeeMonthlyStats[employee.id] || { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0, horasComputablesMes: 0 },
               horasExtrasSemana: 0,
             }
           })

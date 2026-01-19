@@ -32,6 +32,16 @@ export interface DailyHoursResult {
 }
 
 /**
+ * Resultado del cálculo de horas para un período (múltiples días)
+ * Es la suma de DailyHoursResult de cada día
+ */
+export interface PeriodHoursResult {
+  horasComputables: number
+  horasNormales: number
+  horasExtra: number
+}
+
+/**
  * Calcula las horas computables de un assignment
  * 
  * REGLAS:
@@ -145,6 +155,40 @@ export function calculateTotalDailyHours(
       totalHorasNormales += result.horasNormales
       totalHorasExtra += result.horasExtra
     }
+  })
+
+  return {
+    horasComputables: totalHorasComputables,
+    horasNormales: totalHorasNormales,
+    horasExtra: totalHorasExtra,
+  }
+}
+
+/**
+ * Calcula horas totales para un período (múltiples días)
+ * Suma las horas computables, normales y extra de cada día
+ * 
+ * @param daysAssignments Objeto con assignments por día (clave: fecha "yyyy-MM-dd")
+ * @param config Configuración completa
+ * @returns Objeto con horasComputables, horasNormales y horasExtra totales del período
+ */
+export function calculatePeriodHours(
+  daysAssignments: Record<string, ShiftAssignment[]>,
+  config: WorkingHoursConfig
+): PeriodHoursResult {
+  let totalHorasComputables = 0
+  let totalHorasNormales = 0
+  let totalHorasExtra = 0
+
+  // Iterar por cada día y sumar horas usando el dominio
+  Object.values(daysAssignments).forEach((dayAssignments) => {
+    if (dayAssignments.length === 0) return
+
+    // Usar calculateTotalDailyHours para calcular horas del día
+    const dayResult = calculateTotalDailyHours(dayAssignments, config)
+    totalHorasComputables += dayResult.horasComputables
+    totalHorasNormales += dayResult.horasNormales
+    totalHorasExtra += dayResult.horasExtra
   })
 
   return {

@@ -176,6 +176,10 @@ export function ScheduleGridMobile({
                         <span>{formatStatValue(stats.francos)}</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <span className="font-semibold">Horas mes:</span>
+                        <span>{formatStatValue(stats.horasComputablesMes)}h</span>
+                      </div>
+                      <div className="flex items-center gap-2">
                         <span className="font-semibold">H. extra/sem:</span>
                         <span>{formatStatValue(stats.horasExtrasSemana)}h</span>
                       </div>

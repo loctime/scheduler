@@ -165,6 +165,10 @@ export function EmployeeRow({
                     <span className="font-semibold">{formatStatValue(employeeStats[employee.id].francos)}</span>
                   </div>
                   <div className="flex items-center gap-1">
+                    <span className="font-bold text-foreground">Horas mes:</span>
+                    <span className="font-semibold">{formatStatValue(employeeStats[employee.id].horasComputablesMes)}h</span>
+                  </div>
+                  <div className="flex items-center gap-1">
                     <span className="font-bold text-foreground">Horas extra semana:</span>
                     <span className="font-semibold">{formatStatValue(employeeStats[employee.id].horasExtrasSemana)}h</span>
                   </div>
