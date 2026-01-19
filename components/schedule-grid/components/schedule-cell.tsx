@@ -768,7 +768,6 @@ export function ScheduleCell({
           date={date}
           employeeId={employeeId}
           assignments={assignments}
-          config={config || undefined}
           selectedShift={selectedShiftForLicencia}
           onApply={(date, employeeId, updatedAssignments) => {
             if (onAssignmentUpdate) {
