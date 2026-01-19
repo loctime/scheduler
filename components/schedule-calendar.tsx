@@ -10,7 +10,8 @@ import { getCustomMonthRange, getMonthWeeks, getInitialMonthForRange } from "@/l
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { useScheduleUpdates } from "@/hooks/use-schedule-updates"
 import { useSchedulesListener } from "@/hooks/use-schedules-listener"
-import { calculateTotalExtraHours, calculateHoursBreakdown } from "@/lib/validations"
+import { calculateHoursBreakdown } from "@/lib/validations"
+import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { GeneralView } from "@/components/schedule-calendar/general-view"
 import { ExportOverlay } from "@/components/export-overlay"
@@ -280,19 +281,14 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
             stats[employeeId].horasMedioFranco = (stats[employeeId].horasMedioFranco || 0) + hoursBreakdown.medio_franco
           }
 
-          // Calcular horas extras: simplemente contar los 30 minutos agregados
-          const { horasExtra } = calculateTotalExtraHours(
-            normalizedAssignments,
-            shiftsToUse,
-            minutosDescanso,
-            horasMinimasParaDescanso
-          )
-          const extraHours = horasExtra
-          if (extraHours > 0) {
+          // Calcular horas normales y extra usando el nuevo servicio de dominio
+          const workingConfig = toWorkingHoursConfig(config)
+          const { horasExtra } = calculateTotalDailyHours(normalizedAssignments, workingConfig)
+          if (horasExtra > 0) {
             // Acumular en el total del mes
-            stats[employeeId].horasExtrasMes += extraHours
+            stats[employeeId].horasExtrasMes += horasExtra
             // Acumular en la semana actual
-            weeklyExtras[weekStartStr][employeeId] = (weeklyExtras[weekStartStr][employeeId] || 0) + extraHours
+            weeklyExtras[weekStartStr][employeeId] = (weeklyExtras[weekStartStr][employeeId] || 0) + horasExtra
           }
         })
       })
@@ -380,6 +376,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         onMarkWeekComplete={handleMarkWeekComplete}
         lastCompletedWeekStart={lastCompletedWeekStart}
         allSchedules={schedules}
+        config={config}
       />
       </div>
     </>

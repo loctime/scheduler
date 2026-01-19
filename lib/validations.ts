@@ -108,6 +108,8 @@ export function calculateShiftHours(
 }
 
 /**
+ * @deprecated Usar calculateDailyHours de @/lib/domain/working-hours en su lugar
+ * 
  * Calcula las horas extras comparando el turno base con el horario real de la asignación
  * Las horas extra se derivan automáticamente de la diferencia entre el turno teórico y el horario trabajado
  * 
@@ -118,6 +120,8 @@ export function calculateShiftHours(
  * @returns Objeto con horas normales y horas extra
  */
 /**
+ * @deprecated Usar calculateDailyHours de @/lib/domain/working-hours en su lugar
+ * 
  * Calcula las horas extras comparando el turno base con el horario real de la asignación
  * REGLA CRÍTICA: El assignment debe ser autosuficiente - nunca se infieren horarios desde el turno base
  * 
@@ -168,6 +172,8 @@ export function calculateExtraHours(
 }
 
 /**
+ * @deprecated Usar calculateTotalDailyHours de @/lib/domain/working-hours en su lugar
+ * 
  * Calcula las horas extras totales de un array de asignaciones
  * Útil para calcular horas extra de un día completo con múltiples turnos
  * REGLA: Solo calcula horas extra si el assignment tiene horarios explícitos Y existe el turno base

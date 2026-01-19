@@ -4,10 +4,10 @@ import { useState, useMemo, useCallback, useEffect } from "react"
 import { MonthHeader } from "@/components/schedule-calendar/month-header"
 import { WeekSchedule } from "@/components/schedule-calendar/week-schedule"
 import { EmptyStateCard, LoadingStateCard } from "@/components/schedule-calendar/state-card"
-import type { Horario, Empleado, Turno, MedioTurno, ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
+import type { Horario, Empleado, Turno, MedioTurno, ShiftAssignment, ShiftAssignmentValue, Configuracion } from "@/lib/types"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { format } from "date-fns"
-import { calculateTotalExtraHours } from "@/lib/validations"
+import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
 
 type AssignmentUpdateHandler = (
   date: string,
@@ -38,6 +38,7 @@ interface GeneralViewProps {
   onMarkWeekComplete?: (weekStartDate: Date, completed: boolean) => Promise<void>
   lastCompletedWeekStart?: string | null
   allSchedules?: Horario[]
+  config?: Configuracion | null
 }
 
 export function GeneralView({
@@ -62,6 +63,7 @@ export function GeneralView({
   onMarkWeekComplete,
   lastCompletedWeekStart,
   allSchedules = [],
+  config,
 }: GeneralViewProps) {
   // Crear un mapa de semanas expandidas usando la fecha de inicio de semana como clave
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(() => {
@@ -209,13 +211,9 @@ export function GeneralView({
                   return
                 }
 
-                // Calcular horas extras para este día
-                const { horasExtra } = calculateTotalExtraHours(
-                  normalizedAssignments,
-                  shifts,
-                  30, // minutosDescanso por defecto
-                  6   // horasMinimasParaDescanso por defecto
-                )
+                // Calcular horas extras para este día usando el nuevo servicio de dominio
+                const workingConfig = toWorkingHoursConfig(config)
+                const { horasExtra } = calculateTotalDailyHours(normalizedAssignments, workingConfig)
                 if (horasExtra > 0) {
                   weekStats[employeeId].horasExtrasSemana += horasExtra
                 }

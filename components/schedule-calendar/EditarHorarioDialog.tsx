@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label"
 import { ShiftAssignment, Turno, Configuracion } from "@/lib/types"
 import { validateCellAssignments } from "@/lib/assignment-validators"
 import { useToast } from "@/hooks/use-toast"
-import { calculateExtraHours } from "@/lib/validations"
+import { calculateDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
 import { adjustTime } from "@/lib/utils"
 import { rangeDuration, rangesOverlap } from "@/lib/time-utils"
 
@@ -503,57 +503,46 @@ export function EditarHorarioDialog({
               </div>
             )}
 
-            {/* Cálculo de horas extra (si hay turno base) */}
-            {shift && editStartTime && editEndTime && config && (() => {
-              const tempAssignment = {
+            {/* Cálculo de horas normales y extra */}
+            {editStartTime && editEndTime && config && (() => {
+              const tempAssignment: ShiftAssignment = {
                 ...assignment,
+                type: assignment.type || "shift",
                 startTime: editStartTime,
                 endTime: editEndTime,
                 startTime2: hasSecondSegment && editStartTime2 && editEndTime2 ? editStartTime2 : undefined,
                 endTime2: hasSecondSegment && editStartTime2 && editEndTime2 ? editEndTime2 : undefined,
               }
-              const { horasNormales, horasExtra } = calculateExtraHours(
-                tempAssignment,
-                shift,
-                config.minutosDescanso || 30,
-                config.horasMinimasParaDescanso || 6
-              )
-              if (horasExtra > 0) {
-                return (
-                  <div className="border-t pt-4">
-                    <div className="text-xs space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Horas normales:</span>
-                        <span className="font-medium">{horasNormales.toFixed(2)}h</span>
-                      </div>
+              const workingConfig = toWorkingHoursConfig(config)
+              const { horasNormales, horasExtra } = calculateDailyHours(tempAssignment, workingConfig)
+              
+              // Mostrar siempre las horas normales y extra si hay horario completo
+              return (
+                <div className="border-t pt-4">
+                  <div className="text-xs space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Horas normales:</span>
+                      <span className="font-medium">{horasNormales.toFixed(2)}h</span>
+                    </div>
+                    {horasExtra > 0 && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Horas extra:</span>
                         <span className="font-semibold text-primary">{horasExtra.toFixed(2)}h</span>
                       </div>
-                    </div>
+                    )}
                   </div>
-                )
-              }
-              return null
+                </div>
+              )
             })()}
 
-            {/* Mensaje si el turno es huérfano o assignment incompleto */}
-            <>
-              {!shift && (
-                <div className="border-t pt-4">
-                  <div className="text-xs text-muted-foreground">
-                    ⚠️ Turno base eliminado. No se puede calcular horas extra.
-                  </div>
+            {/* Mensaje si assignment incompleto */}
+            {(!editStartTime || !editEndTime) && (
+              <div className="border-t pt-4">
+                <div className="text-xs text-muted-foreground">
+                  ℹ️ Complete el horario registrado para ver el cálculo de horas normales y extra.
                 </div>
-              )}
-              {shift && (!editStartTime || !editEndTime) && (
-                <div className="border-t pt-4">
-                  <div className="text-xs text-muted-foreground">
-                    ℹ️ Complete el horario real para ver el cálculo de horas extra.
-                  </div>
-                </div>
-              )}
-            </>
+              </div>
+            )}
           </div>
         </div>
         <DialogFooter>

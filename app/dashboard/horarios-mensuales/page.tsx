@@ -18,7 +18,8 @@ import { getCustomMonthRange, getMonthWeeks } from "@/lib/utils"
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { ExportOverlay } from "@/components/export-overlay"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
-import { calculateDailyHours, calculateTotalExtraHours, calculateHoursBreakdown } from "@/lib/validations"
+import { calculateDailyHours, calculateHoursBreakdown } from "@/lib/validations"
+import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
 import { ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Share2 } from "lucide-react"
@@ -240,13 +241,9 @@ export default function HorariosMensualesPage() {
             stats[employeeId].horasMedioFranco = (stats[employeeId].horasMedioFranco || 0) + hoursBreakdown.medio_franco
           }
 
-          // Calcular horas extras: comparar turno base con horario real
-          const { horasExtra } = calculateTotalExtraHours(
-            normalizedAssignments,
-            shifts,
-            config?.minutosDescanso || 30,
-            config?.horasMinimasParaDescanso || 6
-          )
+          // Calcular horas extras usando el nuevo servicio de dominio
+          const workingConfig = toWorkingHoursConfig(config)
+          const { horasExtra } = calculateTotalDailyHours(normalizedAssignments, workingConfig)
           if (horasExtra > 0) {
             // Acumular en el total del mes
             stats[employeeId].horasExtrasMes += horasExtra
@@ -409,13 +406,9 @@ export default function HorariosMensualesPage() {
                                 return
                               }
 
-                              // Calcular horas extras para este día
-                              const { horasExtra } = calculateTotalExtraHours(
-                                normalizedAssignments,
-                                shifts,
-                                config?.minutosDescanso || 30,
-                                config?.horasMinimasParaDescanso || 6
-                              )
+                              // Calcular horas extras para este día usando el nuevo servicio de dominio
+                              const workingConfig = toWorkingHoursConfig(config)
+                              const { horasExtra } = calculateTotalDailyHours(normalizedAssignments, workingConfig)
                               if (horasExtra > 0) {
                                 weekStats[employeeId].horasExtrasSemana += horasExtra
                               }
