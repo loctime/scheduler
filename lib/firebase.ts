@@ -59,4 +59,5 @@ export const COLLECTIONS = {
   GROUPS: getCollectionPath("groups"),
   CONVERSACIONES: getCollectionPath("conversaciones"),
   MENSAJES: getCollectionPath("mensajes"),
+  SOLICITUDES: getCollectionPath("solicitudes"),
 } as const

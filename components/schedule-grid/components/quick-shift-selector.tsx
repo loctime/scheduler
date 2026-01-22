@@ -14,8 +14,6 @@ interface QuickShiftSelectorProps {
   mediosTurnos?: MedioTurno[]
   onSelectAssignments: (assignments: ShiftAssignment[]) => void
   onUndo?: () => void
-  onToggleFixed?: () => void
-  isManuallyFixed?: boolean
   hasCellHistory?: boolean
   readonly?: boolean
   config?: Configuracion | null
@@ -28,8 +26,6 @@ export function QuickShiftSelector({
   mediosTurnos = [],
   onSelectAssignments,
   onUndo,
-  onToggleFixed,
-  isManuallyFixed = false,
   hasCellHistory = false,
   readonly = false,
   config,
@@ -112,38 +108,6 @@ export function QuickShiftSelector({
     if (next.startTime && next.endTime) handleMedioFranco(next)
   }
 
-  // Obtener asignaciones guardadas manualmente desde config.fixedSchedules
-  const getManualFixedAssignments = (): ShiftAssignment[] | null => {
-    if (!config?.fixedSchedules || !employeeId || dayOfWeek === undefined) {
-      return null
-    }
-    
-    const fixed = config.fixedSchedules.find(
-      (f) => f.employeeId === employeeId && f.dayOfWeek === dayOfWeek
-    )
-    
-    if (fixed && fixed.assignments && fixed.assignments.length > 0) {
-      return fixed.assignments
-    }
-    
-    return null
-  }
-
-  const handleApplySuggestion = () => {
-    const manualAssignments = getManualFixedAssignments()
-    if (manualAssignments && manualAssignments.length > 0) {
-      onSelectAssignments(manualAssignments)
-      resetMode()
-      toast({
-        title: "Horario fijo aplicado",
-        description: "Se aplicó el horario fijo guardado manualmente.",
-      })
-    }
-  }
-
-  // Solo mostrar si está marcado manualmente Y tiene asignaciones guardadas
-  const manualAssignments = getManualFixedAssignments()
-  const hasManualSuggestion = isManuallyFixed && manualAssignments && manualAssignments.length > 0
 
   return (
     <div
@@ -151,23 +115,6 @@ export function QuickShiftSelector({
       onClick={(e) => e.stopPropagation()}
       data-quick-selector="true"
     >
-      {/* BOTÓN SUGERIR - Solo para horarios fijos manuales con asignaciones guardadas */}
-      {hasManualSuggestion && (
-        <div className="w-full p-1.5 mb-1 flex-shrink-0">
-          <Button
-            type="button"
-            variant="default"
-            className="w-full text-xs font-semibold h-8 rounded-md bg-primary/90 hover:bg-primary transition-all"
-            onClick={(e) => {
-              e.stopPropagation()
-              handleApplySuggestion()
-            }}
-          >
-            <Sparkles className="h-3 w-3 mr-1.5" />
-            Sugerir
-          </Button>
-        </div>
-      )}
       {/* CONTENIDO PRINCIPAL */}
       <div className="flex flex-col flex-1 min-h-0 p-0 m-0 overflow-hidden">
         {/* FRANCO / TURNO - 30% (50%-50% cada uno) */}

@@ -50,13 +50,11 @@ interface EmployeeRowProps {
   onClearEmployeeRow?: (employeeId: string) => Promise<boolean>
   // Pattern suggestions
   getSuggestion?: (employeeId: string, dayOfWeek: number) => any
-  // Manual fixed schedules
-  isManuallyFixed?: (employeeId: string, dayOfWeek: number) => boolean
-  onToggleFixed?: (date: string, employeeId: string, dayOfWeek: number) => void
   // Close selector
   onCloseSelector?: () => void
   config?: Configuracion | null
   hasIncompleteAssignments?: (employeeId: string, date: string) => boolean
+  ownerId?: string
 }
 
 export function EmployeeRow({
@@ -91,11 +89,10 @@ export function EmployeeRow({
   handleCellUndo,
   onClearEmployeeRow,
   getSuggestion,
-  isManuallyFixed,
-  onToggleFixed,
   onCloseSelector,
   config,
   hasIncompleteAssignments,
+  ownerId,
 }: EmployeeRowProps) {
   return (
     <tr
@@ -209,8 +206,6 @@ export function EmployeeRow({
         // Obtener sugerencia de patrón para este día
         const dayOfWeek = getDay(parseISO(dateStr))
         const suggestion = getSuggestion ? getSuggestion(employee.id, dayOfWeek) : null
-        const hasFixedSchedule = suggestion?.isFixed === true
-        const isManuallyFixedCell = isManuallyFixed ? isManuallyFixed(employee.id, dayOfWeek) : false
 
         return (
           <ScheduleCell
@@ -236,13 +231,10 @@ export function EmployeeRow({
             readonly={readonly}
             hasCellHistory={hasCellHistory}
             onCellUndo={() => handleCellUndo(dateStr, employee.id)}
-            hasFixedSchedule={hasFixedSchedule}
-            suggestionWeeks={suggestion?.weeksMatched}
-            isManuallyFixed={isManuallyFixedCell}
-            onToggleFixed={onToggleFixed}
             suggestion={suggestion}
             config={config}
             hasIncompleteAssignments={hasIncompleteAssignments ? hasIncompleteAssignments(employee.id, dateStr) : false}
+            ownerId={ownerId}
           />
         )
       })}

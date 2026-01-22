@@ -21,7 +21,6 @@ import { ShiftItem } from "@/components/shift-selector/shift-item"
 import { cn } from "@/lib/utils"
 import { getSuggestionForDay } from "@/lib/pattern-learning"
 import { format, parseISO, getDay } from "date-fns"
-import { Lock } from "lucide-react"
 import { useState, useEffect } from "react"
 
 interface ShiftSelectorPopoverProps {
@@ -174,8 +173,8 @@ export function ShiftSelectorPopover({
       onAssignmentsChange(suggestion.assignments)
       onOpenChange(false)
       toast({
-        title: "Horario fijo aplicado",
-        description: `Se aplicó el horario fijo basado en ${suggestion.weeksMatched} semanas consecutivas.`,
+        title: "Sugerencia aplicada",
+        description: `Se aplicó la sugerencia basada en ${suggestion.weeksMatched} semanas consecutivas.`,
       })
     }
   }
@@ -291,12 +290,11 @@ export function ShiftSelectorPopover({
         </DialogHeader>
         
         <div className="flex-1 overflow-y-auto space-y-4 py-4">
-          {/* Mostrar sugerencia de horario fijo si existe */}
-          {suggestion && suggestion.isFixed && (
+          {/* Mostrar sugerencia de patrón si existe */}
+          {suggestion && (
             <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 space-y-2">
               <div className="flex items-center gap-2">
-                <Lock className="h-4 w-4 text-primary" />
-                <span className="text-sm font-semibold text-primary">Horario Fijo Detectado</span>
+                <span className="text-sm font-semibold text-primary">Sugerencia Detectada</span>
                 <Badge variant="secondary" className="ml-auto">
                   {suggestion.weeksMatched} semanas
                 </Badge>
@@ -310,7 +308,7 @@ export function ShiftSelectorPopover({
                 onClick={handleApplySuggestion}
                 className="w-full"
               >
-                Aplicar Horario Fijo
+                Aplicar Sugerencia
               </Button>
             </div>
           )}

@@ -60,6 +60,7 @@ interface ScheduleGridProps {
   allSchedules?: Horario[] // Todos los horarios para análisis de patrones
   user?: any // Usuario opcional (para páginas públicas sin DataProvider)
   onExportEmployeeImage?: (employeeId: string, employeeName: string, weekStartDate: Date) => void // Función para exportar imagen de un empleado
+  ownerId?: string // ID del dueño para comentarios
 }
 
 export const ScheduleGrid = memo(function ScheduleGrid({
@@ -81,6 +82,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   allSchedules = [],
   user: userProp,
   onExportEmployeeImage,
+  ownerId,
 }: ScheduleGridProps) {
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
   const [cellUndoHistory, setCellUndoHistory] = useState<Map<string, ShiftAssignment[]>>(new Map())
@@ -427,71 +429,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
 
   const isClickable = !readonly && !!(onShiftUpdate || onAssignmentUpdate)
 
-  // Funciones para manejar horarios fijos manuales
-  const isManuallyFixed = useCallback(
-    (employeeId: string, dayOfWeek: number): boolean => {
-      if (!config?.fixedSchedules) return false
-      return config.fixedSchedules.some(
-        (fixed) => fixed.employeeId === employeeId && fixed.dayOfWeek === dayOfWeek
-      )
-    },
-    [config?.fixedSchedules]
-  )
-
-  const handleToggleFixed = useCallback(
-    async (date: string, employeeId: string, dayOfWeek: number) => {
-      if (!user || !db || readonly) return
-
-      try {
-        const configRef = doc(db, COLLECTIONS.CONFIG, user.uid)
-        const currentFixed = config?.fixedSchedules || []
-        const existingIndex = currentFixed.findIndex(
-          (fixed) => fixed.employeeId === employeeId && fixed.dayOfWeek === dayOfWeek
-        )
-
-        // Obtener las asignaciones actuales de esta celda
-        const currentAssignments = getEmployeeAssignments(employeeId, date)
-
-        let newFixed: Array<{ employeeId: string; dayOfWeek: number; assignments?: ShiftAssignment[] }>
-        if (existingIndex >= 0) {
-          // Remover si ya existe
-          newFixed = currentFixed.filter((_, index) => index !== existingIndex)
-          toast({
-            title: "Horario fijo desmarcado",
-            description: "Este horario ya no se recordará automáticamente.",
-          })
-        } else {
-          // Agregar si no existe, guardando las asignaciones actuales
-          newFixed = [...currentFixed, { 
-            employeeId, 
-            dayOfWeek,
-            assignments: currentAssignments.length > 0 ? currentAssignments : undefined
-          }]
-          toast({
-            title: "Horario fijo marcado",
-            description: currentAssignments.length > 0 
-              ? "Este horario se recordará para futuras semanas."
-              : "Este horario se recordará cuando tenga asignaciones.",
-          })
-        }
-
-        await updateDoc(configRef, {
-          fixedSchedules: newFixed,
-          updatedAt: serverTimestamp(),
-          updatedBy: user.uid,
-          updatedByName: user.displayName || user.email || "Usuario",
-        })
-      } catch (error: any) {
-        console.error("Error al actualizar horario fijo:", error)
-        toast({
-          title: "Error",
-          description: "No se pudo actualizar el horario fijo",
-          variant: "destructive",
-        })
-      }
-    },
-    [user, db, readonly, config?.fixedSchedules, toast, getEmployeeAssignments]
-  )
 
   // Preparar datos de días para vista móvil
   const weekDaysData = useMemo(() => {
@@ -534,11 +471,9 @@ export const ScheduleGrid = memo(function ScheduleGrid({
           mediosTurnos={mediosTurnos}
           cellUndoHistory={cellUndoHistory}
           handleCellUndo={handleCellUndo}
-          getSuggestion={getSuggestion}
-          isManuallyFixed={isManuallyFixed}
-          onToggleFixed={handleToggleFixed}
           onExportEmployeeImage={onExportEmployeeImage}
           weekStartDate={weekStartDate}
+          ownerId={ownerId}
         />
       </>
     )
@@ -623,12 +558,10 @@ export const ScheduleGrid = memo(function ScheduleGrid({
                         cellUndoHistory={cellUndoHistory}
                         handleCellUndo={handleCellUndo}
                         onClearEmployeeRow={handleClearEmployeeRow}
-                        getSuggestion={getSuggestion}
-                        isManuallyFixed={isManuallyFixed}
-                        onToggleFixed={handleToggleFixed}
                         onCloseSelector={() => setSelectedCell(null)}
                         config={config}
                         hasIncompleteAssignments={hasIncompleteAssignments}
+                        ownerId={ownerId}
                       />
                     )}
                   </React.Fragment>

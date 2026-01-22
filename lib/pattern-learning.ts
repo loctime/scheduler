@@ -8,7 +8,6 @@ export interface PatternSuggestion {
   assignments: ShiftAssignment[]
   confidence: number // 0-1, basado en cuántas semanas consecutivas tienen este patrón
   weeksMatched: number
-  isFixed: boolean // true si tiene 3+ semanas consecutivas
 }
 
 export interface EmployeePattern {
@@ -157,7 +156,7 @@ export function generateSuggestions(
   employeeId: string,
   schedules: Horario[],
   targetWeekStart: string, // Semana para la cual generar sugerencias
-  minConsecutiveWeeks: number = 3 // Mínimo de semanas consecutivas para considerar "fijo"
+  minConsecutiveWeeks: number = 3 // Mínimo de semanas consecutivas para considerar sugerencia
 ): PatternSuggestion[] {
   const patterns = analyzeEmployeePatterns(employeeId, schedules)
   const suggestions: PatternSuggestion[] = []
@@ -173,7 +172,6 @@ export function generateSuggestions(
         assignments: pattern.assignments,
         confidence,
         weeksMatched: pattern.consecutiveWeeks,
-        isFixed: true,
       })
     }
   }

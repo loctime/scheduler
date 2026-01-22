@@ -131,11 +131,6 @@ export interface Configuracion {
   mediosTurnos: MedioTurno[]
   separadores?: Separador[]
   ordenEmpleados?: string[]
-  fixedSchedules?: Array<{
-    employeeId: string
-    dayOfWeek: number
-    assignments?: ShiftAssignment[]
-  }>
   formatoSalida?: string
   mensajePrevio?: string
   nombreFirma?: string

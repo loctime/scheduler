@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Empleado, Turno, ShiftAssignment, MedioTurno } from "@/lib/types"
 import { CellAssignments } from "./cell-assignments"
 import { InlineShiftSelector } from "./inline-shift-selector"
-import { GripVertical, Plus, RotateCcw, Lock, Download, FileText } from "lucide-react"
+import { GripVertical, Plus, RotateCcw, Download, FileText } from "lucide-react"
 import { getDay, parseISO } from "date-fns"
 import type { EmployeeMonthlyStats } from "../index"
 import { formatStatValue } from "../utils/schedule-grid-utils"
@@ -52,10 +52,9 @@ interface ScheduleGridMobileProps {
   cellUndoHistory: Map<string, ShiftAssignment[]>
   handleCellUndo: (date: string, employeeId: string) => void
   getSuggestion?: (employeeId: string, dayOfWeek: number) => any
-  isManuallyFixed?: (employeeId: string, dayOfWeek: number) => boolean
-  onToggleFixed?: (date: string, employeeId: string, dayOfWeek: number) => void
   onExportEmployeeImage?: (employeeId: string, employeeName: string, weekStartDate: Date) => void
   weekStartDate: Date
+  ownerId?: string
 }
 
 export function ScheduleGridMobile({
@@ -78,10 +77,9 @@ export function ScheduleGridMobile({
   cellUndoHistory,
   handleCellUndo,
   getSuggestion,
-  isManuallyFixed,
-  onToggleFixed,
   onExportEmployeeImage,
   weekStartDate,
+  ownerId,
 }: ScheduleGridMobileProps) {
   const [notaDialogOpen, setNotaDialogOpen] = useState(false)
   const [notaData, setNotaData] = useState<{ date: string; employeeId: string; texto: string } | null>(null)
@@ -202,8 +200,6 @@ export function ScheduleGridMobile({
                 const isCellSelected = selectedCell?.date === dateStr && selectedCell?.employeeId === employee.id
                 const dayOfWeek = getDay(parseISO(dateStr))
                 const suggestion = getSuggestion ? getSuggestion(employee.id, dayOfWeek) : null
-                const hasFixedSchedule = suggestion?.isFixed === true
-                const isManuallyFixedCell = isManuallyFixed ? isManuallyFixed(employee.id, dayOfWeek) : false
 
                 const undoCellKey = `${dateStr}-${employee.id}`
                 const hasCellHistory = cellUndoHistory.has(undoCellKey)
@@ -277,24 +273,6 @@ export function ScheduleGridMobile({
                               title="Deshacer"
                             >
                               <RotateCcw className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                          {isManuallyFixed && onToggleFixed && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className={`h-7 w-7 ${
-                                isManuallyFixedCell
-                                  ? "bg-primary text-primary-foreground"
-                                  : "text-muted-foreground"
-                              }`}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                onToggleFixed(dateStr, employee.id, dayOfWeek)
-                              }}
-                              title={isManuallyFixedCell ? "Desmarcar fijo" : "Marcar fijo"}
-                            >
-                              <Lock className="h-3.5 w-3.5" />
                             </Button>
                           )}
                         </div>

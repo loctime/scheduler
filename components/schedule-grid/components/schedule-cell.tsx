@@ -24,10 +24,11 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Check, RotateCcw, Undo2, Lock, FileText, X, Clock, Baby, Plus } from "lucide-react"
+import { Check, RotateCcw, Undo2, FileText, X, Clock, Baby, Plus } from "lucide-react"
 import { ShiftAssignment, Turno, MedioTurno, Configuracion } from "@/lib/types"
 import { CellAssignments } from "./cell-assignments"
 import { QuickShiftSelector } from "./quick-shift-selector"
+import { CommentIcon } from "@/components/comment-icon"
 import { getDay, parseISO } from "date-fns"
 import type { PatternSuggestion } from "@/lib/pattern-learning"
 import { validateCellAssignments } from "@/lib/assignment-validators"
@@ -59,13 +60,10 @@ interface ScheduleCellProps {
   readonly?: boolean
   hasCellHistory?: boolean
   onCellUndo?: () => void
-  hasFixedSchedule?: boolean
-  suggestionWeeks?: number
-  isManuallyFixed?: boolean
-  onToggleFixed?: (date: string, employeeId: string, dayOfWeek: number) => void
   suggestion?: PatternSuggestion | null
   config?: Configuracion | null
   hasIncompleteAssignments?: boolean
+  ownerId?: string
 }
 
 export function ScheduleCell({
@@ -86,13 +84,10 @@ export function ScheduleCell({
   readonly = false,
   hasCellHistory = false,
   onCellUndo,
-  hasFixedSchedule = false,
-  suggestionWeeks,
-  isManuallyFixed = false,
-  onToggleFixed,
   suggestion,
   config,
   hasIncompleteAssignments = false,
+  ownerId,
 }: ScheduleCellProps) {
   const [notaDialogOpen, setNotaDialogOpen] = useState(false)
   const [notaTexto, setNotaTexto] = useState("")
@@ -396,7 +391,7 @@ export function ScheduleCell({
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <td
-            className={`border-r-2 border-black px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 md:py-2 last:border-r-0 relative group ${
+            className={`border-r-2 border-black px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 md:py-2 last:border-r-0 relative group overflow-visible ${
               isClickable ? `cursor-pointer transition-all ${hoverClass} active:brightness-90 touch-manipulation` : ""
             } ${selectedClass} ${incompleteClass} ${
               isSelected && isClickable && onQuickAssignments ? "min-h-[140px] py-2 sm:py-2.5 md:py-3" : ""
@@ -419,28 +414,6 @@ export function ScheduleCell({
                 <RotateCcw className="h-3 w-3" />
               </button>
             )}
-            {/* Indicador de horario fijo - oculto en exportaciones */}
-            {hasFixedSchedule && (
-              <div
-                className="schedule-fixed-indicator absolute top-1 left-1 z-10 flex items-center gap-1 bg-primary/10 border border-primary/20 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                title={`Horario fijo detectado (${suggestionWeeks || 0} semanas consecutivas)`}
-                aria-label="Horario fijo"
-              >
-                <Lock className="h-3 w-3 text-primary" />
-                <span className="text-xs font-semibold text-primary">{suggestionWeeks}</span>
-              </div>
-            )}
-            {/* Indicador de assignments incompletos */}
-            {hasIncompleteAssignments && (
-              <div
-                className="absolute top-1 right-1 z-10 flex items-center gap-1 bg-destructive/20 border border-destructive/40 rounded px-1.5 py-0.5"
-                title="Esta celda contiene assignments incompletos. Debe normalizarlos antes de editar."
-                aria-label="Assignments incompletos"
-              >
-                <Lock className="h-3 w-3 text-destructive" />
-                <span className="text-xs font-semibold text-destructive">!</span>
-              </div>
-            )}
         <div className="flex flex-col gap-1.5">
           {isSelected && isClickable && onQuickAssignments ? (
             <QuickShiftSelector
@@ -448,15 +421,6 @@ export function ScheduleCell({
               mediosTurnos={mediosTurnos}
               onSelectAssignments={onQuickAssignments}
               onUndo={hasCellHistory ? onCellUndo : undefined}
-              onToggleFixed={
-                onToggleFixed
-                  ? () => {
-                      const dayOfWeek = getDay(parseISO(date))
-                      onToggleFixed(date, employeeId, dayOfWeek)
-                    }
-                  : undefined
-              }
-              isManuallyFixed={isManuallyFixed}
               hasCellHistory={hasCellHistory}
               readonly={readonly}
               config={config}
@@ -467,25 +431,17 @@ export function ScheduleCell({
             <CellAssignments assignments={assignments} getShiftInfo={getShiftInfo} />
           )}
         </div>
-        {/* Botón de candado para marcar como fijo (abajo al centro) - oculto en exportaciones */}
-        {!readonly && isClickable && onToggleFixed && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              const dayOfWeek = getDay(parseISO(date))
-              onToggleFixed(date, employeeId, dayOfWeek)
-            }}
-            className={`schedule-lock-button absolute bottom-1 left-1/2 -translate-x-1/2 z-10 flex h-5 w-5 items-center justify-center rounded transition-all ${
-              isManuallyFixed
-                ? "bg-primary text-primary-foreground opacity-100"
-                : "bg-muted/50 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-primary hover:text-primary-foreground"
-            }`}
-            title={isManuallyFixed ? "Desmarcar como horario fijo" : "Marcar como horario fijo"}
-            aria-label={isManuallyFixed ? "Desmarcar como horario fijo" : "Marcar como horario fijo"}
-          >
-            <Lock className={`h-3 w-3 ${isManuallyFixed ? "" : "opacity-60"}`} />
-          </button>
+        {/* Contenedor overlay para el ícono de comentario */}
+        {!readonly && isClickable && ownerId && (
+          <div className="absolute bottom-1 left-0 right-0 flex justify-center z-20 pointer-events-none">
+            <div className="pointer-events-auto">
+              <CommentIcon
+                ownerId={ownerId}
+                employeeId={employeeId}
+                date={date}
+              />
+            </div>
+          </div>
         )}
       </td>
         </ContextMenuTrigger>

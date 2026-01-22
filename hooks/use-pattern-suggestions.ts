@@ -27,33 +27,10 @@ export function usePatternSuggestions({
       if (suggestions.size > 0) {
         result.set(employee.id, suggestions)
       }
-      
-      // Agregar horarios marcados manualmente como fijos
-      if (config?.fixedSchedules) {
-        config.fixedSchedules.forEach((fixed) => {
-          if (fixed.employeeId === employee.id) {
-            if (!result.has(employee.id)) {
-              result.set(employee.id, new Map())
-            }
-            const employeeSuggestions = result.get(employee.id)!
-            // Si ya hay una sugerencia automática, mantenerla, sino crear una manual
-            if (!employeeSuggestions.has(fixed.dayOfWeek)) {
-              employeeSuggestions.set(fixed.dayOfWeek, {
-                employeeId: employee.id,
-                dayOfWeek: fixed.dayOfWeek,
-                assignments: [], // Se llenará con las asignaciones actuales
-                confidence: 1.0,
-                weeksMatched: 0,
-                isFixed: true,
-              })
-            }
-          }
-        })
-      }
     }
     
     return result
-  }, [employees, schedules, targetWeekStartStr, config?.fixedSchedules])
+  }, [employees, schedules, targetWeekStartStr])
   
   // Función helper para obtener sugerencia de un empleado en un día específico
   const getSuggestion = useMemo(
@@ -65,20 +42,10 @@ export function usePatternSuggestions({
     [suggestionsByEmployee]
   )
   
-  // Función helper para verificar si un empleado tiene horario fijo
-  const hasFixedSchedule = useMemo(
-    () => (employeeId: string): boolean => {
-      const employeeSuggestions = suggestionsByEmployee.get(employeeId)
-      if (!employeeSuggestions) return false
-      return Array.from(employeeSuggestions.values()).some(s => s.isFixed)
-    },
-    [suggestionsByEmployee]
-  )
   
   return {
     suggestionsByEmployee,
     getSuggestion,
-    hasFixedSchedule,
   }
 }
 
