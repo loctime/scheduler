@@ -54,7 +54,6 @@ export function WeekScheduleActions({
 }: WeekScheduleActionsProps) {
   const [confirmCopyDialogOpen, setConfirmCopyDialogOpen] = useState(false)
   const [confirmClearDialogOpen, setConfirmClearDialogOpen] = useState(false)
-  const [confirmSuggestDialogOpen, setConfirmSuggestDialogOpen] = useState(false)
 
   const handleCopyPreviousWeek = useCallback(async () => {
     try {
@@ -86,20 +85,6 @@ export function WeekScheduleActions({
     await weekActions.executeClearWeek()
   }, [weekActions])
 
-  const handleSuggestSchedules = useCallback(async () => {
-    try {
-      await weekActions.handleSuggestSchedules()
-    } catch (error: any) {
-      if (error.message === "NEEDS_CONFIRMATION") {
-        setConfirmSuggestDialogOpen(true)
-      }
-    }
-  }, [weekActions])
-
-  const handleConfirmSuggest = useCallback(async () => {
-    setConfirmSuggestDialogOpen(false)
-    await weekActions.executeSuggestSchedules()
-  }, [weekActions])
 
 
   return (
@@ -111,7 +96,7 @@ export function WeekScheduleActions({
               variant="outline"
               size="sm"
               onClick={handleCopyPreviousWeek}
-              disabled={weekActions.isCopying || exporting || weekActions.isClearing || weekActions.isSuggesting}
+              disabled={weekActions.isCopying || exporting || weekActions.isClearing}
               aria-label="Copiar semana anterior"
             >
               {weekActions.isCopying ? (
@@ -126,25 +111,6 @@ export function WeekScheduleActions({
                 </>
               )}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSuggestSchedules}
-              disabled={weekActions.isSuggesting || exporting || weekActions.isCopying || weekActions.isClearing}
-              aria-label="Sugerir horarios fijos"
-            >
-              {weekActions.isSuggesting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Sugiriendo...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Sugerir
-                </>
-              )}
-            </Button>
           </>
         )}
         {!readonly && onAssignmentUpdate && (
@@ -152,7 +118,7 @@ export function WeekScheduleActions({
             variant="outline"
             size="sm"
             onClick={handleClearWeek}
-            disabled={weekActions.isClearing || exporting || weekActions.isCopying || weekActions.isSuggesting}
+            disabled={weekActions.isClearing || exporting || weekActions.isCopying}
             aria-label="Limpiar semana"
           >
             {weekActions.isClearing ? (
@@ -289,23 +255,6 @@ export function WeekScheduleActions({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={confirmSuggestDialogOpen} onOpenChange={setConfirmSuggestDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Confirmar aplicación de sugerencias?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta semana está marcada como completada. Al aplicar las sugerencias, se modificarán las asignaciones actuales.
-              ¿Estás seguro de que deseas continuar?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSuggest}>Confirmar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
     </>
   )
 }
-
