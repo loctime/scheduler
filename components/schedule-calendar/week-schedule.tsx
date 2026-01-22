@@ -204,6 +204,7 @@ export function WeekSchedule({
         />
       </div>
       <CollapsibleContent
+        forceMount
         id={weekId}
         className="overflow-hidden transition-all duration-300 data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down"
       >
