@@ -66,7 +66,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     await signOut(auth)
   }
 
-  // Mapeo de rutas a IDs de páginas (debe coincidir con el de layout.tsx)
+  // Mapeo de .rutas a IDs de páginas (debe coincidir con el de layout.tsx)
   const ROUTE_TO_PAGE_ID: Record<string, string> = {
     "/dashboard": "horarios",
     "/dashboard/horarios": "horarios",
