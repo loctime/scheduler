@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { MessageSquare, Edit, X } from 'lucide-react';
+import { EmployeeRequestDialog, EmployeeRequestData } from '@/components/employee-request-dialog';
+import { getEmployeeRequest, saveEmployeeRequest, deleteEmployeeRequest } from '@/lib/employee-requests';
+import { Turno, MedioTurno } from '@/lib/types';
+import { MessageSquare } from 'lucide-react';
 
 /**
  * Componente para marcar visualmente pedidos de empleados.
@@ -20,6 +19,16 @@ interface ShiftRequestMarkerProps {
   onToggle: () => void;
   /** Callback al editar la descripción */
   onEditDescription: (description: string) => void;
+  /** ID del schedule */
+  scheduleId: string;
+  /** ID del empleado */
+  employeeId: string;
+  /** Fecha de la celda */
+  date: string;
+  /** Turnos disponibles para el diálogo */
+  availableShifts: Turno[];
+  /** Medios turnos disponibles */
+  mediosTurnos?: MedioTurno[];
 }
 
 /**
@@ -29,52 +38,107 @@ interface ShiftRequestMarkerProps {
  * - Si active es false → muestra ícono inactivo clickable
  * - Si active es true → muestra ícono activo con tooltip
  * - Click para activar/desactivar o editar descripción
+ * - Persiste datos en Firestore
  * - No afecta lógica de negocio ni bloquea edición
  */
 export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
   active,
   description,
   onToggle,
-  onEditDescription
+  onEditDescription,
+  scheduleId,
+  employeeId,
+  date,
+  availableShifts,
+  mediosTurnos
 }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [tempDescription, setTempDescription] = useState(description || '');
+  const [requestData, setRequestData] = useState<EmployeeRequestData | undefined>();
 
-  // Texto a mostrar en el tooltip (solo si está activo)
-  const tooltipText = description 
-    ? `Pedido – ${description}`
-    : 'Pedido';
+  // Cargar datos existentes al montar el componente
+  useEffect(() => {
+    const loadRequestData = async () => {
+      try {
+        const request = await getEmployeeRequest(scheduleId, employeeId, date);
+        if (request) {
+          setRequestData({
+            active: request.active,
+            requestedShift: request.requestedShift,
+            description: request.description
+          });
+        }
+      } catch (error) {
+        console.error('Error loading employee request:', error);
+      }
+    };
+
+    loadRequestData();
+  }, [scheduleId, employeeId, date]);
+
+  // Generar texto para el tooltip
+  const getTooltipText = () => {
+    if (!active || !requestData) return '';
+    
+    let shiftInfo = '';
+    if (requestData.requestedShift) {
+      if (requestData.requestedShift.type === 'existing' && requestData.requestedShift.shiftId) {
+        const shift = availableShifts.find(s => s.id === requestData.requestedShift?.shiftId);
+        if (shift) {
+          shiftInfo = `${shift.name} (${shift.startTime || ''}-${shift.endTime || ''})`;
+        }
+      } else if (requestData.requestedShift.type === 'manual') {
+        shiftInfo = `${requestData.requestedShift.startTime || ''}-${requestData.requestedShift.endTime || ''}`;
+      }
+    }
+
+    const parts = ['Pedido del empleado'];
+    if (shiftInfo) parts.push(shiftInfo);
+    if (requestData.description) parts.push(requestData.description);
+    
+    return parts.join(' – ');
+  };
 
   const handleClick = () => {
-    if (!active) {
-      // Si está inactivo, activar y abrir diálogo para descripción
-      onToggle();
-      setTempDescription('');
-      setIsDialogOpen(true);
-    } else {
-      // Si está activo, abrir diálogo para editar o desactivar
-      setIsDialogOpen(true);
-      setTempDescription(description || '');
-    }
+    setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
-    if (tempDescription.trim()) {
-      onEditDescription(tempDescription.trim());
-      if (!active) {
+  const handleSaveRequest = async (data: EmployeeRequestData) => {
+    try {
+      await saveEmployeeRequest(scheduleId, employeeId, date, data);
+      
+      // Actualizar estado local
+      const isActive = data.active;
+      const description = data.description;
+      
+      if (isActive !== active) {
         onToggle();
       }
-    } else if (active) {
-      // Si no hay descripción y estaba activo, desactivar
-      onToggle();
+      onEditDescription(description);
+      
+      setRequestData(data);
+    } catch (error) {
+      console.error('Error saving employee request:', error);
     }
-    setIsDialogOpen(false);
   };
 
-  const handleDeactivate = () => {
-    onToggle();
-    setIsDialogOpen(false);
+  const handleDeleteRequest = async () => {
+    try {
+      await deleteEmployeeRequest(scheduleId, employeeId, date);
+      
+      // Actualizar estado local
+      if (active) {
+        onToggle();
+      }
+      onEditDescription('');
+      
+      setRequestData(undefined);
+      setIsDialogOpen(false);
+    } catch (error) {
+      console.error('Error deleting employee request:', error);
+    }
   };
+
+  const tooltipText = getTooltipText();
 
   return (
     <>
@@ -90,9 +154,11 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
                 <MessageSquare className="w-3 h-3" />
               </div>
             </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-sm">{tooltipText}</p>
-            </TooltipContent>
+            {tooltipText && (
+              <TooltipContent>
+                <p className="text-sm max-w-xs">{tooltipText}</p>
+              </TooltipContent>
+            )}
           </Tooltip>
         </TooltipProvider>
       ) : (
@@ -105,38 +171,14 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
         </div>
       )}
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>
-              {active ? 'Editar pedido del empleado' : 'Agregar pedido del empleado'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="description">Descripción del pedido</Label>
-              <Input
-                id="description"
-                value={tempDescription}
-                onChange={(e) => setTempDescription(e.target.value)}
-                placeholder="Ej: Necesito cambiar mi turno por motivos personales"
-                className="col-span-3"
-              />
-            </div>
-          </div>
-          <DialogFooter className="flex gap-2">
-            {active && (
-              <Button variant="outline" onClick={handleDeactivate}>
-                <X className="w-4 h-4 mr-2" />
-                Desactivar
-              </Button>
-            )}
-            <Button onClick={handleSave}>
-              {active ? 'Guardar cambios' : 'Activar pedido'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <EmployeeRequestDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        initialData={requestData}
+        availableShifts={availableShifts}
+        mediosTurnos={mediosTurnos}
+        onSave={handleSaveRequest}
+      />
     </>
   );
 };

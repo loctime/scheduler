@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect } from "react"
 import type { CSSProperties } from "react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu"
@@ -36,6 +36,7 @@ import { useToast } from "@/hooks/use-toast"
 import { isAssignmentIncomplete, getIncompletenessReason } from "@/lib/assignment-utils"
 import { EditarHorarioDialog } from "@/components/schedule-calendar/EditarHorarioDialog"
 import { LicenciaEmbarazoDialog } from "@/components/schedule-calendar/LicenciaEmbarazoDialog"
+import { getEmployeeRequest } from "@/lib/employee-requests"
 
 interface ScheduleCellProps {
   date: string
@@ -100,6 +101,27 @@ export function ScheduleCell({
   // Estado local para pedidos de empleados
   const [employeeRequestActive, setEmployeeRequestActive] = useState(false)
   const [employeeRequestDescription, setEmployeeRequestDescription] = useState("")
+  
+  // Cargar datos del pedido al montar el componente
+  useEffect(() => {
+    const loadEmployeeRequest = async () => {
+      try {
+        if (!scheduleId) return;
+        const request = await getEmployeeRequest(scheduleId, employeeId, date);
+        if (request && request.active) {
+          setEmployeeRequestActive(true);
+          setEmployeeRequestDescription(request.description);
+        } else {
+          setEmployeeRequestActive(false);
+          setEmployeeRequestDescription('');
+        }
+      } catch (error) {
+        console.error('Error loading employee request:', error);
+      }
+    };
+
+    loadEmployeeRequest();
+  }, [scheduleId, employeeId, date]);
   
   // Handlers para pedidos de empleados
   const handleEmployeeRequestToggle = () => {
@@ -465,6 +487,11 @@ export function ScheduleCell({
             description={employeeRequestDescription}
             onToggle={handleEmployeeRequestToggle}
             onEditDescription={handleEmployeeRequestEditDescription}
+            scheduleId={scheduleId || ''}
+            employeeId={employeeId}
+            date={date}
+            availableShifts={quickShifts}
+            mediosTurnos={mediosTurnos}
           />
         </div>
       </td>
