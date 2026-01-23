@@ -25,6 +25,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Check, RotateCcw, Undo2, Lock, FileText, X, Clock, Baby, Plus } from "lucide-react"
+import { ShiftRequestMarker } from "@/components/shift-request-marker"
 import { ShiftAssignment, Turno, MedioTurno, Configuracion } from "@/lib/types"
 import { CellAssignments } from "./cell-assignments"
 import { QuickShiftSelector } from "./quick-shift-selector"
@@ -96,6 +97,18 @@ export function ScheduleCell({
 }: ScheduleCellProps) {
   const [notaDialogOpen, setNotaDialogOpen] = useState(false)
   const [notaTexto, setNotaTexto] = useState("")
+  // Estado local para pedidos de empleados
+  const [employeeRequestActive, setEmployeeRequestActive] = useState(false)
+  const [employeeRequestDescription, setEmployeeRequestDescription] = useState("")
+  
+  // Handlers para pedidos de empleados
+  const handleEmployeeRequestToggle = () => {
+    setEmployeeRequestActive(!employeeRequestActive)
+  }
+  
+  const handleEmployeeRequestEditDescription = (description: string) => {
+    setEmployeeRequestDescription(description)
+  }
   const [horarioEspecialDialogOpen, setHorarioEspecialDialogOpen] = useState(false)
   const [startTime, setStartTime] = useState("")
   const [endTime, setEndTime] = useState("")
@@ -419,28 +432,6 @@ export function ScheduleCell({
                 <RotateCcw className="h-3 w-3" />
               </button>
             )}
-            {/* Indicador de horario fijo - oculto en exportaciones */}
-            {hasFixedSchedule && (
-              <div
-                className="schedule-fixed-indicator absolute top-1 left-1 z-10 flex items-center gap-1 bg-primary/10 border border-primary/20 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                title={`Horario fijo detectado (${suggestionWeeks || 0} semanas consecutivas)`}
-                aria-label="Horario fijo"
-              >
-                <Lock className="h-3 w-3 text-primary" />
-                <span className="text-xs font-semibold text-primary">{suggestionWeeks}</span>
-              </div>
-            )}
-            {/* Indicador de assignments incompletos */}
-            {hasIncompleteAssignments && (
-              <div
-                className="absolute top-1 right-1 z-10 flex items-center gap-1 bg-destructive/20 border border-destructive/40 rounded px-1.5 py-0.5"
-                title="Esta celda contiene assignments incompletos. Debe normalizarlos antes de editar."
-                aria-label="Assignments incompletos"
-              >
-                <Lock className="h-3 w-3 text-destructive" />
-                <span className="text-xs font-semibold text-destructive">!</span>
-              </div>
-            )}
         <div className="flex flex-col gap-1.5">
           {isSelected && isClickable && onQuickAssignments ? (
             <QuickShiftSelector
@@ -467,26 +458,15 @@ export function ScheduleCell({
             <CellAssignments assignments={assignments} getShiftInfo={getShiftInfo} />
           )}
         </div>
-        {/* Botón de candado para marcar como fijo (abajo al centro) - oculto en exportaciones */}
-        {!readonly && isClickable && onToggleFixed && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              const dayOfWeek = getDay(parseISO(date))
-              onToggleFixed(date, employeeId, dayOfWeek)
-            }}
-            className={`schedule-lock-button absolute bottom-1 left-1/2 -translate-x-1/2 z-10 flex h-5 w-5 items-center justify-center rounded transition-all ${
-              isManuallyFixed
-                ? "bg-primary text-primary-foreground opacity-100"
-                : "bg-muted/50 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-primary hover:text-primary-foreground"
-            }`}
-            title={isManuallyFixed ? "Desmarcar como horario fijo" : "Marcar como horario fijo"}
-            aria-label={isManuallyFixed ? "Desmarcar como horario fijo" : "Marcar como horario fijo"}
-          >
-            <Lock className={`h-3 w-3 ${isManuallyFixed ? "" : "opacity-60"}`} />
-          </button>
-        )}
+        {/* Marcador visual único abajo al centro */}
+        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10">
+          <ShiftRequestMarker 
+            active={employeeRequestActive}
+            description={employeeRequestDescription}
+            onToggle={handleEmployeeRequestToggle}
+            onEditDescription={handleEmployeeRequestEditDescription}
+          />
+        </div>
       </td>
         </ContextMenuTrigger>
         <ContextMenuContent>
