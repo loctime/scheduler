@@ -39,6 +39,9 @@ interface GeneralViewProps {
   lastCompletedWeekStart?: string | null
   allSchedules?: Horario[]
   config?: Configuracion | null
+  copiedWeekData?: any
+  onCopyCurrentWeek?: (weekStartDate: Date) => void
+  onPasteCopiedWeek?: (targetWeekStartDate: Date) => Promise<void>
 }
 
 export function GeneralView({
@@ -64,6 +67,9 @@ export function GeneralView({
   lastCompletedWeekStart,
   allSchedules = [],
   config,
+  copiedWeekData,
+  onCopyCurrentWeek,
+  onPasteCopiedWeek,
 }: GeneralViewProps) {
   // Crear un mapa de semanas expandidas usando la fecha de inicio de semana como clave
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(() => {
@@ -245,6 +251,9 @@ export function GeneralView({
               lastCompletedWeekStart={lastCompletedWeekStart}
               getWeekSchedule={getWeekSchedule}
               allSchedules={allSchedules}
+              copiedWeekData={copiedWeekData}
+              onCopyCurrentWeek={onCopyCurrentWeek}
+              onPasteCopiedWeek={onPasteCopiedWeek}
             />
           )
         })}

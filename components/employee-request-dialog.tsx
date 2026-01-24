@@ -4,8 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Turno, MedioTurno } from '@/lib/types';
 import { Clock, Calendar, MessageSquare } from 'lucide-react';
 
@@ -37,7 +35,6 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
   mediosTurnos,
   onSave
 }) => {
-  const [requestType, setRequestType] = useState<'existing' | 'manual'>('existing');
   const [selectedShiftId, setSelectedShiftId] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -49,9 +46,10 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
       if (initialData?.active) {
         // Cargar datos existentes
         if (initialData.requestedShift) {
-          setRequestType(initialData.requestedShift.type);
           if (initialData.requestedShift.type === 'existing' && initialData.requestedShift.shiftId) {
             setSelectedShiftId(initialData.requestedShift.shiftId);
+            setStartTime(initialData.requestedShift.startTime || '');
+            setEndTime(initialData.requestedShift.endTime || '');
           } else if (initialData.requestedShift.type === 'manual') {
             setStartTime(initialData.requestedShift.startTime || '');
             setEndTime(initialData.requestedShift.endTime || '');
@@ -60,7 +58,6 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
         setDescription(initialData.description);
       } else {
         // Resetear a valores por defecto
-        setRequestType('existing');
         setSelectedShiftId('');
         setStartTime('');
         setEndTime('');
@@ -69,15 +66,23 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
     }
   }, [open, initialData]);
 
+  const handleShiftSelect = (shift: Turno) => {
+    setSelectedShiftId(shift.id);
+    setStartTime(shift.startTime || '');
+    setEndTime(shift.endTime || '');
+  };
+
   const handleSave = () => {
     const requestData: EmployeeRequestData = {
       active: true,
       requestedShift: {
-        type: requestType,
-        ...(requestType === 'existing' 
+        type: selectedShiftId ? 'existing' : 'manual',
+        ...(selectedShiftId 
           ? { shiftId: selectedShiftId }
-          : { startTime, endTime }
-        )
+          : {}
+        ),
+        startTime,
+        endTime
       },
       description
     };
@@ -87,27 +92,23 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
   };
 
   const getSelectedShiftInfo = () => {
-    if (requestType === 'existing' && selectedShiftId) {
+    if (selectedShiftId) {
       const shift = availableShifts.find(s => s.id === selectedShiftId);
       return shift ? `${shift.name} (${shift.startTime || ''}-${shift.endTime || ''})` : '';
     }
-    if (requestType === 'manual' && startTime && endTime) {
+    if (startTime && endTime) {
       return `${startTime}-${endTime}`;
     }
     return '';
   };
 
   const isFormValid = () => {
-    if (requestType === 'existing') {
-      return selectedShiftId.trim() !== '' && description.trim() !== '';
-    } else {
-      return startTime.trim() !== '' && endTime.trim() !== '' && description.trim() !== '';
-    }
+    return startTime.trim() !== '' && endTime.trim() !== '' && description.trim() !== '';
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageSquare className="w-5 h-5" />
@@ -116,46 +117,34 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
         </DialogHeader>
 
         <div className="grid gap-6 py-4">
-          {/* Tipo de solicitud */}
+          {/* Selección de turnos - Visual igual a la grilla */}
           <div className="grid gap-3">
-            <Label className="text-sm font-medium">Tipo de horario solicitado</Label>
-            <RadioGroup value={requestType} onValueChange={(value: 'existing' | 'manual') => setRequestType(value)}>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="existing" id="existing" />
-                <Label htmlFor="existing" className="text-sm">
-                  Seleccionar turno existente
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="manual" id="manual" />
-                <Label htmlFor="manual" className="text-sm">
-                  Definir horario manual
-                </Label>
-              </div>
-            </RadioGroup>
+            <Label className="text-sm font-medium">Seleccionar turno solicitado</Label>
+            <div className="flex flex-wrap gap-2 p-2 border rounded-md bg-muted/20 min-h-[80px]">
+              {availableShifts.map((shift) => (
+                <Button
+                  key={shift.id}
+                  type="button"
+                  variant={selectedShiftId === shift.id ? "default" : "outline"}
+                  className="h-10 flex-[0_0_calc(33.333%-0.5rem)] text-sm font-semibold flex items-center justify-center rounded-md border-2 shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md active:scale-95 px-2"
+                  style={{ 
+                    backgroundColor: selectedShiftId === shift.id ? shift.color : undefined,
+                    color: selectedShiftId === shift.id ? '#ffffff' : undefined,
+                    borderColor: shift.color
+                  }}
+                  onClick={() => handleShiftSelect(shift)}
+                >
+                  <span className="text-center truncate">
+                    {shift.name.length > 8 ? shift.name.substring(0, 8) : shift.name}
+                  </span>
+                </Button>
+              ))}
+            </div>
           </div>
 
-          {/* Selección de turno existente */}
-          {requestType === 'existing' && (
-            <div className="grid gap-2">
-              <Label htmlFor="shift">Turno solicitado</Label>
-              <Select value={selectedShiftId} onValueChange={setSelectedShiftId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar turno..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableShifts.map((shift) => (
-                    <SelectItem key={shift.id} value={shift.id}>
-                      {shift.name} ({shift.startTime || ''} - {shift.endTime || ''})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Horario manual */}
-          {requestType === 'manual' && (
+          {/* Horario solicitado - Siempre visible */}
+          <div className="grid gap-3">
+            <Label className="text-sm font-medium">Horario solicitado</Label>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="startTime">Hora inicio</Label>
@@ -176,7 +165,7 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
                 />
               </div>
             </div>
-          )}
+          </div>
 
           {/* Descripción */}
           <div className="grid gap-2">
@@ -195,7 +184,7 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
             <div className="bg-muted/50 rounded-lg p-3">
               <Label className="text-sm font-medium text-muted-foreground">Vista previa</Label>
               <p className="text-sm mt-1">
-                <strong>Horario solicitado:</strong> {getSelectedShiftInfo()}
+                <strong>Turno solicitado:</strong> {getSelectedShiftInfo()}
               </p>
               <p className="text-sm mt-1">
                 <strong>Motivo:</strong> {description}

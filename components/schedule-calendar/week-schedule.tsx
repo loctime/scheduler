@@ -49,6 +49,9 @@ interface WeekScheduleProps {
   lastCompletedWeekStart?: string | null
   getWeekSchedule?: (weekStartDate: Date) => Horario | null
   allSchedules?: Horario[]
+  copiedWeekData?: any
+  onCopyCurrentWeek?: (weekStartDate: Date) => void
+  onPasteCopiedWeek?: (targetWeekStartDate: Date) => Promise<void>
 }
 
 export function WeekSchedule({
@@ -77,6 +80,9 @@ export function WeekSchedule({
   lastCompletedWeekStart,
   getWeekSchedule,
   allSchedules = [],
+  copiedWeekData,
+  onCopyCurrentWeek,
+  onPasteCopiedWeek,
 }: WeekScheduleProps) {
   const weekStartDate = weekDays[0]
   const weekEndDate = weekDays[weekDays.length - 1]
@@ -201,6 +207,10 @@ export function WeekSchedule({
           onExportPDF={handleExportPDF}
           onExportExcel={onExportExcel}
           weekActions={weekActions}
+          copiedWeekData={copiedWeekData}
+          onCopyCurrentWeek={onCopyCurrentWeek}
+          onPasteCopiedWeek={onPasteCopiedWeek}
+          weekStartDate={weekStartDate}
         />
       </div>
       <CollapsibleContent

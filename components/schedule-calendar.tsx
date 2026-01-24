@@ -47,6 +47,9 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   const { toast } = useToast()
   const { exporting, exportImage, exportPDF, exportExcel, exportMonthPDF } = useExportSchedule()
 
+  // Estado para almacenar la semana copiada
+  const [copiedWeekData, setCopiedWeekData] = useState<any>(null)
+
   const monthStartDay = config?.mesInicioDia || 1
   const weekStartsOn = (config?.semanaInicioDia || 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
 
@@ -339,6 +342,98 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     )
   }, [exportMonthPDF, monthWeeks, getWeekSchedule, employees, shiftsToUse, monthRange, config, employeeMonthlyStats])
 
+  // Función para copiar la semana actual
+  const copyCurrentWeek = useCallback((weekStartDate: Date) => {
+    const weekSchedule = getWeekSchedule(weekStartDate)
+    if (weekSchedule?.assignments) {
+      setCopiedWeekData({
+        assignments: weekSchedule.assignments,
+        weekStartDate: weekStartDate.toISOString(),
+        copiedAt: new Date().toISOString()
+      })
+      toast({
+        title: "Semana copiada",
+        description: "La semana ha sido copiada exitosamente",
+        duration: 2000,
+      })
+    } else {
+      toast({
+        title: "Error",
+        description: "No hay datos para copiar en esta semana",
+        variant: "destructive",
+      })
+    }
+  }, [getWeekSchedule, toast])
+
+  // Función para pegar la semana copiada
+  const pasteCopiedWeek = useCallback(async (targetWeekStartDate: Date) => {
+    if (!copiedWeekData) {
+      toast({
+        title: "Error",
+        description: "No hay una semana copiada para pegar",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      // Obtener las fechas de la semana objetivo (7 días)
+      const targetWeekDates = []
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(targetWeekStartDate)
+        date.setDate(date.getDate() + i)
+        targetWeekDates.push(date)
+      }
+
+      // Obtener las fechas de la semana copiada
+      const copiedWeekStartDate = new Date(copiedWeekData.weekStartDate)
+      const copiedWeekDates = []
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(copiedWeekStartDate)
+        date.setDate(date.getDate() + i)
+        copiedWeekDates.push(date)
+      }
+
+      // Mapear las asignaciones por día de la semana (lunes, martes, etc.)
+      const assignmentsByDayOfWeek: Record<number, Record<string, any>> = {}
+      
+      // Organizar las asignaciones copiadas por día de la semana (0-6)
+      copiedWeekDates.forEach((date, index) => {
+        const dateStr = format(date, "yyyy-MM-dd")
+        const assignments = copiedWeekData.assignments[dateStr]
+        if (assignments && typeof assignments === 'object') {
+          assignmentsByDayOfWeek[index] = assignments
+        }
+      })
+
+      // Aplicar las asignaciones a los días correspondientes de la semana objetivo
+      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+        const targetDate = targetWeekDates[dayIndex]
+        const targetDateStr = format(targetDate, "yyyy-MM-dd")
+        const assignments = assignmentsByDayOfWeek[dayIndex]
+
+        if (assignments) {
+          for (const [employeeId, assignmentValue] of Object.entries(assignments)) {
+            await handleAssignmentUpdate(targetDateStr, employeeId, assignmentValue)
+          }
+        }
+      }
+      
+      toast({
+        title: "Semana pegada",
+        description: "La semana copiada ha sido aplicada exitosamente",
+        duration: 2000,
+      })
+    } catch (error) {
+      console.error('Error al pegar semana:', error)
+      toast({
+        title: "Error",
+        description: "Ocurrió un error al pegar la semana",
+        variant: "destructive",
+      })
+    }
+  }, [copiedWeekData, handleAssignmentUpdate, toast])
+
   return (
     <>
       <ExportOverlay isExporting={exporting} message="Exportando horario..." />
@@ -381,6 +476,9 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         lastCompletedWeekStart={lastCompletedWeekStart}
         allSchedules={schedules}
         config={config}
+        copiedWeekData={copiedWeekData}
+        onCopyCurrentWeek={copyCurrentWeek}
+        onPasteCopiedWeek={pasteCopiedWeek}
       />
       </div>
     </>

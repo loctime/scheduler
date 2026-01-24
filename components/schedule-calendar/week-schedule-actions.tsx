@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Loader2, Copy, Trash2, CheckCircle2, Circle, Download, Sparkles, ChevronDown } from "lucide-react"
+import { Loader2, Copy, Trash2, CheckCircle2, Circle, Download, Sparkles, ChevronDown, Clipboard } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,6 +20,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import type { WeekActionsReturn } from "@/hooks/use-week-actions"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
 
 interface WeekScheduleActionsProps {
   readonly: boolean
@@ -35,6 +37,10 @@ interface WeekScheduleActionsProps {
   onExportPDF?: () => void
   onExportExcel?: () => void
   weekActions: WeekActionsReturn
+  copiedWeekData?: any
+  onCopyCurrentWeek?: (weekStartDate: Date) => void
+  onPasteCopiedWeek?: (targetWeekStartDate: Date) => Promise<void>
+  weekStartDate: Date
 }
 
 export function WeekScheduleActions({
@@ -51,10 +57,15 @@ export function WeekScheduleActions({
   onExportPDF,
   onExportExcel,
   weekActions,
+  copiedWeekData,
+  onCopyCurrentWeek,
+  onPasteCopiedWeek,
+  weekStartDate,
 }: WeekScheduleActionsProps) {
   const [confirmCopyDialogOpen, setConfirmCopyDialogOpen] = useState(false)
   const [confirmClearDialogOpen, setConfirmClearDialogOpen] = useState(false)
   const [confirmSuggestDialogOpen, setConfirmSuggestDialogOpen] = useState(false)
+  const [confirmPasteDialogOpen, setConfirmPasteDialogOpen] = useState(false)
 
   const handleCopyPreviousWeek = useCallback(async () => {
     try {
@@ -101,12 +112,49 @@ export function WeekScheduleActions({
     await weekActions.executeSuggestSchedules()
   }, [weekActions])
 
+  const handleCopyCurrentWeek = useCallback(() => {
+    if (onCopyCurrentWeek) {
+      onCopyCurrentWeek(weekStartDate)
+    }
+  }, [onCopyCurrentWeek, weekStartDate])
+
+  const handlePasteCopiedWeek = useCallback(async () => {
+    if (onPasteCopiedWeek) {
+      await onPasteCopiedWeek(weekStartDate)
+    }
+  }, [onPasteCopiedWeek, weekStartDate])
+
+  const handleConfirmPaste = useCallback(async () => {
+    setConfirmPasteDialogOpen(false)
+    await handlePasteCopiedWeek()
+  }, [handlePasteCopiedWeek])
+
 
   return (
     <>
       <div className="flex flex-wrap gap-1 sm:gap-2 ml-2 sm:ml-4" onClick={(e) => e.stopPropagation()}>
         {!readonly && getWeekSchedule && onAssignmentUpdate && (
           <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyCurrentWeek}
+              disabled={exporting || weekActions.isCopying || weekActions.isClearing || weekActions.isSuggesting}
+              aria-label="Copiar semana actual"
+            >
+              <Copy className="mr-2 h-4 w-4" />
+              Copiar
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setConfirmPasteDialogOpen(true)}
+              disabled={!copiedWeekData || exporting || weekActions.isCopying || weekActions.isClearing || weekActions.isSuggesting}
+              aria-label="Pegar semana copiada"
+            >
+              <Clipboard className="mr-2 h-4 w-4" />
+              Pegar
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -301,6 +349,27 @@ export function WeekScheduleActions({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmSuggest}>Confirmar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmPasteDialogOpen} onOpenChange={setConfirmPasteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Confirmar pegado de semana?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Al pegar la semana copiada, se reemplazarán todas las asignaciones actuales de esta semana.
+              {copiedWeekData && (
+                <span className="block mt-2 text-sm">
+                  Semana a pegar: {format(new Date(copiedWeekData.weekStartDate), "d 'de' MMMM, yyyy", { locale: es })}
+                </span>
+              )}
+              ¿Estás seguro de que deseas continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmPaste}>Confirmar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
