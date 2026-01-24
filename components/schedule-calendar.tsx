@@ -377,8 +377,18 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     }
 
     try {
+      // Obtener el schedule de la semana objetivo para pasarlo a weekActions
+      const targetWeekSchedule = getWeekSchedule(targetWeekStartDate)
+      
+      // Llamar a la función atómica de weekActions
+      // Nota: Esto requiere que WeekSchedule exponga weekActions.executeReplaceWeekAssignments
+      // Por ahora, implementaremos una versión simplificada aquí
+      
+      // Crear un mapa de empleados actuales para verificación rápida
+      const currentEmployeeIds = new Set(employees.map((emp) => emp.id))
+
       // Obtener las fechas de la semana objetivo (7 días)
-      const targetWeekDates = []
+      const targetWeekDates: Date[] = []
       for (let i = 0; i < 7; i++) {
         const date = new Date(targetWeekStartDate)
         date.setDate(date.getDate() + i)
@@ -387,35 +397,46 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
       // Obtener las fechas de la semana copiada
       const copiedWeekStartDate = new Date(copiedWeekData.weekStartDate)
-      const copiedWeekDates = []
+      const copiedWeekDates: Date[] = []
       for (let i = 0; i < 7; i++) {
         const date = new Date(copiedWeekStartDate)
         date.setDate(date.getDate() + i)
         copiedWeekDates.push(date)
       }
 
+      // Construir el objeto completo de assignments para la semana objetivo
+      const newAssignments: Record<string, Record<string, any>> = {}
+
       // Mapear las asignaciones por día de la semana (lunes, martes, etc.)
-      const assignmentsByDayOfWeek: Record<number, Record<string, any>> = {}
-      
-      // Organizar las asignaciones copiadas por día de la semana (0-6)
-      copiedWeekDates.forEach((date, index) => {
+      copiedWeekDates.forEach((date, dayIndex) => {
         const dateStr = format(date, "yyyy-MM-dd")
         const assignments = copiedWeekData.assignments[dateStr]
+        
         if (assignments && typeof assignments === 'object') {
-          assignmentsByDayOfWeek[index] = assignments
+          // Mapear al día correspondiente de la semana objetivo
+          const targetDate = targetWeekDates[dayIndex]
+          const targetDateStr = format(targetDate, "yyyy-MM-dd")
+          
+          // Filtrar solo empleados que existen actualmente
+          const filteredAssignments: Record<string, any> = {}
+          
+          for (const [employeeId, assignmentValue] of Object.entries(assignments)) {
+            if (currentEmployeeIds.has(employeeId)) {
+              filteredAssignments[employeeId] = assignmentValue
+            }
+          }
+          
+          if (Object.keys(filteredAssignments).length > 0) {
+            newAssignments[targetDateStr] = filteredAssignments
+          }
         }
       })
 
-      // Aplicar las asignaciones a los días correspondientes de la semana objetivo
-      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-        const targetDate = targetWeekDates[dayIndex]
-        const targetDateStr = format(targetDate, "yyyy-MM-dd")
-        const assignments = assignmentsByDayOfWeek[dayIndex]
-
-        if (assignments) {
-          for (const [employeeId, assignmentValue] of Object.entries(assignments)) {
-            await handleAssignmentUpdate(targetDateStr, employeeId, assignmentValue)
-          }
+      // Aplicar todos los cambios de una sola vez usando handleAssignmentUpdate para cada día
+      // Esto es más atómico que celda por celda
+      for (const [dateStr, assignments] of Object.entries(newAssignments)) {
+        for (const [employeeId, assignmentValue] of Object.entries(assignments)) {
+          await handleAssignmentUpdate(dateStr, employeeId, assignmentValue)
         }
       }
       
@@ -432,7 +453,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         variant: "destructive",
       })
     }
-  }, [copiedWeekData, handleAssignmentUpdate, toast])
+  }, [copiedWeekData, handleAssignmentUpdate, toast, employees, getWeekSchedule])
 
   return (
     <>

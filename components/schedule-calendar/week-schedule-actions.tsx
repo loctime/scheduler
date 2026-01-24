@@ -119,15 +119,32 @@ export function WeekScheduleActions({
   }, [onCopyCurrentWeek, weekStartDate])
 
   const handlePasteCopiedWeek = useCallback(async () => {
-    if (onPasteCopiedWeek) {
-      await onPasteCopiedWeek(weekStartDate)
+    if (onPasteCopiedWeek && copiedWeekData) {
+      // Usar la función atómica de weekActions si está disponible
+      if (weekActions.executeReplaceWeekAssignments) {
+        try {
+          await weekActions.executeReplaceWeekAssignments(weekStartDate, copiedWeekData)
+        } catch (error: any) {
+          if (error.message === "NEEDS_CONFIRMATION") {
+            // Si necesita confirmación, mostrar diálogo
+            setConfirmPasteDialogOpen(true)
+          } else {
+            throw error
+          }
+        }
+      } else {
+        // Fallback al método original
+        await onPasteCopiedWeek(weekStartDate)
+      }
     }
-  }, [onPasteCopiedWeek, weekStartDate])
+  }, [onPasteCopiedWeek, copiedWeekData, weekActions, weekStartDate])
 
   const handleConfirmPaste = useCallback(async () => {
     setConfirmPasteDialogOpen(false)
-    await handlePasteCopiedWeek()
-  }, [handlePasteCopiedWeek])
+    if (copiedWeekData && weekActions.executeReplaceWeekAssignments) {
+      await weekActions.executeReplaceWeekAssignments(weekStartDate, copiedWeekData)
+    }
+  }, [copiedWeekData, weekActions, weekStartDate])
 
 
   return (
@@ -139,7 +156,7 @@ export function WeekScheduleActions({
               variant="outline"
               size="sm"
               onClick={handleCopyCurrentWeek}
-              disabled={exporting || weekActions.isCopying || weekActions.isClearing || weekActions.isSuggesting}
+              disabled={exporting || weekActions.isCopying || weekActions.isClearing || weekActions.isSuggesting || weekActions.isPasting}
               aria-label="Copiar semana actual"
             >
               <Copy className="mr-2 h-4 w-4" />
@@ -149,17 +166,26 @@ export function WeekScheduleActions({
               variant="outline"
               size="sm"
               onClick={() => setConfirmPasteDialogOpen(true)}
-              disabled={!copiedWeekData || exporting || weekActions.isCopying || weekActions.isClearing || weekActions.isSuggesting}
+              disabled={!copiedWeekData || exporting || weekActions.isCopying || weekActions.isClearing || weekActions.isSuggesting || weekActions.isPasting}
               aria-label="Pegar semana copiada"
             >
-              <Clipboard className="mr-2 h-4 w-4" />
-              Pegar
+              {weekActions.isPasting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Pegando...
+                </>
+              ) : (
+                <>
+                  <Clipboard className="mr-2 h-4 w-4" />
+                  Pegar
+                </>
+              )}
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={handleCopyPreviousWeek}
-              disabled={weekActions.isCopying || exporting || weekActions.isClearing || weekActions.isSuggesting}
+              disabled={weekActions.isCopying || exporting || weekActions.isClearing || weekActions.isSuggesting || weekActions.isPasting}
               aria-label="Copiar semana anterior"
             >
               {weekActions.isCopying ? (
@@ -178,7 +204,7 @@ export function WeekScheduleActions({
               variant="outline"
               size="sm"
               onClick={handleSuggestSchedules}
-              disabled={weekActions.isSuggesting || exporting || weekActions.isCopying || weekActions.isClearing}
+              disabled={weekActions.isSuggesting || exporting || weekActions.isCopying || weekActions.isClearing || weekActions.isPasting}
               aria-label="Sugerir horarios fijos"
             >
               {weekActions.isSuggesting ? (
@@ -200,7 +226,7 @@ export function WeekScheduleActions({
             variant="outline"
             size="sm"
             onClick={handleClearWeek}
-            disabled={weekActions.isClearing || exporting || weekActions.isCopying || weekActions.isSuggesting}
+            disabled={weekActions.isClearing || exporting || weekActions.isCopying || weekActions.isSuggesting || weekActions.isPasting}
             aria-label="Limpiar semana"
           >
             {weekActions.isClearing ? (
