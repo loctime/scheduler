@@ -20,6 +20,95 @@ export function useExportSchedule() {
     document.body.classList.remove("exporting-image")
   }
 
+  // Helper para preparar elemento para captura
+  const prepareElementForCapture = (htmlElement: HTMLElement, config?: { nombreEmpresa?: string; colorEmpresa?: string }) => {
+    const snapshot = {
+      originalOverflow: {
+        overflow: htmlElement.style.overflow,
+        overflowX: htmlElement.style.overflowX,
+        overflowY: htmlElement.style.overflowY,
+      },
+      originalStyles: new Map<HTMLElement, { padding: string; margin: string }>(),
+      originalPadding: htmlElement.style.padding || getComputedStyle(htmlElement).padding,
+      bottomSeparatorRow: null as HTMLTableRowElement | null,
+      cleanedFlex: [] as any[],
+    }
+
+    // Eliminar padding y márgenes del elemento y sus hijos
+    const removeSpacing = (el: HTMLElement) => {
+      snapshot.originalStyles.set(el, {
+        padding: el.style.padding || getComputedStyle(el).padding,
+        margin: el.style.margin || getComputedStyle(el).margin,
+      })
+      el.style.padding = "0"
+      el.style.margin = "0"
+    }
+    
+    removeSpacing(htmlElement)
+    htmlElement.querySelectorAll("*").forEach((el) => {
+      if (el instanceof HTMLElement) {
+        removeSpacing(el)
+      }
+    })
+
+    htmlElement.style.overflow = "visible"
+    htmlElement.style.overflowX = "visible"
+    htmlElement.style.overflowY = "visible"
+
+    snapshot.cleanedFlex = cleanFlexDivs(htmlElement)
+
+    // Ajustar contenedores al ancho real de la tabla
+    const table = htmlElement.querySelector("table")
+    if (table) {
+      // Agregar separador inferior antes de exportar
+      if (config?.nombreEmpresa) {
+        snapshot.bottomSeparatorRow = addBottomSeparator(table, config.nombreEmpresa, config.colorEmpresa)
+      }
+
+      const tableWidth = table.scrollWidth
+      const containers = htmlElement.querySelectorAll(".overflow-x-auto, .overflow-hidden, [class*='Card'], [class*='card']")
+      containers.forEach((container) => {
+        if (container instanceof HTMLElement) {
+          container.style.width = `${tableWidth}px`
+          container.style.maxWidth = `${tableWidth}px`
+        }
+      })
+      htmlElement.style.width = `${tableWidth}px`
+      htmlElement.style.maxWidth = `${tableWidth}px`
+    }
+
+    // Agregar margen abajo y a la derecha antes de exportar
+    const marginRight = 20
+    const marginBottom = 20
+    htmlElement.style.padding = `0 ${marginRight}px ${marginBottom}px 0`
+    htmlElement.style.boxSizing = "content-box"
+
+    return snapshot
+  }
+
+  // Helper para restaurar elemento después de captura
+  const restoreElementAfterCapture = (htmlElement: HTMLElement, snapshot: any) => {
+    // Restaurar padding original
+    htmlElement.style.padding = snapshot.originalPadding
+
+    // Remover separador inferior después de exportar
+    if (snapshot.bottomSeparatorRow && snapshot.bottomSeparatorRow.parentNode) {
+      snapshot.bottomSeparatorRow.parentNode.removeChild(snapshot.bottomSeparatorRow)
+    }
+
+    restoreFlexDivs(snapshot.cleanedFlex)
+
+    // Restaurar estilos originales
+    snapshot.originalStyles.forEach((styles: any, el: HTMLElement) => {
+      el.style.padding = styles.padding
+      el.style.margin = styles.margin
+    })
+
+    htmlElement.style.overflow = snapshot.originalOverflow.overflow
+    htmlElement.style.overflowX = snapshot.originalOverflow.overflowX
+    htmlElement.style.overflowY = snapshot.originalOverflow.overflowY
+  }
+
   const cleanFlexDivs = (element: HTMLElement) => {
     const cleaned: Array<{
       el: HTMLElement
@@ -221,59 +310,8 @@ export function useExportSchedule() {
 
     try {
       disablePseudoElements()
-
-      // Eliminar padding y márgenes del elemento y sus hijos
-      const originalStyles = new Map<HTMLElement, { padding: string; margin: string }>()
-      const removeSpacing = (el: HTMLElement) => {
-        originalStyles.set(el, {
-          padding: el.style.padding || getComputedStyle(el).padding,
-          margin: el.style.margin || getComputedStyle(el).margin,
-        })
-        el.style.padding = "0"
-        el.style.margin = "0"
-      }
       
-      removeSpacing(htmlElement)
-      htmlElement.querySelectorAll("*").forEach((el) => {
-        if (el instanceof HTMLElement) {
-          removeSpacing(el)
-        }
-      })
-
-      // mostrar todo el contenido
-      htmlElement.style.overflow = "visible"
-      htmlElement.style.overflowX = "visible"
-      htmlElement.style.overflowY = "visible"
-
-      // limpiar celdas
-      const cleanedFlex = cleanFlexDivs(htmlElement)
-
-      // Ajustar contenedores al ancho real de la tabla para eliminar espacios en blanco
-      const table = htmlElement.querySelector("table")
-      if (table) {
-        // Agregar separador inferior antes de exportar
-        if (config?.nombreEmpresa) {
-          bottomSeparatorRow = addBottomSeparator(table, config.nombreEmpresa, config.colorEmpresa)
-        }
-
-        const tableWidth = table.scrollWidth
-        const containers = htmlElement.querySelectorAll(".overflow-x-auto, .overflow-hidden, [class*='Card'], [class*='card']")
-        containers.forEach((container) => {
-          if (container instanceof HTMLElement) {
-            container.style.width = `${tableWidth}px`
-            container.style.maxWidth = `${tableWidth}px`
-          }
-        })
-        htmlElement.style.width = `${tableWidth}px`
-        htmlElement.style.maxWidth = `${tableWidth}px`
-      }
-
-      // Agregar margen abajo y a la derecha antes de exportar
-      const marginRight = 20
-      const marginBottom = 20
-      const originalPadding = htmlElement.style.padding || getComputedStyle(htmlElement).padding
-      htmlElement.style.padding = `0 ${marginRight}px ${marginBottom}px 0`
-      htmlElement.style.boxSizing = "content-box"
+      const snapshot = prepareElementForCapture(htmlElement, config)
 
       const domtoimage = await import("dom-to-image-more")
 
@@ -281,40 +319,27 @@ export function useExportSchedule() {
       const scale = 4 // Aumentar a 4x para mejor calidad y tamaño más grande
       
       // Usar el ancho real de la tabla, no del contenedor, más los márgenes
+      const table = htmlElement.querySelector("table")
       const actualWidth = table ? table.scrollWidth : element.scrollWidth
       const actualHeight = table ? table.scrollHeight : element.scrollHeight
       
       const dataUrl = await domtoimage.toPng(htmlElement, {
         quality: 1.0,
         bgcolor: "#ffffff",
-        width: (actualWidth + marginRight) * scale,
-        height: (actualHeight + marginBottom) * scale,
+        width: (actualWidth + 20) * scale,
+        height: (actualHeight + 20) * scale,
         style: {
           transform: `scale(${scale})`,
           transformOrigin: 'top left',
         },
       })
 
-      // Restaurar padding original
-      htmlElement.style.padding = originalPadding
-
-      // Remover separador inferior después de exportar
-      if (bottomSeparatorRow && bottomSeparatorRow.parentNode) {
-        bottomSeparatorRow.parentNode.removeChild(bottomSeparatorRow)
-      }
+      restoreElementAfterCapture(htmlElement, snapshot)
 
       const link = document.createElement("a")
       link.download = filename
       link.href = dataUrl
       link.click()
-
-      restoreFlexDivs(cleanedFlex)
-
-      // Restaurar estilos originales
-      originalStyles.forEach((styles, el) => {
-        el.style.padding = styles.padding
-        el.style.margin = styles.margin
-      })
 
       // Subir al backend siempre que haya ownerId (indica exportación de semana completa)
       // Validar que ownerId sea un string no vacío para evitar enviar valores inválidos
@@ -348,10 +373,6 @@ export function useExportSchedule() {
       })
     } catch (e) {
       console.error(e)
-      // Asegurar que el separador se elimine incluso si hay error
-      if (bottomSeparatorRow && bottomSeparatorRow.parentNode) {
-        bottomSeparatorRow.parentNode.removeChild(bottomSeparatorRow)
-      }
       toast({
         title: "Error",
         description: "No se pudo exportar.",
@@ -359,9 +380,6 @@ export function useExportSchedule() {
       })
     } finally {
       enablePseudoElements()
-      htmlElement.style.overflow = originalOverflow.overflow
-      htmlElement.style.overflowX = originalOverflow.overflowX
-      htmlElement.style.overflowY = originalOverflow.overflowY
       setExporting(false)
     }
   }, [toast])
@@ -391,57 +409,8 @@ export function useExportSchedule() {
 
     try {
       disablePseudoElements()
-
-      // Eliminar padding y márgenes del elemento y sus hijos
-      const originalStyles = new Map<HTMLElement, { padding: string; margin: string }>()
-      const removeSpacing = (el: HTMLElement) => {
-        originalStyles.set(el, {
-          padding: el.style.padding || getComputedStyle(el).padding,
-          margin: el.style.margin || getComputedStyle(el).margin,
-        })
-        el.style.padding = "0"
-        el.style.margin = "0"
-      }
       
-      removeSpacing(htmlElement)
-      htmlElement.querySelectorAll("*").forEach((el) => {
-        if (el instanceof HTMLElement) {
-          removeSpacing(el)
-        }
-      })
-
-      htmlElement.style.overflow = "visible"
-      htmlElement.style.overflowX = "visible"
-      htmlElement.style.overflowY = "visible"
-
-      const cleanedFlex = cleanFlexDivs(htmlElement)
-
-      // Ajustar contenedores al ancho real de la tabla para eliminar espacios en blanco
-      const table = htmlElement.querySelector("table")
-      if (table) {
-        // Agregar separador inferior antes de exportar
-        if (config?.nombreEmpresa) {
-          bottomSeparatorRow = addBottomSeparator(table, config.nombreEmpresa, config.colorEmpresa)
-        }
-
-        const tableWidth = table.scrollWidth
-        const containers = htmlElement.querySelectorAll(".overflow-x-auto, .overflow-hidden, [class*='Card'], [class*='card']")
-        containers.forEach((container) => {
-          if (container instanceof HTMLElement) {
-            container.style.width = `${tableWidth}px`
-            container.style.maxWidth = `${tableWidth}px`
-          }
-        })
-        htmlElement.style.width = `${tableWidth}px`
-        htmlElement.style.maxWidth = `${tableWidth}px`
-      }
-
-      // Agregar margen abajo y a la derecha antes de exportar
-      const marginRight = 20
-      const marginBottom = 20
-      const originalPadding = htmlElement.style.padding || getComputedStyle(htmlElement).padding
-      htmlElement.style.padding = `0 ${marginRight}px ${marginBottom}px 0`
-      htmlElement.style.boxSizing = "content-box"
+      const snapshot = prepareElementForCapture(htmlElement, config)
 
       const [domtoimage, jsPDF] = await Promise.all([
         import("dom-to-image-more"),
@@ -452,27 +421,22 @@ export function useExportSchedule() {
       const scale = 4 // Aumentar a 4x para mejor calidad y tamaño más grande
       
       // Usar el ancho real de la tabla, no del contenedor, más los márgenes
+      const table = htmlElement.querySelector("table")
       const actualWidth = table ? table.scrollWidth : element.scrollWidth
       const actualHeight = table ? table.scrollHeight : element.scrollHeight
       
       const dataUrl = await domtoimage.toPng(htmlElement, {
         quality: 1.0,
         bgcolor: "#ffffff",
-        width: (actualWidth + marginRight) * scale,
-        height: (actualHeight + marginBottom) * scale,
+        width: (actualWidth + 20) * scale,
+        height: (actualHeight + 20) * scale,
         style: {
           transform: `scale(${scale})`,
           transformOrigin: 'top left',
         },
       })
 
-      // Restaurar padding original
-      htmlElement.style.padding = originalPadding
-
-      // Remover separador inferior después de exportar
-      if (bottomSeparatorRow && bottomSeparatorRow.parentNode) {
-        bottomSeparatorRow.parentNode.removeChild(bottomSeparatorRow)
-      }
+      restoreElementAfterCapture(htmlElement, snapshot)
 
       const pdf = new jsPDF("l", "mm", "a4")
       const pdfWidth = pdf.internal.pageSize.getWidth()
@@ -485,24 +449,12 @@ export function useExportSchedule() {
       pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight)
       pdf.save(filename)
 
-      restoreFlexDivs(cleanedFlex)
-
-      // Restaurar estilos originales
-      originalStyles.forEach((styles, el) => {
-        el.style.padding = styles.padding
-        el.style.margin = styles.margin
-      })
-
       toast({
         title: "PDF exportado",
         description: "Se generó correctamente.",
       })
     } catch (e) {
       console.error(e)
-      // Asegurar que el separador se elimine incluso si hay error
-      if (bottomSeparatorRow && bottomSeparatorRow.parentNode) {
-        bottomSeparatorRow.parentNode.removeChild(bottomSeparatorRow)
-      }
       toast({
         title: "Error",
         description: "No se pudo exportar el PDF.",
@@ -510,9 +462,6 @@ export function useExportSchedule() {
       })
     } finally {
       enablePseudoElements()
-      htmlElement.style.overflow = originalOverflow.overflow
-      htmlElement.style.overflowX = originalOverflow.overflowX
-      htmlElement.style.overflowY = originalOverflow.overflowY
       setExporting(false)
     }
   }, [toast])
@@ -974,6 +923,9 @@ export function useExportSchedule() {
     setExporting(true)
     
     try {
+      // Desactivar pseudo-elementos UNA SOLA VEZ al inicio
+      disablePseudoElements()
+      
       const [domtoimage, jsPDF] = await Promise.all([
         import("dom-to-image-more"),
         import("jspdf").then(m => m.default),
@@ -1375,6 +1327,14 @@ export function useExportSchedule() {
         const weekEndDate = weekDays[weekDays.length - 1]
         const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
         
+        // Feedback de progreso NO intrusivo
+        if (weekIndex > 0) {
+          toast({
+            title: "Procesando...",
+            description: `Semana ${weekIndex + 1} de ${monthWeeks.length}`,
+          })
+        }
+        
         // Esperar a que el elemento esté disponible
         await new Promise((resolve) => setTimeout(resolve, 100))
         
@@ -1415,66 +1375,8 @@ export function useExportSchedule() {
           continue
         }
 
-        // Preparar el elemento para exportación (similar a exportPDF)
-        disablePseudoElements()
-
-        const originalOverflow = {
-          overflow: htmlElement.style.overflow,
-          overflowX: htmlElement.style.overflowX,
-          overflowY: htmlElement.style.overflowY,
-        }
-
-        let bottomSeparatorRow: HTMLTableRowElement | null = null
-
-        // Eliminar padding y márgenes
-        const originalStyles = new Map<HTMLElement, { padding: string; margin: string }>()
-        const removeSpacing = (el: HTMLElement) => {
-          originalStyles.set(el, {
-            padding: el.style.padding || getComputedStyle(el).padding,
-            margin: el.style.margin || getComputedStyle(el).margin,
-          })
-          el.style.padding = "0"
-          el.style.margin = "0"
-        }
-        
-        removeSpacing(htmlElement)
-        htmlElement.querySelectorAll("*").forEach((el) => {
-          if (el instanceof HTMLElement) {
-            removeSpacing(el)
-          }
-        })
-
-        htmlElement.style.overflow = "visible"
-        htmlElement.style.overflowX = "visible"
-        htmlElement.style.overflowY = "visible"
-
-        const cleanedFlex = cleanFlexDivs(htmlElement)
-
-        // Ajustar contenedores al ancho real de la tabla
-        if (table) {
-          // Agregar separador inferior antes de exportar
-          if (config?.nombreEmpresa) {
-            bottomSeparatorRow = addBottomSeparator(table, config.nombreEmpresa, config.colorEmpresa)
-          }
-
-          const tableWidth = table.scrollWidth
-          const containers = htmlElement.querySelectorAll(".overflow-x-auto, .overflow-hidden, [class*='Card'], [class*='card']")
-          containers.forEach((container) => {
-            if (container instanceof HTMLElement) {
-              container.style.width = `${tableWidth}px`
-              container.style.maxWidth = `${tableWidth}px`
-            }
-          })
-          htmlElement.style.width = `${tableWidth}px`
-          htmlElement.style.maxWidth = `${tableWidth}px`
-        }
-
-        // Agregar margen abajo y a la derecha antes de exportar
-        const marginRight = 20
-        const marginBottom = 20
-        const originalPadding = htmlElement.style.padding || getComputedStyle(htmlElement).padding
-        htmlElement.style.padding = `0 ${marginRight}px ${marginBottom}px 0`
-        htmlElement.style.boxSizing = "content-box"
+        // Preparar el elemento para exportación usando el helper
+        const snapshot = prepareElementForCapture(htmlElement, config)
 
         const scale = 2
         // Usar el ancho real de la tabla, no del contenedor, más los márgenes
@@ -1485,27 +1387,16 @@ export function useExportSchedule() {
         const dataUrl = await domtoimage.toJpeg(htmlElement, {
           quality: 0.8,
           bgcolor: "#ffffff",
-          width: (actualWidth + marginRight) * scale,
-          height: (actualHeight + marginBottom) * scale,
+          width: (actualWidth + 20) * scale,
+          height: (actualHeight + 20) * scale,
           style: {
             transform: `scale(${scale})`,
             transformOrigin: 'top left',
           },
         })
 
-        // Restaurar estilos
-        htmlElement.style.padding = originalPadding
-        if (bottomSeparatorRow && bottomSeparatorRow.parentNode) {
-          bottomSeparatorRow.parentNode.removeChild(bottomSeparatorRow)
-        }
-        restoreFlexDivs(cleanedFlex)
-        originalStyles.forEach((styles, el) => {
-          el.style.padding = styles.padding
-          el.style.margin = styles.margin
-        })
-        htmlElement.style.overflow = originalOverflow.overflow
-        htmlElement.style.overflowX = originalOverflow.overflowX
-        htmlElement.style.overflowY = originalOverflow.overflowY
+        // Restaurar el elemento usando el helper
+        restoreElementAfterCapture(htmlElement, snapshot)
 
         // Agregar nueva página para cada semana (el dashboard está en la página 1)
         pdf.addPage()
@@ -1540,9 +1431,6 @@ export function useExportSchedule() {
 
         // Agregar footer
         addFooter(pdf, weekIndex + 1, totalWeeks)
-
-        // Restaurar pseudo-elementos después de procesar cada semana
-        enablePseudoElements()
       }
 
       pdf.save(filename)
@@ -1553,17 +1441,17 @@ export function useExportSchedule() {
       })
     } catch (e) {
       console.error(e)
-      enablePseudoElements()
       toast({
         title: "Error",
         description: "No se pudo exportar el PDF mensual.",
         variant: "destructive",
       })
     } finally {
-      enablePseudoElements() // Asegurar que siempre se restaure
+      // Restaurar pseudo-elementos UNA SOLA VEZ al final
+      enablePseudoElements()
       setExporting(false)
     }
-  }, [toast, disablePseudoElements, enablePseudoElements, cleanFlexDivs, restoreFlexDivs, addBottomSeparator])
+  }, [toast, disablePseudoElements, enablePseudoElements, prepareElementForCapture, restoreElementAfterCapture])
 
   return { exporting, exportImage, exportPDF, exportExcel, exportMonthPDF }
 }
