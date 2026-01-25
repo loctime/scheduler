@@ -1,7 +1,8 @@
 import type { CaptureSnapshot } from "./prepareElementForCapture"
+import { restoreFlexDivs } from "./restoreFlexDivs"
 
 // Helper para restaurar elemento después de captura
-export const restoreElementAfterCapture = (htmlElement: HTMLElement, snapshot: CaptureSnapshot, restoreFlexDivs: (cleaned: any[]) => void) => {
+export const restoreElementAfterCapture = (htmlElement: HTMLElement, snapshot: CaptureSnapshot) => {
   // Restaurar padding original
   htmlElement.style.padding = snapshot.originalPadding
 

@@ -1,4 +1,5 @@
 import { addBottomSeparator } from "./separators"
+import { cleanFlexDivs } from "./cleanFlexDivs"
 
 export interface CaptureSnapshot {
   originalOverflow: {
@@ -15,7 +16,6 @@ export interface CaptureSnapshot {
 // Helper para preparar elemento para captura
 export const prepareElementForCapture = (
   htmlElement: HTMLElement,
-  cleanFlexDivs: (element: HTMLElement) => any[],
   config?: { nombreEmpresa?: string; colorEmpresa?: string }
 ): CaptureSnapshot => {
   const snapshot: CaptureSnapshot = {
