@@ -1476,14 +1476,14 @@ export function useExportSchedule() {
         htmlElement.style.padding = `0 ${marginRight}px ${marginBottom}px 0`
         htmlElement.style.boxSizing = "content-box"
 
-        const scale = 4
+        const scale = 2
         // Usar el ancho real de la tabla, no del contenedor, más los márgenes
         const actualWidth = table ? table.scrollWidth : htmlElement.scrollWidth
         const actualHeight = table ? table.scrollHeight : htmlElement.scrollHeight
 
-        // Capturar como imagen
-        const dataUrl = await domtoimage.toPng(htmlElement, {
-          quality: 1.0,
+        // Capturar como imagen JPEG con compresión para reducir tamaño
+        const dataUrl = await domtoimage.toJpeg(htmlElement, {
+          quality: 0.8,
           bgcolor: "#ffffff",
           width: (actualWidth + marginRight) * scale,
           height: (actualHeight + marginBottom) * scale,
@@ -1535,8 +1535,8 @@ export function useExportSchedule() {
         const x = (pdfWidth - imgWidth) / 2
         const y = headerHeight + margin
 
-        // Agregar imagen al PDF
-        pdf.addImage(dataUrl, "PNG", x, y, imgWidth, imgHeight)
+        // Agregar imagen al PDF (usar JPEG para menor tamaño)
+        pdf.addImage(dataUrl, "JPEG", x, y, imgWidth, imgHeight)
 
         // Agregar footer
         addFooter(pdf, weekIndex + 1, totalWeeks)
