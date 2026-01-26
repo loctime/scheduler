@@ -9,6 +9,10 @@ const urlsToCache = [
   '/icon.svg',
   '/apple-icon.png'
 ]
+const publishedAssets = [
+  '/pwa/horario/published.png',
+  '/pwa/horario/published.json'
+]
 
 // Instalación del Service Worker
 self.addEventListener('install', (event) => {
@@ -81,9 +85,15 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // NO interceptar imágenes externas del CDN
-  // El frontend solo debe pedir la URL al backend y renderizar <img src="URL_CDN">
-  // Las imágenes del CDN se manejan directamente por el navegador sin intervención del SW
+  // Recursos publicados por la app para offline
+  if (publishedAssets.includes(url.pathname)) {
+    event.respondWith(
+      caches.match(event.request).then((response) => {
+        return response || new Response(null, { status: 404 })
+      })
+    )
+    return
+  }
 
   // Para otros recursos estáticos locales (manifest, iconos), usar cache primero
   if (url.pathname.startsWith('/manifest-horario.json') || 

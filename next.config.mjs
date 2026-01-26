@@ -86,19 +86,6 @@ const nextConfig = {
           },
         ],
       },
-      {
-        source: '/sw-horario.js',
-        headers: [
-          {
-            key: 'Content-Type',
-            value: 'application/javascript',
-          },
-          {
-            key: 'Service-Worker-Allowed',
-            value: '/pwa/horario',
-          },
-        ],
-      },
     ]
   },
 }
