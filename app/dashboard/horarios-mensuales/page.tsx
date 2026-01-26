@@ -23,6 +23,7 @@ import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/wor
 import { ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Share2 } from "lucide-react"
+import { savePublishedHorario } from "@/lib/pwa-horario"
 
 const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAssignment[] => {
   if (!value || !Array.isArray(value) || value.length === 0) return []
@@ -56,6 +57,7 @@ export default function HorariosMensualesPage() {
   const { config } = useConfig(user)
   const { toast } = useToast()
   const { exporting, exportImage, exportPDF, exportExcel } = useExportSchedule()
+  const [publishingWeekId, setPublishingWeekId] = useState<string | null>(null)
   const weekStartsOn = (config?.semanaInicioDia || 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
   const monthStartDay = config?.mesInicioDia || 1
 
@@ -269,15 +271,11 @@ export default function HorariosMensualesPage() {
 
   const handleExportWeekImage = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
     const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
-    const ownerId = userData?.role === "invited" && userData?.ownerId 
-      ? userData.ownerId 
-      : user?.uid
     await exportImage(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.png`, {
       nombreEmpresa: config?.nombreEmpresa,
       colorEmpresa: config?.colorEmpresa,
-      ownerId,
     })
-  }, [exportImage, config, userData, user])
+  }, [exportImage, config])
 
   const handleExportWeekPDF = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
     const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
@@ -296,6 +294,32 @@ export default function HorariosMensualesPage() {
       `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.xlsx`
     )
   }, [exportExcel, employees, shifts])
+
+  const handlePublishPwa = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
+    const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
+    setPublishingWeekId(weekId)
+    try {
+      await exportImage(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.png`, {
+        nombreEmpresa: config?.nombreEmpresa,
+        colorEmpresa: config?.colorEmpresa,
+        download: false,
+        showToast: false,
+        onImageReady: async (blob) => {
+          await savePublishedHorario({
+            imageBlob: blob,
+            weekStart: format(weekStartDate, "yyyy-MM-dd"),
+            weekEnd: format(weekEndDate, "yyyy-MM-dd"),
+          })
+        },
+      })
+      toast({
+        title: "PWA actualizada",
+        description: `Semana publicada: ${format(weekStartDate, "d 'de' MMMM", { locale: es })}.`,
+      })
+    } finally {
+      setPublishingWeekId(null)
+    }
+  }, [exportImage, config, toast])
 
   const handleShareLink = useCallback(async () => {
     if (!user) return
@@ -433,6 +457,8 @@ export default function HorariosMensualesPage() {
                             onExportPDF={handleExportWeekPDF}
                             onExportExcel={() => handleExportWeekExcel(week.weekStartDate, week.weekDays, week.schedule)}
                             exporting={exporting}
+                            onPublishPwa={handlePublishPwa}
+                            isPublishingPwa={publishingWeekId === `schedule-week-${format(week.weekStartDate, "yyyy-MM-dd")}`}
                             mediosTurnos={config?.mediosTurnos}
                             employeeStats={weekStats}
                             readonly={true}
@@ -451,4 +477,3 @@ export default function HorariosMensualesPage() {
     </>
   )
 }
-

@@ -10,25 +10,35 @@ export const useExportImage = () => {
   const exportImage = useCallback(async (
     elementId: string, 
     filename: string,
-    config?: { nombreEmpresa?: string; colorEmpresa?: string; ownerId?: string }
+    config?: {
+      nombreEmpresa?: string
+      colorEmpresa?: string
+      download?: boolean
+      showToast?: boolean
+      onImageReady?: (blob: Blob, dataUrl: string) => Promise<void> | void
+    }
   ) => {
     const element = document.getElementById(elementId)
     if (!element) {
-      toast({
-        title: "Error",
-        description: "No se encontró el elemento a exportar.",
-        variant: "destructive",
-      })
+      if (config?.showToast !== false) {
+        toast({
+          title: "Error",
+          description: "No se encontró el elemento a exportar.",
+          variant: "destructive",
+        })
+      }
       return
     }
 
     const rect = element.getBoundingClientRect()
     if (rect.width === 0 || rect.height === 0) {
-      toast({
-        title: "Error",
-        description: "El elemento no es visible.",
-        variant: "destructive",
-      })
+      if (config?.showToast !== false) {
+        toast({
+          title: "Error",
+          description: "El elemento no es visible.",
+          variant: "destructive",
+        })
+      }
       return
     }
     
@@ -65,48 +75,36 @@ export const useExportImage = () => {
 
       restoreElementAfterCapture(htmlElement, snapshot)
 
-      const link = document.createElement("a")
-      link.download = filename
-      link.href = dataUrl
-      link.click()
-
-      // Subir al backend siempre que haya ownerId (indica exportación de semana completa)
-      // Validar que ownerId sea un string no vacío para evitar enviar valores inválidos
-      if (config?.ownerId && typeof config.ownerId === 'string' && config.ownerId.trim() !== '') {
-        try {
-          const ownerId = config.ownerId.trim()
-
-          const response = await fetch(dataUrl)
-          const blob = await response.blob()
-
-          const formData = new FormData()
-          formData.append("file", blob, "semana-actual.png")
-          // Agregar ownerId explícitamente al FormData para asegurar consistencia
-          formData.append("ownerId", ownerId)
-
-          await fetch(
-            `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/horarios/semana-actual?ownerId=${encodeURIComponent(ownerId)}`,
-            {
-              method: "POST",
-              body: formData,
-            }
-          )
-        } catch (error) {
-          console.warn('Error al subir imagen al backend:', error)
-        }
+      const shouldDownload = config?.download !== false
+      if (shouldDownload) {
+        const link = document.createElement("a")
+        link.download = filename
+        link.href = dataUrl
+        link.click()
       }
 
-      toast({
-        title: "OK",
-        description: "Imagen exportada correctamente.",
-      })
+      const needsBlob = Boolean(config?.onImageReady)
+      const blob = needsBlob ? await (await fetch(dataUrl)).blob() : null
+
+      if (config?.onImageReady && blob) {
+        await config.onImageReady(blob, dataUrl)
+      }
+
+      if (config?.showToast !== false) {
+        toast({
+          title: "OK",
+          description: "Imagen exportada correctamente.",
+        })
+      }
     } catch (e) {
       console.error(e)
-      toast({
-        title: "Error",
-        description: "No se pudo exportar.",
-        variant: "destructive",
-      })
+      if (config?.showToast !== false) {
+        toast({
+          title: "Error",
+          description: "No se pudo exportar.",
+          variant: "destructive",
+        })
+      }
     } finally {
       enablePseudoElements()
     }

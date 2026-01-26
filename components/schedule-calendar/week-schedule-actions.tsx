@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Loader2, Copy, Trash2, CheckCircle2, Circle, Download, Sparkles, ChevronDown, Clipboard } from "lucide-react"
+import { Loader2, Copy, Trash2, CheckCircle2, Circle, Download, Sparkles, ChevronDown, Clipboard, Smartphone } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,6 +41,8 @@ interface WeekScheduleActionsProps {
   onCopyCurrentWeek?: (weekStartDate: Date) => void
   onPasteCopiedWeek?: (targetWeekStartDate: Date) => Promise<void>
   weekStartDate: Date
+  onPublishPwa?: () => Promise<void> | void
+  isPublishingPwa?: boolean
 }
 
 export function WeekScheduleActions({
@@ -61,6 +63,8 @@ export function WeekScheduleActions({
   onCopyCurrentWeek,
   onPasteCopiedWeek,
   weekStartDate,
+  onPublishPwa,
+  isPublishingPwa = false,
 }: WeekScheduleActionsProps) {
   const [confirmCopyDialogOpen, setConfirmCopyDialogOpen] = useState(false)
   const [confirmClearDialogOpen, setConfirmClearDialogOpen] = useState(false)
@@ -145,6 +149,12 @@ export function WeekScheduleActions({
       await weekActions.executeReplaceWeekAssignments(weekStartDate, copiedWeekData)
     }
   }, [copiedWeekData, weekActions, weekStartDate])
+
+  const handlePublishPwa = useCallback(() => {
+    if (onPublishPwa) {
+      onPublishPwa()
+    }
+  }, [onPublishPwa])
 
 
   return (
@@ -328,6 +338,27 @@ export function WeekScheduleActions({
             </DropdownMenu>
           </div>
         )}
+        {onPublishPwa && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePublishPwa}
+            disabled={isPublishingPwa || exporting || weekActions.isCopying || weekActions.isClearing || weekActions.isSuggesting || weekActions.isPasting}
+            aria-label="Actualizar PWA de horarios"
+          >
+            {isPublishingPwa ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Actualizando PWA...
+              </>
+            ) : (
+              <>
+                <Smartphone className="mr-2 h-4 w-4" />
+                Actualizar PWA de horarios
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
       {/* Diálogos de confirmación para semanas completadas */}
@@ -403,4 +434,3 @@ export function WeekScheduleActions({
     </>
   )
 }
-
