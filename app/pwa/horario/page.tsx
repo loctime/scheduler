@@ -9,79 +9,19 @@ import { PWAUpdateNotification } from "@/components/pwa-update-notification"
 function HorarioContent() {
   const searchParams = useSearchParams()
   const ownerId = searchParams.get("ownerId")
-  const [imageUrl, setImageUrl] = useState<string>("")
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [hasPublished, setHasPublished] = useState(false)
+  const [imageError, setImageError] = useState(false)
+  const [hasValidOwner, setHasValidOwner] = useState(false)
 
   useEffect(() => {
-    let active = true
-    const fetchPublished = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-
-        // Validar que se proporcionó ownerId
-        if (!ownerId) {
-          setError("Falta el ID del propietario del horario")
-          setLoading(false)
-          return
-        }
-
-        // Consumir desde el backend
-        const backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL
-        if (!backendUrl) {
-          setError('URL del backend no configurada')
-          setLoading(false)
-          return
-        }
-
-        const sanitizedBackendUrl = backendUrl.replace(/\/$/, "")
-        const requestUrl = `${sanitizedBackendUrl}/api/horarios/semana-actual?ownerId=${encodeURIComponent(ownerId)}`
-        const response = await fetch(requestUrl, { cache: "no-store" })
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            // No hay horario publicado
-            setHasPublished(false)
-            setImageUrl("")
-            setLoading(false)
-            return
-          }
-          throw new Error('Error al obtener el horario')
-        }
-
-        const data = await response.json()
-        
-        if (!active) return
-        
-        // Soportar diferentes formatos de respuesta del backend
-        const imageUrl = data.imageUrl || data.url
-        
-        if (!imageUrl) {
-          setHasPublished(false)
-          setImageUrl("")
-          setLoading(false)
-          return
-        }
-
-        // Usar la URL pública del backend
-        setHasPublished(true)
-        setImageUrl(imageUrl)
-        setLoading(false)
-      } catch (err) {
-        console.error("Error al cargar horario publicado:", err)
-        if (!active) return
-        setError("No se pudo cargar el horario publicado")
-        setLoading(false)
-      }
+    // Validar que se proporcionó ownerId
+    if (!ownerId) {
+      setLoading(false)
+      return
     }
-
-    fetchPublished()
-
-    return () => {
-      active = false
-    }
+    
+    setHasValidOwner(true)
+    setLoading(false)
   }, [ownerId])
 
   return (
@@ -92,25 +32,21 @@ function HorarioContent() {
 
       {/* Contenedor de imagen con scroll y zoom */}
       <div className="flex-1 overflow-auto bg-muted/20">
-        {loading && (
-          <div className="flex items-center justify-center h-full">
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Cargando horario...</p>
-            </div>
-          </div>
-        )}
-
-        {error && (
+        {!loading && !hasValidOwner && (
           <div className="flex items-center justify-center h-full">
             <div className="flex flex-col items-center gap-3 p-4 text-center">
-              <AlertCircle className="h-8 w-8 text-destructive" />
-              <p className="text-sm text-muted-foreground">{error}</p>
+              <AlertCircle className="h-8 w-8 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Falta el ID del propietario del horario.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Usa el enlace completo proporcionado por el propietario.
+              </p>
             </div>
           </div>
         )}
 
-        {!loading && !error && !hasPublished && (
+        {!loading && hasValidOwner && imageError && (
           <div className="flex items-center justify-center h-full">
             <div className="flex flex-col items-center gap-3 p-4 text-center">
               <AlertCircle className="h-8 w-8 text-muted-foreground" />
@@ -124,17 +60,14 @@ function HorarioContent() {
           </div>
         )}
 
-        {imageUrl && (
+        {!loading && hasValidOwner && !imageError && (
           <div className="flex items-center justify-center min-h-full p-2">
             <img
-              src={imageUrl}
-              alt="Horario semanal"
-              className="max-w-full h-auto object-contain"
-              style={{
-                minHeight: "100%",
-                width: "auto",
-                height: "auto",
-              }}
+              src={`${process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL}/api/horarios/semana-actual?ownerId=${encodeURIComponent(ownerId || '')}`}
+              alt="Horario publicado"
+              className="max-w-full max-h-full object-contain"
+              onError={() => setImageError(true)}
+              onLoad={() => setLoading(false)}
             />
           </div>
         )}
