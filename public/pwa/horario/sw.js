@@ -10,8 +10,8 @@ const urlsToCache = [
   '/apple-icon.png'
 ]
 
-// Patrón para detectar recursos publicados por ownerId
-const publishedAssetsPattern = /^\/pwa\/horario\/([^\/]+)\/published\.(png|json)$/
+// Patrón para detectar URLs de imágenes de horarios (backend remoto)
+const horarioImagePattern = /^https:\/\/.*\/horarios\/[^\/]+\/semana-actual\.png$/
 
 // Instalación del Service Worker
 self.addEventListener('install', (event) => {
@@ -84,20 +84,35 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Recursos publicados por la app para offline (por ownerId)
-  if (publishedAssetsPattern.test(url.pathname)) {
-    const match = url.pathname.match(publishedAssetsPattern)
-    if (match) {
-      const ownerId = match[1]
-      const cacheKey = `horario-cache-${ownerId}`
-      
-      event.respondWith(
-        caches.open(cacheKey).then((cache) => {
-          return cache.match(event.request) || new Response(null, { status: 404 })
+  // Imágenes de horarios del backend (Cloudflare/B2) - Cache First con Network fallback
+  if (horarioImagePattern.test(url.href)) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then((cache) => {
+        return cache.match(event.request).then((response) => {
+          // Servir desde cache si está disponible
+          if (response) {
+            return response
+          }
+          
+          // Si no está en cache, intentar obtener de red
+          return fetch(event.request).then((response) => {
+            // Si la respuesta es exitosa, guardar en cache
+            if (response.status === 200) {
+              const responseToCache = response.clone()
+              cache.put(event.request, responseToCache)
+            }
+            return response
+          }).catch(() => {
+            // Si falla la red y no hay cache, devolver error
+            return new Response('Horario no disponible offline', {
+              status: 503,
+              headers: { 'Content-Type': 'text/plain' }
+            })
+          })
         })
-      )
-      return
-    }
+      })
+    )
+    return
   }
 
   // Para otros recursos estáticos locales (manifest, iconos), usar cache primero

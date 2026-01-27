@@ -11,7 +11,6 @@ import { getCustomMonthRange, getMonthWeeks, getInitialMonthForRange } from "@/l
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { useScheduleUpdates } from "@/hooks/use-schedule-updates"
 import { useSchedulesListener } from "@/hooks/use-schedules-listener"
-import { savePublishedHorario } from "@/lib/pwa-horario"
 import { calculateHoursBreakdown } from "@/lib/validations"
 import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
@@ -179,17 +178,31 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         download: false,
         showToast: false,
         onImageReady: async (blob) => {
-          await savePublishedHorario({
-            imageBlob: blob,
-            weekStart: format(weekStartDate, "yyyy-MM-dd"),
-            weekEnd: format(weekEndDate, "yyyy-MM-dd"),
-            ownerId,
+          // Subir la imagen al backend en lugar de guardar localmente
+          const formData = new FormData()
+          formData.append('image', blob, `semana-actual.png`)
+          formData.append('ownerId', ownerId)
+          
+          const response = await fetch('/api/horarios/semana-actual', {
+            method: 'POST',
+            body: formData,
           })
+          
+          if (!response.ok) {
+            throw new Error('Error al subir el horario al backend')
+          }
         },
       })
       toast({
         title: "PWA actualizada",
         description: `Semana publicada: ${format(weekStartDate, "d 'de' MMMM", { locale: es })}.`,
+      })
+    } catch (error) {
+      console.error('Error al publicar PWA:', error)
+      toast({
+        title: "Error",
+        description: "No se pudo publicar el horario. Inténtalo nuevamente.",
+        variant: "destructive",
       })
     } finally {
       setPublishingWeekId(null)

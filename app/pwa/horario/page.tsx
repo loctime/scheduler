@@ -1,11 +1,10 @@
 "use client"
 
-import { useEffect, useRef, useState, Suspense } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Loader2, AlertCircle } from "lucide-react"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { PWAUpdateNotification } from "@/components/pwa-update-notification"
-import { loadPublishedHorario } from "@/lib/pwa-horario"
 
 function HorarioContent() {
   const searchParams = useSearchParams()
@@ -14,7 +13,6 @@ function HorarioContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [hasPublished, setHasPublished] = useState(false)
-  const objectUrlRef = useRef<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -30,23 +28,34 @@ function HorarioContent() {
           return
         }
 
-        const published = await loadPublishedHorario(ownerId)
-        if (!active) return
+        // Consumir desde el backend
+        const response = await fetch(`/api/horarios/semana-actual?ownerId=${ownerId}`)
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            // No hay horario publicado
+            setHasPublished(false)
+            setImageUrl("")
+            setLoading(false)
+            return
+          }
+          throw new Error('Error al obtener el horario')
+        }
 
-        if (!published) {
+        const data = await response.json()
+        
+        if (!active) return
+        
+        if (!data.imageUrl) {
           setHasPublished(false)
           setImageUrl("")
           setLoading(false)
           return
         }
 
-        if (objectUrlRef.current) {
-          URL.revokeObjectURL(objectUrlRef.current)
-        }
-        const objectUrl = URL.createObjectURL(published.imageBlob)
-        objectUrlRef.current = objectUrl
+        // Usar la URL pública del backend
         setHasPublished(true)
-        setImageUrl(objectUrl)
+        setImageUrl(data.imageUrl)
         setLoading(false)
       } catch (err) {
         console.error("Error al cargar horario publicado:", err)
@@ -60,10 +69,6 @@ function HorarioContent() {
 
     return () => {
       active = false
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current)
-        objectUrlRef.current = null
-      }
     }
   }, [ownerId])
 
@@ -98,7 +103,7 @@ function HorarioContent() {
             <div className="flex flex-col items-center gap-3 p-4 text-center">
               <AlertCircle className="h-8 w-8 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                Todavía no hay un horario publicado para este usuario.
+                No hay un horario publicado para este usuario.
               </p>
               <p className="text-xs text-muted-foreground">
                 El propietario debe publicar un horario desde la aplicación principal.
