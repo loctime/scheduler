@@ -35,8 +35,10 @@ function HorarioContent() {
           setLoading(false)
           return
         }
-        
-        const response = await fetch(`${backendUrl}/api/horarios/semana-actual?ownerId=${ownerId}`)
+
+        const sanitizedBackendUrl = backendUrl.replace(/\/$/, "")
+        const requestUrl = `${sanitizedBackendUrl}/api/horarios/semana-actual?ownerId=${encodeURIComponent(ownerId)}`
+        const response = await fetch(requestUrl, { cache: "no-store" })
         
         if (!response.ok) {
           if (response.status === 404) {
