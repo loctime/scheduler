@@ -9,10 +9,9 @@ const urlsToCache = [
   '/icon.svg',
   '/apple-icon.png'
 ]
-const publishedAssets = [
-  '/pwa/horario/published.png',
-  '/pwa/horario/published.json'
-]
+
+// Patrón para detectar recursos publicados por ownerId
+const publishedAssetsPattern = /^\/pwa\/horario\/([^\/]+)\/published\.(png|json)$/
 
 // Instalación del Service Worker
 self.addEventListener('install', (event) => {
@@ -85,14 +84,20 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Recursos publicados por la app para offline
-  if (publishedAssets.includes(url.pathname)) {
-    event.respondWith(
-      caches.match(event.request).then((response) => {
-        return response || new Response(null, { status: 404 })
-      })
-    )
-    return
+  // Recursos publicados por la app para offline (por ownerId)
+  if (publishedAssetsPattern.test(url.pathname)) {
+    const match = url.pathname.match(publishedAssetsPattern)
+    if (match) {
+      const ownerId = match[1]
+      const cacheKey = `horario-cache-${ownerId}`
+      
+      event.respondWith(
+        caches.open(cacheKey).then((cache) => {
+          return cache.match(event.request) || new Response(null, { status: 404 })
+        })
+      )
+      return
+    }
   }
 
   // Para otros recursos estáticos locales (manifest, iconos), usar cache primero

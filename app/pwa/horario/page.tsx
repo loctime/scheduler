@@ -1,12 +1,15 @@
 "use client"
 
 import { useEffect, useRef, useState, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { Loader2, AlertCircle } from "lucide-react"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { PWAUpdateNotification } from "@/components/pwa-update-notification"
 import { loadPublishedHorario } from "@/lib/pwa-horario"
 
 function HorarioContent() {
+  const searchParams = useSearchParams()
+  const ownerId = searchParams.get("ownerId")
   const [imageUrl, setImageUrl] = useState<string>("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -20,7 +23,14 @@ function HorarioContent() {
         setLoading(true)
         setError(null)
 
-        const published = await loadPublishedHorario()
+        // Validar que se proporcionó ownerId
+        if (!ownerId) {
+          setError("Falta el ID del propietario del horario")
+          setLoading(false)
+          return
+        }
+
+        const published = await loadPublishedHorario(ownerId)
         if (!active) return
 
         if (!published) {
@@ -55,7 +65,7 @@ function HorarioContent() {
         objectUrlRef.current = null
       }
     }
-  }, [])
+  }, [ownerId])
 
   return (
     <div className="flex flex-col h-screen w-screen bg-background overflow-hidden">
@@ -88,7 +98,10 @@ function HorarioContent() {
             <div className="flex flex-col items-center gap-3 p-4 text-center">
               <AlertCircle className="h-8 w-8 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                Todavía no publicaste un horario. Volvé a la app y presioná “Actualizar PWA de horarios” en una semana.
+                Todavía no hay un horario publicado para este usuario.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                El propietario debe publicar un horario desde la aplicación principal.
               </p>
             </div>
           </div>

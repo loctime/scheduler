@@ -23,7 +23,6 @@ import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/wor
 import { ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Share2 } from "lucide-react"
-import { savePublishedHorario } from "@/lib/pwa-horario"
 
 const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAssignment[] => {
   if (!value || !Array.isArray(value) || value.length === 0) return []
@@ -295,42 +294,16 @@ export default function HorariosMensualesPage() {
     )
   }, [exportExcel, employees, shifts])
 
-  const handlePublishPwa = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
-    const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
-    setPublishingWeekId(weekId)
-    try {
-      await exportImage(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.png`, {
-        nombreEmpresa: config?.nombreEmpresa,
-        colorEmpresa: config?.colorEmpresa,
-        download: false,
-        showToast: false,
-        onImageReady: async (blob) => {
-          await savePublishedHorario({
-            imageBlob: blob,
-            weekStart: format(weekStartDate, "yyyy-MM-dd"),
-            weekEnd: format(weekEndDate, "yyyy-MM-dd"),
-          })
-        },
-      })
-      toast({
-        title: "PWA actualizada",
-        description: `Semana publicada: ${format(weekStartDate, "d 'de' MMMM", { locale: es })}.`,
-      })
-    } finally {
-      setPublishingWeekId(null)
-    }
-  }, [exportImage, config, toast])
-
   const handleShareLink = useCallback(async () => {
     if (!user) return
     
-    const shareUrl = `${window.location.origin}/horarios-mensuales?userId=${user.uid}`
+    const shareUrl = `${window.location.origin}/pwa/horario?ownerId=${user.uid}`
     
     try {
       await navigator.clipboard.writeText(shareUrl)
       toast({
         title: "Enlace copiado",
-        description: "El enlace se ha copiado al portapapeles. Compártelo con tu equipo.",
+        description: "El enlace PWA se ha copiado al portapapeles. Compártelo con tu equipo.",
       })
     } catch (error) {
       toast({
@@ -457,8 +430,6 @@ export default function HorariosMensualesPage() {
                             onExportPDF={handleExportWeekPDF}
                             onExportExcel={() => handleExportWeekExcel(week.weekStartDate, week.weekDays, week.schedule)}
                             exporting={exporting}
-                            onPublishPwa={handlePublishPwa}
-                            isPublishingPwa={publishingWeekId === `schedule-week-${format(week.weekStartDate, "yyyy-MM-dd")}`}
                             mediosTurnos={config?.mediosTurnos}
                             employeeStats={weekStats}
                             readonly={true}

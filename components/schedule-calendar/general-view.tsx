@@ -42,6 +42,8 @@ interface GeneralViewProps {
   copiedWeekData?: any
   onCopyCurrentWeek?: (weekStartDate: Date) => void
   onPasteCopiedWeek?: (targetWeekStartDate: Date) => Promise<void>
+  onPublishPwa?: (weekStartDate: Date, weekEndDate: Date) => Promise<void> | void
+  isPublishingPwa?: boolean
 }
 
 export function GeneralView({
@@ -70,6 +72,8 @@ export function GeneralView({
   copiedWeekData,
   onCopyCurrentWeek,
   onPasteCopiedWeek,
+  onPublishPwa,
+  isPublishingPwa,
 }: GeneralViewProps) {
   // Crear un mapa de semanas expandidas usando la fecha de inicio de semana como clave
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(() => {
@@ -254,6 +258,8 @@ export function GeneralView({
               copiedWeekData={copiedWeekData}
               onCopyCurrentWeek={onCopyCurrentWeek}
               onPasteCopiedWeek={onPasteCopiedWeek}
+              onPublishPwa={onPublishPwa}
+              isPublishingPwa={isPublishingPwa}
             />
           )
         })}

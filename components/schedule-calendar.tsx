@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { format, subMonths, addMonths, startOfWeek } from "date-fns"
+import { es } from "date-fns/locale"
 import { useData } from "@/contexts/data-context"
 import { Horario, ShiftAssignment, ShiftAssignmentValue, Turno } from "@/lib/types"
 import { useConfig } from "@/hooks/use-config"
@@ -10,6 +11,7 @@ import { getCustomMonthRange, getMonthWeeks, getInitialMonthForRange } from "@/l
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { useScheduleUpdates } from "@/hooks/use-schedule-updates"
 import { useSchedulesListener } from "@/hooks/use-schedules-listener"
+import { savePublishedHorario } from "@/lib/pwa-horario"
 import { calculateHoursBreakdown } from "@/lib/validations"
 import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
@@ -49,6 +51,9 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
   // Estado para almacenar la semana copiada
   const [copiedWeekData, setCopiedWeekData] = useState<any>(null)
+  
+  // Estado para PWA publishing
+  const [publishingWeekId, setPublishingWeekId] = useState<string | null>(null)
 
   const monthStartDay = config?.mesInicioDia || 1
   const weekStartsOn = (config?.semanaInicioDia || 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
@@ -149,6 +154,47 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
       colorEmpresa: config?.colorEmpresa,
     })
   }, [exportPDF, config])
+
+  const handlePublishPwa = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
+    const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
+    const ownerId = userData?.role === "invited" && userData?.ownerId 
+      ? userData.ownerId 
+      : user?.uid
+    
+    if (!ownerId) {
+      toast({
+        title: "Error",
+        description: "No se puede determinar el propietario del horario",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    setPublishingWeekId(weekId)
+    try {
+      await exportImage(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.png`, {
+        nombreEmpresa: config?.nombreEmpresa,
+        colorEmpresa: config?.colorEmpresa,
+        ownerId,
+        download: false,
+        showToast: false,
+        onImageReady: async (blob) => {
+          await savePublishedHorario({
+            imageBlob: blob,
+            weekStart: format(weekStartDate, "yyyy-MM-dd"),
+            weekEnd: format(weekEndDate, "yyyy-MM-dd"),
+            ownerId,
+          })
+        },
+      })
+      toast({
+        title: "PWA actualizada",
+        description: `Semana publicada: ${format(weekStartDate, "d 'de' MMMM", { locale: es })}.`,
+      })
+    } finally {
+      setPublishingWeekId(null)
+    }
+  }, [exportImage, config, toast, userData, user])
 
   // Extraer turnos de semanas completadas si no hay turnos activos
   const shiftsToUse = useMemo(() => {
@@ -500,6 +546,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         copiedWeekData={copiedWeekData}
         onCopyCurrentWeek={copyCurrentWeek}
         onPasteCopiedWeek={pasteCopiedWeek}
+        onPublishPwa={handlePublishPwa}
       />
       </div>
     </>
