@@ -20,7 +20,14 @@ export function useExportSchedule() {
   const handleExportImage = useCallback(async (
     elementId: string, 
     filename: string,
-    config?: { nombreEmpresa?: string; colorEmpresa?: string; ownerId?: string }
+    config?: { 
+      nombreEmpresa?: string; 
+      colorEmpresa?: string; 
+      ownerId?: string;
+      download?: boolean;
+      showToast?: boolean;
+      onImageReady?: (blob: Blob, dataUrl: string) => Promise<void> | void;
+    }
   ) => {
     setExporting(true)
     try {
