@@ -180,7 +180,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         onImageReady: async (blob) => {
           // Subir la imagen al backend en lugar de guardar localmente
           const formData = new FormData()
-          formData.append('image', blob, `semana-actual.png`)
+          formData.append('file', blob, `semana-actual.png`)
           formData.append('ownerId', ownerId)
           
           const backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL
