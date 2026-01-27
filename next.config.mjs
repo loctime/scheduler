@@ -79,8 +79,10 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'; " +
               "connect-src 'self' " +
                 "https://controlfile.onrender.com " +
+                "https://firestore.googleapis.com " +
                 "https://identitytoolkit.googleapis.com " +
-                "https://securetoken.googleapis.com; " +
+                "https://securetoken.googleapis.com " +
+                "https://*.googleapis.com; " +
               "frame-src https://vercel.live;",
           },
         ],
