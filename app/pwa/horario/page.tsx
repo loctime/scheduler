@@ -29,7 +29,14 @@ function HorarioContent() {
         }
 
         // Consumir desde el backend
-        const response = await fetch(`/api/horarios/semana-actual?ownerId=${ownerId}`)
+        const backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL
+        if (!backendUrl) {
+          setError('URL del backend no configurada')
+          setLoading(false)
+          return
+        }
+        
+        const response = await fetch(`${backendUrl}/api/horarios/semana-actual?ownerId=${ownerId}`)
         
         if (!response.ok) {
           if (response.status === 404) {

@@ -183,7 +183,12 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
           formData.append('image', blob, `semana-actual.png`)
           formData.append('ownerId', ownerId)
           
-          const response = await fetch('/api/horarios/semana-actual', {
+          const backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL
+          if (!backendUrl) {
+            throw new Error('URL del backend no configurada')
+          }
+          
+          const response = await fetch(`${backendUrl}/api/horarios/semana-actual`, {
             method: 'POST',
             body: formData,
           })
