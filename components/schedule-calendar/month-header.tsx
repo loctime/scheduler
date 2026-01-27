@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
+import { Download, ChevronLeft, ChevronRight, Loader2, ExternalLink } from "lucide-react"
 import { format, addDays } from "date-fns"
 import { es } from "date-fns/locale"
 import { useMemo } from "react"
@@ -13,6 +13,7 @@ interface MonthHeaderProps {
   onNextMonth: () => void
   onExportPDF: () => void
   exporting: boolean
+  user?: any
 }
 
 /**
@@ -68,10 +69,17 @@ export function MonthHeader({
   onNextMonth,
   onExportPDF,
   exporting,
+  user,
 }: MonthHeaderProps) {
   const mainMonth = useMemo(() => {
     return getMainMonth(monthRange.startDate, monthRange.endDate)
   }, [monthRange.startDate, monthRange.endDate])
+
+  const handleOpenPwa = () => {
+    if (!user?.uid) return
+    const pwaUrl = `/pwa/horario?ownerId=${user.uid}`
+    window.open(pwaUrl, '_blank')
+  }
 
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -100,6 +108,13 @@ export function MonthHeader({
       </div>
 
       <div className="flex gap-2 w-full sm:w-auto">
+        {user?.uid && (
+          <Button variant="outline" onClick={handleOpenPwa} aria-label="Abrir PWA de horarios" className="flex-1 sm:flex-initial">
+            <ExternalLink className="mr-2 h-4 w-4" />
+            <span className="hidden sm:inline">Ver horario publicado</span>
+            <span className="sm:hidden">PWA</span>
+          </Button>
+        )}
         <Button variant="outline" onClick={onExportPDF} disabled={exporting} aria-label="Exportar mes completo como PDF" className="flex-1 sm:flex-initial">
           {exporting ? (
             <>

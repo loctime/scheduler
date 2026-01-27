@@ -146,6 +146,7 @@ export function GeneralView({
         onNextMonth={onNextMonth}
         onExportPDF={onExportMonthPDF}
         exporting={exporting}
+        user={user}
       />
 
       <div id="schedule-month-container" className="space-y-6">
