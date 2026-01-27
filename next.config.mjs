@@ -69,21 +69,23 @@ const nextConfig = {
       // ============================
       {
         source: '/(.*)',
-        headers: [
-          {
-            key: 'Content-Security-Policy',
-            value:
-              "default-src 'self'; " +
-              "img-src 'self' data: https://controlfile.onrender.com; " +
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live; " +
-              "style-src 'self' 'unsafe-inline'; " +
-              "connect-src 'self' " +
-                "https://controlfile.onrender.com " +
-                "https://firestore.googleapis.com " +
-                "https://identitytoolkit.googleapis.com " +
-                "https://securetoken.googleapis.com " +
-                "https://*.googleapis.com; " +
-              "frame-src https://vercel.live;",
+  headers: [
+    {
+      key: 'Content-Security-Policy',
+      value:
+        "default-src 'self'; " +
+        "img-src 'self' data: blob: " +
+          "https://controlfile.onrender.com " +
+          "https://lh3.googleusercontent.com; " +
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "connect-src 'self' data: blob: " +
+          "https://controlfile.onrender.com " +
+          "https://firestore.googleapis.com " +
+          "https://identitytoolkit.googleapis.com " +
+          "https://securetoken.googleapis.com " +
+          "https://*.googleapis.com; " +
+        "frame-src https://vercel.live;"
           },
         ],
       },
