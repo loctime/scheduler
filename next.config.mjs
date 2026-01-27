@@ -77,15 +77,18 @@ const nextConfig = {
       // ============================
       {
         source: '/(.*)',
-        headers: [
-          {
-            key: 'Content-Security-Policy',
-            value:
-              "default-src 'self'; " +
-              "img-src 'self' data: https://controlfile.onrender.com; " +
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-              "style-src 'self' 'unsafe-inline'; " +
-              "connect-src 'self' https://controlfile.onrender.com;",
+  headers: [
+    {
+      key: 'Content-Security-Policy',
+      value:
+        "default-src 'self'; " +
+        "img-src 'self' data: https://controlfile.onrender.com; " +
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "connect-src 'self' " +
+          "https://controlfile.onrender.com " +
+          "https://identitytoolkit.googleapis.com " +
+          "https://securetoken.googleapis.com;",
           },
         ],
       },
