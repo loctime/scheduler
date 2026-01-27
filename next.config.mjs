@@ -1,10 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  reactStrictMode: true,
+
   typescript: {
     ignoreBuildErrors: false,
   },
-
-  reactStrictMode: true,
 
   images: {
     unoptimized: true,
@@ -17,27 +17,19 @@ const nextConfig = {
       // ============================
       {
         source: '/manifest.json',
-        headers: [
-          { key: 'Content-Type', value: 'application/manifest+json' },
-        ],
+        headers: [{ key: 'Content-Type', value: 'application/manifest+json' }],
       },
       {
         source: '/manifest-pedidos.json',
-        headers: [
-          { key: 'Content-Type', value: 'application/manifest+json' },
-        ],
+        headers: [{ key: 'Content-Type', value: 'application/manifest+json' }],
       },
       {
         source: '/manifest-fabrica.json',
-        headers: [
-          { key: 'Content-Type', value: 'application/manifest+json' },
-        ],
+        headers: [{ key: 'Content-Type', value: 'application/manifest+json' }],
       },
       {
         source: '/manifest-horario.json',
-        headers: [
-          { key: 'Content-Type', value: 'application/manifest+json' },
-        ],
+        headers: [{ key: 'Content-Type', value: 'application/manifest+json' }],
       },
 
       // ============================
@@ -73,22 +65,22 @@ const nextConfig = {
       },
 
       // ============================
-      // CSP GLOBAL (CRÍTICO)
+      // CSP GLOBAL
       // ============================
       {
         source: '/(.*)',
-  headers: [
-    {
-      key: 'Content-Security-Policy',
-      value:
-        "default-src 'self'; " +
-        "img-src 'self' data: https://controlfile.onrender.com; " +
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-        "style-src 'self' 'unsafe-inline'; " +
-        "connect-src 'self' " +
-          "https://controlfile.onrender.com " +
-          "https://identitytoolkit.googleapis.com " +
-          "https://securetoken.googleapis.com;",
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value:
+              "default-src 'self'; " +
+              "img-src 'self' data: https://controlfile.onrender.com; " +
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live; " +
+              "style-src 'self' 'unsafe-inline'; " +
+              "connect-src 'self' " +
+                "https://controlfile.onrender.com " +
+                "https://identitytoolkit.googleapis.com " +
+                "https://securetoken.googleapis.com;",
           },
         ],
       },
