@@ -65,7 +65,7 @@ const nextConfig = {
       },
 
       // ============================
-      // CSP GLOBAL
+      // CSP GLOBAL (FINAL)
       // ============================
       {
         source: '/(.*)',
@@ -80,7 +80,8 @@ const nextConfig = {
               "connect-src 'self' " +
                 "https://controlfile.onrender.com " +
                 "https://identitytoolkit.googleapis.com " +
-                "https://securetoken.googleapis.com;",
+                "https://securetoken.googleapis.com; " +
+              "frame-src https://vercel.live;",
           },
         ],
       },
