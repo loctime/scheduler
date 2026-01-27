@@ -53,7 +53,10 @@ function HorarioContent() {
         
         if (!active) return
         
-        if (!data.imageUrl) {
+        // Soportar diferentes formatos de respuesta del backend
+        const imageUrl = data.imageUrl || data.url
+        
+        if (!imageUrl) {
           setHasPublished(false)
           setImageUrl("")
           setLoading(false)
@@ -62,7 +65,7 @@ function HorarioContent() {
 
         // Usar la URL pública del backend
         setHasPublished(true)
-        setImageUrl(data.imageUrl)
+        setImageUrl(imageUrl)
         setLoading(false)
       } catch (err) {
         console.error("Error al cargar horario publicado:", err)
