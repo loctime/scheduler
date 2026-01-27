@@ -10,17 +10,14 @@ function HorarioContent() {
   const searchParams = useSearchParams()
   const ownerId = searchParams.get("ownerId")
   const [loading, setLoading] = useState(true)
-  const [imageError, setImageError] = useState(false)
-  const [hasValidOwner, setHasValidOwner] = useState(false)
 
   useEffect(() => {
-    // Validar que se proporcionó ownerId
+    // Solo validar que se proporcionó ownerId
     if (!ownerId) {
       setLoading(false)
       return
     }
     
-    setHasValidOwner(true)
     setLoading(false)
   }, [ownerId])
 
@@ -30,9 +27,9 @@ function HorarioContent() {
         <p className="text-sm text-muted-foreground">Horario publicado</p>
       </div>
 
-      {/* Contenedor de imagen con scroll y zoom */}
+      {/* Contenedor de imagen */}
       <div className="flex-1 overflow-auto bg-muted/20">
-        {!loading && !hasValidOwner && (
+        {!loading && !ownerId && (
           <div className="flex items-center justify-center h-full">
             <div className="flex flex-col items-center gap-3 p-4 text-center">
               <AlertCircle className="h-8 w-8 text-muted-foreground" />
@@ -46,27 +43,12 @@ function HorarioContent() {
           </div>
         )}
 
-        {!loading && hasValidOwner && imageError && (
-          <div className="flex items-center justify-center h-full">
-            <div className="flex flex-col items-center gap-3 p-4 text-center">
-              <AlertCircle className="h-8 w-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                No hay un horario publicado para este usuario.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                El propietario debe publicar un horario desde la aplicación principal.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {!loading && hasValidOwner && !imageError && (
+        {!loading && ownerId && (
           <div className="flex items-center justify-center min-h-full p-2">
             <img
               src={`${process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL}/api/horarios/semana-actual?ownerId=${encodeURIComponent(ownerId || '')}`}
               alt="Horario publicado"
               className="max-w-full max-h-full object-contain"
-              onError={() => setImageError(true)}
               onLoad={() => setLoading(false)}
             />
           </div>
