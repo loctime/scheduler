@@ -12,8 +12,7 @@ import {
   getImageUrlWithCache, 
   loadPublishedHorario, 
   formatWeekHeader,
-  savePublishedHorario,
-  getCurrentWeekDates
+  savePublishedHorario
 } from "@/lib/pwa-horario"
 
 function HorarioContent() {
@@ -79,43 +78,23 @@ function HorarioContent() {
         setWeekHeader(formatWeekHeader(cachedData.metadata.weekStart, cachedData.metadata.weekEnd))
         setLoading(false)
         
-        // En background, verificar si hay actualización
-        checkForUpdates(resolvedOwnerId, cachedData.metadata)
+        // 🗑️ Eliminado: checkForUpdates() no confiable
+        // El PWA es cache-first, se actualiza solo con recarga del usuario
       } else {
-        // ❌ Sin cache: cargar desde red
-        loadFromNetwork(resolvedOwnerId)
+        // ❌ Sin cache: cargar desde red sin metadata
+        loadFromNetwork(resolvedOwnerId, false, null)
       }
     } catch (err) {
       console.error('Error cargando desde cache:', err)
-      loadFromNetwork(resolvedOwnerId)
+      loadFromNetwork(resolvedOwnerId, false, null)
     }
   }
 
-  const checkForUpdates = async (resolvedOwnerId: string, currentMetadata: any) => {
-    try {
-      const imageUrl = getImageUrlWithCache(resolvedOwnerId)
-      const response = await fetch(imageUrl, { 
-        method: 'HEAD',
-        cache: 'no-cache' 
-      })
-      
-      if (response.ok) {
-        const lastModified = response.headers.get('last-modified')
-        const cachedDate = new Date(currentMetadata.updatedAt)
-        const serverDate = lastModified ? new Date(lastModified) : new Date()
-        
-        // Si el servidor tiene versión más reciente, actualizar
-        if (!lastModified || serverDate > cachedDate) {
-          console.log('Actualizando imagen desde servidor...')
-          loadFromNetwork(resolvedOwnerId, true)
-        }
-      }
-    } catch (err) {
-      console.error('Error verificando actualizaciones:', err)
-    }
-  }
+  // 🗑️ Eliminado: checkForUpdates() no confiable con Backblaze B2
+  // Cache-first puro: se actualiza solo cuando el usuario recarga
+  // o cuando el Service Worker detecta cambios
 
-  const loadFromNetwork = async (resolvedOwnerId: string, isUpdate = false) => {
+  const loadFromNetwork = async (resolvedOwnerId: string, isUpdate = false, existingMetadata?: any) => {
     try {
       if (!isUpdate) {
         setLoading(false)
@@ -131,28 +110,39 @@ function HorarioContent() {
       
       const imageBlob = await response.blob()
       
-      // Obtener fechas de semana actuales como fallback
-      const weekDates = getCurrentWeekDates()
-      
-      // ✅ Guardar en cache con metadata
-      await savePublishedHorario({
-        imageBlob,
-        weekStart: weekDates.weekStart,
-        weekEnd: weekDates.weekEnd,
-        ownerId: resolvedOwnerId
-      })
-      
-      // Actualizar UI
-      const blobUrl = URL.createObjectURL(imageBlob)
-      
-      // Limpiar blob anterior
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current)
+      // ✅ Guardar solo si hay metadata real existente
+      // ❌ NO inventar fechas con getCurrentWeekDates()
+      if (existingMetadata?.weekStart && existingMetadata?.weekEnd) {
+        await savePublishedHorario({
+          imageBlob,
+          weekStart: existingMetadata.weekStart,
+          weekEnd: existingMetadata.weekEnd,
+          ownerId: resolvedOwnerId
+        })
+        
+        // Actualizar UI con metadata real
+        const blobUrl = URL.createObjectURL(imageBlob)
+        
+        if (blobUrlRef.current) {
+          URL.revokeObjectURL(blobUrlRef.current)
+        }
+        blobUrlRef.current = blobUrl
+        
+        setImageSrc(blobUrl)
+        setWeekHeader(formatWeekHeader(existingMetadata.weekStart, existingMetadata.weekEnd))
+      } else {
+        // ❌ Sin metadata real: mostrar imagen sin guardar ni header
+        const blobUrl = URL.createObjectURL(imageBlob)
+        
+        if (blobUrlRef.current) {
+          URL.revokeObjectURL(blobUrlRef.current)
+        }
+        blobUrlRef.current = blobUrl
+        
+        setImageSrc(blobUrl)
+        // 🗑️ NO setWeekHeader() si no hay metadata real
       }
-      blobUrlRef.current = blobUrl
       
-      setImageSrc(blobUrl)
-      setWeekHeader(formatWeekHeader(weekDates.weekStart, weekDates.weekEnd))
       setUpdating(false)
       
     } catch (err) {
@@ -165,8 +155,8 @@ function HorarioContent() {
     }
   }
 
-  // Zoom por doble tap
-  const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  // Zoom por doble tap - mejorado para iOS
+  const handleImageClick = (e: React.PointerEvent<HTMLDivElement>) => {
     const now = Date.now()
     const timeDiff = now - lastTapRef.current
     
@@ -264,8 +254,10 @@ function HorarioContent() {
               <div 
                 ref={containerRef}
                 className="w-full h-full flex items-center justify-center p-2 cursor-pointer"
-                style={{ touchAction: 'pan-x pan-y' }}
-                onClick={handleImageClick}
+                style={{ 
+                  touchAction: zoomLevel > 1 ? 'none' : 'pan-x pan-y'
+                }}
+                onPointerUp={handleImageClick}
               >
                 <img
                   ref={imageRef}

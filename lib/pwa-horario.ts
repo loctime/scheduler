@@ -90,21 +90,6 @@ export async function saveHorarioWithMetadata(params: {
   return savePublishedHorario(params)
 }
 
-// Función para obtener fecha de semana actual (fallback)
-export function getCurrentWeekDates(): { weekStart: string; weekEnd: string } {
-  const now = new Date()
-  const dayOfWeek = now.getDay() // 0 = domingo, 1 = lunes, etc.
-  const startOfWeek = new Date(now)
-  startOfWeek.setDate(now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)) // Lunes
-  const endOfWeek = new Date(startOfWeek)
-  endOfWeek.setDate(startOfWeek.getDate() + 6) // Domingo
-  
-  return {
-    weekStart: startOfWeek.toISOString().split('T')[0],
-    weekEnd: endOfWeek.toISOString().split('T')[0]
-  }
-}
-
 export async function savePublishedHorario(params: {
   imageBlob: Blob
   weekStart: string
