@@ -17,9 +17,9 @@ export function getSupportedImageFormat(): 'webp' | 'png' {
 export function getImageUrlWithCache(ownerId: string, baseUrl?: string): string {
   const base = baseUrl || process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL
   const format = getSupportedImageFormat()
-  const timestamp = Date.now() // Para evitar cache del navegador, pero permitir SW cache
   
-  return `${base}/api/horarios/semana-actual?ownerId=${encodeURIComponent(ownerId)}&format=${format}&_t=${timestamp}`
+  // URL estable sin timestamp para permitir cache real
+  return `${base}/api/horarios/semana-actual?ownerId=${encodeURIComponent(ownerId)}&format=${format}`
 }
 
 // Helpers para persistir el ownerId en localStorage
@@ -78,6 +78,31 @@ export function formatWeekHeader(weekStart: string, weekEnd: string): string {
   
   // Si cruzan meses
   return `${startMonth}/${endMonth} – semana del ${startDay} al ${endDay}`
+}
+
+// Función para guardar imagen con metadata de semana
+export async function saveHorarioWithMetadata(params: {
+  imageBlob: Blob
+  weekStart: string
+  weekEnd: string
+  ownerId?: string
+}): Promise<PublishedHorarioMetadata> {
+  return savePublishedHorario(params)
+}
+
+// Función para obtener fecha de semana actual (fallback)
+export function getCurrentWeekDates(): { weekStart: string; weekEnd: string } {
+  const now = new Date()
+  const dayOfWeek = now.getDay() // 0 = domingo, 1 = lunes, etc.
+  const startOfWeek = new Date(now)
+  startOfWeek.setDate(now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)) // Lunes
+  const endOfWeek = new Date(startOfWeek)
+  endOfWeek.setDate(startOfWeek.getDate() + 6) // Domingo
+  
+  return {
+    weekStart: startOfWeek.toISOString().split('T')[0],
+    weekEnd: endOfWeek.toISOString().split('T')[0]
+  }
 }
 
 export async function savePublishedHorario(params: {
