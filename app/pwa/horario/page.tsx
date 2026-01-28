@@ -11,15 +11,13 @@ import {
   OWNER_ID_MISSING_ERROR, 
   getImageUrlWithCache, 
   loadPublishedHorario, 
-  formatWeekHeader,
-  savePublishedHorario
+  formatWeekHeader
 } from "@/lib/pwa-horario"
 
 function HorarioContent() {
   const searchParams = useSearchParams()
   const urlOwnerId = searchParams.get("ownerId")
   const [loading, setLoading] = useState(true)
-  const [updating, setUpdating] = useState(false)
   const [ownerId, setOwnerId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [imageSrc, setImageSrc] = useState<string | null>(null)
@@ -65,93 +63,51 @@ function HorarioContent() {
     }
   }, [urlOwnerId])
 
-  const loadFromCacheFirst = async (resolvedOwnerId: string) => {
+  const loadFromCacheFirst = async (ownerId: string) => {
     try {
-      // 1. Intentar cargar desde cache primero
-      const cachedData = await loadPublishedHorario(resolvedOwnerId)
-      
-      if (cachedData?.imageBlob && cachedData?.metadata) {
-        // ✅ Cache disponible: mostrar inmediatamente
-        const blobUrl = URL.createObjectURL(cachedData.imageBlob)
+      const cached = await loadPublishedHorario(ownerId)
+
+      if (cached?.imageBlob) {
+        const blobUrl = URL.createObjectURL(cached.imageBlob)
         blobUrlRef.current = blobUrl
         setImageSrc(blobUrl)
-        setWeekHeader(formatWeekHeader(cachedData.metadata.weekStart, cachedData.metadata.weekEnd))
+
+        if (cached.metadata) {
+          setWeekHeader(
+            formatWeekHeader(cached.metadata.weekStart, cached.metadata.weekEnd)
+          )
+        }
+
         setLoading(false)
-        
-        // 🗑️ Eliminado: checkForUpdates() no confiable
-        // El PWA es cache-first, se actualiza solo con recarga del usuario
-      } else {
-        // ❌ Sin cache: cargar desde red sin metadata
-        loadFromNetwork(resolvedOwnerId, false, null)
+        return
       }
-    } catch (err) {
-      console.error('Error cargando desde cache:', err)
-      loadFromNetwork(resolvedOwnerId, false, null)
+
+      // NO cache → ir a red
+      await loadFromNetwork(ownerId)
+    } catch {
+      await loadFromNetwork(ownerId)
     }
   }
 
-  // 🗑️ Eliminado: checkForUpdates() no confiable con Backblaze B2
-  // Cache-first puro: se actualiza solo cuando el usuario recarga
-  // o cuando el Service Worker detecta cambios
-
-  const loadFromNetwork = async (resolvedOwnerId: string, isUpdate = false, existingMetadata?: any) => {
+  const loadFromNetwork = async (ownerId: string) => {
     try {
-      if (!isUpdate) {
-        setLoading(false)
-        setUpdating(true)
-      }
-      
-      const imageUrl = getImageUrlWithCache(resolvedOwnerId)
+      setLoading(true)
+
+      const imageUrl = getImageUrlWithCache(ownerId)
       const response = await fetch(imageUrl)
-      
-      if (!response.ok) {
-        throw new Error('Error al cargar imagen')
-      }
-      
+      if (!response.ok) throw new Error()
+
       const imageBlob = await response.blob()
-      
-      // ✅ Guardar solo si hay metadata real existente
-      // ❌ NO inventar fechas con getCurrentWeekDates()
-      if (existingMetadata?.weekStart && existingMetadata?.weekEnd) {
-        await savePublishedHorario({
-          imageBlob,
-          weekStart: existingMetadata.weekStart,
-          weekEnd: existingMetadata.weekEnd,
-          ownerId: resolvedOwnerId
-        })
-        
-        // Actualizar UI con metadata real
-        const blobUrl = URL.createObjectURL(imageBlob)
-        
-        if (blobUrlRef.current) {
-          URL.revokeObjectURL(blobUrlRef.current)
-        }
-        blobUrlRef.current = blobUrl
-        
-        setImageSrc(blobUrl)
-        setWeekHeader(formatWeekHeader(existingMetadata.weekStart, existingMetadata.weekEnd))
-      } else {
-        // ❌ Sin metadata real: mostrar imagen sin guardar ni header
-        const blobUrl = URL.createObjectURL(imageBlob)
-        
-        if (blobUrlRef.current) {
-          URL.revokeObjectURL(blobUrlRef.current)
-        }
-        blobUrlRef.current = blobUrl
-        
-        setImageSrc(blobUrl)
-        // 🗑️ NO setWeekHeader() si no hay metadata real
-      }
-      
-      setUpdating(false)
-      
-    } catch (err) {
-      console.error('Error cargando desde red:', err)
-      if (!isUpdate) {
-        setError('IMAGE_LOAD_ERROR')
-        setLoading(false)
-      }
-      setUpdating(false)
+
+      const blobUrl = URL.createObjectURL(imageBlob)
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
+      blobUrlRef.current = blobUrl
+
+      setImageSrc(blobUrl)
+      setLoading(false)
+    } catch {
+      setError('IMAGE_LOAD_ERROR')
+      setLoading(false)
     }
   }
 
@@ -195,12 +151,6 @@ function HorarioContent() {
     <div className="flex flex-col h-screen w-screen bg-background overflow-hidden">
       <div className="flex items-center justify-between p-2 border-b border-border bg-muted/30 shrink-0">
         <p className="text-sm text-muted-foreground">Horario publicado</p>
-        {updating && (
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">Actualizando...</span>
-          </div>
-        )}
       </div>
 
       {/* Contenedor de imagen */}
@@ -243,14 +193,6 @@ function HorarioContent() {
             
             {/* Contenedor de imagen con zoom */}
             <div className="flex-1 relative overflow-hidden">
-              {updating && (
-                <div className="absolute top-2 right-2 z-20">
-                  <div className="bg-blue-600 text-white px-2 py-1 rounded-full text-xs">
-                    Actualizando...
-                  </div>
-                </div>
-              )}
-              
               <div 
                 ref={containerRef}
                 className="w-full h-full flex items-center justify-center p-2 cursor-pointer"
