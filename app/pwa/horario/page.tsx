@@ -23,12 +23,28 @@ function HorarioContent() {
   const [imageSrc, setImageSrc] = useState<string | null>(null)
   const [weekHeader, setWeekHeader] = useState<string | null>(null)
   const [zoomLevel, setZoomLevel] = useState(1)
-  const [zoomOrigin, setZoomOrigin] = useState({ x: 0.5, y: 0.5 })
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
   
   const imageRef = useRef<HTMLImageElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const lastTapRef = useRef<number>(0)
   const blobUrlRef = useRef<string | null>(null)
+  const pointerPositionsRef = useRef(new Map<number, { x: number; y: number }>())
+  const dragStartRef = useRef({ x: 0, y: 0 })
+  const panStartRef = useRef({ x: 0, y: 0 })
+  const pinchStartRef = useRef({
+    distance: 0,
+    zoom: 1,
+    pan: { x: 0, y: 0 },
+    midpoint: { x: 0, y: 0 },
+  })
+  const sizeRef = useRef({
+    imageWidth: 0,
+    imageHeight: 0,
+    containerWidth: 0,
+    containerHeight: 0,
+  })
 
   useEffect(() => {
     // Prioridad: 1) URL parameter, 2) localStorage, 3) error
@@ -111,6 +127,58 @@ function HorarioContent() {
     }
   }
 
+  const updateSizes = () => {
+    const imageEl = imageRef.current
+    const containerEl = containerRef.current
+    if (!imageEl || !containerEl) return
+    const imageRect = imageEl.getBoundingClientRect()
+    const containerRect = containerEl.getBoundingClientRect()
+    sizeRef.current = {
+      imageWidth: imageRect.width / zoomLevel,
+      imageHeight: imageRect.height / zoomLevel,
+      containerWidth: containerRect.width,
+      containerHeight: containerRect.height,
+    }
+  }
+
+  const clampPan = (nextPan: { x: number; y: number }, zoom = zoomLevel) => {
+    const { imageWidth, imageHeight, containerWidth, containerHeight } = sizeRef.current
+    if (!imageWidth || !imageHeight || !containerWidth || !containerHeight) {
+      return nextPan
+    }
+
+    const scaledWidth = imageWidth * zoom
+    const scaledHeight = imageHeight * zoom
+    const extraWidth = Math.max(0, scaledWidth - containerWidth)
+    const extraHeight = Math.max(0, scaledHeight - containerHeight)
+    const maxPanX = extraWidth / 2
+    const maxPanY = extraHeight / 2
+
+    return {
+      x: Math.min(maxPanX, Math.max(-maxPanX, nextPan.x)),
+      y: Math.min(maxPanY, Math.max(-maxPanY, nextPan.y)),
+    }
+  }
+
+  const getPointFromEvent = (e: React.PointerEvent<HTMLDivElement>) => {
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return { x: 0, y: 0 }
+    return {
+      x: e.clientX - rect.left - rect.width / 2,
+      y: e.clientY - rect.top - rect.height / 2,
+    }
+  }
+
+  const applyZoomAtPoint = (nextZoom: number, point: { x: number; y: number }) => {
+    const ratio = nextZoom / zoomLevel
+    const nextPan = {
+      x: pan.x * ratio + (1 - ratio) * point.x,
+      y: pan.y * ratio + (1 - ratio) * point.y,
+    }
+    setZoomLevel(nextZoom)
+    setPan(clampPan(nextPan, nextZoom))
+  }
+
   // Zoom por doble tap - mejorado para iOS
   const handleImageClick = (e: React.PointerEvent<HTMLDivElement>) => {
     const now = Date.now()
@@ -120,22 +188,95 @@ function HorarioContent() {
       // Doble tap detectado
       e.preventDefault()
       
-      const rect = containerRef.current?.getBoundingClientRect()
-      if (rect) {
-        const x = (e.clientX - rect.left) / rect.width
-        const y = (e.clientY - rect.top) / rect.height
-        
-        if (zoomLevel === 1) {
-          setZoomLevel(2)
-          setZoomOrigin({ x, y })
-        } else {
-          setZoomLevel(1)
-          setZoomOrigin({ x: 0.5, y: 0.5 })
-        }
+      const point = getPointFromEvent(e)
+      if (zoomLevel === 1) {
+        applyZoomAtPoint(2, point)
+      } else {
+        setZoomLevel(1)
+        setPan({ x: 0, y: 0 })
       }
     }
     
     lastTapRef.current = now
+  }
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const container = containerRef.current
+    if (!container) return
+
+    pointerPositionsRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+
+    if (zoomLevel > 1 || pointerPositionsRef.current.size >= 2) {
+      container.setPointerCapture(e.pointerId)
+    }
+
+    if (pointerPositionsRef.current.size === 1 && zoomLevel > 1) {
+      dragStartRef.current = { x: e.clientX, y: e.clientY }
+      panStartRef.current = { ...pan }
+      setIsDragging(true)
+    } else if (pointerPositionsRef.current.size === 2) {
+      const points = Array.from(pointerPositionsRef.current.values())
+      const dx = points[0].x - points[1].x
+      const dy = points[0].y - points[1].y
+      const distance = Math.hypot(dx, dy)
+      const midpoint = {
+        x: (points[0].x + points[1].x) / 2,
+        y: (points[0].y + points[1].y) / 2,
+      }
+      const rect = container.getBoundingClientRect()
+      pinchStartRef.current = {
+        distance,
+        zoom: zoomLevel,
+        pan: { ...pan },
+        midpoint: {
+          x: midpoint.x - rect.left - rect.width / 2,
+          y: midpoint.y - rect.top - rect.height / 2,
+        },
+      }
+      setIsDragging(false)
+    }
+  }
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!pointerPositionsRef.current.has(e.pointerId)) return
+    pointerPositionsRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+
+    if (pointerPositionsRef.current.size === 2) {
+      const points = Array.from(pointerPositionsRef.current.values())
+      const dx = points[0].x - points[1].x
+      const dy = points[0].y - points[1].y
+      const distance = Math.hypot(dx, dy)
+      const scale = distance / pinchStartRef.current.distance
+      const nextZoom = Math.min(5, Math.max(1, pinchStartRef.current.zoom * scale))
+      const ratio = nextZoom / pinchStartRef.current.zoom
+      const nextPan = {
+        x: pinchStartRef.current.pan.x * ratio + (1 - ratio) * pinchStartRef.current.midpoint.x,
+        y: pinchStartRef.current.pan.y * ratio + (1 - ratio) * pinchStartRef.current.midpoint.y,
+      }
+      setZoomLevel(nextZoom)
+      setPan(clampPan(nextPan, nextZoom))
+      return
+    }
+
+    if (pointerPositionsRef.current.size === 1 && zoomLevel > 1) {
+      const dx = e.clientX - dragStartRef.current.x
+      const dy = e.clientY - dragStartRef.current.y
+      const nextPan = {
+        x: panStartRef.current.x + dx,
+        y: panStartRef.current.y + dy,
+      }
+      setPan(clampPan(nextPan))
+    }
+  }
+
+  const handlePointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
+    pointerPositionsRef.current.delete(e.pointerId)
+    if (pointerPositionsRef.current.size < 2) {
+      pinchStartRef.current.distance = 0
+    }
+    if (pointerPositionsRef.current.size === 0) {
+      setIsDragging(false)
+    }
   }
 
   // Cleanup de blob URLs
@@ -145,6 +286,16 @@ function HorarioContent() {
         URL.revokeObjectURL(blobUrlRef.current)
       }
     }
+  }, [])
+
+  useEffect(() => {
+    updateSizes()
+  }, [zoomLevel, imageSrc])
+
+  useEffect(() => {
+    const handleResize = () => updateSizes()
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
   }, [])
 
   return (
@@ -200,6 +351,10 @@ function HorarioContent() {
                   touchAction: zoomLevel > 1 ? 'none' : 'pan-x pan-y'
                 }}
                 onPointerUp={handleImageClick}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerCancel={handlePointerEnd}
+                onPointerUpCapture={handlePointerEnd}
               >
                 <img
                   ref={imageRef}
@@ -207,14 +362,15 @@ function HorarioContent() {
                   alt="Horario publicado"
                   className="max-w-full max-h-full object-contain transition-transform duration-200"
                   style={{ 
-                    transform: `scale(${zoomLevel})`,
-                    transformOrigin: `${zoomOrigin.x * 100}% ${zoomOrigin.y * 100}%`,
+                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})`,
+                    transformOrigin: "0 0",
                     userSelect: 'none',
                     WebkitUserSelect: 'none',
                     WebkitTouchCallout: 'none',
                     pointerEvents: 'auto',
-                    cursor: zoomLevel > 1 ? 'zoom-out' : 'zoom-in'
+                    cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in'
                   }}
+                  onLoad={updateSizes}
                   onError={() => {
                     setError('IMAGE_LOAD_ERROR')
                     setLoading(false)
