@@ -34,6 +34,17 @@ function HorarioContent() {
       // Construir URL de la imagen optimizada con cache
       const image_url = getImageUrlWithCache(resolvedOwnerId)
       setImageSrc(image_url)
+      
+      // Agregar manifest dinámico con ownerId
+      const manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement
+      if (manifestLink) {
+        manifestLink.href = `/api/manifest-horario?ownerId=${encodeURIComponent(resolvedOwnerId)}`
+      } else {
+        const link = document.createElement('link')
+        link.rel = 'manifest'
+        link.href = `/api/manifest-horario?ownerId=${encodeURIComponent(resolvedOwnerId)}`
+        document.head.appendChild(link)
+      }
     } else {
       setError(OWNER_ID_MISSING_ERROR)
     }

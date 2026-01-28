@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next"
 
+// NOTA: El manifest dinámico requiere ownerId para personalizar el nombre.
+// Si no hay ownerId disponible, se usará el manifest estático como fallback.
 export const metadata: Metadata = {
   title: "Horario del día",
   description: "Visualización del horario semanal del personal",
-  manifest: "/manifest-horario.json",
+  manifest: "/api/manifest-horario", // Manifest dinámico
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
