@@ -56,6 +56,30 @@ export interface PublishedHorarioMetadata {
   updatedAt: string
 }
 
+// Función para formatear encabezado de semana
+export function formatWeekHeader(weekStart: string, weekEnd: string): string {
+  const startDate = new Date(weekStart)
+  const endDate = new Date(weekEnd)
+  
+  const monthNames = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ]
+  
+  const startMonth = monthNames[startDate.getMonth()]
+  const endMonth = monthNames[endDate.getMonth()]
+  const startDay = startDate.getDate()
+  const endDay = endDate.getDate()
+  
+  // Si es el mismo mes
+  if (startMonth === endMonth) {
+    return `${startMonth} – semana del ${startDay} al ${endDay}`
+  }
+  
+  // Si cruzan meses
+  return `${startMonth}/${endMonth} – semana del ${startDay} al ${endDay}`
+}
+
 export async function savePublishedHorario(params: {
   imageBlob: Blob
   weekStart: string

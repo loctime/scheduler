@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { Loader2, AlertCircle } from "lucide-react"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { PWAUpdateNotification } from "@/components/pwa-update-notification"
-import { setHorarioOwnerId, getHorarioOwnerId, OWNER_ID_MISSING_ERROR, getImageUrlWithCache } from "@/lib/pwa-horario"
+import { setHorarioOwnerId, getHorarioOwnerId, OWNER_ID_MISSING_ERROR, getImageUrlWithCache, loadPublishedHorario, formatWeekHeader } from "@/lib/pwa-horario"
 
 function HorarioContent() {
   const searchParams = useSearchParams()
@@ -16,6 +16,7 @@ function HorarioContent() {
   const [error, setError] = useState<string | null>(null)
   const [imageSrc, setImageSrc] = useState<string | null>(null)
   const [showCachedImage, setShowCachedImage] = useState(false)
+  const [weekHeader, setWeekHeader] = useState<string | null>(null)
 
   useEffect(() => {
     // Prioridad: 1) URL parameter, 2) localStorage, 3) error
@@ -34,6 +35,17 @@ function HorarioContent() {
       // Construir URL de la imagen optimizada con cache
       const image_url = getImageUrlWithCache(resolvedOwnerId)
       setImageSrc(image_url)
+      
+      // Cargar metadatos para obtener weekStart y weekEnd
+      loadPublishedHorario(resolvedOwnerId).then(result => {
+        if (result?.metadata) {
+          const header = formatWeekHeader(result.metadata.weekStart, result.metadata.weekEnd)
+          setWeekHeader(header)
+        }
+      }).catch(err => {
+        console.error('Error cargando metadatos:', err)
+        // No bloquear la carga si hay error en metadatos
+      })
       
       // Agregar manifest dinámico con ownerId
       const manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement
@@ -81,39 +93,53 @@ function HorarioContent() {
         )}
 
         {!loading && ownerId && imageSrc && (
-          <div className="flex items-center justify-center min-h-full p-2 relative">
-            {/* Placeholder/skeleton mientras carga */}
-            {imageLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-muted/30 rounded-lg">
-                <div className="flex flex-col items-center gap-2">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  <p className="text-xs text-muted-foreground">Cargando horario...</p>
+          <div className="flex flex-col h-full">
+            {/* Encabezado de semana */}
+            {weekHeader && (
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 shadow-lg z-10">
+                <div className="text-center">
+                  <h2 className="text-lg font-semibold tracking-wide">
+                    {weekHeader}
+                  </h2>
                 </div>
               </div>
             )}
             
-            {/* Imagen con soporte para zoom en móvil */}
-            <div className="w-full h-full flex items-center justify-center" style={{ touchAction: 'manipulation' }}>
-              <img
-                src={imageSrc}
-                alt="Horario publicado"
-                className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${
-                  imageLoading ? 'opacity-0' : 'opacity-100'
-                }`}
-                style={{ 
-                  userSelect: 'none',
-                  WebkitUserSelect: 'none',
-                  WebkitTouchCallout: 'none'
-                }}
-                onLoad={() => {
-                  setImageLoading(false)
-                  setShowCachedImage(false)
-                }}
-                onError={() => {
-                  setError('IMAGE_LOAD_ERROR')
-                  setImageLoading(false)
-                }}
-              />
+            {/* Contenedor de imagen */}
+            <div className="flex-1 relative">
+              {/* Placeholder/skeleton mientras carga */}
+              {imageLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-muted/30 rounded-lg">
+                  <div className="flex flex-col items-center gap-2">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">Cargando horario...</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Imagen con soporte para zoom en móvil */}
+              <div className="w-full h-full flex items-center justify-center p-2" style={{ touchAction: 'manipulation' }}>
+                <img
+                  src={imageSrc}
+                  alt="Horario publicado"
+                  className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${
+                    imageLoading ? 'opacity-0' : 'opacity-100'
+                  }`}
+                  style={{ 
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                    WebkitTouchCallout: 'none'
+                  }}
+                  onLoad={() => {
+                    setImageLoading(false)
+                    setShowCachedImage(false)
+                  }}
+                  onError={() => {
+                    setError('IMAGE_LOAD_ERROR')
+                    setImageLoading(false)
+                  }}
+                />
+              </div>
             </div>
           </div>
         )}
