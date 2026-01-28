@@ -147,13 +147,6 @@ export function EmployeeRow({
               <p className="text-base sm:text-lg font-bold truncate">{employee.name}</p>
             </div>
             
-            {/* Headers de la tabla */}
-            {employeeStats && employeeStats[employee.id] && (
-              <div className="flex gap-2 text-xs sm:text-sm font-medium text-muted-foreground">
-                <div>Semana</div>
-                <div>Mes</div>
-              </div>
-            )}
           </div>
           
           {/* FILA 2: Tabla de estadísticas */}
@@ -162,12 +155,12 @@ export function EmployeeRow({
               <div className="grid grid-cols-[auto_48px_48px] divide-x divide-border">
                 {/* Francos row */}
                 <div className="font-bold text-foreground pr-1">Francos</div>
-                <div className="font-semibold text-right px-1 border-t border-border">0</div>
+                <div className="font-semibold text-right px-1 border-t border-border">{formatStatValue(employeeStats[employee.id].francosSemana)}</div>
                 <div className="font-semibold text-right pl-1 border-t border-border">{formatStatValue(employeeStats[employee.id].francos)}</div>
                 
                 {/* Horas row */}
                 <div className="font-bold text-foreground pr-1 border-t border-border">Horas</div>
-                <div className="font-semibold text-right px-1 border-t border-border">0h</div>
+                <div className="font-semibold text-right px-1 border-t border-border">{formatStatValue(employeeStats[employee.id].horasSemana)}h</div>
                 <div className="font-semibold text-right pl-1 border-t border-border">{formatStatValue(employeeStats[employee.id].horasComputablesMes)}h</div>
                 
                 {/* Extras row */}

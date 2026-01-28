@@ -282,7 +282,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   const employeeMonthlyStats = useMemo<Record<string, EmployeeMonthlyStats>>(() => {
     const stats: Record<string, EmployeeMonthlyStats> = {}
     employees.forEach((employee) => {
-      stats[employee.id] = { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0, horasComputablesMes: 0, horasLicenciaEmbarazo: 0, horasMedioFranco: 0 }
+      stats[employee.id] = { francos: 0, francosSemana: 0, horasExtrasSemana: 0, horasExtrasMes: 0, horasComputablesMes: 0, horasSemana: 0, horasLicenciaEmbarazo: 0, horasMedioFranco: 0 }
     })
 
     if (employees.length === 0 || shiftsToUse.length === 0) {
@@ -317,7 +317,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
         Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
           if (!stats[employeeId]) {
-            stats[employeeId] = { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0, horasComputablesMes: 0, horasLicenciaEmbarazo: 0, horasMedioFranco: 0 }
+            stats[employeeId] = { francos: 0, francosSemana: 0, horasExtrasSemana: 0, horasExtrasMes: 0, horasComputablesMes: 0, horasSemana: 0, horasLicenciaEmbarazo: 0, horasMedioFranco: 0 }
           }
 
           const normalizedAssignments = normalizeAssignments(assignmentValue)

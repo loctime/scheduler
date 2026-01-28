@@ -29,9 +29,11 @@ import { isAssignmentIncomplete } from "@/lib/assignment-utils"
 
 export interface EmployeeMonthlyStats {
   francos: number
+  francosSemana: number
   horasExtrasSemana: number
   horasExtrasMes: number
   horasComputablesMes: number
+  horasSemana: number
   horasLicenciaEmbarazo?: number
   horasMedioFranco?: number
 }

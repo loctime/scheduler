@@ -75,6 +75,15 @@ export function GeneralView({
   onPublishPwa,
   isPublishingPwa,
 }: GeneralViewProps) {
+  // Create shift map for efficient lookup
+  const shiftMap = useMemo(() => {
+    return new Map(shifts.map((s) => [s.id, s]))
+  }, [shifts])
+
+  const getShiftInfo = (shiftId: string) => {
+    return shiftMap.get(shiftId)
+  }
+
   // Crear un mapa de semanas expandidas usando la fecha de inicio de semana como clave
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(() => {
     // Por defecto, todas las semanas están cerradas
@@ -187,8 +196,10 @@ export function GeneralView({
           
           employeesForWeek.forEach((employee) => {
             weekStats[employee.id] = {
-              ...employeeMonthlyStats[employee.id] || { francos: 0, horasExtrasSemana: 0, horasExtrasMes: 0, horasComputablesMes: 0 },
+              ...employeeMonthlyStats[employee.id] || { francos: 0, francosSemana: 0, horasExtrasSemana: 0, horasExtrasMes: 0, horasComputablesMes: 0, horasSemana: 0 },
+              francosSemana: 0,
               horasExtrasSemana: 0,
+              horasSemana: 0,
             }
           })
 
@@ -213,20 +224,38 @@ export function GeneralView({
                 if (!weekStats[employeeId]) {
                   weekStats[employeeId] = {
                     ...employeeMonthlyStats[employeeId],
+                    francosSemana: 0,
                     horasExtrasSemana: 0,
+                    horasSemana: 0,
                   }
                 }
 
                 const normalizedAssignments = normalizeAssignments(assignmentValue)
                 if (normalizedAssignments.length === 0) {
+                  // Count as francos if no assignments
+                  weekStats[employeeId].francosSemana += 1
                   return
                 }
 
-                // Calcular horas extras para este día usando el nuevo servicio de dominio
+                // Check if all assignments are francos (day off)
+                const allFrancos = normalizedAssignments.every(assignment => 
+                  assignment.type === 'franco' || assignment.type === 'medio_franco'
+                )
+                
+                if (allFrancos) {
+                  weekStats[employeeId].francosSemana += 1
+                }
+
+                // Calcular horas extras y horas totales para este día usando el nuevo servicio de dominio
                 const workingConfig = toWorkingHoursConfig(config)
-                const { horasExtra } = calculateTotalDailyHours(normalizedAssignments, workingConfig)
+                const { horasExtra, horasNormales } = calculateTotalDailyHours(normalizedAssignments, workingConfig)
+                
                 if (horasExtra > 0) {
                   weekStats[employeeId].horasExtrasSemana += horasExtra
+                }
+                
+                if (horasNormales > 0) {
+                  weekStats[employeeId].horasSemana += horasNormales
                 }
               })
             })
