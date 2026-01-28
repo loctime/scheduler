@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { format, subMonths, addMonths, startOfWeek } from "date-fns"
 import { es } from "date-fns/locale"
+import { savePublishedHorario, setHorarioOwnerId } from "@/lib/pwa-horario"
 import { useData } from "@/contexts/data-context"
 import { Horario, ShiftAssignment, ShiftAssignmentValue, Turno } from "@/lib/types"
 import { useConfig } from "@/hooks/use-config"
@@ -168,6 +169,9 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
       })
       return
     }
+    
+    // Guardar ownerId en localStorage para el PWA
+    setHorarioOwnerId(ownerId)
     
     setPublishingWeekId(weekId)
     try {
