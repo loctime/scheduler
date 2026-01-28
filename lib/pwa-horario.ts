@@ -2,6 +2,26 @@ export const PWA_HORARIO_CACHE = "horario-cache-v1"
 export const PWA_HORARIO_OWNER_ID_KEY = "pwa_horario_owner_id"
 export const OWNER_ID_MISSING_ERROR = "OWNER_ID_MISSING"
 
+// Soporte para formatos de imagen
+export function getSupportedImageFormat(): 'webp' | 'png' {
+  if (typeof window !== 'undefined') {
+    const canvas = document.createElement('canvas')
+    canvas.width = 1
+    canvas.height = 1
+    return canvas.toDataURL('image/webp').indexOf('data:image/webp') === 0 ? 'webp' : 'png'
+  }
+  return 'png' // Fallback para SSR
+}
+
+// Optimización de carga con cache del Service Worker
+export function getImageUrlWithCache(ownerId: string, baseUrl?: string): string {
+  const base = baseUrl || process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL
+  const format = getSupportedImageFormat()
+  const timestamp = Date.now() // Para evitar cache del navegador, pero permitir SW cache
+  
+  return `${base}/api/horarios/semana-actual?ownerId=${encodeURIComponent(ownerId)}&format=${format}&_t=${timestamp}`
+}
+
 // Helpers para persistir el ownerId en localStorage
 export function setHorarioOwnerId(ownerId: string): void {
   if (typeof window !== 'undefined') {
