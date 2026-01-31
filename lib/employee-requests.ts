@@ -10,7 +10,7 @@ export interface EmployeeRequest extends EmployeeRequestData {
   updatedAt: string;
 }
 
-const COLLECTION_NAME = 'apps/horarios/employeeRequests';
+const COLLECTION_NAME = 'apps/horarios/employee_requests';
 
 /**
  * Guardar o actualizar un pedido de empleado

@@ -12,8 +12,10 @@ import { getCustomMonthRange, getMonthWeeks, getInitialMonthForRange } from "@/l
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { useScheduleUpdates } from "@/hooks/use-schedule-updates"
 import { useSchedulesListener } from "@/hooks/use-schedules-listener"
+import { useImplicitFixedRules } from "@/hooks/use-implicit-fixed-rules"
 import { calculateHoursBreakdown } from "@/lib/validations"
 import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
+import { logger } from "@/lib/logger"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { GeneralView } from "@/components/schedule-calendar/general-view"
 import { ExportOverlay } from "@/components/export-overlay"
@@ -89,6 +91,53 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     monthRange,
     enabled: !!user,
   })
+
+  // Hook para generación implícita de reglas fijas
+  const { applyFixedRulesIfWeekEmpty, hasFixedRules } = useImplicitFixedRules({
+    user,
+    employees,
+    shifts,
+    weekStartsOn,
+    getWeekSchedule,
+    onWeekScheduleCreated: (newSchedule) => {
+      // Actualizar el estado local cuando se crea un nuevo schedule
+      // Esto asegura que el UI se actualice inmediatamente
+      logger.info("[ScheduleCalendar] Nuevo schedule creado por reglas fijas", {
+        weekStart: newSchedule.weekStart
+      })
+    }
+  })
+
+  // Efecto para aplicar reglas fijas implícitamente cuando el usuario navega a semanas
+  // Solo se ejecuta si hay reglas fijas configuradas
+  useEffect(() => {
+    if (!hasFixedRules || employees.length === 0 || !user) {
+      return
+    }
+
+    // Para cada semana visible en el mes actual
+    const applyRulesForVisibleWeeks = async () => {
+      for (const weekDays of monthWeeks) {
+        const weekStartDate = weekDays[0]
+        
+        // Para cada empleado, verificar si la semana está vacía y aplicar reglas si es necesario
+        for (const employee of employees) {
+          try {
+            await applyFixedRulesIfWeekEmpty(weekStartDate, employee.id)
+          } catch (error) {
+            logger.error("[ScheduleCalendar] Error aplicando reglas fijas", {
+              employeeId: employee.id,
+              weekStart: format(weekStartDate, "yyyy-MM-dd"),
+              error
+            })
+          }
+        }
+      }
+    }
+
+    // Ejecutar de forma asíncrona para no bloquear el UI
+    applyRulesForVisibleWeeks()
+  }, [hasFixedRules, employees, user, monthWeeks, applyFixedRulesIfWeekEmpty])
 
   const getDateAssignments = useCallback(
     (date: Date) => {

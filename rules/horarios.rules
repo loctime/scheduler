@@ -1,22 +1,17 @@
-// ========= HORARIOS SCHEDULER (Firestore Rules válidas) =========
-// Nota: NO usar let / ?: / if {} / regex dinámico.
 
-rules_version = '2';
 
-service cloud.firestore {
-  match /databases/{database}/documents {
+    // =========================================================
+    // =================== HELPERS GLOBALES ====================
+    // =========================================================
 
-    // ---------- Helpers base ----------
-    function isAuth() {
-      return request.auth != null;
-    }
+   
 
-    function uid() {
-      return request.auth.uid;
+    function userPath(userId) {
+      return /databases/$(database)/documents/apps/horarios/users/$(userId);
     }
 
     function myUserPath() {
-      return /databases/$(database)/documents/apps/horarios/users/$(uid());
+      return userPath(uid());
     }
 
     function hasMyUser() {
@@ -27,18 +22,12 @@ service cloud.firestore {
       return hasMyUser() && get(myUserPath()).data.role == role;
     }
 
-    function isAdmin()   { return myRoleIs('admin'); }
-    function isManager() { return myRoleIs('manager'); }
-    function isFactory() { return myRoleIs('factory'); }
-    function isInvited() { return myRoleIs('invited'); }
+  
 
     function myOwnerId() {
-      // Para invited: ownerId en su user doc
-      return hasMyUser() && ('ownerId' in get(myUserPath()).data) ? get(myUserPath()).data.ownerId : '';
-    }
-
-    function isOwnerOrAdmin(ownerId) {
-      return isAuth() && (uid() == ownerId || isAdmin());
+      return hasMyUser() && ('ownerId' in get(myUserPath()).data)
+        ? get(myUserPath()).data.ownerId
+        : '';
     }
 
     function invitedActingFor(ownerId) {
@@ -46,7 +35,6 @@ service cloud.firestore {
     }
 
     function canActFor(ownerId) {
-      // Dueño, admin, manager, factory o invited actuando por el owner
       return isAuth() && (
         uid() == ownerId
         || isAdmin()
@@ -56,25 +44,29 @@ service cloud.firestore {
       );
     }
 
-    function protectFieldUnchanged(fieldName) {
-      return !(fieldName in request.resource.data) || request.resource.data[fieldName] == resource.data[fieldName];
+    function protectFieldUnchanged(field) {
+      return !(field in request.resource.data)
+        || request.resource.data[field] == resource.data[field];
     }
 
     function protectUserId(resourceUserId) {
-      return !('userId' in request.resource.data) || request.resource.data.userId == resourceUserId;
+      return !('userId' in request.resource.data)
+        || request.resource.data.userId == resourceUserId;
     }
 
     function protectCreatedBy() {
-      return !('createdBy' in request.resource.data) || request.resource.data.createdBy == resource.data.createdBy;
+      return !('createdBy' in request.resource.data)
+        || request.resource.data.createdBy == resource.data.createdBy;
     }
 
     function isParticipantArray(arr) {
       return (arr is list) && arr.hasAny([uid()]);
     }
 
-    // ---------- apps/horarios/users ----------
+    // =========================================================
+    // ======================= USERS ===========================
+    // =========================================================
     match /apps/horarios/users/{userId} {
-      // Lectura: propio, admin/manager/factory
       allow read: if isAuth() && (
         userId == uid()
         || isAdmin()
@@ -82,282 +74,249 @@ service cloud.firestore {
         || isFactory()
       );
 
-      // Crear: solo propio
       allow create: if isAuth() && userId == uid();
 
-      // Update: propio (sin cambiar role), o admin
       allow update: if isAuth() && (
-        (userId == uid() && protectFieldUnchanged('role') && protectFieldUnchanged('uid'))
+        (userId == uid()
+          && protectFieldUnchanged('role')
+          && protectFieldUnchanged('uid'))
         || (isAdmin() && protectFieldUnchanged('uid'))
       );
 
-      // Delete: propio o admin
       allow delete: if isAuth() && (userId == uid() || isAdmin());
     }
 
-    // ---------- apps/horarios/groups ----------
+    // =========================================================
+    // ======================= GROUPS ==========================
+    // =========================================================
     match /apps/horarios/groups/{groupId} {
       allow read: if isAuth();
-
-      // Admin crea
       allow create: if isAuth() && isAdmin();
 
-      // Update: admin o manager dueño del grupo (managerId == uid)
       allow update: if isAuth() && (
         isAdmin()
-        || (isManager() && ('managerId' in resource.data) && resource.data.managerId == uid()
-            && protectFieldUnchanged('managerId'))
+        || (isManager()
+          && ('managerId' in resource.data)
+          && resource.data.managerId == uid()
+          && protectFieldUnchanged('managerId'))
       );
 
       allow delete: if isAuth() && isAdmin();
     }
 
-    // ---------- employees ----------
+    // =========================================================
+    // ====================== EMPLOYEES ========================
+    // =========================================================
     match /apps/horarios/employees/{empleadoId} {
-      // Si querés público, dejalo true; si no, cambiá a isAuth()
       allow read: if true;
 
       allow create: if isAuth()
-        && ('userId' in request.resource.data)
         && request.resource.data.userId == uid();
 
       allow update: if isAuth()
-        && ('userId' in resource.data)
         && canActFor(resource.data.userId)
         && protectUserId(resource.data.userId);
 
       allow delete: if isAuth()
-        && ('userId' in resource.data)
         && (resource.data.userId == uid() || isAdmin());
     }
 
-    // ---------- shifts ----------
+    // =========================================================
+    // ======================= SHIFTS ==========================
+    // =========================================================
     match /apps/horarios/shifts/{turnoId} {
       allow read: if true;
 
       allow create: if isAuth()
-        && ('userId' in request.resource.data)
         && request.resource.data.userId == uid();
 
       allow update: if isAuth()
-        && ('userId' in resource.data)
         && canActFor(resource.data.userId)
         && protectUserId(resource.data.userId);
 
       allow delete: if isAuth()
-        && ('userId' in resource.data)
         && (resource.data.userId == uid() || isAdmin());
     }
 
-    // ---------- schedules ----------
+    // =========================================================
+    // ====================== SCHEDULES ========================
+    // =========================================================
     match /apps/horarios/schedules/{horarioId} {
       allow read: if true;
 
       allow create: if isAuth()
-        && ('createdBy' in request.resource.data)
         && request.resource.data.createdBy == uid();
 
       allow update: if isAuth()
-        && ('createdBy' in resource.data)
         && (resource.data.createdBy == uid() || isAdmin())
         && protectCreatedBy();
 
       allow delete: if isAuth()
-        && ('createdBy' in resource.data)
         && (resource.data.createdBy == uid() || isAdmin());
     }
 
-    // ---------- historial ----------
+    // =========================================================
+    // ====================== HISTORIAL ========================
+    // =========================================================
     match /apps/horarios/historial/{historialId} {
-      allow read: if isAuth()
-        && ('createdBy' in resource.data)
-        && resource.data.createdBy == uid();
-
-      allow create: if isAuth()
-        && ('createdBy' in request.resource.data)
-        && request.resource.data.createdBy == uid();
-
-      // Inmutable
+      allow read: if isAuth() && resource.data.createdBy == uid();
+      allow create: if isAuth() && request.resource.data.createdBy == uid();
       allow update: if false;
-
-      allow delete: if isAuth()
-        && ('createdBy' in resource.data)
-        && (resource.data.createdBy == uid() || isAdmin());
+      allow delete: if isAuth() && (resource.data.createdBy == uid() || isAdmin());
     }
 
-    // ---------- config ----------
+    // =========================================================
+    // ======================== CONFIG =========================
+    // =========================================================
     match /apps/horarios/config/{configId} {
       allow read: if true;
-
-      // Solo el usuario edita su config (configId == uid)
       allow create, update: if isAuth() && configId == uid();
-
       allow delete: if false;
     }
 
-    // ---------- invitaciones ----------
+    // =========================================================
+    // ===================== INVITACIONES ======================
+    // =========================================================
     match /apps/horarios/invitaciones/{invitacionId} {
-      // Validación de token sin auth
       allow read: if true;
 
-      // Owner crea
       allow create: if isAuth()
-        && ('ownerId' in request.resource.data)
         && request.resource.data.ownerId == uid();
 
-      // Owner actualiza / admin
-      allow update: if isAuth() && (
-        (('ownerId' in resource.data) && resource.data.ownerId == uid())
-        || isAdmin()
-      );
-
-      allow delete: if isAuth() && (
-        (('ownerId' in resource.data) && resource.data.ownerId == uid())
-        || isAdmin()
-      );
+      allow update, delete: if isAuth()
+        && (resource.data.ownerId == uid() || isAdmin());
     }
 
-    // ---------- pedidos ----------
+    // =========================================================
+    // ======================= PEDIDOS =========================
+    // =========================================================
     match /apps/horarios/pedidos/{pedidoId} {
-      // Si necesitás público para links, dejalo true.
-      // Si querés más seguro: cambiá a isAuth() && canActFor(resource.data.userId)
       allow read: if true;
 
       allow create: if isAuth()
-        && ('userId' in request.resource.data)
         && request.resource.data.userId == uid()
         && !isInvited();
 
       allow update: if isAuth()
-        && ('userId' in resource.data)
         && canActFor(resource.data.userId)
         && protectUserId(resource.data.userId);
 
       allow delete: if isAuth()
-        && ('userId' in resource.data)
         && (resource.data.userId == uid() || isAdmin());
     }
 
-    // ---------- products ----------
+    // =========================================================
+    // ======================= PRODUCTS ========================
+    // =========================================================
     match /apps/horarios/products/{productoId} {
       allow read: if true;
 
       allow create: if isAuth()
-        && ('userId' in request.resource.data)
-        && (request.resource.data.userId == uid() || invitedActingFor(request.resource.data.userId));
+        && (request.resource.data.userId == uid()
+            || invitedActingFor(request.resource.data.userId));
 
       allow update: if isAuth()
-        && ('userId' in resource.data)
         && canActFor(resource.data.userId)
         && protectUserId(resource.data.userId);
 
       allow delete: if isAuth()
-        && ('userId' in resource.data)
         && (resource.data.userId == uid() || isAdmin());
     }
 
-    // ---------- stock_movimientos ----------
+    // =========================================================
+    // =================== STOCK MOVIMIENTOS ===================
+    // =========================================================
     match /apps/horarios/stock_movimientos/{movimientoId} {
-      allow read: if isAuth()
-        && ('userId' in resource.data)
-        && canActFor(resource.data.userId);
+      allow read: if isAuth() && canActFor(resource.data.userId);
 
       allow create: if isAuth()
-        && ('userId' in request.resource.data)
-        && (request.resource.data.userId == uid() || invitedActingFor(request.resource.data.userId));
+        && (request.resource.data.userId == uid()
+            || invitedActingFor(request.resource.data.userId));
 
-      allow update: if false; // generalmente inmutable
+      allow update: if false;
 
       allow delete: if isAuth()
-        && ('userId' in resource.data)
         && (resource.data.userId == uid() || isAdmin());
     }
 
-    // ---------- stock_actual ----------
+    // =========================================================
+    // ====================== STOCK ACTUAL =====================
+    // =========================================================
     match /apps/horarios/stock_actual/{stockId} {
-      // Para no usar matches dinámico, se controla por userId en el doc
-      allow read: if isAuth()
-        && ('userId' in resource.data)
-        && canActFor(resource.data.userId);
+      allow read: if isAuth() && canActFor(resource.data.userId);
 
       allow create: if isAuth()
-        && ('userId' in request.resource.data)
-        && (request.resource.data.userId == uid() || invitedActingFor(request.resource.data.userId));
+        && (request.resource.data.userId == uid()
+            || invitedActingFor(request.resource.data.userId));
 
       allow update: if isAuth()
-        && ('userId' in resource.data)
         && canActFor(resource.data.userId)
         && protectUserId(resource.data.userId);
 
       allow delete: if isAuth()
-        && ('userId' in resource.data)
         && (resource.data.userId == uid() || isAdmin());
     }
 
-    // ---------- remitos ----------
+    // =========================================================
+    // ======================== REMITOS ========================
+    // =========================================================
     match /apps/horarios/remitos/{remitoId} {
       allow read: if isAuth()
-        && ('userId' in resource.data)
         && (canActFor(resource.data.userId) || isFactory());
 
       allow create: if isAuth()
-        && ('userId' in request.resource.data)
         && (request.resource.data.userId == uid()
             || invitedActingFor(request.resource.data.userId)
             || isFactory()
             || isAdmin());
 
       allow update: if isAuth()
-        && ('userId' in resource.data)
         && (canActFor(resource.data.userId) || isFactory())
         && protectUserId(resource.data.userId);
 
       allow delete: if isAuth()
-        && ('userId' in resource.data)
         && (resource.data.userId == uid() || isAdmin() || isFactory());
     }
 
-    // ---------- recepciones ----------
+    // =========================================================
+    // ======================= RECEPCIONES =====================
+    // =========================================================
     match /apps/horarios/recepciones/{recepcionId} {
-      allow read: if isAuth()
-        && ('userId' in resource.data)
-        && canActFor(resource.data.userId);
+      allow read: if isAuth() && canActFor(resource.data.userId);
 
       allow create: if isAuth()
-        && ('userId' in request.resource.data)
         && request.resource.data.userId == uid();
 
       allow update: if isAuth()
-        && ('userId' in resource.data)
         && canActFor(resource.data.userId)
         && protectUserId(resource.data.userId);
 
       allow delete: if isAuth()
-        && ('userId' in resource.data)
         && (resource.data.userId == uid() || isAdmin());
     }
 
-    // ---------- enlaces_publicos ----------
+    // =========================================================
+    // ==================== ENLACES PUBLICOS ===================
+    // =========================================================
     match /apps/horarios/enlaces_publicos/{enlaceId} {
       allow read: if true;
 
       allow create: if isAuth()
-        && ('userId' in request.resource.data)
         && (request.resource.data.userId == uid()
             || invitedActingFor(request.resource.data.userId)
             || isAdmin());
 
       allow update: if isAuth()
-        && ('userId' in resource.data)
         && (canActFor(resource.data.userId) || isFactory())
         && protectUserId(resource.data.userId);
 
       allow delete: if isAuth()
-        && ('userId' in resource.data)
         && (resource.data.userId == uid() || isAdmin());
     }
 
-    // ---------- conversaciones ----------
+    // =========================================================
+    // ===================== CONVERSACIONES ====================
+    // =========================================================
     match /apps/horarios/conversaciones/{conversacionId} {
       function canAccessConversation() {
         return resource.data != null
@@ -374,40 +333,106 @@ service cloud.firestore {
       allow update, delete: if isAuth() && canAccessConversation();
     }
 
-    // ---------- mensajes ----------
+    // =========================================================
+    // ======================== MENSAJES =======================
+    // =========================================================
     match /apps/horarios/mensajes/{mensajeId} {
       function canAccessConvId(convId) {
         return exists(/databases/$(database)/documents/apps/horarios/conversaciones/$(convId))
           && ('participantes' in get(/databases/$(database)/documents/apps/horarios/conversaciones/$(convId)).data)
-          && isParticipantArray(get(/databases/$(database)/documents/apps/horarios/conversaciones/$(convId)).data.participantes);
+          && isParticipantArray(
+               get(/databases/$(database)/documents/apps/horarios/conversaciones/$(convId)).data.participantes
+             );
       }
 
       allow read: if isAuth()
-        && ('conversacionId' in resource.data)
         && canAccessConvId(resource.data.conversacionId);
 
       allow create: if isAuth()
-        && ('remitenteId' in request.resource.data)
         && request.resource.data.remitenteId == uid()
-        && ('conversacionId' in request.resource.data)
         && canAccessConvId(request.resource.data.conversacionId);
 
-      // Update: solo para marcar leído (sin cambiar contenido/remitente/conversación)
       allow update: if isAuth()
-        && ('conversacionId' in resource.data)
         && canAccessConvId(resource.data.conversacionId)
         && protectFieldUnchanged('remitenteId')
         && protectFieldUnchanged('contenido')
         && protectFieldUnchanged('conversacionId');
 
       allow delete: if isAuth()
-        && ('remitenteId' in resource.data)
         && (resource.data.remitenteId == uid() || isAdmin());
     }
+// =========================================================
+// ============ EMPLOYEE FIXED RULES (HORARIOS FIJOS) ======
+// =========================================================
+match /apps/horarios/employee_fixed_rules/{ruleId} {
 
-    // Default deny
+  // Lectura:
+  // - cualquiera autenticado que pueda actuar para el owner
+  allow read: if isAuth()
+    && canActFor(resource.data.ownerId);
+
+  // Creación:
+  allow create: if isAuth()
+    // owner correcto
+    && request.resource.data.ownerId == myOwnerId()
+    // usuario creador correcto
+    && request.resource.data.createdBy == uid()
+    // employeeId obligatorio
+    && ('employeeId' in request.resource.data)
+    // día válido
+    && request.resource.data.dayOfWeek >= 0
+    && request.resource.data.dayOfWeek <= 6;
+
+  // Actualización:
+  allow update: if isAuth()
+    && canActFor(resource.data.ownerId)
+    // no permitir cambiar owner
+    && protectFieldUnchanged('ownerId')
+    // no permitir cambiar empleado
+    && protectFieldUnchanged('employeeId')
+    // no permitir cambiar creador
+    && protectCreatedBy();
+
+  // Eliminación:
+  allow delete: if isAuth()
+    && canActFor(resource.data.ownerId);
+}
+// =========================================================
+// ================= EMPLOYEE REQUESTS =====================
+// =========================================================
+match /apps/horarios/employee_requests/{requestId} {
+
+  // Lectura:
+  // - empleado autenticado
+  // - roles con acceso (admin / manager / factory / invitado)
+  // IMPORTANTE: NO usar resource.data en read (queries)
+  allow read: if isAuth();
+
+  // Creación:
+  // - solo el empleado autenticado
+  allow create: if isAuth()
+    && request.resource.data.userId == uid()
+    && request.resource.data.ownerId == myOwnerId();
+
+  // Update:
+  // - owner / admin / manager
+  // - el empleado NO puede editar una vez creada
+  allow update: if isAuth()
+    && canActFor(resource.data.ownerId)
+    && protectFieldUnchanged('userId')
+    && protectFieldUnchanged('employeeId')
+    && protectFieldUnchanged('ownerId');
+
+  // Delete:
+  // - owner o admin
+  allow delete: if isAuth()
+    && canActFor(resource.data.ownerId);
+}
+
+    // =========================================================
+    // ===================== DEFAULT DENY ======================
+    // =========================================================
     match /{document=**} {
       allow read, write: if false;
     }
-  }
-}
+ 

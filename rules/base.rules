@@ -38,6 +38,8 @@ function isAdmin()  { return userRole() == 'admin' || userRole() == 'maxdev'; }
 function isFactory(){ return userRole() == 'factory'; }
 function isBranch() { return userRole() == 'branch'; }
 function isDelivery(){return userRole() == 'delivery'; }
+function isInvited() { return userRole() == 'invited'; }
+function isManager() { return userRole() == 'manager'; }
 
 // Operación y campos
 function isCreate() { return !exists(resource.path); }
