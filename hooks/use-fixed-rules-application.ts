@@ -2,6 +2,11 @@ import { useMemo } from "react"
 import { ShiftAssignment, EmployeeFixedRule } from "@/lib/types"
 import { getDay, parseISO, isWithinInterval } from "date-fns"
 
+type FixedRuleResult =
+  | { mode: "RULE"; assignments: ShiftAssignment[] }
+  | { mode: "OVERRIDE"; assignments: ShiftAssignment[] }
+  | { mode: "NONE" }
+
 interface UseFixedRulesApplicationProps {
   fixedRules: EmployeeFixedRule[]
   assignments: Record<string, Record<string, ShiftAssignment[] | string[]>>
@@ -13,6 +18,10 @@ export function useFixedRulesApplication({
   assignments,
   shifts
 }: UseFixedRulesApplicationProps) {
+  
+  // NOTA: Por ahora se deja filtrado por cada celda.
+  // TODO: Evaluar indexado por día (rulesByDay) si hay problemas de performance
+  // con muchas reglas (ej: >100 empleados con reglas múltiples)
   
   // Obtener reglas válidas para una fecha específica
   const getValidRulesForDate = useMemo(() => {
@@ -35,23 +44,29 @@ export function useFixedRulesApplication({
 
   // Aplicar reglas fijas a las asignaciones
   const applyFixedRules = useMemo(() => {
-    return (date: string, employeeId: string) => {
+    return (date: string, employeeId: string): FixedRuleResult => {
       const validRules = getValidRulesForDate(date)
       const employeeRule = validRules.find(rule => rule.employeeId === employeeId)
       
-      if (!employeeRule) return null
+      if (!employeeRule) return { mode: "NONE" }
       
       // Si ya hay una asignación manual (override), no aplicar la regla
       const currentAssignments = assignments[date]?.[employeeId]
       if (currentAssignments && Array.isArray(currentAssignments) && currentAssignments.length > 0) {
+        // Convertir string[] a ShiftAssignment[] si es necesario
+        const normalizedCurrent = Array.isArray(currentAssignments) 
+          ? currentAssignments.map(a => typeof a === 'string' ? { type: "shift" as const, shiftId: a } : a)
+          : []
+          
         // Verificar si es un override (diferente de lo que dictaría la regla)
         const ruleAssignments = getRuleAssignments(employeeRule, shifts)
-        if (!areAssignmentsEqual(currentAssignments, ruleAssignments)) {
-          return { isOverride: true, originalAssignments: currentAssignments }
+        if (!areAssignmentsEqual(normalizedCurrent, ruleAssignments)) {
+          return { mode: "OVERRIDE", assignments: normalizedCurrent }
         }
       }
       
-      return getRuleAssignments(employeeRule, shifts)
+      const ruleAssignments = getRuleAssignments(employeeRule, shifts)
+      return { mode: "RULE", assignments: ruleAssignments }
     }
   }, [getValidRulesForDate, assignments, shifts])
 
@@ -68,28 +83,35 @@ export function useFixedRulesApplication({
         return false
       }
       
+      // Normalizar asignaciones actuales
+      const normalizedCurrent = currentAssignments.map(a => typeof a === 'string' ? { type: "shift" as const, shiftId: a } : a)
+      
       const ruleAssignments = getRuleAssignments(employeeRule, shifts)
-      return !areAssignmentsEqual(currentAssignments, ruleAssignments)
+      return !areAssignmentsEqual(normalizedCurrent, ruleAssignments)
     }
   }, [getValidRulesForDate, assignments, shifts])
 
   // Obtener asignaciones con reglas aplicadas
   const getAssignmentsWithRules = useMemo(() => {
-    return (date: string, employeeId: string) => {
+    return (date: string, employeeId: string): ShiftAssignment[] => {
       const ruleResult = applyFixedRules(date, employeeId)
       
-      if (ruleResult && typeof ruleResult === 'object' && 'isOverride' in ruleResult) {
+      if (ruleResult.mode === "OVERRIDE") {
         // Es un override, devolver las asignaciones originales
-        return ruleResult.originalAssignments
+        return ruleResult.assignments
       }
       
-      if (ruleResult) {
+      if (ruleResult.mode === "RULE") {
         // Aplicar regla
-        return ruleResult
+        return ruleResult.assignments
       }
       
-      // Sin regla, devolver asignaciones actuales
-      return assignments[date]?.[employeeId] || []
+      // Sin regla, devolver asignaciones actuales (normalizadas)
+      const currentAssignments = assignments[date]?.[employeeId]
+      if (currentAssignments && Array.isArray(currentAssignments)) {
+        return currentAssignments.map(a => typeof a === 'string' ? { type: "shift" as const, shiftId: a } : a)
+      }
+      return []
     }
   }, [applyFixedRules, assignments])
 
@@ -125,23 +147,23 @@ function getRuleAssignments(rule: EmployeeFixedRule, shifts: any[]): ShiftAssign
 }
 
 // Función auxiliar para comparar asignaciones
+// TODO: Evaluar si es suficiente para doble turno, franco, medio turno
 function areAssignmentsEqual(
-  assignments1: ShiftAssignment[] | string[],
+  assignments1: ShiftAssignment[],
   assignments2: ShiftAssignment[]
 ): boolean {
-  // Convertir string[] a ShiftAssignment[] si es necesario
-  const normalized1 = Array.isArray(assignments1) 
-    ? assignments1.map(a => typeof a === 'string' ? { type: "shift" as const, shiftId: a } : a)
-    : []
+  if (assignments1.length !== assignments2.length) return false
   
-  if (normalized1.length !== assignments2.length) return false
-  
-  return normalized1.every((assignment, index) => {
+  return assignments1.every((assignment, index) => {
     const other = assignments2[index]
     if (assignment.type !== other.type) return false
     if ('shiftId' in assignment && 'shiftId' in other && assignment.shiftId !== other.shiftId) return false
     if ('startTime' in assignment && 'startTime' in other && assignment.startTime !== other.startTime) return false
     if ('endTime' in assignment && 'endTime' in other && assignment.endTime !== other.endTime) return false
+    if ('startTime2' in assignment && 'startTime2' in other && assignment.startTime2 !== other.startTime2) return false
+    if ('endTime2' in assignment && 'endTime2' in other && assignment.endTime2 !== other.endTime2) return false
+    if ('texto' in assignment && 'texto' in other && assignment.texto !== other.texto) return false
+    if ('licenciaType' in assignment && 'licenciaType' in other && assignment.licenciaType !== other.licenciaType) return false
     return true
   })
 }

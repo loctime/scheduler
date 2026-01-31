@@ -404,7 +404,8 @@ export interface ConversacionGrupo {
 export interface EmployeeFixedRule {
   id: string
   employeeId: string
-  ownerId: string
+  ownerId: string // ID de la empresa/cuenta dueña
+  createdBy: string // ID del usuario que creó la regla
   dayOfWeek: 0 | 1 | 2 | 3 | 4 | 5 | 6 // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
   type: "SHIFT" | "OFF"
   shiftId?: string

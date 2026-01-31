@@ -84,7 +84,7 @@ export function useEmployeeFixedRules({ ownerId, employeeId }: UseEmployeeFixedR
       
       const ruleDataWithTimestamps = {
         ...ruleData,
-        ownerId,
+        ownerId, // ID de la empresa/cuenta
         updatedAt: serverTimestamp()
       }
 
@@ -102,6 +102,7 @@ export function useEmployeeFixedRules({ ownerId, employeeId }: UseEmployeeFixedR
         const newRule = {
           ...ruleDataWithTimestamps,
           id: newRuleRef.id,
+          createdBy: ruleData.createdBy, // ID del usuario que crea
           createdAt: serverTimestamp()
         }
         

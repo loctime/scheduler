@@ -37,7 +37,7 @@ export function FixedRuleModal({
   const [selectedShiftId, setSelectedShiftId] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   
-  const { createOrUpdateRule, getRuleForDay } = useEmployeeFixedRules({ 
+  const { createOrUpdateRule, deleteRule, getRuleForDay } = useEmployeeFixedRules({ 
     ownerId: user?.uid 
   })
   
@@ -68,7 +68,8 @@ export function FixedRuleModal({
     try {
       const ruleData: Omit<EmployeeFixedRule, "id" | "createdAt" | "updatedAt"> = {
         employeeId,
-        ownerId: user?.uid || "",
+        ownerId: user?.uid || "", // ID de la empresa/cuenta (misma que userId por ahora)
+        createdBy: user?.uid || "", // ID del usuario que crea
         dayOfWeek: dayOfWeek as 0 | 1 | 2 | 3 | 4 | 5 | 6,
         type: ruleType,
         shiftId: ruleType === "SHIFT" ? selectedShiftId : undefined,
@@ -92,8 +93,10 @@ export function FixedRuleModal({
     
     setIsSubmitting(true)
     try {
-      // La eliminación se manejaría en el hook si es necesario
-      onClose()
+      const success = await deleteRule(existingRule.id)
+      if (success) {
+        onClose()
+      }
     } catch (error) {
       console.error("Error deleting rule:", error)
     } finally {
