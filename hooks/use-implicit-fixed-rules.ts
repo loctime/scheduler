@@ -175,7 +175,11 @@ export function useImplicitFixedRules({
     assignments: Record<string, ShiftAssignment[]>
   ): Promise<Horario | null> => {
     if (!db || !user) {
-      logger.error("[ImplicitFixedRules] No hay conexión a base de datos o usuario")
+      logger.error("[ImplicitFixedRules] No hay conexión a base de datos o usuario", {
+        hasDb: !!db,
+        hasUser: !!user,
+        userId: user?.uid
+      })
       return null
     }
 
@@ -184,6 +188,15 @@ export function useImplicitFixedRules({
       const weekEndStr = format(addDays(weekStartDate, 6), "yyyy-MM-dd")
       const userName = user?.displayName || user?.email || "Usuario desconocido"
       const userId = user?.uid || ""
+
+      logger.info("[ImplicitFixedRules] Intentando crear schedule", {
+        weekStart: weekStartStr,
+        employeeId,
+        userId,
+        assignmentsCount: Object.keys(assignments).length,
+        hasDb: !!db,
+        collection: COLLECTIONS.SCHEDULES
+      })
 
       // Crear assignments structure para el schedule
       const scheduleAssignments: Record<string, Record<string, ShiftAssignment[]>> = {}
@@ -208,13 +221,23 @@ export function useImplicitFixedRules({
         completada: false
       }
 
-      const scheduleRef = await setDoc(doc(collection(db, COLLECTIONS.SCHEDULES), weekStartStr), newScheduleData)
+      logger.debug("[ImplicitFixedRules] Datos a guardar:", {
+        documentId: weekStartStr,
+        collection: COLLECTIONS.SCHEDULES,
+        dataKeys: Object.keys(newScheduleData),
+        hasAssignments: Object.keys(scheduleAssignments).length > 0
+      })
+
+      const docRef = doc(collection(db, COLLECTIONS.SCHEDULES), weekStartStr)
+      await setDoc(docRef, newScheduleData)
+      
       const newSchedule = { id: weekStartStr, ...newScheduleData } as Horario
 
-      logger.info("[ImplicitFixedRules] Schedule creado con reglas fijas", {
+      logger.info("[ImplicitFixedRules] Schedule creado con éxito", {
         weekStart: weekStartStr,
         employeeId,
-        assignmentsCount: Object.keys(assignments).length
+        assignmentsCount: Object.keys(assignments).length,
+        documentId: weekStartStr
       })
 
       // Notificar que se creó un nuevo schedule
@@ -223,13 +246,34 @@ export function useImplicitFixedRules({
       }
 
       return newSchedule
-    } catch (error) {
-      logger.error("[ImplicitFixedRules] Error creando schedule:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo crear el horario automáticamente",
-        variant: "destructive"
+    } catch (error: any) {
+      logger.error("[ImplicitFixedRules] Error creando schedule:", {
+        error: error?.message || 'Unknown error',
+        errorCode: error?.code,
+        errorInfo: error?.errorInfo,
+        weekStart: format(weekStartDate, "yyyy-MM-dd"),
+        employeeId,
+        userId: user?.uid,
+        hasUser: !!user,
+        userEmail: user?.email,
+        collection: COLLECTIONS.SCHEDULES
       })
+
+      // Mensaje específico para errores de permisos
+      if (error?.code === 'permission-denied' || error?.message?.includes('Missing or insufficient permissions')) {
+        toast({
+          title: "Error de Permisos",
+          description: "No tienes permisos para crear horarios. Contacta al administrador.",
+          variant: "destructive"
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudo crear el horario automáticamente",
+          variant: "destructive"
+        })
+      }
+      
       return null
     }
   }, [db, user, onWeekScheduleCreated, toast])
