@@ -68,6 +68,26 @@ export function useImplicitFixedRules({
   }, [])
 
   /**
+   * Limpia campos undefined de los assignments para Firestore
+   */
+  const cleanAssignmentsForFirestore = useCallback((
+    assignments: ShiftAssignment[]
+  ): ShiftAssignment[] => {
+    return assignments.map(assignment => {
+      const cleaned: any = {}
+      
+      Object.entries(assignment).forEach(([key, value]) => {
+        // Solo incluir el campo si no es undefined
+        if (value !== undefined) {
+          cleaned[key] = value
+        }
+      })
+      
+      return cleaned as ShiftAssignment
+    })
+  }, [])
+
+  /**
    * Genera asignaciones basadas en reglas fijas para un empleado en una semana
    */
   const generateAssignmentsFromRules = useCallback((
@@ -84,13 +104,13 @@ export function useImplicitFixedRules({
 
       // Buscar regla fija para este empleado y día
       const rule = getRuleForDay(employeeId, dayOfWeek)
-      
       if (rule) {
         // Convertir regla a asignaciones
         const ruleAssignments = convertRuleToAssignments(rule, shifts)
         
         if (ruleAssignments.length > 0) {
-          assignments[dateStr] = ruleAssignments
+          // Limpiar campos undefined antes de guardar
+          assignments[dateStr] = cleanAssignmentsForFirestore(ruleAssignments)
           
           logger.info("[ImplicitFixedRules] Aplicando regla fija", {
             employeeId,
@@ -105,7 +125,7 @@ export function useImplicitFixedRules({
     }
 
     return assignments
-  }, [getRuleForDay, shifts])
+  }, [getRuleForDay, shifts, cleanAssignmentsForFirestore])
 
   /**
    * Convierte una regla fija a asignaciones con formato completo
@@ -121,14 +141,20 @@ export function useImplicitFixedRules({
     if (rule.type === "SHIFT" && rule.shiftId) {
       const shift = shifts.find(s => s.id === rule.shiftId)
       if (shift) {
-        return [{
+        const assignment: ShiftAssignment = {
           type: "shift",
           shiftId: rule.shiftId,
-          startTime: shift.startTime,
-          endTime: shift.endTime,
-          startTime2: shift.startTime2,
-          endTime2: shift.endTime2
-        }]
+          startTime: shift.startTime || "",
+          endTime: shift.endTime || ""
+        }
+
+        // Solo agregar segunda franja si existe en el turno
+        if (shift.startTime2 && shift.endTime2) {
+          assignment.startTime2 = shift.startTime2
+          assignment.endTime2 = shift.endTime2
+        }
+
+        return [assignment]
       } else {
         logger.warn("[ImplicitFixedRules] Turno no encontrado para regla", {
           ruleId: rule.id,
