@@ -111,7 +111,7 @@ export function EmployeeRow({
       onDrop={(e) => onDrop(e, employee.id)}
     >
       <td
-        className="border-r-2 border-black px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 md:py-2 text-xs sm:text-sm md:text-base font-medium text-foreground align-top"
+        className="border-r-2 border-black px-0.5 sm:px-0.5 md:px-1 py-1 sm:py-1.5 md:py-2 text-xs sm:text-sm md:text-base font-medium text-foreground align-top"
         style={
           separatorColor
             ? { backgroundColor: hexToRgba(separatorColor, 0.1) }
@@ -152,21 +152,21 @@ export function EmployeeRow({
           {/* FILA 2: Tabla de estadísticas */}
           {employeeStats && employeeStats[employee.id] && (
             <div className="text-sm text-muted-foreground">
-              <div className="grid grid-cols-[auto_48px_48px] divide-x divide-border">
+              <div className="grid grid-cols-[max-content_auto_auto] divide-x divide-border gap-0">
                 {/* Francos row */}
-                <div className="font-bold text-foreground pr-1">Francos</div>
-                <div className="font-semibold text-right px-1 border-t border-border">{formatStatValue(employeeStats[employee.id].francosSemana)}</div>
-                <div className="font-semibold text-right pl-1 border-t border-border">{formatStatValue(employeeStats[employee.id].francos)}</div>
+                <div className="font-bold text-foreground">Francos</div>
+                <div className="font-semibold text-right border-t border-border">{formatStatValue(employeeStats[employee.id].francosSemana)}</div>
+                <div className="font-semibold text-right border-t border-border">{formatStatValue(employeeStats[employee.id].francos)}</div>
                 
                 {/* Horas row */}
-                <div className="font-bold text-foreground pr-1 border-t border-border">Horas</div>
-                <div className="font-semibold text-right px-1 border-t border-border">{formatStatValue(employeeStats[employee.id].horasSemana)}h</div>
-                <div className="font-semibold text-right pl-1 border-t border-border">{formatStatValue(employeeStats[employee.id].horasComputablesMes)}h</div>
+                <div className="font-bold text-foreground border-t border-border">Horas</div>
+                <div className="font-semibold text-right border-t border-border">{formatStatValue(employeeStats[employee.id].horasSemana)}h</div>
+                <div className="font-semibold text-right border-t border-border">{formatStatValue(employeeStats[employee.id].horasComputablesMes)}h</div>
                 
                 {/* Extras row */}
-                <div className="font-bold text-foreground pr-1 border-t border-border">Extras</div>
-                <div className="font-semibold text-right px-1 border-t border-border">{formatStatValue(employeeStats[employee.id].horasExtrasSemana)}h</div>
-                <div className="font-semibold text-right pl-1 border-t border-border">{formatStatValue(employeeStats[employee.id].horasExtrasMes)}h</div>
+                <div className="font-bold text-foreground border-t border-border">Extras</div>
+                <div className="font-semibold text-right border-t border-border">{formatStatValue(employeeStats[employee.id].horasExtrasSemana)}h</div>
+                <div className="font-semibold text-right border-t border-border">{formatStatValue(employeeStats[employee.id].horasExtrasMes)}h</div>
               </div>
             </div>
           )}
