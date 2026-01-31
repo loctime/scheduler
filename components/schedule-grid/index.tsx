@@ -1,7 +1,7 @@
 "use client"
 
 import React, { memo, useMemo, useCallback, useState } from "react"
-import { format } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 import { Card } from "@/components/ui/card"
 import { Empleado, Turno, Horario, HistorialItem, ShiftAssignment, MedioTurno } from "@/lib/types"
@@ -22,6 +22,8 @@ import { ScheduleGridMobile } from "./components/schedule-grid-mobile"
 import { hexToRgba } from "./utils/schedule-grid-utils"
 import type { GridItem } from "./hooks/use-schedule-grid-data"
 import { usePatternSuggestions } from "@/hooks/use-pattern-suggestions"
+import { useEmployeeFixedRules } from "@/hooks/use-employee-fixed-rules"
+import { FixedRuleModal } from "./components/fixed-rule-modal"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
@@ -86,6 +88,12 @@ export const ScheduleGrid = memo(function ScheduleGrid({
 }: ScheduleGridProps) {
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
   const [cellUndoHistory, setCellUndoHistory] = useState<Map<string, ShiftAssignment[]>>(new Map())
+  const [fixedRuleModalOpen, setFixedRuleModalOpen] = useState(false)
+  const [fixedRuleModalData, setFixedRuleModalData] = useState<{
+    employeeId: string
+    employeeName: string
+    date: Date
+  } | null>(null)
 
   // Intentar obtener user del contexto si no se proporciona como prop
   // Usar useContext directamente para evitar el error si no hay DataProvider
@@ -97,6 +105,11 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   const { toast } = useToast()
   const isMobile = useIsMobile()
   const { updateEmployeeOrder, addSeparator, updateSeparator, deleteSeparator } = useEmployeeOrder()
+
+  // Hook para reglas fijas
+  const { hasFixedRule, getRuleForDay } = useEmployeeFixedRules({ 
+    ownerId: user?.uid 
+  })
 
   // Combinar empleados actuales con snapshot cuando el horario está completado
   const employeesToUse = useMemo(() => {
@@ -328,7 +341,24 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     [onAssignmentUpdate, onShiftUpdate, schedule?.id, saveCellState]
   )
 
-  // Función para limpiar todas las asignaciones de un empleado para toda la semana
+  // Función para manejar el toggle de reglas fijas
+  const handleToggleFixed = useCallback(
+    (date: string, employeeId: string, dayOfWeek: number) => {
+      const employee = employeesToUse.find((emp) => emp.id === employeeId)
+      if (!employee) return
+
+      const dateObj = parseISO(date)
+      
+      setFixedRuleModalData({
+        employeeId,
+        employeeName: employee.name,
+        date: dateObj
+      })
+      setFixedRuleModalOpen(true)
+    },
+    [employeesToUse]
+  )
+
   const handleClearEmployeeRow = useCallback(
     async (employeeId: string) => {
       // Si hay una función externa optimizada, usarla
@@ -438,61 +468,6 @@ export const ScheduleGrid = memo(function ScheduleGrid({
       )
     },
     [config?.fixedSchedules]
-  )
-
-  const handleToggleFixed = useCallback(
-    async (date: string, employeeId: string, dayOfWeek: number) => {
-      if (!user || !db || readonly) return
-
-      try {
-        const configRef = doc(db, COLLECTIONS.CONFIG, user.uid)
-        const currentFixed = config?.fixedSchedules || []
-        const existingIndex = currentFixed.findIndex(
-          (fixed) => fixed.employeeId === employeeId && fixed.dayOfWeek === dayOfWeek
-        )
-
-        // Obtener las asignaciones actuales de esta celda
-        const currentAssignments = getEmployeeAssignments(employeeId, date)
-
-        let newFixed: Array<{ employeeId: string; dayOfWeek: number; assignments?: ShiftAssignment[] }>
-        if (existingIndex >= 0) {
-          // Remover si ya existe
-          newFixed = currentFixed.filter((_, index) => index !== existingIndex)
-          toast({
-            title: "Horario fijo desmarcado",
-            description: "Este horario ya no se recordará automáticamente.",
-          })
-        } else {
-          // Agregar si no existe, guardando las asignaciones actuales
-          newFixed = [...currentFixed, { 
-            employeeId, 
-            dayOfWeek,
-            assignments: currentAssignments.length > 0 ? currentAssignments : undefined
-          }]
-          toast({
-            title: "Horario fijo marcado",
-            description: currentAssignments.length > 0 
-              ? "Este horario se recordará para futuras semanas."
-              : "Este horario se recordará cuando tenga asignaciones.",
-          })
-        }
-
-        await updateDoc(configRef, {
-          fixedSchedules: newFixed,
-          updatedAt: serverTimestamp(),
-          updatedBy: user.uid,
-          updatedByName: user.displayName || user.email || "Usuario",
-        })
-      } catch (error: any) {
-        console.error("Error al actualizar horario fijo:", error)
-        toast({
-          title: "Error",
-          description: "No se pudo actualizar el horario fijo",
-          variant: "destructive",
-        })
-      }
-    },
-    [user, db, readonly, config?.fixedSchedules, toast, getEmployeeAssignments]
   )
 
   // Preparar datos de días para vista móvil
@@ -640,6 +615,23 @@ export const ScheduleGrid = memo(function ScheduleGrid({
           </table>
         </div>
       </Card>
+      
+      {/* Modal para reglas fijas */}
+      {fixedRuleModalOpen && fixedRuleModalData && (
+        <FixedRuleModal
+          isOpen={fixedRuleModalOpen}
+          onClose={() => {
+            setFixedRuleModalOpen(false)
+            setFixedRuleModalData(null)
+          }}
+          employeeId={fixedRuleModalData.employeeId}
+          employeeName={fixedRuleModalData.employeeName}
+          date={fixedRuleModalData.date}
+          shifts={shifts}
+          user={user}
+        />
+      )}
+      
       {/* El selector de turnos ahora se muestra inline en la celda seleccionada,
           así que ya no usamos el modal ShiftSelectorPopover */}
     </>

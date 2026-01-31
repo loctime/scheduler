@@ -59,4 +59,5 @@ export const COLLECTIONS = {
   GROUPS: getCollectionPath("groups"),
   CONVERSACIONES: getCollectionPath("conversaciones"),
   MENSAJES: getCollectionPath("mensajes"),
+  EMPLOYEE_FIXED_RULES: getCollectionPath("employee_fixed_rules"),
 } as const

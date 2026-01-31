@@ -494,6 +494,15 @@ export function ScheduleCell({
             mediosTurnos={mediosTurnos}
           />
         </div>
+        
+        {/* Icono de regla fija */}
+        {hasFixedSchedule && (
+          <div className="absolute top-1 right-1 z-10">
+            <div className="flex h-5 w-5 items-center justify-center rounded bg-blue-500/90 text-white shadow-sm" title="Regla fija">
+              <Lock className="h-3 w-3" />
+            </div>
+          </div>
+        )}
       </td>
         </ContextMenuTrigger>
         <ContextMenuContent>
@@ -623,6 +632,20 @@ export function ScheduleCell({
                   <ContextMenuItem onClick={() => onCellUndo?.()}>
                     <RotateCcw className="mr-2 h-4 w-4" />
                     Deshacer cambio en esta celda
+                  </ContextMenuItem>
+                </>
+              )}
+              
+              {/* Opción de regla fija */}
+              {onToggleFixed && (
+                <>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem onClick={() => {
+                    const dayOfWeek = getDay(parseISO(date))
+                    onToggleFixed(date, employeeId, dayOfWeek)
+                  }}>
+                    <Lock className="mr-2 h-4 w-4" />
+                    {hasFixedSchedule ? "Editar regla fija" : "Crear regla fija"}
                   </ContextMenuItem>
                 </>
               )}

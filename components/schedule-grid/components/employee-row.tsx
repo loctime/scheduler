@@ -189,6 +189,9 @@ export function EmployeeRow({
         const suggestion = getSuggestion ? getSuggestion(employee.id, dayOfWeek) : null
         const hasFixedSchedule = suggestion?.isFixed === true
         const isManuallyFixedCell = isManuallyFixed ? isManuallyFixed(employee.id, dayOfWeek) : false
+        
+        // Verificar si tiene una regla fija nueva
+        const hasNewFixedRule = false // Se implementará con el nuevo sistema
 
         return (
           <ScheduleCell

@@ -496,6 +496,15 @@ export function useWeekActions({
           const employee = employees.find((e) => e.id === fixed.employeeId)
           if (!employee) continue
 
+          // Verificar si ya hay una asignación en esta celda (no sobrescribir)
+          if (weekSchedule?.assignments?.[dateStr]?.[fixed.employeeId]) {
+            const currentAssignments = weekSchedule.assignments[dateStr][fixed.employeeId]
+            if (Array.isArray(currentAssignments) && currentAssignments.length > 0) {
+              // Ya hay asignaciones, omitir este empleado en este día
+              continue
+            }
+          }
+
           let assignmentsToApply: ShiftAssignment[] | null = null
 
           // 1. Primero verificar si hay asignaciones guardadas cuando se marcó como fijo

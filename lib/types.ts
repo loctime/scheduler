@@ -400,3 +400,17 @@ export interface ConversacionGrupo {
   updatedAt?: any
   activa: boolean
 }
+
+export interface EmployeeFixedRule {
+  id: string
+  employeeId: string
+  ownerId: string
+  dayOfWeek: 0 | 1 | 2 | 3 | 4 | 5 | 6 // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
+  type: "SHIFT" | "OFF"
+  shiftId?: string
+  startDate?: string
+  endDate?: string
+  priority: number
+  createdAt: any
+  updatedAt: any
+}
