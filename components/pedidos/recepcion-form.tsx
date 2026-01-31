@@ -10,6 +10,8 @@ import { Package, Check, AlertTriangle, Plus, Minus } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { cn } from "@/lib/utils"
 import type { Recepcion } from "@/lib/types"
+import { validarRecepcion, calcularCantidadDevolucion } from "@/src/domain/pedidos/recepcionRules"
+import { prepararRecepcion } from "@/src/domain/pedidos/prepararRecepcion"
 
 interface RecepcionFormProps {
   productosEnviados: Array<{
@@ -90,14 +92,8 @@ export function RecepcionForm({
         }
       }
       
-      // Si se marca devolución, validar que hay faltante (recibido < enviada) y habilitar comentario
+      // Si se marca devolución, habilitar comentario automáticamente
       if (field === "esDevolucion" && value === true) {
-        const cantidadRecibida = currentData.cantidadRecibida
-        // No permitir marcar devolución si recibido >= enviada (no hay productos a devolver)
-        if (cantidadRecibida >= producto.cantidadEnviada) {
-          return prev
-        }
-        // Habilitar comentario automáticamente cuando se marca como devolución
         setComentariosHabilitados(prev => ({
           ...prev,
           [productoId]: true
@@ -114,92 +110,36 @@ export function RecepcionForm({
     })
   }
   
-  // Calcular cantidad a devolver
-  const calcularCantidadDevolucion = (producto: typeof productosEnviados[0], data: typeof productosRecepcion[string]) => {
-    if (!data.esDevolucion) return 0
-    const diferencia = producto.cantidadEnviada - data.cantidadRecibida
-    if (diferencia > 0) {
-      // Faltante: devolver lo que falta
-      return diferencia
-    } else if (diferencia < 0) {
-      // Excedente: devolver el excedente
-      return Math.abs(diferencia)
-    }
-    return 0
-  }
-  
-  // Validar si se puede marcar como devolución
-  // Solo se puede marcar si hay faltante (recibido < enviada)
-  // Si recibido >= enviada, no hay productos a devolver
-  const puedeMarcarDevolucion = (producto: typeof productosEnviados[0], data: typeof productosRecepcion[string]) => {
-    return data.cantidadRecibida < producto.cantidadEnviada
-  }
-  
-  // Validar formulario antes de confirmar
-  const validarFormulario = (): string | null => {
-    for (const producto of productosEnviados) {
-      const data = productosRecepcion[producto.productoId] || {
-        cantidadRecibida: producto.cantidadEnviada,
-        esDevolucion: false,
-      }
-      
-      // Si está marcado como devolución, debe tener comentario
-      if (data.esDevolucion && (!data.observaciones || !data.observaciones.trim())) {
-        return `El producto "${producto.productoNombre}" está marcado como devolución y requiere un comentario obligatorio.`
-      }
-    }
-    return null
-  }
+  // Estado para errores de validación del dominio
+  const [erroresValidacion, setErroresValidacion] = useState<Array<{productoId: string, mensaje: string}>>([])
 
   const handleConfirmar = async () => {
-    // Validar formulario
-    const error = validarFormulario()
-    if (error) {
-      // Lanzar error para que el componente padre lo maneje
-      throw new Error(error)
+    // Convertir al formato esperado por el dominio
+    const recepcionInput: Record<string, { productoId: string, cantidadRecibida: number, esDevolucion?: boolean, observaciones?: string }> = {}
+    
+    Object.entries(productosRecepcion).forEach(([productoId, data]) => {
+      recepcionInput[productoId] = {
+        productoId,
+        cantidadRecibida: data.cantidadRecibida,
+        esDevolucion: data.esDevolucion || false,
+        observaciones: data.observaciones
+      }
+    })
+
+    // Usar función del dominio para preparar recepción
+    const resultado = prepararRecepcion(productosEnviados, recepcionInput)
+    
+    if (!resultado.ok) {
+      setErroresValidacion(resultado.errores)
+      throw new Error(resultado.errores.map(e => e.mensaje).join(". "))
     }
     
-    const productos = productosEnviados.map((p) => {
-      const data = productosRecepcion[p.productoId] || {
-        cantidadRecibida: p.cantidadEnviada,
-        esDevolucion: false,
-      }
-      
-      // Calcular cantidad a devolver
-      const cantidadDevolucion = calcularCantidadDevolucion(p, data)
-      
-      // Construir objeto de producto (sin campos undefined)
-      // Validar que productoNombre esté presente y sea válido
-      const nombreProducto = (p.productoNombre && p.productoNombre.trim()) || "Producto sin nombre"
-      
-      const producto: any = {
-        productoId: p.productoId,
-        productoNombre: nombreProducto,
-        cantidadEnviada: p.cantidadEnviada,
-        cantidadRecibida: data.cantidadRecibida,
-        estado: "ok", // Siempre "ok" por defecto
-        esDevolucion: data.esDevolucion || false,
-      }
-      
-      // Solo incluir cantidadDevolucion si es mayor a 0
-      if (cantidadDevolucion > 0) {
-        producto.cantidadDevolucion = cantidadDevolucion
-      }
-      
-      // Comentario es obligatorio si hay devolución
-      if (data.esDevolucion) {
-        producto.observaciones = data.observaciones?.trim() || ""
-      } else if (data.observaciones && data.observaciones.trim()) {
-        producto.observaciones = data.observaciones.trim()
-      }
-      
-      return producto
-    })
+    setErroresValidacion([])
 
     await onConfirmar({
       pedidoId: "", // Se completará en el componente padre
       fecha: new Date(),
-      productos,
+      productos: resultado.productos,
       esParcial: esParcial || false,
       completada: true,
       observaciones: observacionesGenerales.trim() || undefined,
@@ -436,7 +376,7 @@ export function RecepcionForm({
                       <Checkbox
                         id={`devolucion-${producto.productoId}`}
                         checked={data.esDevolucion}
-                        disabled={!puedeMarcarDevolucion(producto, data)}
+                        disabled={!data.esDevolucion && data.cantidadRecibida >= producto.cantidadEnviada}
                         onCheckedChange={(checked) =>
                           updateProducto(
                             producto.productoId,
@@ -450,12 +390,21 @@ export function RecepcionForm({
                         htmlFor={`devolucion-${producto.productoId}`}
                         className={cn(
                           "text-sm font-medium cursor-pointer",
-                          !puedeMarcarDevolucion(producto, data) && "text-muted-foreground cursor-not-allowed"
+                          !data.esDevolucion && data.cantidadRecibida >= producto.cantidadEnviada && "text-muted-foreground cursor-not-allowed"
                         )}
                       >
                         Marcar como devolución
                       </Label>
                     </div>
+
+                    {/* Mostrar errores de validación del dominio */}
+                    {erroresValidacion
+                      .filter(error => error.productoId === producto.productoId)
+                      .map((error, index) => (
+                        <div key={index} className="mt-2 p-2 rounded bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
+                          <p className="text-xs text-red-800 dark:text-red-200">{error.mensaje}</p>
+                        </div>
+                      ))}
                   </div>
 
                   {/* Columna Recibido: solo botón - */}
