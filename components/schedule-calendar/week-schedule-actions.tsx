@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Loader2, Copy, Trash2, CheckCircle2, Circle, Download, Sparkles, ChevronDown, Clipboard, Smartphone } from "lucide-react"
+import { Loader2, Copy, Trash2, CheckCircle2, Circle, Download, Sparkles, ChevronDown, Clipboard, Smartphone, Upload } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,8 +41,8 @@ interface WeekScheduleActionsProps {
   onCopyCurrentWeek?: (weekStartDate: Date) => void
   onPasteCopiedWeek?: (targetWeekStartDate: Date) => Promise<void>
   weekStartDate: Date
-  onPublishPwa?: () => Promise<void> | void
-  isPublishingPwa?: boolean
+  onPublishSchedule?: () => Promise<void> | void
+  isPublishingSchedule?: boolean
 }
 
 export function WeekScheduleActions({
@@ -63,8 +63,8 @@ export function WeekScheduleActions({
   onCopyCurrentWeek,
   onPasteCopiedWeek,
   weekStartDate,
-  onPublishPwa,
-  isPublishingPwa = false,
+  onPublishSchedule,
+  isPublishingSchedule = false,
 }: WeekScheduleActionsProps) {
   const [confirmCopyDialogOpen, setConfirmCopyDialogOpen] = useState(false)
   const [confirmClearDialogOpen, setConfirmClearDialogOpen] = useState(false)
@@ -150,11 +150,11 @@ export function WeekScheduleActions({
     }
   }, [copiedWeekData, weekActions, weekStartDate])
 
-  const handlePublishPwa = useCallback(() => {
-    if (onPublishPwa) {
-      onPublishPwa()
+  const handlePublishSchedule = useCallback(() => {
+    if (onPublishSchedule) {
+      onPublishSchedule()
     }
-  }, [onPublishPwa])
+  }, [onPublishSchedule])
 
 
   return (
@@ -194,38 +194,19 @@ export function WeekScheduleActions({
             <Button
               variant="outline"
               size="sm"
-              onClick={handleCopyPreviousWeek}
-              disabled={weekActions.isCopying || exporting || weekActions.isClearing || weekActions.isSuggesting || weekActions.isPasting}
-              aria-label="Copiar semana anterior"
-            >
-              {weekActions.isCopying ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Copiando...
-                </>
-              ) : (
-                <>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copiar semana anterior
-                </>
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
               onClick={handleSuggestSchedules}
               disabled={weekActions.isSuggesting || exporting || weekActions.isCopying || weekActions.isClearing || weekActions.isPasting}
-              aria-label="Sugerir horarios fijos"
+              aria-label="Aplicar horarios fijos"
             >
               {weekActions.isSuggesting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Sugiriendo...
+                  Aplicando...
                 </>
               ) : (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  Sugerir
+                  Aplicar Fijos
                 </>
               )}
             </Button>
@@ -271,12 +252,12 @@ export function WeekScheduleActions({
                 {isCompleted ? (
                   <>
                     <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Listo
+                    LISTO
                   </>
                 ) : (
                   <>
                     <Circle className="mr-2 h-4 w-4" />
-                    Marcar como listo
+                    LISTO
                   </>
                 )}
               </>
@@ -338,27 +319,57 @@ export function WeekScheduleActions({
             </DropdownMenu>
           </div>
         )}
-        {onPublishPwa && (
+        {onPublishSchedule && (
           <Button
-            variant="outline"
+            variant="default"
             size="sm"
-            onClick={handlePublishPwa}
-            disabled={isPublishingPwa || exporting || weekActions.isCopying || weekActions.isClearing || weekActions.isSuggesting || weekActions.isPasting}
-            aria-label="Actualizar PWA de horarios"
+            onClick={handlePublishSchedule}
+            disabled={isPublishingSchedule || exporting || weekActions.isCopying || weekActions.isClearing || weekActions.isSuggesting || weekActions.isPasting}
+            aria-label="Publicar horario"
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            {isPublishingPwa ? (
+            {isPublishingSchedule ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Actualizando PWA...
+                Publicando...
               </>
             ) : (
               <>
-                <Smartphone className="mr-2 h-4 w-4" />
-                Actualizar PWA de horarios
+                <Upload className="mr-2 h-4 w-4" />
+                Publicar horario
               </>
             )}
           </Button>
         )}
+
+        {/* Menú secundario para acciones técnicas */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              aria-label="Más acciones"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={handleCopyPreviousWeek}
+              disabled={weekActions.isCopying || exporting || weekActions.isClearing || weekActions.isSuggesting || weekActions.isPasting}
+            >
+              <Copy className="mr-2 h-4 w-4" />
+              Copiar semana anterior
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setConfirmClearDialogOpen(true)}
+              disabled={weekActions.isClearing || exporting || weekActions.isCopying || weekActions.isSuggesting || weekActions.isPasting}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Limpiar semana
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Diálogos de confirmación para semanas completadas */}
