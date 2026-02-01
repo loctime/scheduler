@@ -1,18 +1,21 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronLeft, ChevronRight, Calendar, Clock } from "lucide-react"
+import { ChevronLeft, ChevronRight, Calendar, Clock, Eye, Globe, CheckCircle, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DateDisplay, WeekDisplay } from "@/components/ui/date-display"
+import { WeekRangeDisplay } from "@/components/ui/week-range-display"
+import { Badge } from "@/components/ui/badge"
+import { useData } from "@/contexts/data-context"
 import { useWeekNavigation, type WeekData } from "@/hooks/use-week-navigation"
 import { useSettings } from "@/hooks/use-settings"
 import { useWeekData } from "@/hooks/use-week-data"
 import { useToast } from "@/hooks/use-toast"
 
 export default function HorarioPage() {
-  const { settings, isLoading: settingsLoading } = useSettings()
+  const { settings, isLoading: settingsLoading, updatePublishedWeek } = useSettings()
   const { 
     currentWeek, 
     isLoading: weekLoading, 
@@ -22,9 +25,31 @@ export default function HorarioPage() {
   } = useWeekNavigation(settings?.publishedWeekId)
   
   const { weekData, isLoading: dataLoading, error } = useWeekData(currentWeek?.weekId || null)
+  const { userData } = useData()
   const { toast } = useToast()
 
   const isLoading = settingsLoading || weekLoading || dataLoading
+
+  const isAdmin = userData?.role === 'admin'
+  const isCurrentWeekPublished = currentWeek?.weekId === settings?.publishedWeekId
+
+  const handlePublishWeek = async () => {
+    if (!currentWeek?.weekId) return
+    
+    try {
+      await updatePublishedWeek(currentWeek.weekId)
+      toast({
+        title: "Semana publicada",
+        description: `La semana ${currentWeek.weekId} ahora es la semana publicada.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo publicar la semana.",
+        variant: "destructive"
+      })
+    }
+  }
 
   useEffect(() => {
     if (error) {
@@ -82,50 +107,105 @@ export default function HorarioPage() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      {/* Header con navegación */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight">Horario Semanal</h1>
-          {currentWeek ? (
-            <WeekDisplay 
-              weekId={currentWeek.weekId}
-              startDate={currentWeek.startDate}
-              endDate={currentWeek.endDate}
-              className="text-muted-foreground"
-            />
-          ) : (
-            <p className="text-muted-foreground">Selecciona una semana</p>
-          )}
-        </div>
-        
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => handleNavigation('previous')}
-            disabled={!currentWeek}
-            aria-label="Semana anterior"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          
-          <div className="flex items-center space-x-2 px-3 py-2 border rounded-md bg-background">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">
-              {currentWeek ? currentWeek.weekId : "Sin semana"}
-            </span>
+      {/* Header Principal - Estilo Dashboard */}
+      <div className="space-y-4">
+        {/* Navegación y título */}
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold tracking-tight">Horario Semanal</h1>
+            {currentWeek && (
+              <div className="flex items-center space-x-2 text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                <WeekRangeDisplay 
+                  startDate={currentWeek.startDate}
+                  endDate={currentWeek.endDate}
+                  className="text-lg font-medium"
+                />
+              </div>
+            )}
+            {userData?.grupoIds && userData.grupoIds.length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Empresa activa: {userData.grupoIds.join(', ')}
+              </p>
+            )}
           </div>
           
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => handleNavigation('next')}
-            disabled={!currentWeek}
-            aria-label="Semana siguiente"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleNavigation('previous')}
+              disabled={!currentWeek}
+              aria-label="Semana anterior"
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Semana anterior
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleNavigation('next')}
+              disabled={!currentWeek}
+              aria-label="Semana siguiente"
+            >
+              Semana siguiente
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
         </div>
+
+        {/* UI de Estado - Chips */}
+        {currentWeek && (
+          <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/50 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <Eye className="h-4 w-4 text-blue-600" />
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
+                Semana visualizada: {currentWeek.weekId}
+              </Badge>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Globe className="h-4 w-4 text-green-600" />
+              <Badge 
+                variant={isCurrentWeekPublished ? "default" : "secondary"}
+                className={isCurrentWeekPublished 
+                  ? "bg-green-100 text-green-800 border-green-200" 
+                  : "bg-orange-100 text-orange-800 border-orange-200"
+                }
+              >
+                {isCurrentWeekPublished && <CheckCircle className="h-3 w-3 mr-1" />}
+                Semana publicada: {settings?.publishedWeekId || "No definida"}
+              </Badge>
+            </div>
+          </div>
+        )}
+
+        {/* Barra de Acciones */}
+        {currentWeek && isAdmin && (
+          <div className="flex items-center justify-between p-4 bg-background border rounded-lg">
+            <div className="flex items-center space-x-2">
+              <Upload className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">
+                {isCurrentWeekPublished 
+                  ? "Esta semana está publicada y visible para todos los usuarios."
+                  : "Esta semana no está publicada. Solo los administradores pueden verla."
+                }
+              </span>
+            </div>
+            
+            {!isCurrentWeekPublished && (
+              <Button
+                onClick={handlePublishWeek}
+                size="sm"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Publicar esta semana
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Información de la semana */}
