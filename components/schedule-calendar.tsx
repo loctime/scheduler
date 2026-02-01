@@ -617,7 +617,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         copiedWeekData={copiedWeekData}
         onCopyCurrentWeek={copyCurrentWeek}
         onPasteCopiedWeek={pasteCopiedWeek}
-        onPublishPwa={handlePublishPwa}
+        onPublishSchedule={handlePublishPwa}
       />
       </div>
     </>

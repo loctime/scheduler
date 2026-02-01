@@ -42,8 +42,8 @@ interface GeneralViewProps {
   copiedWeekData?: any
   onCopyCurrentWeek?: (weekStartDate: Date) => void
   onPasteCopiedWeek?: (targetWeekStartDate: Date) => Promise<void>
-  onPublishPwa?: (weekStartDate: Date, weekEndDate: Date) => Promise<void> | void
-  isPublishingPwa?: boolean
+  onPublishSchedule?: (weekStartDate: Date, weekEndDate: Date) => Promise<void> | void
+  isPublishingSchedule?: boolean
 }
 
 export function GeneralView({
@@ -72,8 +72,8 @@ export function GeneralView({
   copiedWeekData,
   onCopyCurrentWeek,
   onPasteCopiedWeek,
-  onPublishPwa,
-  isPublishingPwa,
+  onPublishSchedule,
+  isPublishingSchedule,
 }: GeneralViewProps) {
   // Create shift map for efficient lookup
   const shiftMap = useMemo(() => {
@@ -288,8 +288,8 @@ export function GeneralView({
               copiedWeekData={copiedWeekData}
               onCopyCurrentWeek={onCopyCurrentWeek}
               onPasteCopiedWeek={onPasteCopiedWeek}
-              onPublishPwa={onPublishPwa}
-              isPublishingPwa={isPublishingPwa}
+              onPublishSchedule={onPublishSchedule}
+              isPublishingSchedule={isPublishingSchedule}
             />
           )
         })}

@@ -52,8 +52,8 @@ interface WeekScheduleProps {
   copiedWeekData?: any
   onCopyCurrentWeek?: (weekStartDate: Date) => void
   onPasteCopiedWeek?: (targetWeekStartDate: Date) => Promise<void>
-  onPublishPwa?: (weekStartDate: Date, weekEndDate: Date) => Promise<void> | void
-  isPublishingPwa?: boolean
+  onPublishSchedule?: (weekStartDate: Date, weekEndDate: Date) => Promise<void> | void
+  isPublishingSchedule?: boolean
 }
 
 export function WeekSchedule({
@@ -85,8 +85,8 @@ export function WeekSchedule({
   copiedWeekData,
   onCopyCurrentWeek,
   onPasteCopiedWeek,
-  onPublishPwa,
-  isPublishingPwa = false,
+  onPublishSchedule,
+  isPublishingSchedule = false,
 }: WeekScheduleProps) {
   const weekStartDate = weekDays[0]
   const weekEndDate = weekDays[weekDays.length - 1]
@@ -215,8 +215,8 @@ export function WeekSchedule({
           onCopyCurrentWeek={onCopyCurrentWeek}
           onPasteCopiedWeek={onPasteCopiedWeek}
           weekStartDate={weekStartDate}
-          onPublishPwa={onPublishPwa ? () => onPublishPwa(weekStartDate, weekEndDate) : undefined}
-          isPublishingPwa={isPublishingPwa}
+          onPublishSchedule={onPublishSchedule ? () => onPublishSchedule(weekStartDate, weekEndDate) : undefined}
+          isPublishingSchedule={isPublishingSchedule}
         />
       </div>
       <CollapsibleContent
