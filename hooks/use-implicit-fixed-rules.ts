@@ -198,6 +198,64 @@ export function useImplicitFixedRules({
         collection: COLLECTIONS.SCHEDULES
       })
 
+      // VERIFICACIÓN DE ROLES ANTES DE INTENTAR CREAR
+      // Esto es para prevenir errores de permisos y dar mejor feedback
+      try {
+        const userDocRef = doc(db, COLLECTIONS.USERS, userId)
+        const userDoc = await getDoc(userDocRef)
+        
+        if (!userDoc.exists()) {
+          logger.error("[ImplicitFixedRules] Usuario no tiene documento en users collection", {
+            userId,
+            userEmail: user?.email
+          })
+          toast({
+            title: "Error de Configuración",
+            description: "Tu usuario no está configurado correctamente. Contacta al administrador.",
+            variant: "destructive"
+          })
+          return null
+        }
+
+        const userData = userDoc.data()
+        const userRole = userData?.role
+        
+        logger.debug("[ImplicitFixedRules] Datos del usuario verificados", {
+          userId,
+          userRole,
+          hasRole: !!userRole,
+          userDataKeys: Object.keys(userData || {})
+        })
+
+        // Verificar que el usuario tenga un rol válido
+        const validRoles = ['user', 'admin', 'maxdev', 'branch', 'factory', 'manager']
+        if (!userRole || !validRoles.includes(userRole)) {
+          logger.error("[ImplicitFixedRules] Usuario sin rol válido", {
+            userId,
+            userRole,
+            validRoles
+          })
+          toast({
+            title: "Error de Permisos",
+            description: "Tu usuario no tiene un rol válido asignado. Contacta al administrador.",
+            variant: "destructive"
+          })
+          return null
+        }
+
+      } catch (roleCheckError: any) {
+        logger.error("[ImplicitFixedRules] Error verificando rol del usuario", {
+          userId,
+          error: roleCheckError?.message || 'Unknown error'
+        })
+        toast({
+          title: "Error de Verificación",
+          description: "No se pudo verificar tu rol. Intenta recargar la página.",
+          variant: "destructive"
+        })
+        return null
+      }
+
       // Crear assignments structure para el schedule
       const scheduleAssignments: Record<string, Record<string, ShiftAssignment[]>> = {}
       
@@ -225,7 +283,8 @@ export function useImplicitFixedRules({
         documentId: weekStartStr,
         collection: COLLECTIONS.SCHEDULES,
         dataKeys: Object.keys(newScheduleData),
-        hasAssignments: Object.keys(scheduleAssignments).length > 0
+        hasAssignments: Object.keys(scheduleAssignments).length > 0,
+        createdBy: userId
       })
 
       const docRef = doc(collection(db, COLLECTIONS.SCHEDULES), weekStartStr)
@@ -237,7 +296,8 @@ export function useImplicitFixedRules({
         weekStart: weekStartStr,
         employeeId,
         assignmentsCount: Object.keys(assignments).length,
-        documentId: weekStartStr
+        documentId: weekStartStr,
+        createdBy: userId
       })
 
       // Notificar que se creó un nuevo schedule
@@ -263,7 +323,7 @@ export function useImplicitFixedRules({
       if (error?.code === 'permission-denied' || error?.message?.includes('Missing or insufficient permissions')) {
         toast({
           title: "Error de Permisos",
-          description: "No tienes permisos para crear horarios. Contacta al administrador.",
+          description: "No tienes permisos para crear horarios. Verifica que tu usuario esté configurado correctamente.",
           variant: "destructive"
         })
       } else {
