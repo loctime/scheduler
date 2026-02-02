@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react"
-import { format, subDays, addDays, getDay, parseISO } from "date-fns"
+import { format, subDays, addDays } from "date-fns"
 import { serverTimestamp, addDoc, collection } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
@@ -18,7 +18,7 @@ import {
   saveHistoryEntry,
   updateSchedulePreservingFields,
 } from "@/lib/firestore-helpers"
-import { getSuggestionForDay } from "@/lib/pattern-learning"
+import { useFixedRulesEngine } from "@/hooks/use-fixed-rules-engine"
 
 interface UseWeekActionsProps {
   weekDays: Date[]
@@ -67,6 +67,7 @@ export function useWeekActions({
   weekStartsOn = 1,
 }: UseWeekActionsProps): WeekActionsReturn {
   const { toast } = useToast()
+  const { buildSuggestedAssignmentsFromLegacyFixedSchedules } = useFixedRulesEngine()
   const [isCopying, setIsCopying] = useState(false)
   const [isClearing, setIsClearing] = useState(false)
   const [isSuggesting, setIsSuggesting] = useState(false)
@@ -470,9 +471,6 @@ export function useWeekActions({
       const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
       const weekEndStr = format(addDays(weekStartDate, 6), "yyyy-MM-dd")
 
-      // Aplicar horarios fijos
-      const suggestedAssignments: Record<string, Record<string, ShiftAssignment[]>> = {}
-      
       if (!config?.fixedSchedules || config.fixedSchedules.length === 0) {
         toast({
           title: "No hay horarios fijos",
@@ -482,91 +480,14 @@ export function useWeekActions({
         return
       }
 
-      // Para cada día de la semana
-      for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
-        const date = new Date(weekStartDate)
-        date.setDate(date.getDate() + dayOffset)
-        const dateStr = format(date, "yyyy-MM-dd")
-        const dayOfWeek = getDay(date)
-
-        // Buscar horarios fijos para este día
-        const fixedForDay = config.fixedSchedules.filter((fixed) => fixed.dayOfWeek === dayOfWeek)
-        
-        for (const fixed of fixedForDay) {
-          const employee = employees.find((e) => e.id === fixed.employeeId)
-          if (!employee) continue
-
-          // Verificar si ya hay una asignación en esta celda (no sobrescribir)
-          if (weekSchedule?.assignments?.[dateStr]?.[fixed.employeeId]) {
-            const currentAssignments = weekSchedule.assignments[dateStr][fixed.employeeId]
-            if (Array.isArray(currentAssignments) && currentAssignments.length > 0) {
-              // Ya hay asignaciones, omitir este empleado en este día
-              continue
-            }
-          }
-
-          let assignmentsToApply: ShiftAssignment[] | null = null
-
-          // 1. Primero verificar si hay asignaciones guardadas cuando se marcó como fijo
-          if (fixed.assignments && fixed.assignments.length > 0) {
-            assignmentsToApply = fixed.assignments
-          }
-          // 2. Si no, buscar sugerencia automática
-          else {
-            const suggestion = getSuggestionForDay(fixed.employeeId, dayOfWeek, allSchedules, weekStartStr)
-            if (suggestion && suggestion.assignments.length > 0) {
-              assignmentsToApply = suggestion.assignments
-            }
-          }
-
-          // 3. Si aún no hay, buscar en la última semana completada
-          if (!assignmentsToApply || assignmentsToApply.length === 0) {
-            const completedSchedules = allSchedules
-              .filter((s) => s.completada === true && s.weekStart && s.weekStart < weekStartStr)
-              .sort((a, b) => {
-                const dateA = a.weekStart || a.semanaInicio || ""
-                const dateB = b.weekStart || b.semanaInicio || ""
-                return dateB.localeCompare(dateA) // Más reciente primero
-              })
-
-            // Buscar en la última semana completada
-            for (const completedSchedule of completedSchedules) {
-              const completedWeekStart = parseISO(completedSchedule.weekStart || completedSchedule.semanaInicio)
-              const completedDate = new Date(completedWeekStart)
-              completedDate.setDate(completedDate.getDate() + dayOffset)
-              const completedDateStr = format(completedDate, "yyyy-MM-dd")
-              
-              const completedAssignments = completedSchedule.assignments[completedDateStr]
-              if (completedAssignments && completedAssignments[fixed.employeeId]) {
-                const normalized = normalizeAssignments(completedAssignments[fixed.employeeId])
-                if (normalized.length > 0) {
-                  assignmentsToApply = normalized
-                  break // Usar la primera semana completada que tenga asignaciones
-                }
-              }
-            }
-          }
-
-          // 4. Si aún no hay, buscar en la semana actual (si tiene asignaciones)
-          if ((!assignmentsToApply || assignmentsToApply.length === 0) && weekSchedule) {
-            const currentAssignments = weekSchedule.assignments[dateStr]
-            if (currentAssignments && currentAssignments[fixed.employeeId]) {
-              const normalized = normalizeAssignments(currentAssignments[fixed.employeeId])
-              if (normalized.length > 0) {
-                assignmentsToApply = normalized
-              }
-            }
-          }
-
-          // Aplicar si encontramos asignaciones
-          if (assignmentsToApply && assignmentsToApply.length > 0) {
-            if (!suggestedAssignments[dateStr]) {
-              suggestedAssignments[dateStr] = {}
-            }
-            suggestedAssignments[dateStr][fixed.employeeId] = assignmentsToApply
-          }
-        }
-      }
+      const suggestedAssignments = buildSuggestedAssignmentsFromLegacyFixedSchedules({
+        weekStartDate,
+        weekStartStr,
+        employees,
+        allSchedules,
+        weekSchedule,
+        fixedSchedules: config.fixedSchedules,
+      })
 
       if (Object.keys(suggestedAssignments).length === 0) {
         toast({
@@ -835,4 +756,3 @@ export function useWeekActions({
     handleSuggestSchedules,
   }
 }
-
