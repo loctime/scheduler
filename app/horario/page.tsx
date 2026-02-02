@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { DateDisplay, WeekDisplay } from "@/components/ui/date-display"
 import { WeekRangeDisplay } from "@/components/ui/week-range-display"
 import { Badge } from "@/components/ui/badge"
+import { PublicSchedulePublisher } from "@/components/public-schedule-publisher"
 import { useData } from "@/contexts/data-context"
 import { useWeekNavigation, type WeekData } from "@/hooks/use-week-navigation"
 import { useSettings } from "@/hooks/use-settings"
@@ -203,16 +204,24 @@ export default function HorarioPage() {
               </span>
             </div>
             
-            {!isCurrentWeekPublished && (
-              <Button
-                onClick={handlePublishWeek}
-                size="sm"
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Publicar esta semana
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {/* Botón de publicación pública */}
+              <PublicSchedulePublisher 
+                weekId={currentWeek.weekId} 
+                weekData={weekData}
+              />
+              
+              {!isCurrentWeekPublished && (
+                <Button
+                  onClick={handlePublishWeek}
+                  size="sm"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Publicar esta semana
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </div>
