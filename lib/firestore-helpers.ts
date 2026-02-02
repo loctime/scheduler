@@ -3,6 +3,77 @@ import { db, COLLECTIONS } from "./firebase"
 import type { Horario, HistorialItem } from "./types"
 
 /**
+ * Normaliza IDs para Firestore reemplazando caracteres problemáticos
+ */
+export function normalizeFirestoreId(value: string): string {
+  return value.replace(/\//g, '_').replace(/#/g, '_').replace(/\$/g, '_').replace(/\[/g, '_').replace(/\]/g, '_')
+}
+
+/**
+ * Construye paths válidos para Firestore con número par de segmentos
+ */
+export function buildFirestorePath(basePath: string, ...segments: string[]): string {
+  const normalizedSegments = segments.map(segment => normalizeFirestoreId(segment))
+  return [basePath, ...normalizedSegments].join('/')
+}
+
+/**
+ * Crea una referencia de documento válida con logging defensivo
+ */
+export function createValidDocRef(dbInstance: any, ...pathSegments: string[]) {
+  if (!dbInstance) {
+    throw new Error("Firestore instance not available")
+  }
+
+  const normalizedSegments = pathSegments.map(segment => {
+    if (typeof segment !== 'string') {
+      console.error('🔧 [createValidDocRef] Invalid segment type:', typeof segment, segment)
+      throw new Error(`Invalid segment type: ${typeof segment}`)
+    }
+    
+    const normalized = normalizeFirestoreId(segment)
+    console.log('🔧 [createValidDocRef] Normalizing:', segment, '→', normalized)
+    return normalized
+  })
+
+  const fullPath = normalizedSegments.join('/')
+  console.log('🔧 [createValidDocRef] Final path:', fullPath)
+  
+  // Verificar que tengamos número par de segmentos
+  if (normalizedSegments.length % 2 !== 0) {
+    console.error('🔧 [createValidDocRef] Invalid path - odd number of segments:', normalizedSegments)
+    throw new Error(`Invalid path: odd number of segments (${normalizedSegments.length})`)
+  }
+
+  return doc(dbInstance, ...normalizedSegments)
+}
+
+/**
+ * Crea una referencia de colección válida
+ */
+export function createValidCollectionRef(dbInstance: any, pathSegments: string[]) {
+  if (!dbInstance) {
+    throw new Error("Firestore instance not available")
+  }
+
+  const normalizedSegments = pathSegments.map(segment => {
+    if (typeof segment !== 'string') {
+      console.error('🔧 [createValidCollectionRef] Invalid segment type:', typeof segment, segment)
+      throw new Error(`Invalid segment type: ${typeof segment}`)
+    }
+    
+    const normalized = normalizeFirestoreId(segment)
+    console.log('🔧 [createValidCollectionRef] Normalizing:', segment, '→', normalized)
+    return normalized
+  })
+
+  const fullPath = normalizedSegments.join('/')
+  console.log('🔧 [createValidCollectionRef] Final collection path:', fullPath)
+
+  return collection(dbInstance, normalizedSegments[0], ...normalizedSegments.slice(1))
+}
+
+/**
  * Preserva todos los campos inmutables de un schedule al actualizar
  */
 export function preserveScheduleFields(

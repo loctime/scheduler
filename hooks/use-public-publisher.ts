@@ -2,6 +2,7 @@ import { useState } from "react"
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useOwnerId } from "./use-owner-id"
+import { createValidDocRef, normalizeFirestoreId } from "@/lib/firestore-helpers"
 
 export interface PublishPublicScheduleOptions {
   companyName: string
@@ -40,17 +41,18 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
       })
 
       // Generate public schedule ID (could be based on ownerId + timestamp or custom)
-      const publicScheduleId = `${ownerId}_${Date.now()}`
+      const publicScheduleId = `${normalizeFirestoreId(ownerId)}_${Date.now()}`
       
-      // Get the actual week data from schedules collection
-      const weekRef = doc(db, "apps/horarios", "schedules", options.weekId)
+      // Get the actual week data from weeks collection (ruta corregida)
+      const normalizedWeekId = normalizeFirestoreId(options.weekId)
+      const weekRef = createValidDocRef(db, "apps", "horarios", normalizeFirestoreId(ownerId), "weeks", normalizedWeekId)
       const weekDoc = await getDoc(weekRef)
       
       if (!weekDoc.exists()) {
         throw new Error("No se encontraron datos para la semana especificada")
       }
 
-      const weekData = weekDoc.data()
+      const weekData = weekDoc.data() as any
 
       // Create public schedule document
       const publicScheduleData = {

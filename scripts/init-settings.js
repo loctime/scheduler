@@ -3,6 +3,11 @@ const { getFirestore, doc, setDoc, serverTimestamp } = require("firebase/firesto
 const { getWeek, startOfWeek, format } = require("date-fns")
 const { es } = require("date-fns/locale")
 
+// Helper para normalizar IDs (similar al de frontend)
+function normalizeFirestoreId(value) {
+  return value.replace(/\//g, '_').replace(/#/g, '_').replace(/\$/g, '_').replace(/\[/g, '_').replace(/\]/g, '_')
+}
+
 // Configuración de Firebase (debe coincidir con la del proyecto)
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -35,13 +40,14 @@ async function initializeSettings() {
       throw new Error("Se requiere OWNER_ID. Usar: OWNER_ID=tu_uid node scripts/init-settings.js")
     }
 
-    console.log(`🔧 Usando ownerId: ${ownerId}`)
+    console.log(`🔧 [init-settings] Using ownerId: ${ownerId}`)
 
     // Generar ID de la semana actual
     const currentWeekId = generateWeekId(new Date())
+    const normalizedWeekId = normalizeFirestoreId(currentWeekId)
 
-    // Crear documento de settings
-    const settingsRef = doc(db, "apps/horarios", ownerId, "settings/main")
+    // Crear documento de settings - path corregido
+    const settingsRef = doc(db, "apps", "horarios", normalizeFirestoreId(ownerId), "settings")
     
     await setDoc(settingsRef, {
       publishedWeekId: currentWeekId,
@@ -68,7 +74,8 @@ async function initializeSettings() {
       updatedAt: serverTimestamp()
     }
 
-    const weekRef = doc(db, "apps/horarios", "schedules", currentWeekId)
+    // Path corregido para weeks
+    const weekRef = doc(db, "apps", "horarios", normalizeFirestoreId(ownerId), "weeks", normalizedWeekId)
     await setDoc(weekRef, weekData)
 
     console.log(`✅ Semana ${currentWeekId} creada en Firestore`)

@@ -3,6 +3,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useData } from "@/contexts/data-context"
 import { useOwnerId } from "./use-owner-id"
+import { createValidDocRef, normalizeFirestoreId } from "@/lib/firestore-helpers"
 import { type WeekData } from "./use-week-navigation"
 
 export interface WeekDocument extends WeekData {
@@ -45,8 +46,12 @@ export function useWeekData(weekId: string | null): UseWeekDataReturn {
     try {
       console.log("🔧 [useWeekData] Loading week data:", { weekId, ownerId, role: userData?.role })
       
-      const weekRef = doc(db, "apps/horarios", "schedules", weekId)
-      console.log("🔧 [useWeekData] Week path:", `apps/horarios/schedules/${weekId}`)
+      // Normalizar weekId y usar path consistente: apps/horarios/{ownerId}/weeks/{weekId}
+      const normalizedWeekId = normalizeFirestoreId(weekId)
+      console.log("🔧 [useWeekData] Normalized weekId:", weekId, '→', normalizedWeekId)
+      
+      const weekRef = createValidDocRef(db, "apps", "horarios", normalizeFirestoreId(ownerId), "weeks", normalizedWeekId)
+      console.log("🔧 [useWeekData] Week ref created successfully")
       
       const weekDoc = await getDoc(weekRef)
 
@@ -108,7 +113,8 @@ export function useWeekData(weekId: string | null): UseWeekDataReturn {
     try {
       console.log("🔧 [useWeekData] Saving week data:", { weekId, ownerId })
       
-      const weekRef = doc(db, "apps/horarios", "schedules", weekId)
+      const normalizedWeekId = normalizeFirestoreId(weekId)
+      const weekRef = createValidDocRef(db, "apps", "horarios", normalizeFirestoreId(ownerId), "weeks", normalizedWeekId)
       
       const updateData = {
         ...data,
