@@ -24,6 +24,7 @@ interface QuickShiftSelectorProps {
   dayOfWeek?: number
   date?: string
   scheduleId?: string
+  updateEmployeeRequestCache?: (key: string, request: any) => void
 }
 
 export function QuickShiftSelector({
@@ -40,6 +41,7 @@ export function QuickShiftSelector({
   dayOfWeek,
   date,
   scheduleId,
+  updateEmployeeRequestCache,
 }: QuickShiftSelectorProps) {
   const { toast } = useToast()
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("turno")
@@ -53,6 +55,13 @@ export function QuickShiftSelector({
       
       try {
         const request = await getEmployeeRequest(scheduleId, employeeId, date)
+        
+        // Actualizar caché
+        if (updateEmployeeRequestCache) {
+          const cacheKey = `${scheduleId}_${employeeId}_${date}`
+          updateEmployeeRequestCache(cacheKey, request)
+        }
+        
         if (request && request.active && request.requestedShift) {
           setEmployeeRequest(request)
           
@@ -80,7 +89,7 @@ export function QuickShiftSelector({
     }
 
     loadEmployeeRequest()
-  }, [employeeId, date, scheduleId])
+  }, [employeeId, date, scheduleId, updateEmployeeRequestCache])
 
   const resetMode = () => {
     setSelectionMode("none")

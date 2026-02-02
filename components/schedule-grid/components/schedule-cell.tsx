@@ -68,6 +68,7 @@ interface ScheduleCellProps {
   suggestion?: PatternSuggestion | null
   config?: Configuracion | null
   hasIncompleteAssignments?: boolean
+  updateEmployeeRequestCache?: (key: string, request: any) => void
 }
 
 export function ScheduleCell({
@@ -95,6 +96,7 @@ export function ScheduleCell({
   suggestion,
   config,
   hasIncompleteAssignments = false,
+  updateEmployeeRequestCache,
 }: ScheduleCellProps) {
   const [notaDialogOpen, setNotaDialogOpen] = useState(false)
   const [notaTexto, setNotaTexto] = useState("")
@@ -477,6 +479,7 @@ export function ScheduleCell({
               dayOfWeek={dayOfWeek}
               date={date}
               scheduleId={scheduleId}
+              updateEmployeeRequestCache={updateEmployeeRequestCache}
             />
           ) : (
             <CellAssignments assignments={assignments} getShiftInfo={getShiftInfo} />
@@ -499,14 +502,7 @@ export function ScheduleCell({
           </div>
         )}
         
-        {/* Icono de regla fija */}
-        {hasFixedSchedule && (
-          <div className="absolute top-1 right-1 z-10">
-            <div className="flex h-5 w-5 items-center justify-center rounded bg-blue-500/90 text-white shadow-sm" title="Regla fija">
-              <Lock className="h-3 w-3" />
-            </div>
-          </div>
-        )}
+       
       </td>
         </ContextMenuTrigger>
         <ContextMenuContent>

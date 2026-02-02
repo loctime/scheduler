@@ -198,6 +198,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     getEmployeeShifts,
     getEmployeeAssignments,
     getShiftInfo,
+    updateEmployeeRequestCache,
   } = useScheduleGridData({
     employees: employeesToUse,
     shifts,
@@ -206,6 +207,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
       ? (schedule as Horario).ordenEmpleadosSnapshot
       : config?.ordenEmpleados,
     schedule,
+    scheduleId: schedule?.id,
     isScheduleCompleted,
     currentWeekStart,
     lastCompletedWeekStart,
@@ -610,6 +612,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
                         onCloseSelector={() => setSelectedCell(null)}
                         config={config}
                         hasIncompleteAssignments={hasIncompleteAssignments}
+                        updateEmployeeRequestCache={updateEmployeeRequestCache}
                         draggedEmployeeId={draggedEmployeeId}
                         dragOverEmployeeId={dragOverEmployeeId}
                         onDragStart={handleDragStart}
@@ -662,6 +665,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
             onToggleFixed={handleToggleFixed}
             onExportEmployeeImage={onExportEmployeeImage}
             weekStartDate={weekStartDate}
+            updateEmployeeRequestCache={updateEmployeeRequestCache}
           />
         </>
       )

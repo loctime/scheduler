@@ -57,6 +57,7 @@ interface EmployeeRowProps {
   onCloseSelector?: () => void
   config?: Configuracion | null
   hasIncompleteAssignments?: (employeeId: string, date: string) => boolean
+  updateEmployeeRequestCache?: (key: string, request: any) => void
 }
 
 export function EmployeeRow({
@@ -96,6 +97,7 @@ export function EmployeeRow({
   onCloseSelector,
   config,
   hasIncompleteAssignments,
+  updateEmployeeRequestCache,
 }: EmployeeRowProps) {
   return (
     <tr
@@ -224,6 +226,7 @@ export function EmployeeRow({
             suggestion={suggestion}
             config={config}
             hasIncompleteAssignments={hasIncompleteAssignments ? hasIncompleteAssignments(employee.id, dateStr) : false}
+            updateEmployeeRequestCache={updateEmployeeRequestCache}
           />
         )
       })}

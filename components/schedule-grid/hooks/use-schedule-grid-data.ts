@@ -1,6 +1,7 @@
-import { useMemo } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { Empleado, Separador, ShiftAssignmentValue, Horario, HistorialItem } from "@/lib/types"
 import { toShiftIds, toAssignments } from "../utils/schedule-grid-utils"
+import { getEmployeeRequest } from "@/lib/employee-requests"
 
 export type GridItem = { type: "employee"; data: Empleado } | { type: "separator"; data: Separador }
 
@@ -10,6 +11,7 @@ interface UseScheduleGridDataProps {
   separadores?: Separador[]
   ordenEmpleados?: string[]
   schedule: Horario | HistorialItem | null
+  scheduleId?: string
   isScheduleCompleted?: boolean
   currentWeekStart?: string // Fecha de inicio de la semana actual (formato yyyy-MM-dd)
   lastCompletedWeekStart?: string | null // Fecha de inicio de la última semana completada (formato yyyy-MM-dd)
@@ -22,11 +24,45 @@ export function useScheduleGridData({
   separadores = [],
   ordenEmpleados = [],
   schedule,
+  scheduleId,
   isScheduleCompleted = false,
   currentWeekStart,
   lastCompletedWeekStart,
   allEmployees = [],
 }: UseScheduleGridDataProps) {
+  // Estado para caché de employee requests
+  const [employeeRequestsCache, setEmployeeRequestsCache] = useState<Map<string, any>>(new Map())
+
+  // Cargar employee requests cuando cambie el scheduleId
+  useEffect(() => {
+    if (!scheduleId) return
+
+    const loadEmployeeRequests = async () => {
+      try {
+        // Por ahora, el caché se actualizará desde los componentes individuales
+        // que ya cargan los requests (InlineShiftSelector, QuickShiftSelector)
+        // Esto evita hacer múltiples llamadas asíncronas
+      } catch (error) {
+        console.error('Error loading employee requests cache:', error)
+      }
+    }
+
+    loadEmployeeRequests()
+  }, [scheduleId])
+
+  // Función para actualizar el caché (usada por los componentes)
+  const updateEmployeeRequestCache = (key: string, request: any) => {
+    setEmployeeRequestsCache(prev => {
+      const newCache = new Map(prev)
+      if (request && request.active) {
+        newCache.set(key, request)
+      } else {
+        newCache.delete(key)
+      }
+      return newCache
+    })
+  }
+
   // Memoizar mapa de turnos para búsqueda O(1)
   const shiftMap = useMemo(() => {
     return new Map(shifts.map((s) => [s.id, s]))
@@ -180,16 +216,70 @@ export function useScheduleGridData({
     [schedule?.assignments]
   )
 
-  // Función para obtener asignaciones completas
+  // Función para obtener asignaciones completas con employee requests como overrides
   const getEmployeeAssignments = useMemo(
     () => (employeeId: string, date: string) => {
-      if (!schedule?.assignments) return []
-      const dateAssignments = schedule.assignments[date] || {}
-      const employeeShifts = dateAssignments[employeeId]
-      // NUEVO MODELO SIMPLE: Pasar turnos para copiar horarios al convertir desde string[]
-      return toAssignments(employeeShifts, shifts)
+      // Primero obtener assignments del schedule
+      let baseAssignments: any[] = []
+      if (schedule?.assignments) {
+        const dateAssignments = schedule.assignments[date] || {}
+        const employeeShifts = dateAssignments[employeeId]
+        baseAssignments = toAssignments(employeeShifts, shifts)
+      }
+
+      // Luego verificar si hay un employee request activo en el caché
+      const cacheKey = `${scheduleId}_${employeeId}_${date}`
+      const request = employeeRequestsCache.get(cacheKey)
+      
+      if (request && request.active && request.requestedShift) {
+        // Convertir requestedShift a ShiftAssignment
+        const requestedShift = request.requestedShift
+        let overrideAssignment: any
+
+        switch (requestedShift.type) {
+          case 'franco':
+            overrideAssignment = { type: 'franco' }
+            break
+          
+          case 'medio-franco':
+            overrideAssignment = {
+              type: 'medio_franco',
+              startTime: requestedShift.startTime,
+              endTime: requestedShift.endTime
+            }
+            break
+          
+          case 'existing':
+            if (requestedShift.shiftId) {
+              const shift = shiftMap.get(requestedShift.shiftId)
+              overrideAssignment = {
+                type: 'shift',
+                shiftId: requestedShift.shiftId,
+                startTime: requestedShift.startTime || shift?.startTime || '',
+                endTime: requestedShift.endTime || shift?.endTime || ''
+              }
+            }
+            break
+          
+          case 'manual':
+            overrideAssignment = {
+              type: 'shift',
+              startTime: requestedShift.startTime,
+              endTime: requestedShift.endTime
+            }
+            break
+        }
+
+        // Si hay un override válido, reemplazar los assignments base
+        if (overrideAssignment) {
+          return [overrideAssignment]
+        }
+      }
+
+      // Si no hay override, retornar assignments base
+      return baseAssignments
     },
-    [schedule?.assignments, shifts]
+    [schedule?.assignments, shifts, shiftMap, scheduleId, employeeRequestsCache]
   )
 
   // Memoizar función de obtener info de turno
@@ -208,6 +298,7 @@ export function useScheduleGridData({
     getEmployeeShifts,
     getEmployeeAssignments,
     getShiftInfo,
+    updateEmployeeRequestCache,
   }
 }
 

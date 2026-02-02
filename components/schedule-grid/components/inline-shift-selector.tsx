@@ -16,6 +16,7 @@ interface InlineShiftSelectorProps {
   employeeId?: string
   date?: string
   scheduleId?: string
+  updateEmployeeRequestCache?: (key: string, request: any) => void
 }
 
 export function InlineShiftSelector({ 
@@ -24,7 +25,8 @@ export function InlineShiftSelector({
   onSelectAssignments, 
   employeeId, 
   date, 
-  scheduleId 
+  scheduleId,
+  updateEmployeeRequestCache
 }: InlineShiftSelectorProps) {
   const [specialType, setSpecialType] = useState<SpecialType>("shift")
   const [medioFrancoTime, setMedioFrancoTime] = useState<{ startTime: string; endTime: string }>({
@@ -40,6 +42,13 @@ export function InlineShiftSelector({
       
       try {
         const request = await getEmployeeRequest(scheduleId, employeeId, date)
+        
+        // Actualizar caché
+        if (updateEmployeeRequestCache) {
+          const cacheKey = `${scheduleId}_${employeeId}_${date}`
+          updateEmployeeRequestCache(cacheKey, request)
+        }
+        
         if (request && request.active && request.requestedShift) {
           setEmployeeRequest(request)
           
@@ -67,7 +76,7 @@ export function InlineShiftSelector({
     }
 
     loadEmployeeRequest()
-  }, [employeeId, date, scheduleId])
+  }, [employeeId, date, scheduleId, updateEmployeeRequestCache])
 
   const handleSelectShift = (shift: Turno) => {
     // CRÍTICO: Crear assignment completo con horarios desde el inicio

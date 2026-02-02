@@ -91,7 +91,18 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
   const { toast } = useToast()
 
   const weekStartDate = useMemo(
-    () => (horario ? getWeekStartDate(horario.weekId, horario.days) : null),
+    () => {
+      if (!horario) return null
+      
+      // Obtener la semana publicada actual
+      const currentWeek = horario.weeks?.[horario.publishedWeekId]
+      if (currentWeek) {
+        return getWeekStartDate(currentWeek.weekId, currentWeek.days)
+      }
+      
+      // Fallback a estructura antigua
+      return getWeekStartDate(horario.weekId, horario.days)
+    },
     [horario],
   )
 
@@ -105,11 +116,15 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
     const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
     const weekEndStr = format(addDays(weekStartDate, 6), "yyyy-MM-dd")
 
+    // Obtener datos de la semana actual desde la nueva estructura
+    const currentWeek = horario.weeks?.[horario.publishedWeekId]
+    const days = currentWeek?.days || horario.days
+
     // Transform horario.days to match Horario.assignments structure
     const transformedAssignments: { [date: string]: { [empleadoId: string]: ShiftAssignment[] | string[] } } = {}
     
-    if (horario.days) {
-      Object.entries(horario.days).forEach(([date, dayAssignments]) => {
+    if (days) {
+      Object.entries(days).forEach(([date, dayAssignments]) => {
         if (dayAssignments && typeof dayAssignments === 'object' && !Array.isArray(dayAssignments)) {
           // If it's already in the correct format (nested object)
           transformedAssignments[date] = dayAssignments as { [empleadoId: string]: ShiftAssignment[] | string[] }
@@ -118,8 +133,8 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
     }
 
     return {
-      id: horario.weekId || horario.ownerId,
-      nombre: horario.weekLabel || `Semana ${weekStartStr}`,
+      id: currentWeek?.weekId || horario.publishedWeekId || horario.ownerId,
+      nombre: currentWeek?.weekLabel || horario.weekLabel || `Semana ${weekStartStr}`,
       weekStart: weekStartStr,
       semanaInicio: weekStartStr,
       semanaFin: weekEndStr,
@@ -129,8 +144,13 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
 
   const employees = useMemo(() => {
     if (!horario) return []
-    if (horario.employees?.length) {
-      return horario.employees.map((employee: any, index: number) => ({
+    
+    // Obtener datos de la semana actual desde la nueva estructura
+    const currentWeek = horario.weeks?.[horario.publishedWeekId]
+    const employeesData = currentWeek?.employees || horario.employees
+    
+    if (employeesData?.length) {
+      return employeesData.map((employee: any, index: number) => ({
         id: employee.id || employee.uid || `employee-${index}`,
         name: employee.name || employee.nombre || `Empleado ${index + 1}`,
         email: employee.email,
@@ -138,12 +158,15 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
         userId: employee.userId || horario.ownerId,
       })) as Empleado[]
     }
-    return buildFallbackEmployees(horario.ownerId, horario.days)
+    return buildFallbackEmployees(horario.ownerId, currentWeek?.days || horario.days)
   }, [horario])
 
   const shifts = useMemo(() => {
     if (!horario) return []
-    return buildShiftsFromAssignments(horario.ownerId, horario.days)
+    
+    // Obtener datos de la semana actual desde la nueva estructura
+    const currentWeek = horario.weeks?.[horario.publishedWeekId]
+    return buildShiftsFromAssignments(horario.ownerId, currentWeek?.days || horario.days)
   }, [horario])
 
   // Crear employeeStats vacío pero con estructura correcta para activar layout completo
@@ -264,7 +287,12 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
               Horario Semanal
             </h1>
             <div className="mt-1 flex items-center gap-4">
-              <div className="font-semibold text-gray-900">{horario.weekLabel}</div>
+              <div className="font-semibold text-gray-900">
+                {(() => {
+                  const currentWeek = horario.weeks?.[horario.publishedWeekId]
+                  return currentWeek?.weekLabel || horario.weekLabel || 'Semana sin etiqueta'
+                })()}
+              </div>
               <div className="text-sm text-gray-500">
                 {format(weekStartDate, "dd/MM/yyyy")} – {format(addDays(weekStartDate, 6), "dd/MM/yyyy")}
               </div>
@@ -287,32 +315,56 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
         </div>
       </div>
 
-      {/* Calendario como foco principal - full width sin Card */}
+      {/* Calendario como foco principal - mostrar imagen si existe, sino ScheduleGrid */}
       <div className="w-full px-2 py-6">
-        {weekDays.length > 0 ? (
-          <ScheduleGrid
-            weekDays={weekDays}
-            employees={employees}
-            allEmployees={employees}
-            shifts={shifts}
-            schedule={schedule}
-            monthRange={undefined}
-            mediosTurnos={[]}
-            employeeStats={employeeStats}
-            readonly={true}
-            allSchedules={[]}
-            isScheduleCompleted={false}
-            lastCompletedWeekStart={undefined}
-            onClearEmployeeRow={undefined}
-            user={ownerUser}
-            onExportEmployeeImage={undefined}
-          />
-        ) : (
-          <div className="text-center py-8 text-gray-500">
-            <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
-            <p>No hay asignaciones para esta semana</p>
-          </div>
-        )}
+        {(() => {
+          const currentWeek = horario.weeks?.[horario.publishedWeekId]
+          const hasImage = currentWeek?.publicImageUrl
+          
+          if (hasImage && currentWeek.publicImageUrl) {
+            // Mostrar imagen publicada con scroll controlado
+            return (
+              <div className="w-full overflow-x-auto">
+                <img 
+                  src={currentWeek.publicImageUrl} 
+                  alt={`Horario ${currentWeek.weekLabel || 'semanal'}`}
+                  style={{ 
+                    width: '100%', 
+                    maxWidth: '100%', 
+                    height: 'auto', 
+                    display: 'block' 
+                  }}
+                />
+              </div>
+            )
+          }
+          
+          // Fallback a ScheduleGrid si no hay imagen
+          return weekDays.length > 0 ? (
+            <ScheduleGrid
+              weekDays={weekDays}
+              employees={employees}
+              allEmployees={employees}
+              shifts={shifts}
+              schedule={schedule}
+              monthRange={undefined}
+              mediosTurnos={[]}
+              employeeStats={employeeStats}
+              readonly={true}
+              allSchedules={[]}
+              isScheduleCompleted={false}
+              lastCompletedWeekStart={undefined}
+              onClearEmployeeRow={undefined}
+              user={ownerUser}
+              onExportEmployeeImage={undefined}
+            />
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p>No hay asignaciones para esta semana</p>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Footer discreto */}
@@ -321,7 +373,11 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
           <div className="flex items-center justify-between text-sm text-gray-500">
             <div>
               Publicado:{" "}
-              {horario.publishedAt ? new Date(horario.publishedAt.toDate()).toLocaleDateString("es-AR") : "Desconocido"}
+              {(() => {
+                const currentWeek = horario.weeks?.[horario.publishedWeekId]
+                const publishedAt = currentWeek?.publishedAt || horario.publishedAt
+                return publishedAt ? new Date(publishedAt.toDate()).toLocaleDateString("es-AR") : "Desconocido"
+              })()}
             </div>
             <div>Este horario es de solo lectura</div>
           </div>

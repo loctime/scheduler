@@ -279,8 +279,29 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
       // Esperar un frame para asegurar que el componente está renderizado
       await new Promise(resolve => requestAnimationFrame(resolve))
+      
+      // Validación adicional: verificar que el elemento tiene dimensiones
+      const elementRect = captureRef.current.getBoundingClientRect()
+      if (elementRect.width === 0 || elementRect.height === 0) {
+        console.error("🔧 [ScheduleCalendar] Error: Elemento de captura sin dimensiones válidas", {
+          width: elementRect.width,
+          height: elementRect.height
+        })
+        toast({
+          title: "Error",
+          description: "El elemento de captura no tiene dimensiones válidas",
+          variant: "destructive",
+        })
+        return
+      }
 
       console.log("🔧 [ScheduleCalendar] Generando imagen del ScheduleGrid...")
+      console.log("🔧 [ScheduleCalendar] Dimensiones del elemento:", {
+        width: elementRect.width,
+        height: elementRect.height,
+        left: elementRect.left,
+        top: elementRect.top
+      })
       
       // Generar imagen PNG del ScheduleGrid de captura
       const dataUrl = await toPng(captureRef.current, {
@@ -293,6 +314,17 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
       console.log("🔧 [ScheduleCalendar] Imagen generada exitosamente")
       console.log("🔧 [ScheduleCalendar] Tamaño del dataUrl:", dataUrl.length)
       console.log("🔧 [ScheduleCalendar] Primeros 100 caracteres:", dataUrl.substring(0, 100))
+
+      // Validar que la imagen se generó correctamente
+      if (!dataUrl || dataUrl.length === 0) {
+        console.error("🔧 [ScheduleCalendar] Error: Imagen generada vacía o inválida")
+        toast({
+          title: "Error",
+          description: "No se pudo generar la imagen del horario",
+          variant: "destructive",
+        })
+        return
+      }
 
       // Usar el dataURL directamente como publicImageUrl
       const publicImageUrl = dataUrl
@@ -707,11 +739,11 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
       {/* Componente de captura robusto - siempre montado pero fuera de pantalla */}
       <ScheduleGridCapture
         ref={captureRef}
-        weekDays={monthWeeks[0]?.days || []}
+        weekDays={monthWeeks[0] || []}
         employees={employees}
         shifts={shifts}
-        schedule={getWeekSchedule(monthWeeks[0]?.startDate)}
-        allEmployees={allEmployees}
+        schedule={getWeekSchedule(monthWeeks[0]?.[0])}
+        allEmployees={employees}
       />
     </>
   )

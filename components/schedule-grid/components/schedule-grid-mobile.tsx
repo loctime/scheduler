@@ -56,6 +56,7 @@ interface ScheduleGridMobileProps {
   onToggleFixed?: (date: string, employeeId: string, dayOfWeek: number) => void
   onExportEmployeeImage?: (employeeId: string, employeeName: string, weekStartDate: Date) => void
   weekStartDate: Date
+  updateEmployeeRequestCache?: (key: string, request: any) => void
 }
 
 export function ScheduleGridMobile({
@@ -82,6 +83,7 @@ export function ScheduleGridMobile({
   onToggleFixed,
   onExportEmployeeImage,
   weekStartDate,
+  updateEmployeeRequestCache,
 }: ScheduleGridMobileProps) {
   const [notaDialogOpen, setNotaDialogOpen] = useState(false)
   const [notaData, setNotaData] = useState<{ date: string; employeeId: string; texto: string } | null>(null)
@@ -240,6 +242,7 @@ export function ScheduleGridMobile({
                             employeeId={employee.id}
                             date={dateStr}
                             scheduleId={scheduleId}
+                            updateEmployeeRequestCache={updateEmployeeRequestCache}
                           />
                         ) : (
                           <div className="text-xs sm:text-sm">
