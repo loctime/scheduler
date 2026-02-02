@@ -24,7 +24,7 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
 
   console.log("🔧 [usePublicPublisher] Hook inicializado", { 
     hasOwnerId: !!ownerId,
-    ownerId: ownerId?.substring(0, 10) + '...', // Solo mostrar primeros 10 chars por seguridad
+    ownerId: ownerId?.substring(0, 10) + '...', // .Solo mostrar primeros 10 chars por seguridad
     hasUser: !!user,
     userId: user?.uid?.substring(0, 10) + '...'
   })
