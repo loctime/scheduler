@@ -1,0 +1,312 @@
+"use client"
+
+import { useMemo, useState, useEffect } from "react"
+import { addDays, format, parseISO } from "date-fns"
+import { Calendar, Check, Copy } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { ScheduleGrid } from "@/components/schedule-grid"
+import { usePublicHorario } from "@/hooks/use-public-horario"
+import { useToast } from "@/hooks/use-toast"
+import type { Empleado, Horario, Turno } from "@/lib/types"
+
+interface PublicHorarioPageProps {
+  scheduleId: string
+}
+
+const buildFallbackEmployees = (ownerId: string, days?: Record<string, any>) => {
+  const employeeIds = new Set<string>()
+  if (days) {
+    Object.values(days).forEach((dayAssignments) => {
+      if (dayAssignments && typeof dayAssignments === "object") {
+        Object.keys(dayAssignments as Record<string, unknown>).forEach((employeeId) => {
+          employeeIds.add(employeeId)
+        })
+      }
+    })
+  }
+
+  return Array.from(employeeIds).map((employeeId) => ({
+    id: employeeId,
+    name: `Empleado ${employeeId}`,
+    userId: ownerId,
+  })) as Empleado[]
+}
+
+const buildShiftsFromAssignments = (ownerId: string, days?: Record<string, any>) => {
+  const shiftIds = new Set<string>()
+  if (days) {
+    Object.values(days).forEach((dayAssignments) => {
+      if (dayAssignments && typeof dayAssignments === "object") {
+        Object.values(dayAssignments as Record<string, any>).forEach((assignments) => {
+          if (!Array.isArray(assignments)) return
+          assignments.forEach((assignment) => {
+            if (typeof assignment === "string") {
+              shiftIds.add(assignment)
+              return
+            }
+            if (assignment && typeof assignment === "object" && "shiftId" in assignment && assignment.shiftId) {
+              shiftIds.add(assignment.shiftId)
+            }
+          })
+        })
+      }
+    })
+  }
+
+  return Array.from(shiftIds).map((shiftId) => ({
+    id: shiftId,
+    name: `Turno ${shiftId}`,
+    color: "#9ca3af",
+    userId: ownerId,
+  })) as Turno[]
+}
+
+const getWeekStartDate = (weekId?: string, days?: Record<string, any>) => {
+  if (weekId?.startsWith("schedule-week-")) {
+    const dateStr = weekId.replace("schedule-week-", "")
+    const parsed = parseISO(dateStr)
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed
+    }
+  }
+
+  const dayKeys = Object.keys(days || {}).sort()
+  if (dayKeys.length > 0) {
+    const parsed = parseISO(dayKeys[0])
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed
+    }
+  }
+
+  return null
+}
+
+export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps) {
+  const { horario, isLoading, error } = usePublicHorario(scheduleId)
+  const [copied, setCopied] = useState(false)
+  const { toast } = useToast()
+
+  const weekStartDate = useMemo(
+    () => (horario ? getWeekStartDate(horario.weekId, horario.days) : null),
+    [horario],
+  )
+
+  const weekDays = useMemo(() => {
+    if (!weekStartDate) return []
+    return Array.from({ length: 7 }, (_, i) => addDays(weekStartDate, i))
+  }, [weekStartDate])
+
+  const schedule = useMemo(() => {
+    if (!horario || !weekStartDate) return null
+    const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+    const weekEndStr = format(addDays(weekStartDate, 6), "yyyy-MM-dd")
+
+    return {
+      id: horario.weekId || horario.ownerId,
+      nombre: horario.weekLabel || `Semana ${weekStartStr}`,
+      weekStart: weekStartStr,
+      semanaInicio: weekStartStr,
+      semanaFin: weekEndStr,
+      assignments: horario.days || {},
+    } as Horario
+  }, [horario, weekStartDate])
+
+  const employees = useMemo(() => {
+    if (!horario) return []
+    if (horario.employees?.length) {
+      return horario.employees.map((employee: any, index: number) => ({
+        id: employee.id || employee.uid || `employee-${index}`,
+        name: employee.name || employee.nombre || `Empleado ${index + 1}`,
+        email: employee.email,
+        phone: employee.phone,
+        userId: employee.userId || horario.ownerId,
+      })) as Empleado[]
+    }
+    return buildFallbackEmployees(horario.ownerId, horario.days)
+  }, [horario])
+
+  const shifts = useMemo(() => {
+    if (!horario) return []
+    return buildShiftsFromAssignments(horario.ownerId, horario.days)
+  }, [horario])
+
+  const ownerUser = useMemo(() => {
+    if (!horario?.ownerId) return null
+    return { uid: horario.ownerId }
+  }, [horario?.ownerId])
+
+  const handleCopyUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+
+      toast({
+        title: "Enlace copiado",
+        description: "El enlace del horario ha sido copiado al portapapeles",
+      })
+    } catch (copyError) {
+      toast({
+        title: "Error",
+        description: "No se pudo copiar el enlace",
+        variant: "destructive",
+      })
+    }
+  }
+
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Error",
+        description: error,
+        variant: "destructive",
+      })
+    }
+  }, [error, toast])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background p-4">
+        <div className="mx-auto max-w-6xl space-y-4">
+          <div>
+            <Skeleton className="h-8 w-64 mb-2" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-48 mb-2" />
+              <Skeleton className="h-4 w-32" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex items-center space-x-4">
+                    <Skeleton className="h-10 w-24" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-3/4" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
+  if (!horario || !schedule || !weekStartDate) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <div className="text-gray-500 mb-4">
+              <Calendar className="h-12 w-12 mx-auto" />
+            </div>
+            <h1 className="text-lg font-semibold mb-2">No hay horario publicado</h1>
+            <p className="text-gray-600 text-sm mb-4">
+              No hay ningún horario publicado para este identificador.
+            </p>
+            <p className="text-gray-500 text-xs">
+              El administrador debe publicar un horario desde el dashboard.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="border-b bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+          <div>
+            <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+              <Calendar className="h-6 w-6" />
+              Horario Semanal
+            </h1>
+            <p className="text-sm text-gray-600 mt-1">Horario público</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="bg-green-100 text-green-800">
+              Publicado
+            </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyUrl}
+              className="flex items-center gap-2"
+            >
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copied ? "Copiado" : "Copiar enlace"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-b bg-white">
+        <div className="mx-auto max-w-6xl px-4 py-4">
+          <div className="text-center">
+            <div className="font-semibold text-gray-900">{horario.weekLabel}</div>
+            <div className="text-sm text-gray-600">Semana {horario.weekId}</div>
+            <p className="text-xs text-gray-500">ID: {horario.weekId}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-6xl p-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Horario Semanal
+            </CardTitle>
+            <p className="text-sm text-gray-600">
+              {horario.weekLabel} - Semana {horario.weekId}
+            </p>
+          </CardHeader>
+          <CardContent>
+            {weekDays.length > 0 ? (
+              <ScheduleGrid
+                weekDays={weekDays}
+                employees={employees}
+                shifts={shifts}
+                schedule={schedule}
+                readonly
+                user={ownerUser}
+              />
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>No hay asignaciones para esta semana</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="mt-6 text-center text-sm text-gray-500">
+          <p>
+            Horario publicado:{" "}
+            {horario.publishedAt ? new Date(horario.publishedAt.toDate()).toLocaleDateString("es-AR") : "Desconocido"}
+          </p>
+          <p className="mt-1">Este horario es de solo lectura</p>
+          <div className="mt-2 flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyUrl}
+              className="flex items-center gap-2"
+            >
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copied ? "Enlace copiado" : "Copiar enlace"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -106,22 +106,22 @@ export function ScheduleCell({
   useEffect(() => {
     const loadEmployeeRequest = async () => {
       try {
-        if (!scheduleId) return;
-        const request = await getEmployeeRequest(scheduleId, employeeId, date);
+        if (readonly || !scheduleId) return
+        const request = await getEmployeeRequest(scheduleId, employeeId, date)
         if (request && request.active) {
-          setEmployeeRequestActive(true);
-          setEmployeeRequestDescription(request.description);
+          setEmployeeRequestActive(true)
+          setEmployeeRequestDescription(request.description)
         } else {
-          setEmployeeRequestActive(false);
-          setEmployeeRequestDescription('');
+          setEmployeeRequestActive(false)
+          setEmployeeRequestDescription("")
         }
       } catch (error) {
-        console.error('Error loading employee request:', error);
+        console.error("Error loading employee request:", error)
       }
-    };
+    }
 
-    loadEmployeeRequest();
-  }, [scheduleId, employeeId, date]);
+    loadEmployeeRequest()
+  }, [scheduleId, employeeId, date, readonly])
   
   // Handlers para pedidos de empleados
   const handleEmployeeRequestToggle = () => {
@@ -481,19 +481,21 @@ export function ScheduleCell({
           )}
         </div>
         {/* Marcador visual único abajo al centro */}
-        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10">
-          <ShiftRequestMarker 
-            active={employeeRequestActive}
-            description={employeeRequestDescription}
-            onToggle={handleEmployeeRequestToggle}
-            onEditDescription={handleEmployeeRequestEditDescription}
-            scheduleId={scheduleId || ''}
-            employeeId={employeeId}
-            date={date}
-            availableShifts={quickShifts}
-            mediosTurnos={mediosTurnos}
-          />
-        </div>
+        {!readonly && (
+          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10">
+            <ShiftRequestMarker 
+              active={employeeRequestActive}
+              description={employeeRequestDescription}
+              onToggle={handleEmployeeRequestToggle}
+              onEditDescription={handleEmployeeRequestEditDescription}
+              scheduleId={scheduleId || ''}
+              employeeId={employeeId}
+              date={date}
+              availableShifts={quickShifts}
+              mediosTurnos={mediosTurnos}
+            />
+          </div>
+        )}
         
         {/* Icono de regla fija */}
         {hasFixedSchedule && (
@@ -831,4 +833,3 @@ export function ScheduleCell({
     </>
   )
 }
-

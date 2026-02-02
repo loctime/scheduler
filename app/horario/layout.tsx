@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import { onAuthStateChanged } from "firebase/auth"
 import { auth, isFirebaseConfigured } from "@/lib/firebase"
 import { DataProvider } from "@/contexts/data-context"
@@ -12,27 +11,22 @@ export default function HorarioLayout({
 }: {
   children: React.ReactNode
 }) {
-  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
     if (!isFirebaseConfigured() || !auth) {
-      router.push("/")
+      setLoading(false)
       return
     }
 
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (!currentUser) {
-        router.push("/")
-      } else {
-        setUser(currentUser)
-        setLoading(false)
-      }
+      setUser(currentUser)
+      setLoading(false)
     })
 
     return () => unsubscribe()
-  }, [router])
+  }, [])
 
   if (loading) {
     return (
@@ -40,10 +34,6 @@ export default function HorarioLayout({
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
-  }
-
-  if (!user) {
-    return null
   }
 
   return (

@@ -3,9 +3,9 @@
 import { useParams } from "next/navigation"
 import PublicHorarioPage from "@/components/public-horario-page"
 
-export default function HorarioPublicPage() {
+export default function HorariosPublicPage() {
   const params = useParams()
-  const ownerId = params.ownerId as string
+  const scheduleId = params.scheduleId as string
 
-  return <PublicHorarioPage scheduleId={ownerId} />
+  return <PublicHorarioPage scheduleId={scheduleId} />
 }
