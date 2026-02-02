@@ -237,6 +237,9 @@ export function ScheduleGridMobile({
                             onSelectAssignments={(assignments) =>
                               onQuickAssignments(dateStr, employee.id, assignments)
                             }
+                            employeeId={employee.id}
+                            date={dateStr}
+                            scheduleId={scheduleId}
                           />
                         ) : (
                           <div className="text-xs sm:text-sm">

@@ -10,7 +10,7 @@ import { Clock, Calendar, MessageSquare } from 'lucide-react';
 export interface EmployeeRequestData {
   active: boolean;
   requestedShift?: {
-    type: 'existing' | 'manual';
+    type: 'existing' | 'manual' | 'franco' | 'medio-franco';
     shiftId?: string;
     startTime?: string;
     endTime?: string;
@@ -35,6 +35,9 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
   mediosTurnos,
   onSave
 }) => {
+  const [requestType, setRequestType] = useState<
+    'existing' | 'manual' | 'franco' | 'medio-franco'
+  >('existing');
   const [selectedShiftId, setSelectedShiftId] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -47,10 +50,22 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
         // Cargar datos existentes
         if (initialData.requestedShift) {
           if (initialData.requestedShift.type === 'existing' && initialData.requestedShift.shiftId) {
+            setRequestType('existing');
             setSelectedShiftId(initialData.requestedShift.shiftId);
             setStartTime(initialData.requestedShift.startTime || '');
             setEndTime(initialData.requestedShift.endTime || '');
           } else if (initialData.requestedShift.type === 'manual') {
+            setRequestType('manual');
+            setStartTime(initialData.requestedShift.startTime || '');
+            setEndTime(initialData.requestedShift.endTime || '');
+          } else if (initialData.requestedShift.type === 'franco') {
+            setRequestType('franco');
+            setSelectedShiftId('');
+            setStartTime('');
+            setEndTime('');
+          } else if (initialData.requestedShift.type === 'medio-franco') {
+            setRequestType('medio-franco');
+            setSelectedShiftId('');
             setStartTime(initialData.requestedShift.startTime || '');
             setEndTime(initialData.requestedShift.endTime || '');
           }
@@ -58,6 +73,7 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
         setDescription(initialData.description);
       } else {
         // Resetear a valores por defecto
+        setRequestType('existing');
         setSelectedShiftId('');
         setStartTime('');
         setEndTime('');
@@ -67,23 +83,46 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
   }, [open, initialData]);
 
   const handleShiftSelect = (shift: Turno) => {
+    setRequestType('existing');
     setSelectedShiftId(shift.id);
     setStartTime(shift.startTime || '');
     setEndTime(shift.endTime || '');
   };
 
+  const handleFrancoSelect = () => {
+    setRequestType('franco');
+    setSelectedShiftId('');
+    setStartTime('');
+    setEndTime('');
+  };
+
+  const handleMedioFrancoSelect = () => {
+    setRequestType('medio-franco');
+    setSelectedShiftId('');
+  };
+
   const handleSave = () => {
+    let requestedShift: EmployeeRequestData['requestedShift'];
+    
+    switch (requestType) {
+      case 'franco':
+        requestedShift = { type: 'franco' as const };
+        break;
+      case 'medio-franco':
+        requestedShift = { type: 'medio-franco' as const, startTime, endTime };
+        break;
+      case 'existing':
+        requestedShift = { type: 'existing' as const, shiftId: selectedShiftId, startTime, endTime };
+        break;
+      case 'manual':
+      default:
+        requestedShift = { type: 'manual' as const, startTime, endTime };
+        break;
+    }
+
     const requestData: EmployeeRequestData = {
       active: true,
-      requestedShift: {
-        type: selectedShiftId ? 'existing' : 'manual',
-        ...(selectedShiftId 
-          ? { shiftId: selectedShiftId }
-          : {}
-        ),
-        startTime,
-        endTime
-      },
+      requestedShift,
       description
     };
 
@@ -92,18 +131,40 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
   };
 
   const getSelectedShiftInfo = () => {
-    if (selectedShiftId) {
-      const shift = availableShifts.find(s => s.id === selectedShiftId);
-      return shift ? `${shift.name} (${shift.startTime || ''}-${shift.endTime || ''})` : '';
-    }
-    if (startTime && endTime) {
-      return `${startTime}-${endTime}`;
+    switch (requestType) {
+      case 'franco':
+        return 'Franco';
+      case 'medio-franco':
+        return startTime && endTime ? `Medio franco (${startTime}-${endTime})` : 'Medio franco';
+      case 'existing':
+        if (selectedShiftId) {
+          const shift = availableShifts.find(s => s.id === selectedShiftId);
+          return shift ? `${shift.name} (${shift.startTime || ''}-${shift.endTime || ''})` : '';
+        }
+        break;
+      case 'manual':
+        if (startTime && endTime) {
+          return `${startTime}-${endTime}`;
+        }
+        break;
     }
     return '';
   };
 
   const isFormValid = () => {
-    return startTime.trim() !== '' && endTime.trim() !== '' && description.trim() !== '';
+    if (description.trim() === '') {
+      return false;
+    }
+    
+    switch (requestType) {
+      case 'franco':
+        return true; // Solo requiere descripción
+      case 'medio-franco':
+      case 'existing':
+      case 'manual':
+      default:
+        return startTime.trim() !== '' && endTime.trim() !== '';
+    }
   };
 
   return (
@@ -125,11 +186,11 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
                 <Button
                   key={shift.id}
                   type="button"
-                  variant={selectedShiftId === shift.id ? "default" : "outline"}
+                  variant={selectedShiftId === shift.id && requestType === 'existing' ? "default" : "outline"}
                   className="h-10 flex-[0_0_calc(33.333%-0.5rem)] text-sm font-semibold flex items-center justify-center rounded-md border-2 shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md active:scale-95 px-2"
                   style={{ 
-                    backgroundColor: selectedShiftId === shift.id ? shift.color : undefined,
-                    color: selectedShiftId === shift.id ? '#ffffff' : undefined,
+                    backgroundColor: selectedShiftId === shift.id && requestType === 'existing' ? shift.color : undefined,
+                    color: selectedShiftId === shift.id && requestType === 'existing' ? '#ffffff' : undefined,
                     borderColor: shift.color
                   }}
                   onClick={() => handleShiftSelect(shift)}
@@ -139,33 +200,63 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
                   </span>
                 </Button>
               ))}
+              <Button
+                type="button"
+                variant={requestType === 'franco' ? "default" : "outline"}
+                className="h-10 flex-[0_0_calc(33.333%-0.5rem)] text-sm font-semibold flex items-center justify-center rounded-md border-2 shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md active:scale-95 px-2"
+                style={{ 
+                  backgroundColor: requestType === 'franco' ? '#10b981' : undefined,
+                  color: requestType === 'franco' ? '#ffffff' : undefined,
+                  borderColor: '#10b981'
+                }}
+                onClick={handleFrancoSelect}
+              >
+                <span className="text-center truncate">Franco</span>
+              </Button>
+              <Button
+                type="button"
+                variant={requestType === 'medio-franco' ? "default" : "outline"}
+                className="h-10 flex-[0_0_calc(33.333%-0.5rem)] text-sm font-semibold flex items-center justify-center rounded-md border-2 shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md active:scale-95 px-2"
+                style={{ 
+                  backgroundColor: requestType === 'medio-franco' ? '#f59e0b' : undefined,
+                  color: requestType === 'medio-franco' ? '#ffffff' : undefined,
+                  borderColor: '#f59e0b'
+                }}
+                onClick={handleMedioFrancoSelect}
+              >
+                <span className="text-center truncate">Medio franco</span>
+              </Button>
             </div>
           </div>
 
-          {/* Horario solicitado - Siempre visible */}
-          <div className="grid gap-3">
-            <Label className="text-sm font-medium">Horario solicitado</Label>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="startTime">Hora inicio</Label>
-                <Input
-                  id="startTime"
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="endTime">Hora fin</Label>
-                <Input
-                  id="endTime"
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                />
+          {/* Horario solicitado - Solo visible para manual, existing y medio-franco */}
+          {requestType !== 'franco' && (
+            <div className="grid gap-3">
+              <Label className="text-sm font-medium">Horario solicitado</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="startTime">Hora inicio</Label>
+                  <Input
+                    id="startTime"
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    disabled={requestType === 'existing'}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="endTime">Hora fin</Label>
+                  <Input
+                    id="endTime"
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    disabled={requestType === 'existing'}
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Descripción */}
           <div className="grid gap-2">

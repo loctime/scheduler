@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sparkles } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { Turno, ShiftAssignment, MedioTurno, Configuracion } from "@/lib/types"
+import { getEmployeeRequest } from "@/lib/employee-requests"
 
 type SelectionMode = "none" | "franco" | "turno" | "medio_franco"
 
@@ -21,6 +22,8 @@ interface QuickShiftSelectorProps {
   config?: Configuracion | null
   employeeId?: string
   dayOfWeek?: number
+  date?: string
+  scheduleId?: string
 }
 
 export function QuickShiftSelector({
@@ -35,10 +38,49 @@ export function QuickShiftSelector({
   config,
   employeeId,
   dayOfWeek,
+  date,
+  scheduleId,
 }: QuickShiftSelectorProps) {
   const { toast } = useToast()
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("turno")
   const [medioFrancoTime, setMedioFrancoTime] = useState({ startTime: "", endTime: "" })
+  const [employeeRequest, setEmployeeRequest] = useState<any>(null)
+
+  // Cargar employee request si existe
+  useEffect(() => {
+    const loadEmployeeRequest = async () => {
+      if (!employeeId || !date || !scheduleId) return
+      
+      try {
+        const request = await getEmployeeRequest(scheduleId, employeeId, date)
+        if (request && request.active && request.requestedShift) {
+          setEmployeeRequest(request)
+          
+          // Si hay un request, mostrar el horario solicitado
+          const requestedShift = request.requestedShift
+          if (requestedShift.type === 'franco') {
+            setSelectionMode('franco')
+          } else if (requestedShift.type === 'medio-franco') {
+            setSelectionMode('medio_franco')
+            if (requestedShift.startTime && requestedShift.endTime) {
+              setMedioFrancoTime({
+                startTime: requestedShift.startTime,
+                endTime: requestedShift.endTime
+              })
+            }
+          } else if (requestedShift.type === 'existing' && requestedShift.shiftId) {
+            setSelectionMode('turno')
+          }
+        } else {
+          setEmployeeRequest(null)
+        }
+      } catch (error) {
+        console.error("Error loading employee request:", error)
+      }
+    }
+
+    loadEmployeeRequest()
+  }, [employeeId, date, scheduleId])
 
   const resetMode = () => {
     setSelectionMode("none")
@@ -151,6 +193,36 @@ export function QuickShiftSelector({
       onClick={(e) => e.stopPropagation()}
       data-quick-selector="true"
     >
+      {/* Indicador de employee request */}
+      {employeeRequest && (
+        <div className="w-full p-1.5 mb-1 flex-shrink-0">
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-2 text-xs">
+            <div className="flex items-center gap-1 text-blue-700 font-medium">
+              <span>📋</span>
+              <span>Horario solicitado</span>
+            </div>
+            {employeeRequest.requestedShift?.type === 'franco' && (
+              <div className="text-blue-600 mt-1">Franco</div>
+            )}
+            {employeeRequest.requestedShift?.type === 'medio-franco' && (
+              <div className="text-blue-600 mt-1">
+                Medio franco ({employeeRequest.requestedShift.startTime} - {employeeRequest.requestedShift.endTime})
+              </div>
+            )}
+            {employeeRequest.requestedShift?.type === 'existing' && (
+              <div className="text-blue-600 mt-1">
+                Turno: {shifts.find(s => s.id === employeeRequest.requestedShift?.shiftId)?.name || 'Eliminado'}
+              </div>
+            )}
+            {employeeRequest.requestedShift?.type === 'manual' && (
+              <div className="text-blue-600 mt-1">
+                Manual ({employeeRequest.requestedShift.startTime} - {employeeRequest.requestedShift.endTime})
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
       {/* BOTÓN SUGERIR - Solo para horarios fijos manuales con asignaciones guardadas */}
       {hasManualSuggestion && (
         <div className="w-full p-1.5 mb-1 flex-shrink-0">

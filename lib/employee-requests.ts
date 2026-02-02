@@ -1,11 +1,13 @@
 import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { EmployeeRequestData } from '@/components/employee-request-dialog';
 
 export interface EmployeeRequest extends EmployeeRequestData {
+  userId: string;
   scheduleId: string;
   employeeId: string;
   date: string;
+  ownerId: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -19,24 +21,48 @@ export const saveEmployeeRequest = async (
   scheduleId: string,
   employeeId: string,
   date: string,
-  requestData: EmployeeRequestData
+  requestData: EmployeeRequestData,
+  ownerId: string
 ): Promise<void> => {
   if (!db) {
     throw new Error('Firestore no está inicializado');
   }
 
   try {
+    // VALIDACIÓN Y LOGS DE DEPURACIÓN
+    console.log('EMPLOYEE REQUEST – PAYLOAD DEBUG');
+    console.log('auth.currentUser?.uid:', auth?.currentUser?.uid);
+    console.log('ownerId enviado:', ownerId);
+    console.log('userId enviado:', auth?.currentUser?.uid);
+    console.log('employeeId (si existe):', employeeId);
+    
+    // Verificar explícitamente que ownerId exista y sea válido
+    if (!ownerId || ownerId === 'undefined' || ownerId === 'null' || ownerId === '') {
+      console.error('EMPLOYEE REQUEST – ownerId MISSING OR INVALID');
+      throw new Error('ownerId es requerido y no puede estar vacío');
+    }
+
+    // Verificar que el usuario esté autenticado
+    if (!auth?.currentUser?.uid) {
+      console.error('EMPLOYEE REQUEST – USER NOT AUTHENTICATED');
+      throw new Error('Usuario no autenticado');
+    }
+
     const docId = `${scheduleId}_${employeeId}_${date}`;
     const docRef = doc(db, COLLECTION_NAME, docId);
     
     const employeeRequest: EmployeeRequest = {
       ...requestData,
+      userId: auth.currentUser.uid, // UID del usuario autenticado
       scheduleId,
-      employeeId,
+      employeeId, // ID real del empleado solicitado
       date,
+      ownerId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
+
+    console.log('EMPLOYEE REQUEST – DOCUMENTO COMPLETO:', employeeRequest);
 
     await setDoc(docRef, employeeRequest);
   } catch (error) {

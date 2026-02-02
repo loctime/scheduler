@@ -475,6 +475,8 @@ export function ScheduleCell({
               config={config}
               employeeId={employeeId}
               dayOfWeek={dayOfWeek}
+              date={date}
+              scheduleId={scheduleId}
             />
           ) : (
             <CellAssignments assignments={assignments} getShiftInfo={getShiftInfo} />

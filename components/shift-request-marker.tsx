@@ -4,6 +4,7 @@ import { EmployeeRequestDialog, EmployeeRequestData } from '@/components/employe
 import { getEmployeeRequest, saveEmployeeRequest, deleteEmployeeRequest } from '@/lib/employee-requests';
 import { Turno, MedioTurno } from '@/lib/types';
 import { MessageSquare } from 'lucide-react';
+import { useData } from '@/contexts/data-context';
 
 /**
  * Componente para marcar visualmente pedidos de empleados.
@@ -52,6 +53,7 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
   availableShifts,
   mediosTurnos
 }) => {
+  const { userData } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [requestData, setRequestData] = useState<EmployeeRequestData | undefined>();
 
@@ -104,7 +106,12 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
 
   const handleSaveRequest = async (data: EmployeeRequestData) => {
     try {
-      await saveEmployeeRequest(scheduleId, employeeId, date, data);
+      // Determinar el ownerId a usar
+      const ownerId = userData?.role === 'invited' && userData?.ownerId 
+        ? userData.ownerId 
+        : userData?.uid || '';
+
+      await saveEmployeeRequest(scheduleId, employeeId, date, data, ownerId);
       
       // Actualizar estado local
       const isActive = data.active;

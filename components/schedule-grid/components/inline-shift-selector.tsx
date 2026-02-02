@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import type { MedioTurno, ShiftAssignment, Turno } from "@/lib/types"
+import { getEmployeeRequest } from "@/lib/employee-requests"
 
 type SpecialType = "shift" | "franco" | "medio_franco"
 
@@ -12,14 +13,61 @@ interface InlineShiftSelectorProps {
   shifts: Turno[]
   mediosTurnos?: MedioTurno[]
   onSelectAssignments: (assignments: ShiftAssignment[]) => void
+  employeeId?: string
+  date?: string
+  scheduleId?: string
 }
 
-export function InlineShiftSelector({ shifts, mediosTurnos, onSelectAssignments }: InlineShiftSelectorProps) {
+export function InlineShiftSelector({ 
+  shifts, 
+  mediosTurnos, 
+  onSelectAssignments, 
+  employeeId, 
+  date, 
+  scheduleId 
+}: InlineShiftSelectorProps) {
   const [specialType, setSpecialType] = useState<SpecialType>("shift")
   const [medioFrancoTime, setMedioFrancoTime] = useState<{ startTime: string; endTime: string }>({
     startTime: "",
     endTime: "",
   })
+  const [employeeRequest, setEmployeeRequest] = useState<any>(null)
+
+  // Cargar employee request si existe
+  useEffect(() => {
+    const loadEmployeeRequest = async () => {
+      if (!employeeId || !date || !scheduleId) return
+      
+      try {
+        const request = await getEmployeeRequest(scheduleId, employeeId, date)
+        if (request && request.active && request.requestedShift) {
+          setEmployeeRequest(request)
+          
+          // Si hay un request, mostrar el horario solicitado
+          const requestedShift = request.requestedShift
+          if (requestedShift.type === 'franco') {
+            setSpecialType('franco')
+          } else if (requestedShift.type === 'medio-franco') {
+            setSpecialType('medio_franco')
+            if (requestedShift.startTime && requestedShift.endTime) {
+              setMedioFrancoTime({
+                startTime: requestedShift.startTime,
+                endTime: requestedShift.endTime
+              })
+            }
+          } else if (requestedShift.type === 'existing' && requestedShift.shiftId) {
+            setSpecialType('shift')
+          }
+        } else {
+          setEmployeeRequest(null)
+        }
+      } catch (error) {
+        console.error("Error loading employee request:", error)
+      }
+    }
+
+    loadEmployeeRequest()
+  }, [employeeId, date, scheduleId])
 
   const handleSelectShift = (shift: Turno) => {
     // CRÍTICO: Crear assignment completo con horarios desde el inicio
@@ -67,6 +115,34 @@ export function InlineShiftSelector({ shifts, mediosTurnos, onSelectAssignments 
   // El usuario puede nombrarlos "Mañana", "Tarde", "Noche", etc.
   return (
     <div className="space-y-2" onClick={(e) => e.stopPropagation()} data-inline-selector="true">
+      {/* Indicador de employee request */}
+      {employeeRequest && (
+        <div className="bg-blue-50 border border-blue-200 rounded-md p-2 text-xs">
+          <div className="flex items-center gap-1 text-blue-700 font-medium">
+            <span>📋</span>
+            <span>Horario solicitado</span>
+          </div>
+          {employeeRequest.requestedShift?.type === 'franco' && (
+            <div className="text-blue-600 mt-1">Franco</div>
+          )}
+          {employeeRequest.requestedShift?.type === 'medio-franco' && (
+            <div className="text-blue-600 mt-1">
+              Medio franco ({employeeRequest.requestedShift.startTime} - {employeeRequest.requestedShift.endTime})
+            </div>
+          )}
+          {employeeRequest.requestedShift?.type === 'existing' && (
+            <div className="text-blue-600 mt-1">
+              Turno: {shifts.find(s => s.id === employeeRequest.requestedShift?.shiftId)?.name || 'Eliminado'}
+            </div>
+          )}
+          {employeeRequest.requestedShift?.type === 'manual' && (
+            <div className="text-blue-600 mt-1">
+              Manual ({employeeRequest.requestedShift.startTime} - {employeeRequest.requestedShift.endTime})
+            </div>
+          )}
+        </div>
+      )}
+      
       <div className="grid grid-cols-3 gap-1.5">
         <Button
           type="button"
