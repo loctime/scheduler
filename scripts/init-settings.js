@@ -63,11 +63,12 @@ async function initializeSettings() {
       weekNumber: getWeek(monday, { weekStartsOn: 1, locale: es }),
       year: monday.getFullYear(),
       month: monday.getMonth(),
+      createdBy: "system", // El script se ejecuta como sistema
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     }
 
-    const weekRef = doc(db, "apps/horarios", ownerId, "weeks", currentWeekId)
+    const weekRef = doc(db, "apps/horarios", "schedules", currentWeekId)
     await setDoc(weekRef, weekData)
 
     console.log(`✅ Semana ${currentWeekId} creada en Firestore`)
