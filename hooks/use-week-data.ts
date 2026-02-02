@@ -36,7 +36,7 @@ export function useWeekData(weekId: string | null): UseWeekDataReturn {
     }
 
     if (!ownerId) {
-      console.warn("🔧 [useWeekData] ownerId not available yet")
+      console.warn("🔧 [useWeekData] ownerId not available yet - skipping load")
       return
     }
 
@@ -46,11 +46,11 @@ export function useWeekData(weekId: string | null): UseWeekDataReturn {
     try {
       console.log("🔧 [useWeekData] Loading week data:", { weekId, ownerId, role: userData?.role })
       
-      // Normalizar weekId y usar path consistente: apps/horarios/{ownerId}/weeks/{weekId}
-      const normalizedWeekId = normalizeFirestoreId(weekId)
-      console.log("🔧 [useWeekData] Normalized weekId:", weekId, '→', normalizedWeekId)
+      // Usar path de documento válido: apps/horarios/weeks/{ownerId}_{weekId}
+      const compositeId = `${normalizeFirestoreId(ownerId)}_${normalizeFirestoreId(weekId)}`
+      console.log("🔧 [useWeekData] Composite ID:", compositeId)
       
-      const weekRef = createValidDocRef(db, "apps", "horarios", normalizeFirestoreId(ownerId), "weeks", normalizedWeekId)
+      const weekRef = createValidDocRef(db, "apps", "horarios", "weeks", compositeId)
       console.log("🔧 [useWeekData] Week ref created successfully")
       
       const weekDoc = await getDoc(weekRef)
@@ -113,8 +113,8 @@ export function useWeekData(weekId: string | null): UseWeekDataReturn {
     try {
       console.log("🔧 [useWeekData] Saving week data:", { weekId, ownerId })
       
-      const normalizedWeekId = normalizeFirestoreId(weekId)
-      const weekRef = createValidDocRef(db, "apps", "horarios", normalizeFirestoreId(ownerId), "weeks", normalizedWeekId)
+      const compositeId = `${normalizeFirestoreId(ownerId)}_${normalizeFirestoreId(weekId)}`
+      const weekRef = createValidDocRef(db, "apps", "horarios", "weeks", compositeId)
       
       const updateData = {
         ...data,

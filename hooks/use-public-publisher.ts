@@ -44,8 +44,8 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
       const publicScheduleId = `${normalizeFirestoreId(ownerId)}_${Date.now()}`
       
       // Get the actual week data from weeks collection (ruta corregida)
-      const normalizedWeekId = normalizeFirestoreId(options.weekId)
-      const weekRef = createValidDocRef(db, "apps", "horarios", normalizeFirestoreId(ownerId), "weeks", normalizedWeekId)
+      const compositeId = `${normalizeFirestoreId(ownerId)}_${normalizeFirestoreId(options.weekId)}`
+      const weekRef = createValidDocRef(db, "apps", "horarios", "weeks", compositeId)
       const weekDoc = await getDoc(weekRef)
       
       if (!weekDoc.exists()) {

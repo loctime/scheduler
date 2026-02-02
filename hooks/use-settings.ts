@@ -31,15 +31,15 @@ export function useSettings(): UseSettingsReturn {
       }
 
       if (!ownerId) {
-        console.warn("🔧 [useSettings] ownerId not available yet")
+        console.warn("🔧 [useSettings] ownerId not available yet - skipping load")
         setIsLoading(false)
         return
       }
 
       console.log("🔧 [useSettings] Loading settings for ownerId:", ownerId)
       
-      // Usar path consistente: apps/horarios/{ownerId}/settings
-      const settingsRef = createValidDocRef(db, "apps", "horarios", normalizeFirestoreId(ownerId), "settings")
+      // Usar path de documento válido: apps/horarios/{ownerId}/settings/main
+      const settingsRef = createValidDocRef(db, "apps", "horarios", normalizeFirestoreId(ownerId), "settings", "main")
       console.log("🔧 [useSettings] Settings ref created successfully")
       
       const settingsDoc = await getDoc(settingsRef)
@@ -48,10 +48,9 @@ export function useSettings(): UseSettingsReturn {
         console.log("🔧 [useSettings] Settings found:", settingsDoc.data())
         setSettings(settingsDoc.data() as Settings)
       } else {
-        console.log("🔧 [useSettings] No settings found, creating empty")
-        // Crear settings si no existen
-        const initialSettings: Settings = {}
-        setSettings(initialSettings)
+        console.log("🔧 [useSettings] No settings found - using null")
+        // No crear settings automáticamente, manejar como null
+        setSettings(null)
       }
     } catch (error) {
       console.error("🔧 [useSettings] Error loading settings:", error)
@@ -77,7 +76,7 @@ export function useSettings(): UseSettingsReturn {
 
       console.log("🔧 [useSettings] Updating published week:", weekId, "for ownerId:", ownerId)
       
-      const settingsRef = createValidDocRef(db, "apps", "horarios", normalizeFirestoreId(ownerId), "settings")
+      const settingsRef = createValidDocRef(db, "apps", "horarios", normalizeFirestoreId(ownerId), "settings", "main")
       
       await updateDoc(settingsRef, {
         publishedWeekId: weekId,

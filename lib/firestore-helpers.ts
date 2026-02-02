@@ -25,10 +25,17 @@ export function createValidDocRef(dbInstance: any, ...pathSegments: string[]) {
     throw new Error("Firestore instance not available")
   }
 
+  console.log("🔧 [createValidDocRef] Input segments:", pathSegments)
+
   const normalizedSegments = pathSegments.map(segment => {
     if (typeof segment !== 'string') {
       console.error('🔧 [createValidDocRef] Invalid segment type:', typeof segment, segment)
       throw new Error(`Invalid segment type: ${typeof segment}`)
+    }
+    
+    if (!segment || segment.trim() === '') {
+      console.error('🔧 [createValidDocRef] Empty segment:', segment)
+      throw new Error("Empty segment not allowed")
     }
     
     const normalized = normalizeFirestoreId(segment)
@@ -41,11 +48,19 @@ export function createValidDocRef(dbInstance: any, ...pathSegments: string[]) {
   
   // Verificar que tengamos número par de segmentos
   if (normalizedSegments.length % 2 !== 0) {
-    console.error('🔧 [createValidDocRef] Invalid path - odd number of segments:', normalizedSegments)
-    throw new Error(`Invalid path: odd number of segments (${normalizedSegments.length})`)
+    const errorMsg = `Invalid path: odd number of segments (${normalizedSegments.length}). Path: ${fullPath}`
+    console.error('🔧 [createValidDocRef] ERROR:', errorMsg)
+    throw new Error(errorMsg)
   }
 
-  return doc(dbInstance, ...normalizedSegments)
+  try {
+    const ref = doc(dbInstance, ...normalizedSegments)
+    console.log('🔧 [createValidDocRef] Document reference created successfully')
+    return ref
+  } catch (error) {
+    console.error('🔧 [createValidDocRef] Failed to create reference:', error)
+    throw new Error(`Failed to create document reference: ${error}`)
+  }
 }
 
 /**
