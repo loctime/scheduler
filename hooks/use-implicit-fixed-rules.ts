@@ -33,6 +33,30 @@ export function useImplicitFixedRules({
   onWeekScheduleCreated,
 }: UseImplicitFixedRulesProps) {
   const { toast } = useToast()
+  
+  // GUARD: Solo ejecutar en dashboard (usuario autenticado con rol adecuado)
+  const isDashboardContext = useMemo(() => {
+    // Verificar si estamos en contexto de dashboard
+    if (typeof window === 'undefined') return false
+    
+    const isDashboardPage = window.location.pathname.startsWith('/dashboard')
+    const hasValidUser = user && user.uid
+    const isAdmin = user?.role === 'admin' || user?.role === 'manager'
+    
+    const canExecute = isDashboardPage && hasValidUser && isAdmin
+    
+    console.log("🔧 [useImplicitFixedRules] Context check:", {
+      isDashboardPage,
+      hasValidUser,
+      isAdmin,
+      canExecute,
+      userId: user?.uid,
+      path: window.location.pathname
+    })
+    
+    return canExecute
+  }, [user])
+
   const { getRuleForDay, rules: fixedRules } = useEmployeeFixedRules({ 
     ownerId: user?.uid 
   })
@@ -345,6 +369,13 @@ export function useImplicitFixedRules({
     weekStartDate: Date,
     employeeId: string
   ): Promise<Horario | null> => {
+    // GUARD: Solo ejecutar en dashboard
+    if (!isDashboardContext) {
+      console.warn(" [useImplicitFixedRules] applyFixedRulesIfWeekEmpty called outside dashboard - blocking execution")
+      return null
+    }
+
+    console.log(" [useImplicitFixedRules] Applying fixed rules for week:", weekStartDate, "employee:", employeeId)
     const weekSchedule = getWeekSchedule(weekStartDate)
     
     // 1. Detectar si la semana está vacía para este empleado

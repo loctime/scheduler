@@ -44,54 +44,29 @@ export function useWeekData(weekId: string | null): UseWeekDataReturn {
     setError(null)
 
     try {
-      console.log("🔧 [useWeekData] Loading week data:", { weekId, ownerId, role: userData?.role })
+      console.log("🔧 [useWeekData] Loading week data (READ-ONLY MODE):", { weekId, ownerId, role: userData?.role })
       
       // Usar path de documento válido: apps/horarios/weeks/{ownerId}_{weekId}
       const compositeId = `${normalizeFirestoreId(ownerId)}_${normalizeFirestoreId(weekId)}`
       console.log("🔧 [useWeekData] Composite ID:", compositeId)
       
       const weekRef = createValidDocRef(db, "apps", "horarios", "weeks", compositeId)
-      console.log("🔧 [useWeekData] Week ref created successfully")
+      console.log("🔧 [useWeekData] Week ref created for READ-ONLY access")
       
       const weekDoc = await getDoc(weekRef)
 
       if (weekDoc.exists()) {
-        console.log("🔧 [useWeekData] Week data found")
+        console.log("🔧 [useWeekData] Week data found (READ-ONLY)")
         setWeekData(weekDoc.data() as WeekDocument)
       } else {
-        console.log("🔧 [useWeekData] No week data found")
-        
-        // Verificar si el usuario puede crear documentos
-        const canCreate = userData?.role !== 'invited' // Los invitados no pueden crear
-        
-        if (canCreate) {
-          console.log("🔧 [useWeekData] Creating basic document (user has permission)")
-          // Si no existe, crear documento básico
-          const basicWeekData: WeekDocument = {
-            weekId,
-            startDate: "", // Se llenaría desde el hook de navegación
-            endDate: "",   // Se llenaría desde el hook de navegación
-            weekNumber: 0,
-            year: 0,
-            month: 0,
-            createdBy: user?.uid,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-          }
-          
-          await setDoc(weekRef, basicWeekData)
-          console.log("🔧 [useWeekData] Basic week document created")
-          setWeekData(basicWeekData)
-        } else {
-          console.log("🔧 [useWeekData] User cannot create documents, showing empty state")
-          // Mostrar estado vacío si no puede crear
-          setWeekData(null)
-        }
+        console.log("🔧 [useWeekData] No week data found - READ-ONLY mode, NOT creating document")
+        // EN MODO SOLO LECTURA, NO CREAR DOCUMENTOS
+        setWeekData(null)
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Error desconocido"
       setError(errorMessage)
-      console.error("🔧 [useWeekData] Error loading week data:", err)
+      console.error("🔧 [useWeekData] Error loading week data (READ-ONLY):", err)
     } finally {
       setIsLoading(false)
     }
@@ -102,37 +77,9 @@ export function useWeekData(weekId: string | null): UseWeekDataReturn {
   }, [weekId, ownerId, userData]) // Disparar cuando weekId, ownerId o userData cambien
 
   const saveWeekData = async (data: Partial<WeekDocument>) => {
-    if (!weekId || !db) {
-      throw new Error("WeekId o Firestore no disponible")
-    }
-
-    if (!ownerId) {
-      throw new Error("ownerId not available")
-    }
-
-    try {
-      console.log("🔧 [useWeekData] Saving week data:", { weekId, ownerId })
-      
-      const compositeId = `${normalizeFirestoreId(ownerId)}_${normalizeFirestoreId(weekId)}`
-      const weekRef = createValidDocRef(db, "apps", "horarios", "weeks", compositeId)
-      
-      const updateData = {
-        ...data,
-        updatedAt: serverTimestamp()
-      }
-
-      await setDoc(weekRef, updateData, { merge: true })
-      
-      console.log("🔧 [useWeekData] Week data saved successfully")
-      
-      // Actualizar estado local
-      setWeekData(prev => prev ? { ...prev, ...updateData } : null)
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Error al guardar"
-      setError(errorMessage)
-      console.error("🔧 [useWeekData] Error saving week data:", err)
-      throw new Error(errorMessage)
-    }
+    // EN MODO SOLO LECTURA, ESTA FUNCIÓN NO DEBERÍA USARSE FUERA DEL DASHBOARD
+    console.error("🔧 [useWeekData] saveWeekData called in READ-ONLY mode - this should only be used in dashboard")
+    throw new Error("saveWeekData is disabled in READ-ONLY mode. Use dashboard for editing.")
   }
 
   const refreshWeekData = async () => {
