@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { ScheduleGrid } from "@/components/schedule-grid"
 import { usePublicHorario } from "@/hooks/use-public-horario"
 import { useToast } from "@/hooks/use-toast"
-import type { Empleado, Horario, Turno } from "@/lib/types"
+import type { Empleado, Horario, Turno, ShiftAssignment } from "@/lib/types"
 
 interface PublicHorarioPageProps {
   scheduleId: string
@@ -104,13 +104,25 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
     const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
     const weekEndStr = format(addDays(weekStartDate, 6), "yyyy-MM-dd")
 
+    // Transform horario.days to match Horario.assignments structure
+    const transformedAssignments: { [date: string]: { [empleadoId: string]: ShiftAssignment[] | string[] } } = {}
+    
+    if (horario.days) {
+      Object.entries(horario.days).forEach(([date, dayAssignments]) => {
+        if (dayAssignments && typeof dayAssignments === 'object' && !Array.isArray(dayAssignments)) {
+          // If it's already in the correct format (nested object)
+          transformedAssignments[date] = dayAssignments as { [empleadoId: string]: ShiftAssignment[] | string[] }
+        }
+      })
+    }
+
     return {
       id: horario.weekId || horario.ownerId,
       nombre: horario.weekLabel || `Semana ${weekStartStr}`,
       weekStart: weekStartStr,
       semanaInicio: weekStartStr,
       semanaFin: weekEndStr,
-      assignments: horario.days || {},
+      assignments: transformedAssignments,
     } as Horario
   }, [horario, weekStartDate])
 
