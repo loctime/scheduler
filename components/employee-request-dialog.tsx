@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Turno, MedioTurno } from '@/lib/types';
+import { Turno, MedioTurno, ShiftAssignment } from '@/lib/types';
 import { Clock, Calendar, MessageSquare } from 'lucide-react';
 
 export interface EmployeeRequestData {
@@ -25,6 +25,7 @@ interface EmployeeRequestDialogProps {
   availableShifts: Turno[];
   mediosTurnos?: MedioTurno[];
   onSave: (data: EmployeeRequestData) => void;
+  onAssign?: (assignment: ShiftAssignment) => void;
 }
 
 export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
@@ -33,7 +34,8 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
   initialData,
   availableShifts,
   mediosTurnos,
-  onSave
+  onSave,
+  onAssign
 }) => {
   const [requestType, setRequestType] = useState<
     'existing' | 'manual' | 'franco' | 'medio-franco'
@@ -103,20 +105,27 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
 
   const handleSave = () => {
     let requestedShift: EmployeeRequestData['requestedShift'];
+    let assignment: ShiftAssignment | null = null;
     
     switch (requestType) {
       case 'franco':
         requestedShift = { type: 'franco' as const };
+        assignment = { type: 'franco' };
         break;
       case 'medio-franco':
         requestedShift = { type: 'medio-franco' as const, startTime, endTime };
+        assignment = { type: 'medio_franco', startTime, endTime };
         break;
       case 'existing':
         requestedShift = { type: 'existing' as const, shiftId: selectedShiftId, startTime, endTime };
+        if (selectedShiftId) {
+          assignment = { type: 'shift', shiftId: selectedShiftId, startTime, endTime };
+        }
         break;
       case 'manual':
       default:
         requestedShift = { type: 'manual' as const, startTime, endTime };
+        assignment = { type: 'shift', startTime, endTime };
         break;
     }
 
@@ -126,7 +135,14 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
       description
     };
 
+    // Guardar el request
     onSave(requestData);
+    
+    // Asignar el horario en la celda inmediatamente
+    if (assignment && onAssign) {
+      onAssign(assignment);
+    }
+    
     onOpenChange(false);
   };
 

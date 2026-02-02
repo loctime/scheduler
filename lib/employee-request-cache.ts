@@ -8,6 +8,7 @@ import { saveEmployeeRequest } from "@/lib/employee-requests"
  * @param requestData - Datos del request
  * @param ownerId - ID del owner
  * @param updateCache - Función para actualizar el caché
+ * @param onAssignmentsUpdate - Función para actualizar asignaciones en el schedule
  */
 export async function saveEmployeeRequestWithCache(
   scheduleId: string,
@@ -15,7 +16,8 @@ export async function saveEmployeeRequestWithCache(
   date: string,
   requestData: any,
   ownerId: string,
-  updateCache: (key: string, request: any) => void
+  updateCache: (key: string, request: any) => void,
+  onAssignmentsUpdate?: (date: string, employeeId: string, assignments: any[], options?: { scheduleId?: string }) => void
 ) {
   try {
     // Guardar en Firestore
@@ -34,6 +36,52 @@ export async function saveEmployeeRequestWithCache(
     }
     
     updateCache(cacheKey, requestToCache)
+    
+    // Si el request está activo y tiene un horario solicitado, asignarlo realmente en el schedule
+    if (requestData.active && requestData.requestedShift && onAssignmentsUpdate) {
+      console.log('🔄 [saveEmployeeRequestWithCache] Asignando horario en el schedule:', requestData.requestedShift)
+      
+      let assignment: any = null
+      
+      switch (requestData.requestedShift.type) {
+        case 'franco':
+          assignment = { type: 'franco' }
+          break
+          
+        case 'medio-franco':
+          assignment = {
+            type: 'medio_franco',
+            startTime: requestData.requestedShift.startTime,
+            endTime: requestData.requestedShift.endTime
+          }
+          break
+          
+        case 'existing':
+          if (requestData.requestedShift.shiftId) {
+            assignment = {
+              type: 'shift',
+              shiftId: requestData.requestedShift.shiftId,
+              startTime: requestData.requestedShift.startTime,
+              endTime: requestData.requestedShift.endTime
+            }
+          }
+          break
+          
+        case 'manual':
+          assignment = {
+            type: 'shift',
+            startTime: requestData.requestedShift.startTime,
+            endTime: requestData.requestedShift.endTime
+          }
+          break
+      }
+      
+      // Si tenemos una asignación válida, guardarla en el schedule
+      if (assignment) {
+        onAssignmentsUpdate(date, employeeId, [assignment], { scheduleId })
+        console.log('✅ [saveEmployeeRequestWithCache] Horario asignado en el schedule')
+      }
+    }
     
     console.log('✅ [saveEmployeeRequestWithCache] Request guardado y caché actualizado')
     return true

@@ -499,6 +499,8 @@ export function ScheduleCell({
               availableShifts={quickShifts}
               mediosTurnos={mediosTurnos}
               updateEmployeeRequestCache={updateEmployeeRequestCache}
+              onAssignmentUpdate={onAssignmentUpdate}
+              onAssign={(assignment) => onQuickAssignments?.([assignment])}
             />
           </div>
         )}

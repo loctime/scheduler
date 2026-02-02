@@ -33,6 +33,10 @@ interface ShiftRequestMarkerProps {
   mediosTurnos?: MedioTurno[];
   /** Función para actualizar caché */
   updateEmployeeRequestCache?: (key: string, request: any) => void;
+  /** Función para actualizar asignaciones en el schedule */
+  onAssignmentUpdate?: (date: string, employeeId: string, assignments: any[], options?: { scheduleId?: string }) => void;
+  /** Función para asignar horario directamente en la celda */
+  onAssign?: (assignment: any) => void;
 }
 
 /**
@@ -55,7 +59,9 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
   date,
   availableShifts,
   mediosTurnos,
-  updateEmployeeRequestCache
+  updateEmployeeRequestCache,
+  onAssignmentUpdate,
+  onAssign
 }) => {
   const { userData } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -115,7 +121,7 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
         ? userData.ownerId 
         : userData?.uid || '';
 
-      // Usar la función que actualiza el caché
+      // Usar la función que actualiza el caché y asigna en el schedule
       if (updateEmployeeRequestCache) {
         const success = await saveEmployeeRequestWithCache(
           scheduleId, 
@@ -123,7 +129,8 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
           date, 
           data, 
           ownerId, 
-          updateEmployeeRequestCache
+          updateEmployeeRequestCache,
+          onAssignmentUpdate
         );
         
         if (!success) {
@@ -206,6 +213,7 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
         availableShifts={availableShifts}
         mediosTurnos={mediosTurnos}
         onSave={handleSaveRequest}
+        onAssign={onAssign}
       />
     </>
   );
