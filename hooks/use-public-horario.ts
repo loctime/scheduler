@@ -3,21 +3,11 @@ import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 export interface PublicHorarioData {
-  id: string
-  companyName: string
   ownerId: string
-  publishedWeekId: string
-  weekData: {
-    weekId: string
-    startDate: string
-    endDate: string
-    weekNumber: number
-    year: number
-    month: number
-    assignments?: Record<string, Record<string, any[]>>
-  }
+  weekId: string
+  weekLabel: string
   publishedAt: any
-  updatedAt: any
+  days: Record<string, any[]>
 }
 
 export interface UsePublicHorarioReturn {
@@ -69,14 +59,12 @@ export function usePublicHorario(ownerId: string): UsePublicHorarioReturn {
 
       const horarioData = horarioDoc.data() as PublicHorarioData
       console.log("🔧 [usePublicHorario] Public horario found:", {
-        companyName: horarioData.companyName,
-        publishedWeekId: horarioData.publishedWeekId
+        ownerId: horarioData.ownerId,
+        weekId: horarioData.weekId,
+        weekLabel: horarioData.weekLabel
       })
       
-      setHorario({
-        ...horarioData,
-        id: horarioDoc.id
-      })
+      setHorario(horarioData)
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Error al cargar horario"

@@ -1,11 +1,10 @@
 import { useState } from "react"
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
+import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useOwnerId } from "./use-owner-id"
-import { createWeekRef } from "@/lib/firestore-helpers"
 
 export interface PublishPublicScheduleOptions {
-  companyName: string
+  companyName?: string
   weekId: string
   weekData: any
 }
@@ -30,57 +29,43 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
       throw new Error("Firestore no disponible")
     }
 
+    // Validación obligatoria: debe haber weekData
+    if (!options.weekData) {
+      throw new Error("No hay datos de semana para publicar")
+    }
+
     setIsPublishing(true)
     setError(null)
 
     try {
-      console.log("🔧 [usePublicPublisher] Publishing schedule:", { 
-        companyName: options.companyName, 
-        weekId: options.weekId,
-        ownerId 
-      })
-
-      // Generate public schedule ID (could be based on ownerId + timestamp or custom)
-      const publicScheduleId = `${ownerId}_${Date.now()}`
+      console.log("🔧 [usePublicPublisher] Publishing schedule for ownerId:", ownerId)
+      console.log("🔧 [usePublicPublisher] WeekId:", options.weekId)
       
-      // Get the actual week data from weeks collection (ruta corregida)
-      const weekRef = createWeekRef(db, ownerId, options.weekId)
-      const weekDoc = await getDoc(weekRef)
+      // Path EXACTO: apps/horarios/published/{ownerId} (4 segmentos)
+      console.log("🔧 [usePublicPublisher] Writing to apps/horarios/published/" + ownerId)
       
-      if (!weekDoc.exists()) {
-        throw new Error("No se encontraron datos para la semana especificada")
-      }
-
-      const weekData = weekDoc.data() as any
-
-      // Create public schedule document
+      // Estructura mínima para lectura pública
       const publicScheduleData = {
-        companyName: options.companyName,
         ownerId: ownerId,
-        publishedWeekId: options.weekId,
-        weekData: {
-          weekId: options.weekId,
-          startDate: weekData.startDate || "",
-          endDate: weekData.endDate || "",
-          weekNumber: weekData.weekNumber || 0,
-          year: weekData.year || new Date().getFullYear(),
-          month: weekData.month || 0,
-          assignments: weekData.scheduleData?.assignments || weekData.assignments || {}
-        },
-        updatedAt: serverTimestamp(),
-        publishedAt: serverTimestamp()
+        weekId: options.weekId,
+        weekLabel: options.weekData.startDate && options.weekData.endDate 
+          ? `${options.weekData.startDate} - ${options.weekData.endDate}`
+          : `Semana ${options.weekId}`,
+        publishedAt: serverTimestamp(),
+        days: options.weekData.scheduleData?.assignments || options.weekData.assignments || {}
       }
 
+      // Usar setDoc con overwrite completo
       const publicRef = doc(db, "apps", "horarios", "published", ownerId)
       await setDoc(publicRef, publicScheduleData)
 
-      console.log("🔧 [usePublicPublisher] Schedule published successfully to apps/horarios/published/" + ownerId)
+      console.log("🔧 [usePublicPublisher] Publish success - document written to apps/horarios/published/" + ownerId)
       
       return ownerId // Retornar el ownerId para generar URL pública
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Error al publicar"
       setError(errorMessage)
-      console.error("🔧 [usePublicPublisher] Error publishing schedule:", err)
+      console.error("🔧 [usePublicPublisher] Publish error:", err)
       throw new Error(errorMessage)
     } finally {
       setIsPublishing(false)

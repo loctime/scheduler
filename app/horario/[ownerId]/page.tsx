@@ -41,7 +41,7 @@ export default function PublicHorarioPage() {
       try {
         await navigator.share({
           title: "Horario Semanal",
-          text: `Horario de ${horario?.companyName}`,
+          text: `Horario Semanal - ${horario?.weekLabel}`,
           url: window.location.href
         })
       } catch (error) {
@@ -110,9 +110,6 @@ export default function PublicHorarioPage() {
             <p className="text-gray-500 text-xs">
               El administrador debe publicar un horario desde el dashboard.
             </p>
-            <div className="mt-4 text-xs text-gray-400">
-              ID: {ownerId}
-            </div>
           </CardContent>
         </Card>
       </div>
@@ -128,10 +125,10 @@ export default function PublicHorarioPage() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                 <Calendar className="h-6 w-6" />
-                {horario.companyName}
+                Horario Semanal
               </h1>
               <p className="text-gray-600 text-sm mt-1">
-                Horario semanal público
+                Horario público
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -157,14 +154,14 @@ export default function PublicHorarioPage() {
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="text-center">
             <div className="font-semibold text-gray-900">
-              Semana {horario.weekData.weekNumber} de {new Date(horario.weekData.year, horario.weekData.month).toLocaleDateString('es-AR', { month: 'long' })}
+              {horario.weekLabel}
             </div>
             <div className="text-sm text-gray-600">
-              {horario.weekData.startDate} - {horario.weekData.endDate}
+              Semana {horario.weekId}
             </div>
-            <div className="text-xs text-gray-500 mt-1">
-              ID: {horario.publishedWeekId}
-            </div>
+            <p className="text-gray-500 text-xs">
+              ID: {horario.weekId}
+            </p>
           </div>
         </div>
       </div>
@@ -178,24 +175,19 @@ export default function PublicHorarioPage() {
               Horario Semanal
             </CardTitle>
             <p className="text-sm text-gray-600">
-              Semana {horario.weekData.weekNumber} - {horario.weekData.startDate} al {horario.weekData.endDate}
+              {horario.weekLabel} - Semana {horario.weekId}
             </p>
           </CardHeader>
           <CardContent>
-            {horario.weekData.assignments ? (
+            {horario.days ? (
               <div className="space-y-4">
-                {Object.entries(horario.weekData.assignments).map(([date, dayAssignments]) => (
-                  <div key={date} className="border rounded-lg p-4">
-                    <h3 className="font-semibold mb-3 text-gray-900">
-                      {new Date(date).toLocaleDateString('es-AR', { 
-                        weekday: 'long', 
-                        day: '2-digit', 
-                        month: '2-digit', 
-                        year: 'numeric' 
-                      })}
+                {Object.entries(horario.days).map(([day, dayAssignments]) => (
+                  <div key={day} className="border rounded-lg p-4">
+                    <h3 className="font-semibold mb-3 text-gray-900 capitalize">
+                      {day}
                     </h3>
                     <div className="grid gap-2">
-                      {Object.entries(dayAssignments).map(([employeeId, assignments]) => (
+                      {Object.entries(dayAssignments as any).map(([employeeId, assignments]) => (
                         <div key={employeeId} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                           <span className="font-medium text-gray-900">
                             Empleado {employeeId}
@@ -230,7 +222,7 @@ export default function PublicHorarioPage() {
 
         {/* Footer */}
         <div className="mt-6 text-center text-sm text-gray-500">
-          <p>Horario actualizado: {horario.updatedAt ? new Date(horario.updatedAt.toDate()).toLocaleDateString('es-AR') : 'Desconocido'}</p>
+          <p>Horario publicado: {horario.publishedAt ? new Date(horario.publishedAt.toDate()).toLocaleDateString('es-AR') : 'Desconocido'}</p>
           <p className="mt-1">Este horario es de solo lectura</p>
           <div className="mt-2">
             <Button
