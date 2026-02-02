@@ -137,7 +137,14 @@ export function ScheduleCell({
   }
 
   // Handler para clic en celda con confirmación de pedido de empleado
-  const handleCellClickWrapper = () => {
+  const handleCellClickWrapper = (event?: React.MouseEvent) => {
+    // Si el evento viene del icono del pedido (ShiftRequestMarker), no mostrar advertencia
+    // porque el usuario quiere gestionar el pedido, no modificar el turno
+    if (event?.target instanceof Element && event.target.closest('[data-shift-request-marker]')) {
+      onCellClick(date, employeeId)
+      return
+    }
+    
     // Si hay un pedido de empleado activo, mostrar confirmación
     if (employeeRequestActive && !readonly) {
       setEmployeeRequestConfirmDialogOpen(true)
@@ -458,7 +465,7 @@ export function ScheduleCell({
               isSelected && isClickable && onQuickAssignments ? "min-h-[140px] py-2 sm:py-2.5 md:py-3" : ""
             }`}
             style={backgroundStyle}
-            onClick={() => handleCellClickWrapper()}
+            onClick={(event) => handleCellClickWrapper(event)}
           >
             {/* Botón pequeño de deshacer en celda (arriba a la izquierda) */}
             {!readonly && hasCellHistory && (
@@ -506,7 +513,7 @@ export function ScheduleCell({
         </div>
         {/* Marcador visual único abajo al centro */}
         {!readonly && (
-          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10">
+          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10" data-shift-request-marker>
             <ShiftRequestMarker 
               active={employeeRequestActive}
               description={employeeRequestDescription}

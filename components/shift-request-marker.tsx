@@ -214,6 +214,7 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
         mediosTurnos={mediosTurnos}
         onSave={handleSaveRequest}
         onAssign={onAssign}
+        onDelete={handleDeleteRequest}
       />
     </>
   );

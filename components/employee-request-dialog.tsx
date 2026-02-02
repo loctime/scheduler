@@ -26,6 +26,7 @@ interface EmployeeRequestDialogProps {
   mediosTurnos?: MedioTurno[];
   onSave: (data: EmployeeRequestData) => void;
   onAssign?: (assignment: ShiftAssignment) => void;
+  onDelete?: () => void;
 }
 
 export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
@@ -35,7 +36,8 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
   availableShifts,
   mediosTurnos,
   onSave,
-  onAssign
+  onAssign,
+  onDelete
 }) => {
   const [requestType, setRequestType] = useState<
     'existing' | 'manual' | 'franco' | 'medio-franco'
@@ -304,6 +306,19 @@ export const EmployeeRequestDialog: React.FC<EmployeeRequestDialogProps> = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
+          {/* Botón de eliminar - solo visible si hay un pedido activo */}
+          {initialData?.active && onDelete && (
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                onDelete?.()
+                onOpenChange(false)
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Eliminar pedido
+            </Button>
+          )}
           <Button onClick={handleSave} disabled={!isFormValid()}>
             Guardar pedido
           </Button>
