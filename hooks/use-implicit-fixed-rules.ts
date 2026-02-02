@@ -1,11 +1,12 @@
 import { useEffect, useCallback, useMemo } from "react"
-import { format, startOfWeek, addDays, getDay, parseISO } from "date-fns"
+import { format, startOfWeek, addDays } from "date-fns"
 import { collection, doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
-import { ShiftAssignment, EmployeeFixedRule, Horario, Turno } from "@/lib/types"
+import { ShiftAssignment, Horario, Turno } from "@/lib/types"
 import { useEmployeeFixedRules } from "./use-employee-fixed-rules"
 import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
+import { useFixedRulesEngine } from "@/hooks/use-fixed-rules-engine"
 
 interface UseImplicitFixedRulesProps {
   user: any
@@ -46,9 +47,10 @@ export function useImplicitFixedRules({
     return isDashboardPage && hasValidUser && isAdmin
   }, [user])
 
-  const { getRuleForDay, rules: fixedRules } = useEmployeeFixedRules({ 
+  const { rules: fixedRules } = useEmployeeFixedRules({ 
     ownerId: user?.uid 
   })
+  const { buildAssignmentsFromFixedRulesForEmployee } = useFixedRulesEngine()
 
   /**
    * Determina si una semana está vacía para un empleado específico
@@ -81,103 +83,19 @@ export function useImplicitFixedRules({
   }, [])
 
   /**
-   * Limpia campos undefined de los assignments para Firestore
-   */
-  const cleanAssignmentsForFirestore = useCallback((
-    assignments: ShiftAssignment[]
-  ): ShiftAssignment[] => {
-    return assignments.map(assignment => {
-      const cleaned: any = {}
-      
-      Object.entries(assignment).forEach(([key, value]) => {
-        // Solo incluir el campo si no es undefined
-        if (value !== undefined) {
-          cleaned[key] = value
-        }
-      })
-      
-      return cleaned as ShiftAssignment
-    })
-  }, [])
-
-  /**
    * Genera asignaciones basadas en reglas fijas para un empleado en una semana
    */
-  const generateAssignmentsFromRules = useCallback((
-    employeeId: string,
-    weekStartDate: Date
-  ): Record<string, ShiftAssignment[]> => {
-    const assignments: Record<string, ShiftAssignment[]> = {}
-
-    // Para cada día de la semana
-    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
-      const date = addDays(weekStartDate, dayOffset)
-      const dateStr = format(date, "yyyy-MM-dd")
-      const dayOfWeek = getDay(date)
-
-      // Buscar regla fija para este empleado y día
-      const rule = getRuleForDay(employeeId, dayOfWeek)
-      if (rule) {
-        // Convertir regla a asignaciones
-        const ruleAssignments = convertRuleToAssignments(rule, shifts)
-        
-        if (ruleAssignments.length > 0) {
-          // Limpiar campos undefined antes de guardar
-          assignments[dateStr] = cleanAssignmentsForFirestore(ruleAssignments)
-          
-          logger.info("[ImplicitFixedRules] Aplicando regla fija", {
-            employeeId,
-            date: dateStr,
-            dayOfWeek,
-            ruleType: rule.type,
-            shiftId: rule.shiftId,
-            assignmentsCount: ruleAssignments.length
-          })
-        }
-      }
-    }
-
-    return assignments
-  }, [getRuleForDay, shifts, cleanAssignmentsForFirestore])
-
-  /**
-   * Convierte una regla fija a asignaciones con formato completo
-   */
-  const convertRuleToAssignments = useCallback((
-    rule: EmployeeFixedRule,
-    shifts: Turno[]
-  ): ShiftAssignment[] => {
-    if (rule.type === "OFF") {
-      return [{ type: "franco" }]
-    }
-
-    if (rule.type === "SHIFT" && rule.shiftId) {
-      const shift = shifts.find(s => s.id === rule.shiftId)
-      if (shift) {
-        const assignment: ShiftAssignment = {
-          type: "shift",
-          shiftId: rule.shiftId,
-          startTime: shift.startTime || "",
-          endTime: shift.endTime || ""
-        }
-
-        // Solo agregar segunda franja si existe en el turno
-        if (shift.startTime2 && shift.endTime2) {
-          assignment.startTime2 = shift.startTime2
-          assignment.endTime2 = shift.endTime2
-        }
-
-        return [assignment]
-      } else {
-        logger.warn("[ImplicitFixedRules] Turno no encontrado para regla", {
-          ruleId: rule.id,
-          shiftId: rule.shiftId
-        })
-      }
-    }
-
-    return []
-  }, [shifts])
+  const generateAssignmentsFromRules = useCallback(
+    (employeeId: string, weekStartDate: Date): Record<string, ShiftAssignment[]> => {
+      return buildAssignmentsFromFixedRulesForEmployee({
+        employeeId,
+        weekStartDate,
+        rules: fixedRules,
+        shifts,
+      })
+    },
+    [buildAssignmentsFromFixedRulesForEmployee, fixedRules, shifts]
+  )
 
   /**
    * Crea un nuevo schedule con asignaciones de reglas fijas
