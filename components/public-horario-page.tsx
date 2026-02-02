@@ -11,6 +11,7 @@ import { ScheduleGrid } from "@/components/schedule-grid"
 import { usePublicHorario } from "@/hooks/use-public-horario"
 import { useToast } from "@/hooks/use-toast"
 import type { Empleado, Horario, Turno, ShiftAssignment } from "@/lib/types"
+import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 
 interface PublicHorarioPageProps {
   scheduleId: string
@@ -145,6 +146,26 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
     return buildShiftsFromAssignments(horario.ownerId, horario.days)
   }, [horario])
 
+  // Crear employeeStats vacío pero con estructura correcta para activar layout completo
+  const employeeStats = useMemo(() => {
+    if (!horario) return {}
+    
+    const stats: Record<string, EmployeeMonthlyStats> = {}
+    employees.forEach((employee) => {
+      stats[employee.id] = {
+        francos: 0,
+        francosSemana: 0,
+        horasExtrasSemana: 0,
+        horasExtrasMes: 0,
+        horasComputablesMes: 0,
+        horasSemana: 0,
+        horasLicenciaEmbarazo: 0,
+        horasMedioFranco: 0,
+      }
+    })
+    return stats
+  }, [horario, employees])
+
   const ownerUser = useMemo(() => {
     if (!horario?.ownerId) return null
     return { uid: horario.ownerId }
@@ -234,16 +255,22 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Header único unificado */}
       <div className="border-b bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-          <div>
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <div className="flex-1">
             <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
               <Calendar className="h-6 w-6" />
               Horario Semanal
             </h1>
-            <p className="text-sm text-gray-600 mt-1">Horario público</p>
+            <div className="mt-1 flex items-center gap-4">
+              <div className="font-semibold text-gray-900">{horario.weekLabel}</div>
+              <div className="text-sm text-gray-500">
+                {format(weekStartDate, "dd/MM/yyyy")} – {format(addDays(weekStartDate, 6), "dd/MM/yyyy")}
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Badge variant="secondary" className="bg-green-100 text-green-800">
               Publicado
             </Badge>
@@ -260,62 +287,43 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
         </div>
       </div>
 
-      <div className="border-b bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-4">
-          <div className="text-center">
-            <div className="font-semibold text-gray-900">{horario.weekLabel}</div>
-            <div className="text-sm text-gray-600">Semana {horario.weekId}</div>
-            <p className="text-xs text-gray-500">ID: {horario.weekId}</p>
+      {/* Calendario como foco principal - full width sin Card */}
+      <div className="w-full px-2 py-6">
+        {weekDays.length > 0 ? (
+          <ScheduleGrid
+            weekDays={weekDays}
+            employees={employees}
+            allEmployees={employees}
+            shifts={shifts}
+            schedule={schedule}
+            monthRange={undefined}
+            mediosTurnos={[]}
+            employeeStats={employeeStats}
+            readonly={true}
+            allSchedules={[]}
+            isScheduleCompleted={false}
+            lastCompletedWeekStart={undefined}
+            onClearEmployeeRow={undefined}
+            user={ownerUser}
+            onExportEmployeeImage={undefined}
+          />
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
+            <p>No hay asignaciones para esta semana</p>
           </div>
-        </div>
+        )}
       </div>
 
-      <div className="mx-auto max-w-6xl p-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Horario Semanal
-            </CardTitle>
-            <p className="text-sm text-gray-600">
-              {horario.weekLabel} - Semana {horario.weekId}
-            </p>
-          </CardHeader>
-          <CardContent>
-            {weekDays.length > 0 ? (
-              <ScheduleGrid
-                weekDays={weekDays}
-                employees={employees}
-                shifts={shifts}
-                schedule={schedule}
-                readonly
-                user={ownerUser}
-              />
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>No hay asignaciones para esta semana</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <div className="mt-6 text-center text-sm text-gray-500">
-          <p>
-            Horario publicado:{" "}
-            {horario.publishedAt ? new Date(horario.publishedAt.toDate()).toLocaleDateString("es-AR") : "Desconocido"}
-          </p>
-          <p className="mt-1">Este horario es de solo lectura</p>
-          <div className="mt-2 flex justify-center">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyUrl}
-              className="flex items-center gap-2"
-            >
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              {copied ? "Enlace copiado" : "Copiar enlace"}
-            </Button>
+      {/* Footer discreto */}
+      <div className="border-t bg-gray-50">
+        <div className="w-full px-2 py-4">
+          <div className="flex items-center justify-between text-sm text-gray-500">
+            <div>
+              Publicado:{" "}
+              {horario.publishedAt ? new Date(horario.publishedAt.toDate()).toLocaleDateString("es-AR") : "Desconocido"}
+            </div>
+            <div>Este horario es de solo lectura</div>
           </div>
         </div>
       </div>
