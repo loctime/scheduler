@@ -190,7 +190,7 @@ export default function PublicHorarioPage() {
                       {Object.entries(dayAssignments as any).map(([employeeId, assignments]) => (
                         <div key={employeeId} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                           <span className="font-medium text-gray-900">
-                            Empleado {employeeId}
+                            {horario.employees?.find((emp: any) => emp.id === employeeId)?.name || `Empleado ${employeeId}`}
                           </span>
                           <div className="flex gap-1">
                             {Array.isArray(assignments) && assignments.length > 0 ? (

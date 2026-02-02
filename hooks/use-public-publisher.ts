@@ -56,8 +56,8 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
       console.log("🔧 [usePublicPublisher] Publishing schedule for ownerId:", ownerId)
       console.log("🔧 [usePublicPublisher] WeekId:", options.weekId)
       
-      // Path EXACTO: apps/horarios/published/{ownerId} (4 segmentos)
-      const fullPath = "apps/horarios/published/" + ownerId
+      // Path EXACTO: apps/horarios_public/{ownerId}/current (4 segmentos)
+      const fullPath = "apps/horarios_public/" + ownerId + "/current"
       console.log("🔧 [usePublicPublisher] Writing to:", fullPath)
       
       // Estructura mínima para lectura pública
@@ -68,19 +68,21 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
           ? `${options.weekData.startDate} - ${options.weekData.endDate}`
           : `Semana ${options.weekId}`,
         publishedAt: serverTimestamp(),
-        days: options.weekData.scheduleData?.assignments || options.weekData.assignments || {}
+        days: options.weekData.scheduleData?.assignments || options.weekData.assignments || {},
+        employees: options.weekData.employees || []
       }
 
       console.log("🔧 [usePublicPublisher] Datos a publicar:", {
         ...publicScheduleData,
         publishedAt: "[Timestamp]",
         daysCount: Object.keys(publicScheduleData.days).length,
-        hasAssignments: Object.keys(publicScheduleData.days).length > 0
+        hasAssignments: Object.keys(publicScheduleData.days).length > 0,
+        employeesCount: publicScheduleData.employees.length
       })
 
-      // Usar setDoc con overwrite completo
-      const publicRef = doc(db, "apps", "horarios", "published", ownerId)
-      console.log("🔧 [usePublicPublisher] Document reference created")
+      // Usar setDoc con overwrite completo en apps/horarios_public/{ownerId}/current
+      const publicRef = doc(db, "apps", "horarios_public", ownerId, "current")
+      console.log("🔧 [usePublicPublisher] Document reference created for apps/horarios_public/" + ownerId + "/current")
       
       await setDoc(publicRef, publicScheduleData)
       console.log("🔧 [usePublicPublisher] Publish success - document written to:", fullPath)

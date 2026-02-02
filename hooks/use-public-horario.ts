@@ -8,6 +8,7 @@ export interface PublicHorarioData {
   weekLabel: string
   publishedAt: any
   days: Record<string, any[]>
+  employees: any[]
 }
 
 export interface UsePublicHorarioReturn {
@@ -18,7 +19,7 @@ export interface UsePublicHorarioReturn {
 
 /**
  * Hook para leer horarios públicos SIN autenticación
- * Lee desde: apps/horarios/published/{ownerId}
+ * Lee desde: apps/horarios_public/{ownerId}/current
  */
 export function usePublicHorario(ownerId: string): UsePublicHorarioReturn {
   const [horario, setHorario] = useState<PublicHorarioData | null>(null)
@@ -47,12 +48,12 @@ export function usePublicHorario(ownerId: string): UsePublicHorarioReturn {
 
       console.log("🔧 [usePublicHorario] Loading public horario for ownerId:", ownerId)
       
-      // Path válido: apps/horarios/published/{ownerId}
-      const fullPath = "apps/horarios/published/" + ownerId
+      // Path válido: apps/horarios_public/{ownerId}/current
+      const fullPath = "apps/horarios_public/" + ownerId + "/current"
       console.log("🔧 [usePublicHorario] Reading from:", fullPath)
       
-      const horarioRef = doc(db, "apps", "horarios", "published", ownerId)
-      console.log("🔧 [usePublicHorario] Document reference created")
+      const horarioRef = doc(db, "apps", "horarios_public", ownerId, "current")
+      console.log("🔧 [usePublicHorario] Document reference created for apps/horarios_public/" + ownerId + "/current")
       
       const horarioDoc = await getDoc(horarioRef)
       console.log("🔧 [usePublicHorario] Document fetched, exists:", horarioDoc.exists())
@@ -69,7 +70,8 @@ export function usePublicHorario(ownerId: string): UsePublicHorarioReturn {
         weekId: horarioData.weekId,
         weekLabel: horarioData.weekLabel,
         hasPublishedAt: !!horarioData.publishedAt,
-        daysCount: Object.keys(horarioData.days || {}).length
+        daysCount: Object.keys(horarioData.days || {}).length,
+        employeesCount: horarioData.employees?.length || 0
       })
       
       setHorario(horarioData)
