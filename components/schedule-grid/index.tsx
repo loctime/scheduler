@@ -25,9 +25,12 @@ import { usePatternSuggestions } from "@/hooks/use-pattern-suggestions"
 import { useEmployeeFixedRules } from "@/hooks/use-employee-fixed-rules"
 import { FixedRuleModal } from "./components/fixed-rule-modal"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { useScheduleGridImage } from "@/hooks/useScheduleGridImage"
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { isAssignmentIncomplete } from "@/lib/assignment-utils"
+import { Grid, User } from "lucide-react"
+import { forwardRef, useRef, useEffect } from "react"
 
 export interface EmployeeMonthlyStats {
   francos: number
@@ -66,7 +69,7 @@ interface ScheduleGridProps {
   onExportEmployeeImage?: (employeeId: string, employeeName: string, weekStartDate: Date) => void // Función para exportar imagen de un empleado
 }
 
-export const ScheduleGrid = memo(function ScheduleGrid({
+export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
   weekDays,
   employees,
   allEmployees,
@@ -80,12 +83,12 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   employeeStats,
   isFirstWeek = false,
   isScheduleCompleted = false,
-  lastCompletedWeekStart,
+  lastCompletedWeekStart = null,
   onClearEmployeeRow: externalOnClearEmployeeRow,
   allSchedules = [],
   user: userProp,
   onExportEmployeeImage,
-}: ScheduleGridProps) {
+}, ref) => {
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
   const [cellUndoHistory, setCellUndoHistory] = useState<Map<string, ShiftAssignment[]>>(new Map())
   const [fixedRuleModalOpen, setFixedRuleModalOpen] = useState(false)
@@ -94,6 +97,16 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     employeeName: string
     date: Date
   } | null>(null)
+
+  // Estado para controlar vista en móvil
+  const [mobileView, setMobileView] = useState<"full" | "individual">("full")
+  
+  // Refs para generación de imagen
+  const gridRef = useRef<HTMLDivElement>(null)
+  const hiddenGridRef = useRef<HTMLDivElement>(null)
+  
+  // Hook para generar imagen de la grilla
+  const { imageUrl, generateImage, loading } = useScheduleGridImage()
 
   // Intentar obtener user del contexto si no se proporciona como prop
   // Usar useContext directamente para evitar el error si no hay DataProvider
@@ -105,6 +118,22 @@ export const ScheduleGrid = memo(function ScheduleGrid({
   const { toast } = useToast()
   const isMobile = useIsMobile()
   const { updateEmployeeOrder, addSeparator, updateSeparator, deleteSeparator } = useEmployeeOrder()
+
+  // Efecto para generar imagen de la grilla en móvil
+  useEffect(() => {
+    if (!isMobile || !hiddenGridRef.current || imageUrl) return
+    
+    const id = requestAnimationFrame(() => {
+      // Dar tiempo extra para renderizado completo
+      setTimeout(() => {
+        if (hiddenGridRef.current) {
+          generateImage(hiddenGridRef.current)
+        }
+      }, 100)
+    })
+    
+    return () => cancelAnimationFrame(id)
+  }, [isMobile, generateImage, imageUrl])
 
   // Hook para reglas fijas
   const { hasFixedRule, getRuleForDay } = useEmployeeFixedRules({ 
@@ -487,43 +516,218 @@ export const ScheduleGrid = memo(function ScheduleGrid({
       .map((item) => item.data as Empleado)
   }, [orderedItems])
 
+  // Función para renderizar la grilla desktop (reutilizable)
+  const renderDesktopGrid = ({ 
+    containerRef 
+  }: { 
+    containerRef?: React.RefObject<HTMLDivElement | null>
+  } = {}) => {
+    const isHiddenContainer = !!containerRef
+    
+    return (
+      <Card 
+        ref={containerRef}
+        className="overflow-hidden border border-border bg-card"
+        style={isHiddenContainer ? {
+          position: "absolute",
+          top: "-9999px",
+          left: "-9999px",
+          width: "1400px",
+        } : undefined}
+        onClick={(e) => {
+          // Detectar si el click fue dentro de la tabla
+          const target = e.target as HTMLElement
+          const isInsideTable = target.closest('table')
+          // Detectar si el click fue en el selector inline
+          const isInlineSelector = target.closest('[data-inline-selector]')
+          
+          // Si hay un selector abierto y el click no fue dentro de la tabla ni en el selector
+          if (selectedCell && !isInsideTable && !isInlineSelector) {
+            setSelectedCell(null)
+          }
+        }}
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <GridHeader 
+              weekDays={weekDays} 
+              user={user} 
+              onCloseSelector={() => setSelectedCell(null)} 
+            />
+            <tbody>
+              {orderedItems.map((item, itemIndex) => {
+                const showAddButton = !readonly && item.type === "employee"
+                const insertIndex = itemIndex
+                // Detectar si es el primer separador (está en el índice 0)
+                const isFirstSeparator = item.type === "separator" && itemIndex === 0
+
+                return (
+                  <React.Fragment key={item.type === "employee" ? `emp-${item.data.id}` : `sep-${item.data.id}`}>
+                    {item.type === "separator" ? (
+                      <SeparatorRow
+                        separator={item.data}
+                        weekDays={weekDays}
+                        editingSeparatorId={editingSeparatorId}
+                        separatorEditName={separatorEditName}
+                        separatorEditColor={separatorEditColor}
+                        readonly={readonly}
+                        onEditNameChange={setSeparatorEditName}
+                        onEditColorChange={setSeparatorEditColor}
+                        onSave={handleSaveSeparatorEdit}
+                        onCancel={handleCancelEdit}
+                        onEdit={handleEditSeparator}
+                        onDelete={handleDeleteSeparator}
+                        isFirstSeparator={isFirstSeparator}
+                        onCloseSelector={() => setSelectedCell(null)}
+                      />
+                    ) : (
+                      <EmployeeRow
+                        employee={item.data}
+                        weekDays={weekDays}
+                        monthRange={monthRange}
+                        readonly={readonly}
+                        employeeIndex={itemIndex}
+                        separatorColor={getSeparatorColorForEmployee(itemIndex)}
+                        showAddButton={showAddButton}
+                        employeeStats={employeeStats}
+                        getEmployeeAssignments={getEmployeeAssignments}
+                        getCellBackgroundStyle={getCellBackgroundStyle}
+                        getShiftInfo={getShiftInfo}
+                        selectedCell={selectedCell}
+                        isClickable={isClickable}
+                        onCellClick={handleCellClick}
+                        onAssignmentUpdate={onAssignmentUpdate}
+                        scheduleId={schedule?.id}
+                        shifts={shifts}
+                        mediosTurnos={mediosTurnos}
+                        onQuickAssignments={handleQuickAssignments}
+                        cellUndoHistory={cellUndoHistory}
+                        handleCellUndo={handleCellUndo}
+                        onClearEmployeeRow={handleClearEmployeeRow}
+                        getSuggestion={getSuggestion}
+                        isManuallyFixed={isManuallyFixed}
+                        onToggleFixed={handleToggleFixed}
+                        onCloseSelector={() => setSelectedCell(null)}
+                        config={config}
+                        hasIncompleteAssignments={hasIncompleteAssignments}
+                        draggedEmployeeId={draggedEmployeeId}
+                        dragOverEmployeeId={dragOverEmployeeId}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        onAddSeparator={handleAddSeparator}
+                      />
+                    )}
+                  </React.Fragment>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    )
+  }
+
   // Vista móvil
   if (isMobile) {
     const weekStartDate = weekDays[0]
+    
+    // Renderizar vista individual solo si está seleccionada
+    if (mobileView === "individual") {
+      return (
+        <>
+          <ScheduleGridMobile
+            weekDays={weekDays}
+            employees={employeesForMobile}
+            weekDaysData={weekDaysData}
+            getEmployeeAssignments={getEmployeeAssignments}
+            getCellBackgroundStyle={getCellBackgroundStyle}
+            getShiftInfo={getShiftInfo}
+            selectedCell={selectedCell}
+            isClickable={isClickable}
+            onCellClick={handleCellClick}
+            onQuickAssignments={handleQuickAssignments}
+            onAssignmentUpdate={onAssignmentUpdate}
+            scheduleId={schedule?.id}
+            readonly={readonly}
+            employeeStats={employeeStats}
+            shifts={shifts}
+            mediosTurnos={mediosTurnos}
+            cellUndoHistory={cellUndoHistory}
+            handleCellUndo={handleCellUndo}
+            getSuggestion={getSuggestion}
+            isManuallyFixed={isManuallyFixed}
+            onToggleFixed={handleToggleFixed}
+            onExportEmployeeImage={onExportEmployeeImage}
+            weekStartDate={weekStartDate}
+          />
+        </>
+      )
+    }
+    
+    // Renderizar vista completa con imagen generada
     return (
       <>
-        <ScheduleGridMobile
-          weekDays={weekDays}
-          employees={employeesForMobile}
-          weekDaysData={weekDaysData}
-          getEmployeeAssignments={getEmployeeAssignments}
-          getCellBackgroundStyle={getCellBackgroundStyle}
-          getShiftInfo={getShiftInfo}
-          selectedCell={selectedCell}
-          isClickable={isClickable}
-          onCellClick={handleCellClick}
-          onQuickAssignments={handleQuickAssignments}
-          onAssignmentUpdate={onAssignmentUpdate}
-          scheduleId={schedule?.id}
-          readonly={readonly}
-          employeeStats={employeeStats}
-          shifts={shifts}
-          mediosTurnos={mediosTurnos}
-          cellUndoHistory={cellUndoHistory}
-          handleCellUndo={handleCellUndo}
-          getSuggestion={getSuggestion}
-          isManuallyFixed={isManuallyFixed}
-          onToggleFixed={handleToggleFixed}
-          onExportEmployeeImage={onExportEmployeeImage}
-          weekStartDate={weekStartDate}
-        />
+        {/* Botones de toggle solo en móvil */}
+        <div className="flex justify-center mb-4 gap-2">
+          <button
+            onClick={() => setMobileView("full" as const)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              mobileView === "full"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            <Grid className="h-4 w-4" />
+            Grilla completa
+          </button>
+          <button
+            onClick={() => setMobileView("individual" as const)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              mobileView === "individual"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            <User className="h-4 w-4" />
+            Vista individual
+          </button>
+        </div>
+        
+        {/* Contenedor oculto para generar imagen - ref directo al Card */}
+        {renderDesktopGrid({ containerRef: hiddenGridRef })}
+        
+        {/* Vista de imagen generada */}
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-sm text-gray-500">Generando vista del horario...</div>
+          </div>
+        ) : imageUrl ? (
+          <div className="w-full overflow-x-auto">
+            <img
+              src={imageUrl}
+              alt="Horario completo"
+              style={{
+                width: '1400px',   // mismo ancho que arriba
+                maxWidth: 'none',  // 🔴 CLAVE
+                height: 'auto',
+              }}
+            />
+          </div>
+        ) : (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-sm text-gray-500">Preparando vista del horario...</div>
+          </div>
+        )}
       </>
     )
   }
 
   // Vista desktop (tabla)
   return (
-    <>
+    <div ref={ref} className="schedule-grid-container">
       <Card 
         className="overflow-hidden border border-border bg-card"
         onClick={(e) => {
@@ -634,6 +838,8 @@ export const ScheduleGrid = memo(function ScheduleGrid({
       
       {/* El selector de turnos ahora se muestra inline en la celda seleccionada,
           así que ya no usamos el modal ShiftSelectorPopover */}
-    </>
+    </div>
   )
 })
+
+ScheduleGrid.displayName = 'ScheduleGrid'

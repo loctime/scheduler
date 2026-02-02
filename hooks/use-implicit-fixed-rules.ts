@@ -43,18 +43,7 @@ export function useImplicitFixedRules({
     const hasValidUser = user && user.uid
     const isAdmin = user?.role === 'admin' || user?.role === 'manager'
     
-    const canExecute = isDashboardPage && hasValidUser && isAdmin
-    
-    console.log("🔧 [useImplicitFixedRules] Context check:", {
-      isDashboardPage,
-      hasValidUser,
-      isAdmin,
-      canExecute,
-      userId: user?.uid,
-      path: window.location.pathname
-    })
-    
-    return canExecute
+    return isDashboardPage && hasValidUser && isAdmin
   }, [user])
 
   const { getRuleForDay, rules: fixedRules } = useEmployeeFixedRules({ 
@@ -371,11 +360,16 @@ export function useImplicitFixedRules({
   ): Promise<Horario | null> => {
     // GUARD: Solo ejecutar en dashboard
     if (!isDashboardContext) {
-      console.warn(" [useImplicitFixedRules] applyFixedRulesIfWeekEmpty called outside dashboard - blocking execution")
+      // Silenciosamente bloquear ejecución - comportamiento esperado, no es un error
+      // No loguear nada para evitar advertencias en consola
       return null
     }
 
-    console.log(" [useImplicitFixedRules] Applying fixed rules for week:", weekStartDate, "employee:", employeeId)
+    // Solo loguear cuando realmente se va a ejecutar
+    logger.debug("[ImplicitFixedRules] Aplicando reglas fijas", {
+      weekStart: format(weekStartDate, "yyyy-MM-dd"),
+      employeeId
+    })
     const weekSchedule = getWeekSchedule(weekStartDate)
     
     // 1. Detectar si la semana está vacía para este empleado

@@ -16,6 +16,9 @@ import { useImplicitFixedRules } from "@/hooks/use-implicit-fixed-rules"
 import { calculateHoursBreakdown } from "@/lib/validations"
 import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
 import { logger } from "@/lib/logger"
+import { toPng } from "html-to-image"
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { db, COLLECTIONS } from "@/lib/firebase"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { GeneralView } from "@/components/schedule-calendar/general-view"
 import { ExportOverlay } from "@/components/export-overlay"
@@ -63,6 +66,9 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
   // Rastrear si ya se inicializó para evitar sobrescribir cuando el usuario navega
   const isInitialized = useRef(false)
+  
+  // Ref para capturar el ScheduleGrid actual (enfoque simplificado)
+  const scheduleGridRef = useRef<HTMLDivElement>(null)
   
   // Inicializar con el mes correcto basado en la fecha actual y mesInicioDia
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -213,7 +219,19 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
       userData: { role: userData?.role, uid: userData?.uid }
     })
 
-    const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
+    // Verificar que sea la semana actual
+    const today = new Date()
+    const currentWeekStart = startOfWeek(today, { weekStartsOn: 1 })
+    const isCurrentWeek = format(weekStartDate, "yyyy-MM-dd") === format(currentWeekStart, "yyyy-MM-dd")
+    
+    if (!isCurrentWeek) {
+      toast({
+        title: "Error",
+        description: "Solo se puede publicar la semana actual",
+        variant: "destructive",
+      })
+      return
+    }
     
     // Obtener datos de la semana actual
     const weekSchedule = getWeekSchedule(weekStartDate)
@@ -232,51 +250,101 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
       return
     }
 
+    const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
     setPublishingWeekId(weekId)
     
     try {
-      console.log("🔧 [ScheduleCalendar] Llamando a publishToPublic...")
+      console.log("🔧 [ScheduleCalendar] Buscando ScheduleGrid...")
+      
+      // Buscar el ScheduleGrid usando un selector específico pero robusto
+      const scheduleGridElement = document.querySelector('.schedule-grid-container') as HTMLDivElement
+      
+      if (!scheduleGridElement) {
+        console.error("🔧 [ScheduleCalendar] Error: No se encontró el ScheduleGrid")
+        toast({
+          title: "Error",
+          description: "No se encontró la grilla del horario para capturar",
+          variant: "destructive",
+        })
+        return
+      }
+
+      console.log("🔧 [ScheduleCalendar] ScheduleGrid encontrado:", {
+        hasElement: !!scheduleGridElement,
+        elementTag: scheduleGridElement.tagName,
+        elementClass: scheduleGridElement.className,
+        elementWidth: scheduleGridElement.offsetWidth,
+        elementHeight: scheduleGridElement.offsetHeight,
+      })
+
+      console.log("🔧 [ScheduleCalendar] Generando imagen del ScheduleGrid...")
+      
+      // Generar imagen PNG del ScheduleGrid
+      const dataUrl = await toPng(scheduleGridElement, {
+        cacheBust: true,
+        pixelRatio: 2, // calidad alta
+        backgroundColor: "#ffffff",
+        width: 1400, // ancho fijo para consistencia
+      })
+
+      console.log("🔧 [ScheduleCalendar] Imagen generada exitosamente")
+      console.log("🔧 [ScheduleCalendar] Tamaño del dataUrl:", dataUrl.length)
+      console.log("🔧 [ScheduleCalendar] Primeros 100 caracteres:", dataUrl.substring(0, 100))
+
+      // Usar el dataURL directamente como publicImageUrl
+      const publicImageUrl = dataUrl
+      
+      console.log("🔧 [ScheduleCalendar] publicImageUrl generado, llamando a publishToPublic...")
+      
+      // Llamar a publishToPublic con la imagen generada
       const publishedOwnerId = await publishToPublic({
         weekId,
         weekData: {
           ...weekSchedule,
           startDate: format(weekStartDate, "dd/MM/yyyy"),
-          endDate: format(weekEndDate, "dd/MM/yyyy")
+          endDate: format(weekEndDate, "dd/MM/yyyy"),
+          publicImageUrl: publicImageUrl, // Pasar la imagen generada
         }
       })
 
-      console.log("🔧 [ScheduleCalendar] Publicación exitosa:", publishedOwnerId)
+      console.log("🔧 [ScheduleCalendar] publishToPublic completado:", {
+        publishedOwnerId,
+        hasImage: !!publicImageUrl,
+      })
       
-      const publicUrl = `${window.location.origin}/horario/${publishedOwnerId}`
-      console.log("🔧 [ScheduleCalendar] URL pública:", publicUrl)
+      // Actualizar el documento en Firestore con la imagen y estado de publicación
+      if (!db) {
+        throw new Error("Firestore no está inicializado")
+      }
+      
+      const scheduleRef = doc(db, COLLECTIONS.SCHEDULES, weekSchedule.id)
+      await updateDoc(scheduleRef, {
+        isPublished: true,
+        publicImageUrl: publicImageUrl,
+        publicImageUpdatedAt: serverTimestamp(),
+      })
+
+      console.log("🔧 [ScheduleCalendar] publicImageUrl guardado en Firestore:", {
+        scheduleId: weekSchedule.id,
+        hasImage: !!publicImageUrl,
+      })
 
       toast({
         title: "Horario publicado",
-        description: "El horario ahora está disponible públicamente",
+        description: "El horario ahora está disponible públicamente con imagen",
       })
 
-      // Opcional: copiar URL al portapapeles
-      try {
-        await navigator.clipboard.writeText(publicUrl)
-        toast({
-          title: "URL copiada",
-          description: "El enlace público ha sido copiado al portapapeles",
-        })
-      } catch (error) {
-        console.log("🔧 [ScheduleCalendar] No se pudo copiar URL automáticamente")
-      }
-
     } catch (error) {
-      console.error("🔧 [ScheduleCalendar] Error en publicación:", error)
+      console.error("🔧 [ScheduleCalendar] Error publicando horario:", error)
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "No se pudo publicar el horario",
+        description: "No se pudo publicar el horario",
         variant: "destructive",
       })
     } finally {
       setPublishingWeekId(null)
     }
-  }, [getWeekSchedule, publishToPublic, toast, userData])
+  }, [userData, getWeekSchedule, toast, publishToPublic])
 
   // Extraer turnos de semanas completadas si no hay turnos activos
   const shiftsToUse = useMemo(() => {

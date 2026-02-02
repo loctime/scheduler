@@ -44,6 +44,7 @@ interface GeneralViewProps {
   onPasteCopiedWeek?: (targetWeekStartDate: Date) => Promise<void>
   onPublishSchedule?: (weekStartDate: Date, weekEndDate: Date) => Promise<void> | void
   isPublishingSchedule?: boolean
+  onWeekScheduleRef?: (weekKey: string, element: HTMLDivElement) => void
 }
 
 export function GeneralView({
@@ -74,6 +75,7 @@ export function GeneralView({
   onPasteCopiedWeek,
   onPublishSchedule,
   isPublishingSchedule,
+  onWeekScheduleRef,
 }: GeneralViewProps) {
   // Create shift map for efficient lookup
   const shiftMap = useMemo(() => {
@@ -122,6 +124,19 @@ export function GeneralView({
       return updated
     })
   }, [])
+
+  // Función para manejar refs de los ScheduleGrid
+  const handleWeekScheduleRef = useCallback((weekStartDate: Date, element: HTMLDivElement | null) => {
+    const weekKey = format(weekStartDate, "yyyy-MM-dd")
+    console.log("🔧 [GeneralView] Recibiendo ref:", { weekKey, hasElement: !!element })
+    if (element && onWeekScheduleRef) {
+      // Pasar el ref al componente padre (ScheduleCalendar)
+      console.log("🔧 [GeneralView] Pasando ref al padre:", weekKey)
+      onWeekScheduleRef(weekKey, element)
+    } else {
+      console.log("🔧 [GeneralView] No se pasó ref:", { hasElement: !!element, hasCallback: !!onWeekScheduleRef })
+    }
+  }, [onWeekScheduleRef])
 
   // Verificar si hay semanas completadas en el rango del mes
   // IMPORTANTE: Este hook debe estar antes de cualquier return condicional
@@ -264,6 +279,7 @@ export function GeneralView({
           return (
             <WeekSchedule
               key={weekIndex}
+              ref={(element) => handleWeekScheduleRef(weekStartDate, element)}
               weekDays={weekDays}
               weekIndex={weekIndex}
               weekSchedule={weekSchedule}

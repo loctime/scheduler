@@ -48,6 +48,7 @@
     "dom-to-image-more": "^3.7.2",
     "embla-carousel-react": "8.5.1",
     "firebase": "latest",
+    "html-to-image": "^1.11.13",
     "html2canvas": "latest",
     "input-otp": "1.4.1",
     "jspdf": "latest",

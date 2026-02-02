@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, forwardRef } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { ScheduleGrid, type EmployeeMonthlyStats } from "@/components/schedule-grid"
@@ -28,35 +28,35 @@ interface WeekScheduleProps {
   weekIndex: number
   weekSchedule: Horario | null
   employees: Empleado[]
-  allEmployees?: Empleado[]
+  allEmployees: Empleado[]
   shifts: Turno[]
-  monthRange: { startDate: Date; endDate: Date }
-  onAssignmentUpdate?: (date: string, employeeId: string, assignments: any[], options?: { scheduleId?: string }) => void
+  monthRange: { start: Date; end: Date }
+  onAssignmentUpdate?: (date: string, employeeId: string, shiftId: string, value: string | null) => void
   onExportImage?: (weekStartDate: Date, weekEndDate: Date) => void
   onExportPDF?: (weekStartDate: Date, weekEndDate: Date) => void
-  onExportExcel?: () => void
-  onExportEmployeeImage?: (employeeId: string, employeeName: string, weekStartDate: Date) => void
-  exporting: boolean
-  mediosTurnos?: MedioTurno[]
-  employeeStats?: Record<string, EmployeeMonthlyStats>
+  onExportExcel?: (weekStartDate: Date, weekEndDate: Date) => void
+  onExportEmployeeImage?: (employeeId: string, weekStartDate: Date, weekEndDate: Date) => void
+  exporting?: boolean
+  mediosTurnos?: ShiftAssignment[]
+  employeeStats?: EmployeeMonthlyStats[]
   readonly?: boolean
   showActions?: boolean
   title?: string
   open?: boolean
   onOpenChange?: (open: boolean) => void
   user?: any
-  onMarkComplete?: (weekStartDate: Date, completed: boolean) => Promise<void>
-  lastCompletedWeekStart?: string | null
+  onMarkComplete?: (weekId: string) => void
+  lastCompletedWeekStart?: Date | null
   getWeekSchedule?: (weekStartDate: Date) => Horario | null
   allSchedules?: Horario[]
-  copiedWeekData?: any
-  onCopyCurrentWeek?: (weekStartDate: Date) => void
-  onPasteCopiedWeek?: (targetWeekStartDate: Date) => Promise<void>
+  config?: any
+  onCopyCurrentWeek?: () => void
+  onPasteCopiedWeek?: () => void
   onPublishSchedule?: (weekStartDate: Date, weekEndDate: Date) => Promise<void> | void
   isPublishingSchedule?: boolean
 }
 
-export function WeekSchedule({
+export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
   weekDays,
   weekIndex,
   weekSchedule,
@@ -87,7 +87,7 @@ export function WeekSchedule({
   onPasteCopiedWeek,
   onPublishSchedule,
   isPublishingSchedule = false,
-}: WeekScheduleProps) {
+}, ref) => {
   const weekStartDate = weekDays[0]
   const weekEndDate = weekDays[weekDays.length - 1]
   const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
@@ -225,6 +225,7 @@ export function WeekSchedule({
       >
         <div className="pt-2">
           <ScheduleGrid
+            ref={ref}
             weekDays={weekDays}
             employees={employees}
             allEmployees={allEmployees || employees}
@@ -263,4 +264,6 @@ export function WeekSchedule({
       </AlertDialog>
     </Collapsible>
   )
-}
+})
+
+WeekSchedule.displayName = 'WeekSchedule'
