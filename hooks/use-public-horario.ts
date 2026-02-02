@@ -26,15 +26,17 @@ export function usePublicHorario(ownerId: string): UsePublicHorarioReturn {
   const [error, setError] = useState<string | null>(null)
 
   const loadPublicHorario = async () => {
+    console.log("🔧 [usePublicHorario] Iniciando carga para ownerId:", ownerId?.substring(0, 10) + '...')
+
     try {
       if (!db) {
-        console.warn("Firestore not available")
+        console.warn("🔧 [usePublicHorario] Firestore no disponible")
         setIsLoading(false)
         return
       }
 
       if (!ownerId || ownerId.trim() === '') {
-        console.warn("🔧 [usePublicHorario] ownerId not provided")
+        console.warn("🔧 [usePublicHorario] ownerId no proporcionado")
         setError("Se requiere ownerId para acceder al horario")
         setIsLoading(false)
         return
@@ -46,10 +48,14 @@ export function usePublicHorario(ownerId: string): UsePublicHorarioReturn {
       console.log("🔧 [usePublicHorario] Loading public horario for ownerId:", ownerId)
       
       // Path válido: apps/horarios/published/{ownerId}
+      const fullPath = "apps/horarios/published/" + ownerId
+      console.log("🔧 [usePublicHorario] Reading from:", fullPath)
+      
       const horarioRef = doc(db, "apps", "horarios", "published", ownerId)
-      console.log("🔧 [usePublicHorario] Reading from: apps/horarios/published/" + ownerId)
+      console.log("🔧 [usePublicHorario] Document reference created")
       
       const horarioDoc = await getDoc(horarioRef)
+      console.log("🔧 [usePublicHorario] Document fetched, exists:", horarioDoc.exists())
 
       if (!horarioDoc.exists()) {
         console.log("🔧 [usePublicHorario] No published horario found")
@@ -61,7 +67,9 @@ export function usePublicHorario(ownerId: string): UsePublicHorarioReturn {
       console.log("🔧 [usePublicHorario] Public horario found:", {
         ownerId: horarioData.ownerId,
         weekId: horarioData.weekId,
-        weekLabel: horarioData.weekLabel
+        weekLabel: horarioData.weekLabel,
+        hasPublishedAt: !!horarioData.publishedAt,
+        daysCount: Object.keys(horarioData.days || {}).length
       })
       
       setHorario(horarioData)
@@ -70,6 +78,11 @@ export function usePublicHorario(ownerId: string): UsePublicHorarioReturn {
       const errorMessage = err instanceof Error ? err.message : "Error al cargar horario"
       setError(errorMessage)
       console.error("🔧 [usePublicHorario] Error loading public horario:", err)
+      console.error("🔧 [usePublicHorario] Error details:", {
+        message: errorMessage,
+        stack: err instanceof Error ? err.stack : undefined,
+        ownerId: ownerId?.substring(0, 10) + '...'
+      })
     } finally {
       setIsLoading(false)
     }

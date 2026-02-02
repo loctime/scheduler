@@ -20,17 +20,32 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
   const [error, setError] = useState<string | null>(null)
   const ownerId = useOwnerId()
 
+  console.log("🔧 [usePublicPublisher] Hook inicializado", { 
+    hasOwnerId: !!ownerId,
+    ownerId: ownerId?.substring(0, 10) + '...' // Solo mostrar primeros 10 chars por seguridad
+  })
+
   const publishToPublic = async (options: PublishPublicScheduleOptions): Promise<string> => {
+    console.log("🔧 [usePublicPublisher] publishToPublic llamado con:", {
+      weekId: options.weekId,
+      hasWeekData: !!options.weekData,
+      weekDataSize: options.weekData ? JSON.stringify(options.weekData).length : 0,
+      weekDataKeys: options.weekData ? Object.keys(options.weekData) : []
+    })
+
     if (!ownerId) {
+      console.error("🔧 [usePublicPublisher] Error: No ownerId disponible")
       throw new Error("No se puede publicar sin ownerId")
     }
 
     if (!db) {
+      console.error("🔧 [usePublicPublisher] Error: Firestore no disponible")
       throw new Error("Firestore no disponible")
     }
 
     // Validación obligatoria: debe haber weekData
     if (!options.weekData) {
+      console.error("🔧 [usePublicPublisher] Error: No weekData proporcionado")
       throw new Error("No hay datos de semana para publicar")
     }
 
@@ -42,7 +57,8 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
       console.log("🔧 [usePublicPublisher] WeekId:", options.weekId)
       
       // Path EXACTO: apps/horarios/published/{ownerId} (4 segmentos)
-      console.log("🔧 [usePublicPublisher] Writing to apps/horarios/published/" + ownerId)
+      const fullPath = "apps/horarios/published/" + ownerId
+      console.log("🔧 [usePublicPublisher] Writing to:", fullPath)
       
       // Estructura mínima para lectura pública
       const publicScheduleData = {
@@ -55,17 +71,30 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
         days: options.weekData.scheduleData?.assignments || options.weekData.assignments || {}
       }
 
+      console.log("🔧 [usePublicPublisher] Datos a publicar:", {
+        ...publicScheduleData,
+        publishedAt: "[Timestamp]",
+        daysCount: Object.keys(publicScheduleData.days).length,
+        hasAssignments: Object.keys(publicScheduleData.days).length > 0
+      })
+
       // Usar setDoc con overwrite completo
       const publicRef = doc(db, "apps", "horarios", "published", ownerId)
+      console.log("🔧 [usePublicPublisher] Document reference created")
+      
       await setDoc(publicRef, publicScheduleData)
-
-      console.log("🔧 [usePublicPublisher] Publish success - document written to apps/horarios/published/" + ownerId)
+      console.log("🔧 [usePublicPublisher] Publish success - document written to:", fullPath)
       
       return ownerId // Retornar el ownerId para generar URL pública
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Error al publicar"
       setError(errorMessage)
       console.error("🔧 [usePublicPublisher] Publish error:", err)
+      console.error("🔧 [usePublicPublisher] Error details:", {
+        message: errorMessage,
+        stack: err instanceof Error ? err.stack : undefined,
+        ownerId: ownerId?.substring(0, 10) + '...'
+      })
       throw new Error(errorMessage)
     } finally {
       setIsPublishing(false)

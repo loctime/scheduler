@@ -27,7 +27,17 @@ export function PublicSchedulePublisher({ weekId, weekData }: PublicSchedulePubl
   const canPublish = userData?.role === 'admin'
 
   const handlePublish = async () => {
+    console.log("🔧 [PublicSchedulePublisher] Iniciando publicación")
+    console.log("🔧 [PublicSchedulePublisher] Datos:", {
+      companyName: companyName.trim(),
+      weekId,
+      hasWeekData: !!weekData,
+      weekDataKeys: weekData ? Object.keys(weekData) : [],
+      userData: { role: userData?.role, uid: userData?.uid }
+    })
+
     if (!companyName.trim()) {
+      console.warn("🔧 [PublicSchedulePublisher] Error: companyName vacío")
       toast({
         title: "Error",
         description: "El nombre de la empresa es requerido",
@@ -37,13 +47,17 @@ export function PublicSchedulePublisher({ weekId, weekData }: PublicSchedulePubl
     }
 
     try {
+      console.log("🔧 [PublicSchedulePublisher] Llamando a publishToPublic...")
       const publicScheduleId = await publishToPublic({
         companyName: companyName.trim(),
         weekId,
         weekData
       })
 
-      const url = `${window.location.origin}/pwa/horario/${publicScheduleId}`
+      console.log("🔧 [PublicSchedulePublisher] publishToPublic retornó:", publicScheduleId)
+      
+      const url = `${window.location.origin}/horario/${publicScheduleId}`
+      console.log("🔧 [PublicSchedulePublisher] URL pública generada:", url)
       setPublishedUrl(url)
 
       toast({
@@ -53,6 +67,7 @@ export function PublicSchedulePublisher({ weekId, weekData }: PublicSchedulePubl
 
       setIsDialogOpen(false)
     } catch (error) {
+      console.error("🔧 [PublicSchedulePublisher] Error en publicación:", error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "No se pudo publicar el horario",
