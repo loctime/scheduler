@@ -4,12 +4,18 @@ import { db } from "@/lib/firebase"
 
 export interface PublicHorarioData {
   ownerId: string
-  weekId: string
-  weekLabel: string
-  publishedAt: any
-  days: Record<string, any[]>
-  employees: any[]
+  publishedWeekId: string
+  weeks: Record<string, {
+    weekId: string
+    weekLabel: string
+    publishedAt: any
+    publicImageUrl?: string | null
+    days: Record<string, any[]>
+    employees: any[]
+  }>
+  userId: string
   isPublic?: boolean
+  companyName?: string
 }
 
 export interface UsePublicHorarioReturn {
@@ -66,14 +72,19 @@ export function usePublicHorario(ownerId: string): UsePublicHorarioReturn {
       }
 
       const horarioData = horarioDoc.data() as PublicHorarioData
+      const currentWeek = horarioData.weeks[horarioData.publishedWeekId]
+      
       console.log("🔧 [usePublicHorario] Public horario found:", {
         ownerId: horarioData.ownerId,
-        weekId: horarioData.weekId,
-        weekLabel: horarioData.weekLabel,
-        hasPublishedAt: !!horarioData.publishedAt,
-        daysCount: Object.keys(horarioData.days || {}).length,
-        employeesCount: horarioData.employees?.length || 0,
-        isPublic: horarioData.isPublic
+        publishedWeekId: horarioData.publishedWeekId,
+        currentWeekId: currentWeek?.weekId,
+        currentWeekLabel: currentWeek?.weekLabel,
+        hasPublishedAt: !!currentWeek?.publishedAt,
+        hasPublicImageUrl: !!currentWeek?.publicImageUrl,
+        daysCount: Object.keys(currentWeek?.days || {}).length,
+        employeesCount: currentWeek?.employees?.length || 0,
+        isPublic: horarioData.isPublic,
+        weeksCount: Object.keys(horarioData.weeks).length
       })
       
       setHorario(horarioData)

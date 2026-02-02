@@ -22,6 +22,7 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { GeneralView } from "@/components/schedule-calendar/general-view"
 import { ExportOverlay } from "@/components/export-overlay"
+import { ScheduleGridCapture } from "@/components/schedule-grid-capture"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -69,6 +70,9 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   
   // Ref para capturar el ScheduleGrid actual (enfoque simplificado)
   const scheduleGridRef = useRef<HTMLDivElement>(null)
+  
+  // Ref para el componente de captura robusto
+  const captureRef = useRef<HTMLDivElement>(null)
   
   // Inicializar con el mes correcto basado en la fecha actual y mesInicioDia
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -254,33 +258,32 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     setPublishingWeekId(weekId)
     
     try {
-      console.log("🔧 [ScheduleCalendar] Buscando ScheduleGrid...")
+      console.log("🔧 [ScheduleCalendar] Iniciando captura robusta...")
       
-      // Buscar el ScheduleGrid usando un selector específico pero robusto
-      const scheduleGridElement = document.querySelector('.schedule-grid-container') as HTMLDivElement
-      
-      if (!scheduleGridElement) {
-        console.error("🔧 [ScheduleCalendar] Error: No se encontró el ScheduleGrid")
+      // Validar que existe el elemento de captura
+      if (!captureRef.current) {
+        console.error("🔧 [ScheduleCalendar] Error: No se encontró el elemento de captura")
         toast({
           title: "Error",
-          description: "No se encontró la grilla del horario para capturar",
+          description: "No se encontró el elemento de captura para generar la imagen",
           variant: "destructive",
         })
         return
       }
 
-      console.log("🔧 [ScheduleCalendar] ScheduleGrid encontrado:", {
-        hasElement: !!scheduleGridElement,
-        elementTag: scheduleGridElement.tagName,
-        elementClass: scheduleGridElement.className,
-        elementWidth: scheduleGridElement.offsetWidth,
-        elementHeight: scheduleGridElement.offsetHeight,
+      console.log("🔧 [ScheduleCalendar] Elemento de captura encontrado:", {
+        hasElement: !!captureRef.current,
+        elementTag: captureRef.current.tagName,
+        elementClass: captureRef.current.className,
       })
+
+      // Esperar un frame para asegurar que el componente está renderizado
+      await new Promise(resolve => requestAnimationFrame(resolve))
 
       console.log("🔧 [ScheduleCalendar] Generando imagen del ScheduleGrid...")
       
-      // Generar imagen PNG del ScheduleGrid
-      const dataUrl = await toPng(scheduleGridElement, {
+      // Generar imagen PNG del ScheduleGrid de captura
+      const dataUrl = await toPng(captureRef.current, {
         cacheBust: true,
         pixelRatio: 2, // calidad alta
         backgroundColor: "#ffffff",
@@ -303,8 +306,8 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
           ...weekSchedule,
           startDate: format(weekStartDate, "dd/MM/yyyy"),
           endDate: format(weekEndDate, "dd/MM/yyyy"),
-          publicImageUrl: publicImageUrl, // Pasar la imagen generada
-        }
+        },
+        publicImageUrl: publicImageUrl, // Pasar la imagen generada
       })
 
       console.log("🔧 [ScheduleCalendar] publishToPublic completado:", {
@@ -700,6 +703,16 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         isPublishingSchedule={isPublishing || publishingWeekId !== null}
       />
       </div>
+      
+      {/* Componente de captura robusto - siempre montado pero fuera de pantalla */}
+      <ScheduleGridCapture
+        ref={captureRef}
+        weekDays={monthWeeks[0]?.days || []}
+        employees={employees}
+        shifts={shifts}
+        schedule={getWeekSchedule(monthWeeks[0]?.startDate)}
+        allEmployees={allEmployees}
+      />
     </>
   )
 }

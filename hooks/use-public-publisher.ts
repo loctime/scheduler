@@ -8,6 +8,7 @@ export interface PublishPublicScheduleOptions {
   companyName?: string
   weekId: string
   weekData: any
+  publicImageUrl?: string
 }
 
 export interface UsePublicPublisherReturn {
@@ -59,31 +60,43 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
     try {
       console.log("🔧 [usePublicPublisher] Publishing schedule for ownerId:", ownerId)
       console.log("🔧 [usePublicPublisher] WeekId:", options.weekId)
+      console.log("🔧 [usePublicPublisher] Has publicImageUrl:", !!options.publicImageUrl)
       
       // Path EXACTO: apps/horarios/enlaces_publicos/{ownerId} (3 segmentos - válido)
       const fullPath = "apps/horarios/enlaces_publicos/" + ownerId
       console.log("🔧 [usePublicPublisher] Writing to:", fullPath)
       
-      // Estructura mínima para lectura pública
-      const publicScheduleData = {
-        ownerId: ownerId,
+      // Estructura con weeks y publicImageUrl
+      const weekData = {
         weekId: options.weekId,
         weekLabel: options.weekData.startDate && options.weekData.endDate 
           ? `${options.weekData.startDate} - ${options.weekData.endDate}`
           : `Semana ${options.weekId}`,
         publishedAt: serverTimestamp(),
+        publicImageUrl: options.publicImageUrl || null,
         days: options.weekData.scheduleData?.assignments || options.weekData.assignments || {},
-        employees: options.weekData.employees || [],
+        employees: options.weekData.employees || []
+      }
+      
+      const publicScheduleData = {
+        ownerId: ownerId,
+        publishedWeekId: options.weekId,
+        weeks: {
+          [options.weekId]: weekData
+        },
         userId: user?.uid, // Requerido por las reglas de Firestore
-        isPublic: true // Flag para identificar como horario público
+        isPublic: true, // Flag para identificar como horario público
+        companyName: options.companyName || ""
       }
 
       console.log("🔧 [usePublicPublisher] Datos a publicar:", {
         ...publicScheduleData,
         publishedAt: "[Timestamp]",
-        daysCount: Object.keys(publicScheduleData.days).length,
-        hasAssignments: Object.keys(publicScheduleData.days).length > 0,
-        employeesCount: publicScheduleData.employees.length
+        weeksCount: Object.keys(publicScheduleData.weeks).length,
+        currentWeekId: publicScheduleData.publishedWeekId,
+        hasPublicImageUrl: !!weekData.publicImageUrl,
+        daysCount: Object.keys(weekData.days).length,
+        employeesCount: weekData.employees.length
       })
 
       // Usar setDoc con overwrite completo en apps/horarios/enlaces_publicos/{ownerId}
@@ -92,6 +105,7 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
       
       await setDoc(publicRef, publicScheduleData)
       console.log("🔧 [usePublicPublisher] Publish success - document written to:", fullPath)
+      console.log("🔧 [usePublicPublisher] PublicImageUrl saved successfully:", !!options.publicImageUrl)
       
       return ownerId // Retornar el ownerId para generar URL pública
     } catch (err) {
