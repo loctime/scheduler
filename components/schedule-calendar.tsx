@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { format, subMonths, addMonths, startOfWeek } from "date-fns"
 import { es } from "date-fns/locale"
-import { savePublishedHorario, setHorarioOwnerId } from "@/lib/pwa-horario"
+import { usePublicPublisher } from "@/hooks/use-public-publisher"
 import { useData } from "@/contexts/data-context"
 import { Horario, ShiftAssignment, ShiftAssignmentValue, Turno } from "@/lib/types"
 import { useConfig } from "@/hooks/use-config"
@@ -50,6 +50,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   const { config } = useConfig(user)
   const { toast } = useToast()
   const { exporting, exportImage, exportPDF, exportExcel, exportMonthPDF } = useExportSchedule()
+  const { publishToPublic, isPublishing, error: publishError } = usePublicPublisher()
 
   // Estado para almacenar la semana copiada
   const [copiedWeekData, setCopiedWeekData] = useState<any>(null)
@@ -205,67 +206,77 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   }, [exportPDF, config])
 
   const handlePublishPwa = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
+    console.log("🔧 [ScheduleCalendar] handlePublishPwa iniciado")
+    console.log("🔧 [ScheduleCalendar] Fechas:", {
+      weekStartDate: weekStartDate.toISOString(),
+      weekEndDate: weekEndDate.toISOString(),
+      userData: { role: userData?.role, uid: userData?.uid }
+    })
+
     const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
-    const ownerId = userData?.role === "invited" && userData?.ownerId 
-      ? userData.ownerId 
-      : user?.uid
     
-    if (!ownerId) {
+    // Obtener datos de la semana actual
+    const weekSchedule = getWeekSchedule(weekStartDate)
+    console.log("🔧 [ScheduleCalendar] weekSchedule obtenido:", {
+      hasData: !!weekSchedule,
+      keys: weekSchedule ? Object.keys(weekSchedule) : []
+    })
+
+    if (!weekSchedule) {
+      console.error("🔧 [ScheduleCalendar] Error: No hay datos de la semana")
       toast({
         title: "Error",
-        description: "No se puede determinar el propietario del horario",
+        description: "No hay datos de la semana para publicar",
         variant: "destructive",
       })
       return
     }
-    
-    // Guardar ownerId en localStorage para el PWA
-    setHorarioOwnerId(ownerId)
-    
+
     setPublishingWeekId(weekId)
+    
     try {
-      await exportImage(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.png`, {
-        nombreEmpresa: config?.nombreEmpresa,
-        colorEmpresa: config?.colorEmpresa,
-        ownerId,
-        download: false,
-        showToast: false,
-        onImageReady: async (blob) => {
-          // Subir la imagen al backend en lugar de guardar localmente
-          const formData = new FormData()
-          formData.append('file', blob, `semana-actual.png`)
-          formData.append('ownerId', ownerId)
-          
-          const backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL
-          if (!backendUrl) {
-            throw new Error('URL del backend no configurada')
-          }
-          
-          const response = await fetch(`${backendUrl}/api/horarios/semana-actual`, {
-            method: 'POST',
-            body: formData,
-          })
-          
-          if (!response.ok) {
-            throw new Error('Error al subir el horario al backend')
-          }
-        },
+      console.log("🔧 [ScheduleCalendar] Llamando a publishToPublic...")
+      const publishedOwnerId = await publishToPublic({
+        weekId,
+        weekData: {
+          ...weekSchedule,
+          startDate: format(weekStartDate, "dd/MM/yyyy"),
+          endDate: format(weekEndDate, "dd/MM/yyyy")
+        }
       })
+
+      console.log("🔧 [ScheduleCalendar] Publicación exitosa:", publishedOwnerId)
+      
+      const publicUrl = `${window.location.origin}/horario/${publishedOwnerId}`
+      console.log("🔧 [ScheduleCalendar] URL pública:", publicUrl)
+
       toast({
-        title: "PWA actualizada",
-        description: `Semana publicada: ${format(weekStartDate, "d 'de' MMMM", { locale: es })}.`,
+        title: "Horario publicado",
+        description: "El horario ahora está disponible públicamente",
       })
+
+      // Opcional: copiar URL al portapapeles
+      try {
+        await navigator.clipboard.writeText(publicUrl)
+        toast({
+          title: "URL copiada",
+          description: "El enlace público ha sido copiado al portapapeles",
+        })
+      } catch (error) {
+        console.log("🔧 [ScheduleCalendar] No se pudo copiar URL automáticamente")
+      }
+
     } catch (error) {
-      console.error('Error al publicar PWA:', error)
+      console.error("🔧 [ScheduleCalendar] Error en publicación:", error)
       toast({
         title: "Error",
-        description: "No se pudo publicar el horario. Inténtalo nuevamente.",
+        description: error instanceof Error ? error.message : "No se pudo publicar el horario",
         variant: "destructive",
       })
     } finally {
       setPublishingWeekId(null)
     }
-  }, [exportImage, config, toast, userData, user])
+  }, [getWeekSchedule, publishToPublic, toast, userData])
 
   // Extraer turnos de semanas completadas si no hay turnos activos
   const shiftsToUse = useMemo(() => {
@@ -618,6 +629,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         onCopyCurrentWeek={copyCurrentWeek}
         onPasteCopiedWeek={pasteCopiedWeek}
         onPublishSchedule={handlePublishPwa}
+        isPublishingSchedule={isPublishing || publishingWeekId !== null}
       />
       </div>
     </>
