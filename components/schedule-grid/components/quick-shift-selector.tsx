@@ -48,49 +48,6 @@ export function QuickShiftSelector({
   const [medioFrancoTime, setMedioFrancoTime] = useState({ startTime: "", endTime: "" })
   const [employeeRequest, setEmployeeRequest] = useState<any>(null)
 
-  // Cargar employee request si existe
-  useEffect(() => {
-    const loadEmployeeRequest = async () => {
-      if (!employeeId || !date || !scheduleId) return
-      
-      try {
-        const request = await getEmployeeRequest(scheduleId, employeeId, date)
-        
-        // Actualizar caché
-        if (updateEmployeeRequestCache) {
-          const cacheKey = `${scheduleId}_${employeeId}_${date}`
-          updateEmployeeRequestCache(cacheKey, request)
-        }
-        
-        if (request && request.active && request.requestedShift) {
-          setEmployeeRequest(request)
-          
-          // Si hay un request, mostrar el horario solicitado
-          const requestedShift = request.requestedShift
-          if (requestedShift.type === 'franco') {
-            setSelectionMode('franco')
-          } else if (requestedShift.type === 'medio-franco') {
-            setSelectionMode('medio_franco')
-            if (requestedShift.startTime && requestedShift.endTime) {
-              setMedioFrancoTime({
-                startTime: requestedShift.startTime,
-                endTime: requestedShift.endTime
-              })
-            }
-          } else if (requestedShift.type === 'existing' && requestedShift.shiftId) {
-            setSelectionMode('turno')
-          }
-        } else {
-          setEmployeeRequest(null)
-        }
-      } catch (error) {
-        console.error("Error loading employee request:", error)
-      }
-    }
-
-    loadEmployeeRequest()
-  }, [employeeId, date, scheduleId, updateEmployeeRequestCache])
-
   const resetMode = () => {
     setSelectionMode("none")
     setMedioFrancoTime({ startTime: "", endTime: "" })

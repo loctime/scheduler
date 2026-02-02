@@ -8,56 +8,44 @@ export type GridItem = { type: "employee"; data: Empleado } | { type: "separator
 interface UseScheduleGridDataProps {
   employees: Empleado[]
   shifts: any[]
-  separadores?: Separador[]
+  separadores: Separador[]
   ordenEmpleados?: string[]
-  schedule: Horario | HistorialItem | null
+  schedule?: Horario | null
   scheduleId?: string
   isScheduleCompleted?: boolean
-  currentWeekStart?: string // Fecha de inicio de la semana actual (formato yyyy-MM-dd)
-  lastCompletedWeekStart?: string | null // Fecha de inicio de la última semana completada (formato yyyy-MM-dd)
-  allEmployees?: Empleado[] // Todos los empleados (para determinar cuáles son nuevos)
+  currentWeekStart?: Date
+  lastCompletedWeekStart?: Date
+  allEmployees?: Empleado[]
 }
 
 export function useScheduleGridData({
   employees,
   shifts,
-  separadores = [],
-  ordenEmpleados = [],
+  separadores,
+  ordenEmpleados,
   schedule,
   scheduleId,
   isScheduleCompleted = false,
   currentWeekStart,
   lastCompletedWeekStart,
-  allEmployees = [],
+  allEmployees = employees,
 }: UseScheduleGridDataProps) {
-  // Estado para caché de employee requests
-  const [employeeRequestsCache, setEmployeeRequestsCache] = useState<Map<string, any>>(new Map())
+  // Cache de employee requests por cacheKey
+  const [employeeRequestCache, setEmployeeRequestCache] = useState<Map<string, any>>(new Map())
 
-  // Cargar employee requests cuando cambie el scheduleId
-  useEffect(() => {
-    if (!scheduleId) return
-
-    const loadEmployeeRequests = async () => {
-      try {
-        // Por ahora, el caché se actualizará desde los componentes individuales
-        // que ya cargan los requests (InlineShiftSelector, QuickShiftSelector)
-        // Esto evita hacer múltiples llamadas asíncronas
-      } catch (error) {
-        console.error('Error loading employee requests cache:', error)
-      }
-    }
-
-    loadEmployeeRequests()
-  }, [scheduleId])
-
-  // Función para actualizar el caché (usada por los componentes)
-  const updateEmployeeRequestCache = (key: string, request: any) => {
-    setEmployeeRequestsCache(prev => {
+  // Función para actualizar el caché (evita loops con useCallback)
+  const updateEmployeeRequestCache = (
+    cacheKey: string, 
+    request: any
+  ) => {
+    console.log('💾 [updateEmployeeRequestCache] Guardando:', cacheKey, request?.active ? 'ACTIVE' : 'INACTIVE')
+    
+    setEmployeeRequestCache(prev => {
       const newCache = new Map(prev)
       if (request && request.active) {
-        newCache.set(key, request)
+        newCache.set(cacheKey, request)
       } else {
-        newCache.delete(key)
+        newCache.delete(cacheKey)
       }
       return newCache
     })
@@ -65,70 +53,31 @@ export function useScheduleGridData({
 
   // Memoizar mapa de turnos para búsqueda O(1)
   const shiftMap = useMemo(() => {
-    return new Map(shifts.map((s) => [s.id, s]))
+    return new Map((shifts || []).map((s) => [s.id, s]))
   }, [shifts])
 
   // Memoizar mapa de separadores para búsqueda O(1)
   const separadorMap = useMemo(() => {
-    if (!separadores || separadores.length === 0) return new Map()
-    return new Map(separadores.map((s) => [s.id, s]))
+    return new Map((separadores || []).map((s) => [s.id, s]))
   }, [separadores])
 
-  // Filtrar empleados: si el horario está completado, mostrar empleados del snapshot
-  // Si no hay snapshot, usar la lógica anterior (compatibilidad con horarios antiguos)
-  // Si la semana es pasada (no completada), solo mostrar empleados que existían entonces
+  // Filtrar empleados según el estado del schedule
   const filteredEmployees = useMemo(() => {
-    // Si está completado, usar lógica de snapshot
-    if (isScheduleCompleted) {
-      // Verificar que es un Horario (no HistorialItem) y tiene snapshot
-      // HistorialItem tiene 'horarioId', Horario no
-      if (schedule && !('horarioId' in schedule)) {
-        const horarioSchedule = schedule as Horario
-        if (horarioSchedule.empleadosSnapshot && horarioSchedule.empleadosSnapshot.length > 0) {
-          const snapshotIds = new Set(horarioSchedule.empleadosSnapshot.map((e) => e.id))
-          return employees.filter((emp) => snapshotIds.has(emp.id))
-        }
+    // Si el schedule está completado, usar los empleados guardados en el schedule
+    if (isScheduleCompleted && schedule && !('horarioId' in schedule)) {
+      const completedSchedule = schedule as Horario
+      if (completedSchedule.ordenEmpleadosSnapshot && completedSchedule.ordenEmpleadosSnapshot.length > 0) {
+        const employeeIds = new Set(completedSchedule.ordenEmpleadosSnapshot)
+        return employees.filter((emp) => employeeIds.has(emp.id))
       }
-      
-      // Fallback: si no hay snapshot, usar lógica anterior (compatibilidad)
-      const employeeIdsToShow = new Set<string>()
-      
-      // Agregar empleados que tienen asignaciones
-      if (schedule?.assignments) {
-        Object.values(schedule.assignments).forEach((dateAssignments) => {
-          if (dateAssignments && typeof dateAssignments === 'object') {
-            Object.keys(dateAssignments).forEach((employeeId) => {
-              employeeIdsToShow.add(employeeId)
-            })
-          }
-        })
-      }
-      
-      // Agregar empleados que están en el orden personalizado
-      if (ordenEmpleados && ordenEmpleados.length > 0) {
-        ordenEmpleados.forEach((id) => {
-          if (employees.some((emp) => emp.id === id)) {
-            employeeIdsToShow.add(id)
-          }
-        })
-      }
-      
-      // Si no hay empleados para mostrar, mostrar todos (por seguridad)
-      if (employeeIdsToShow.size === 0) {
-        return employees
-      }
-      
-      return employees.filter((emp) => employeeIdsToShow.has(emp.id))
     }
-    
+
     // Si no está completado, verificar si es una semana pasada
-    // Si hay última semana completada y la semana actual es anterior o igual a ella,
-    // solo mostrar empleados que existían en ese momento
     if (lastCompletedWeekStart && currentWeekStart && currentWeekStart <= lastCompletedWeekStart) {
       // Esta es una semana pasada (no completada), solo mostrar empleados que tienen asignaciones
       // o que estaban en el orden personalizado en ese momento
       const employeeIdsToShow = new Set<string>()
-      
+
       // Agregar empleados que tienen asignaciones en esta semana
       if (schedule?.assignments) {
         Object.values(schedule.assignments).forEach((dateAssignments) => {
@@ -139,7 +88,7 @@ export function useScheduleGridData({
           }
         })
       }
-      
+
       // Agregar empleados que están en el orden personalizado
       if (ordenEmpleados && ordenEmpleados.length > 0) {
         ordenEmpleados.forEach((id) => {
@@ -148,15 +97,15 @@ export function useScheduleGridData({
           }
         })
       }
-      
+
       // Si no hay empleados para mostrar, mostrar todos (por seguridad)
       if (employeeIdsToShow.size === 0) {
         return employees
       }
-      
+
       return employees.filter((emp) => employeeIdsToShow.has(emp.id))
     }
-    
+
     // Si no está completado y es una semana futura (o no hay última semana completada),
     // mostrar todos los empleados (incluyendo los nuevos)
     return employees
@@ -167,13 +116,13 @@ export function useScheduleGridData({
     if (ordenEmpleados && ordenEmpleados.length > 0) {
       const employeeIds = new Set(filteredEmployees.map((emp) => emp.id))
       const separatorIds = new Set(separadores?.map((s) => s.id) || [])
-
+      
       // Filtrar solo IDs válidos (empleados o separadores)
       const validOrder = ordenEmpleados.filter((id) => employeeIds.has(id) || separatorIds.has(id))
-
+      
       // Agregar empleados nuevos que no estén en el orden
       const newEmployees = filteredEmployees.filter((emp) => !validOrder.includes(emp.id)).map((emp) => emp.id)
-
+      
       return [...validOrder, ...newEmployees]
     }
     // Si no hay orden guardado, usar el orden por defecto (por nombre)
@@ -219,19 +168,13 @@ export function useScheduleGridData({
   // Función para obtener asignaciones completas con employee requests como overrides
   const getEmployeeAssignments = useMemo(
     () => (employeeId: string, date: string) => {
-      // Primero obtener assignments del schedule
-      let baseAssignments: any[] = []
-      if (schedule?.assignments) {
-        const dateAssignments = schedule.assignments[date] || {}
-        const employeeShifts = dateAssignments[employeeId]
-        baseAssignments = toAssignments(employeeShifts, shifts)
-      }
-
-      // Luego verificar si hay un employee request activo en el caché
+      // Verificar primero si hay un employee request activo en el caché
       const cacheKey = `${scheduleId}_${employeeId}_${date}`
-      const request = employeeRequestsCache.get(cacheKey)
+      const request = employeeRequestCache.get(cacheKey)
       
       if (request && request.active && request.requestedShift) {
+        console.log('✅ [getEmployeeAssignments] Override aplicado:', cacheKey)
+        
         // Convertir requestedShift a ShiftAssignment
         const requestedShift = request.requestedShift
         let overrideAssignment: any
@@ -276,10 +219,17 @@ export function useScheduleGridData({
         }
       }
 
-      // Si no hay override, retornar assignments base
+      // Si no hay override, obtener assignments del schedule
+      let baseAssignments: any[] = []
+      if (schedule?.assignments) {
+        const dateAssignments = schedule.assignments[date] || {}
+        const employeeShifts = dateAssignments[employeeId]
+        baseAssignments = toAssignments(employeeShifts, shifts)
+      }
+      
       return baseAssignments
     },
-    [schedule?.assignments, shifts, shiftMap, scheduleId, employeeRequestsCache]
+    [schedule?.assignments, shifts, shiftMap, scheduleId, employeeRequestCache]
   )
 
   // Memoizar función de obtener info de turno
@@ -301,4 +251,3 @@ export function useScheduleGridData({
     updateEmployeeRequestCache,
   }
 }
-

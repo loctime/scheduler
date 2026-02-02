@@ -513,7 +513,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
 
   // Filtrar solo empleados (sin separadores) para vista móvil
   const employeesForMobile = useMemo(() => {
-    return orderedItems
+    return (orderedItems || [])
       .filter((item) => item.type === "employee")
       .map((item) => item.data as Empleado)
   }, [orderedItems])
@@ -557,7 +557,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
               onCloseSelector={() => setSelectedCell(null)} 
             />
             <tbody>
-              {orderedItems.map((item, itemIndex) => {
+              {(orderedItems || []).map((item, itemIndex) => {
                 const showAddButton = !readonly && item.type === "employee"
                 const insertIndex = itemIndex
                 // Detectar si es el primer separador (está en el índice 0)
@@ -751,7 +751,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
           <table className="w-full border-collapse">
             <GridHeader weekDays={weekDays} user={user} onCloseSelector={() => setSelectedCell(null)} />
             <tbody>
-              {orderedItems.map((item, itemIndex) => {
+              {(orderedItems || []).map((item, itemIndex) => {
                 const showAddButton = !readonly && item.type === "employee"
                 const insertIndex = itemIndex
                 // Detectar si es el primer separador (está en el índice 0)

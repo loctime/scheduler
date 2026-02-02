@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { EmployeeRequestDialog, EmployeeRequestData } from '@/components/employee-request-dialog';
 import { getEmployeeRequest, saveEmployeeRequest, deleteEmployeeRequest } from '@/lib/employee-requests';
+import { saveEmployeeRequestWithCache } from '@/lib/employee-request-cache';
 import { Turno, MedioTurno } from '@/lib/types';
 import { MessageSquare } from 'lucide-react';
 import { useData } from '@/contexts/data-context';
@@ -30,6 +31,8 @@ interface ShiftRequestMarkerProps {
   availableShifts: Turno[];
   /** Medios turnos disponibles */
   mediosTurnos?: MedioTurno[];
+  /** Función para actualizar caché */
+  updateEmployeeRequestCache?: (key: string, request: any) => void;
 }
 
 /**
@@ -51,7 +54,8 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
   employeeId,
   date,
   availableShifts,
-  mediosTurnos
+  mediosTurnos,
+  updateEmployeeRequestCache
 }) => {
   const { userData } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -111,7 +115,24 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
         ? userData.ownerId 
         : userData?.uid || '';
 
-      await saveEmployeeRequest(scheduleId, employeeId, date, data, ownerId);
+      // Usar la función que actualiza el caché
+      if (updateEmployeeRequestCache) {
+        const success = await saveEmployeeRequestWithCache(
+          scheduleId, 
+          employeeId, 
+          date, 
+          data, 
+          ownerId, 
+          updateEmployeeRequestCache
+        );
+        
+        if (!success) {
+          throw new Error('Error al guardar el request');
+        }
+      } else {
+        // Fallback a método original
+        await saveEmployeeRequest(scheduleId, employeeId, date, data, ownerId);
+      }
       
       // Actualizar estado local
       const isActive = data.active;

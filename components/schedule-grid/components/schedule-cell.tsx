@@ -498,6 +498,7 @@ export function ScheduleCell({
               date={date}
               availableShifts={quickShifts}
               mediosTurnos={mediosTurnos}
+              updateEmployeeRequestCache={updateEmployeeRequestCache}
             />
           </div>
         )}

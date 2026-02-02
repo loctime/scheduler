@@ -35,49 +35,6 @@ export function InlineShiftSelector({
   })
   const [employeeRequest, setEmployeeRequest] = useState<any>(null)
 
-  // Cargar employee request si existe
-  useEffect(() => {
-    const loadEmployeeRequest = async () => {
-      if (!employeeId || !date || !scheduleId) return
-      
-      try {
-        const request = await getEmployeeRequest(scheduleId, employeeId, date)
-        
-        // Actualizar caché
-        if (updateEmployeeRequestCache) {
-          const cacheKey = `${scheduleId}_${employeeId}_${date}`
-          updateEmployeeRequestCache(cacheKey, request)
-        }
-        
-        if (request && request.active && request.requestedShift) {
-          setEmployeeRequest(request)
-          
-          // Si hay un request, mostrar el horario solicitado
-          const requestedShift = request.requestedShift
-          if (requestedShift.type === 'franco') {
-            setSpecialType('franco')
-          } else if (requestedShift.type === 'medio-franco') {
-            setSpecialType('medio_franco')
-            if (requestedShift.startTime && requestedShift.endTime) {
-              setMedioFrancoTime({
-                startTime: requestedShift.startTime,
-                endTime: requestedShift.endTime
-              })
-            }
-          } else if (requestedShift.type === 'existing' && requestedShift.shiftId) {
-            setSpecialType('shift')
-          }
-        } else {
-          setEmployeeRequest(null)
-        }
-      } catch (error) {
-        console.error("Error loading employee request:", error)
-      }
-    }
-
-    loadEmployeeRequest()
-  }, [employeeId, date, scheduleId, updateEmployeeRequestCache])
-
   const handleSelectShift = (shift: Turno) => {
     // CRÍTICO: Crear assignment completo con horarios desde el inicio
     // Esto previene que se guarden assignments sin startTime/endTime
