@@ -15,7 +15,14 @@ import { useWeekData } from "@/hooks/use-week-data"
 import { useToast } from "@/hooks/use-toast"
 
 export default function HorarioPage() {
+  console.log("🔧 [HorarioPage] Component mounting")
+  
+  const { userData } = useData()
+  console.log("🔧 [HorarioPage] userData:", { role: userData?.role, ownerId: userData?.ownerId, uid: userData?.uid })
+  
   const { settings, isLoading: settingsLoading, updatePublishedWeek } = useSettings()
+  console.log("🔧 [HorarioPage] useSettings result:", { settings, settingsLoading })
+  
   const { 
     currentWeek, 
     isLoading: weekLoading, 
@@ -23,9 +30,11 @@ export default function HorarioPage() {
     goToNextWeek,
     formatWeekDisplay 
   } = useWeekNavigation(settings?.publishedWeekId)
+  console.log("🔧 [HorarioPage] useWeekNavigation result:", { currentWeek, weekLoading })
   
   const { weekData, isLoading: dataLoading, error } = useWeekData(currentWeek?.weekId || null)
-  const { userData } = useData()
+  console.log("🔧 [HorarioPage] useWeekData result:", { weekData, dataLoading, error })
+  
   const { toast } = useToast()
 
   const isLoading = settingsLoading || weekLoading || dataLoading

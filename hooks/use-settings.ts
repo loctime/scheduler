@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { useOwnerId } from "./use-owner-id"
 
 export interface Settings {
   publishedWeekId?: string
@@ -18,6 +19,7 @@ export interface UseSettingsReturn {
 export function useSettings(): UseSettingsReturn {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const ownerId = useOwnerId()
 
   const loadSettings = async () => {
     try {
@@ -27,18 +29,30 @@ export function useSettings(): UseSettingsReturn {
         return
       }
 
-      const settingsRef = doc(db, "apps/horarios/settings/main")
+      if (!ownerId) {
+        console.warn("🔧 [useSettings] ownerId not available yet")
+        setIsLoading(false)
+        return
+      }
+
+      console.log("🔧 [useSettings] Loading settings for ownerId:", ownerId)
+      
+      const settingsRef = doc(db, "apps/horarios", ownerId, "settings/main")
+      console.log("🔧 [useSettings] Settings path:", `apps/horarios/${ownerId}/settings/main`)
+      
       const settingsDoc = await getDoc(settingsRef)
       
       if (settingsDoc.exists()) {
+        console.log("🔧 [useSettings] Settings found:", settingsDoc.data())
         setSettings(settingsDoc.data() as Settings)
       } else {
+        console.log("🔧 [useSettings] No settings found, creating empty")
         // Crear settings si no existen
         const initialSettings: Settings = {}
         setSettings(initialSettings)
       }
     } catch (error) {
-      console.error("Error loading settings:", error)
+      console.error("🔧 [useSettings] Error loading settings:", error)
       setSettings(null)
     } finally {
       setIsLoading(false)
@@ -47,7 +61,7 @@ export function useSettings(): UseSettingsReturn {
 
   useEffect(() => {
     loadSettings()
-  }, [])
+  }, [ownerId]) // Disparar cuando ownerId cambie
 
   const updatePublishedWeek = async (weekId: string) => {
     try {
@@ -55,17 +69,25 @@ export function useSettings(): UseSettingsReturn {
         throw new Error("Firestore not available")
       }
 
-      const settingsRef = doc(db, "apps/horarios/settings/main")
+      if (!ownerId) {
+        throw new Error("ownerId not available")
+      }
+
+      console.log("🔧 [useSettings] Updating published week:", weekId, "for ownerId:", ownerId)
+      
+      const settingsRef = doc(db, "apps/horarios", ownerId, "settings/main")
       
       await updateDoc(settingsRef, {
         publishedWeekId: weekId,
         updatedAt: serverTimestamp()
       })
       
+      console.log("🔧 [useSettings] Published week updated successfully")
+      
       // Actualizar estado local
       setSettings(prev => prev ? { ...prev, publishedWeekId: weekId } : { publishedWeekId: weekId })
     } catch (error) {
-      console.error("Error updating published week:", error)
+      console.error("🔧 [useSettings] Error updating published week:", error)
       throw error
     }
   }
