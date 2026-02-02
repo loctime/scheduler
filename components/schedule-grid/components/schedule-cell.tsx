@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Check, RotateCcw, Undo2, Lock, FileText, X, Clock, Baby, Plus } from "lucide-react"
+import { Check, RotateCcw, Undo2, Lock, FileText, X, Clock, Baby, Plus, MessageSquare } from "lucide-react"
 import { ShiftRequestMarker } from "@/components/shift-request-marker"
 import { ShiftAssignment, Turno, MedioTurno, Configuracion } from "@/lib/types"
 import { CellAssignments } from "./cell-assignments"
@@ -103,6 +103,8 @@ export function ScheduleCell({
   // Estado local para pedidos de empleados
   const [employeeRequestActive, setEmployeeRequestActive] = useState(false)
   const [employeeRequestDescription, setEmployeeRequestDescription] = useState("")
+  // Estado para diálogo de confirmación de pedido de empleado
+  const [employeeRequestConfirmDialogOpen, setEmployeeRequestConfirmDialogOpen] = useState(false)
   
   // Cargar datos del pedido al montar el componente
   useEffect(() => {
@@ -132,6 +134,23 @@ export function ScheduleCell({
   
   const handleEmployeeRequestEditDescription = (description: string) => {
     setEmployeeRequestDescription(description)
+  }
+
+  // Handler para clic en celda con confirmación de pedido de empleado
+  const handleCellClickWrapper = () => {
+    // Si hay un pedido de empleado activo, mostrar confirmación
+    if (employeeRequestActive && !readonly) {
+      setEmployeeRequestConfirmDialogOpen(true)
+    } else {
+      // Si no hay pedido, comportamiento normal
+      onCellClick(date, employeeId)
+    }
+  }
+
+  // Confirmar cambio de turno despite pedido de empleado
+  const confirmOverrideEmployeeRequest = () => {
+    setEmployeeRequestConfirmDialogOpen(false)
+    onCellClick(date, employeeId)
   }
   const [horarioEspecialDialogOpen, setHorarioEspecialDialogOpen] = useState(false)
   const [startTime, setStartTime] = useState("")
@@ -439,7 +458,7 @@ export function ScheduleCell({
               isSelected && isClickable && onQuickAssignments ? "min-h-[140px] py-2 sm:py-2.5 md:py-3" : ""
             }`}
             style={backgroundStyle}
-            onClick={() => onCellClick(date, employeeId)}
+            onClick={() => handleCellClickWrapper()}
           >
             {/* Botón pequeño de deshacer en celda (arriba a la izquierda) */}
             {!readonly && hasCellHistory && (
@@ -831,6 +850,48 @@ export function ScheduleCell({
           onSave={onAssignmentUpdate || (() => {})}
         />
       )}
+
+      {/* Diálogo de confirmación para override de pedido de empleado */}
+      <Dialog open={employeeRequestConfirmDialogOpen} onOpenChange={setEmployeeRequestConfirmDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <MessageSquare className="w-5 h-5" />
+              Turno pedido por el empleado
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <p className="text-sm text-amber-800 font-medium mb-2">
+                ⚠️ Este turno tiene un pedido activo del empleado
+              </p>
+              {employeeRequestDescription && (
+                <p className="text-sm text-amber-700 mt-2">
+                  <strong>Motivo del pedido:</strong> {employeeRequestDescription}
+                </p>
+              )}
+            </div>
+            
+            <p className="text-sm text-muted-foreground mt-4">
+              ¿Estás seguro de que quieres modificar este turno? Esto sobrescribirá el pedido del empleado.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmployeeRequestConfirmDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              variant="default" 
+              onClick={confirmOverrideEmployeeRequest}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              Modificar turno
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

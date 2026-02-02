@@ -178,15 +178,15 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
   return (
     <>
       {active ? (
-        // Marcador activo con tooltip
+        // Marcador activo con tooltip - más grande y llamativo
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
               <div 
-                className="inline-flex items-center justify-center w-4 h-4 text-blue-500 hover:text-blue-600 transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center w-6 h-6 text-blue-600 hover:text-blue-700 transition-all duration-200 cursor-pointer bg-blue-100 rounded-full shadow-md hover:shadow-lg hover:scale-110"
                 onClick={handleClick}
               >
-                <MessageSquare className="w-3 h-3" />
+                <MessageSquare className="w-4 h-4" />
               </div>
             </TooltipTrigger>
             {tooltipText && (
@@ -197,9 +197,9 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
           </Tooltip>
         </TooltipProvider>
       ) : (
-        // Marcador inactivo (clickable pero sin tooltip)
+        // Marcador inactivo (clickable pero sin tooltip) - más sutil
         <div 
-          className="inline-flex items-center justify-center w-4 h-4 text-gray-400 hover:text-blue-500 transition-colors cursor-pointer"
+          className="inline-flex items-center justify-center w-5 h-5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-all duration-200 cursor-pointer rounded-full"
           onClick={handleClick}
         >
           <MessageSquare className="w-3 h-3" />
