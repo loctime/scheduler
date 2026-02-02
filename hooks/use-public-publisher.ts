@@ -2,6 +2,7 @@ import { useState } from "react"
 import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useOwnerId } from "./use-owner-id"
+import { useData } from "@/contexts/data-context"
 
 export interface PublishPublicScheduleOptions {
   companyName?: string
@@ -19,10 +20,13 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
   const [isPublishing, setIsPublishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const ownerId = useOwnerId()
+  const { user } = useData()
 
   console.log("🔧 [usePublicPublisher] Hook inicializado", { 
     hasOwnerId: !!ownerId,
-    ownerId: ownerId?.substring(0, 10) + '...' // Solo mostrar primeros 10 chars por seguridad
+    ownerId: ownerId?.substring(0, 10) + '...', // Solo mostrar primeros 10 chars por seguridad
+    hasUser: !!user,
+    userId: user?.uid?.substring(0, 10) + '...'
   })
 
   const publishToPublic = async (options: PublishPublicScheduleOptions): Promise<string> => {
@@ -56,8 +60,8 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
       console.log("🔧 [usePublicPublisher] Publishing schedule for ownerId:", ownerId)
       console.log("🔧 [usePublicPublisher] WeekId:", options.weekId)
       
-      // Path EXACTO: apps/horarios_public/{ownerId}/current (4 segmentos)
-      const fullPath = "apps/horarios_public/" + ownerId + "/current"
+      // Path EXACTO: apps/horarios/enlaces_publicos/{ownerId} (3 segmentos - válido)
+      const fullPath = "apps/horarios/enlaces_publicos/" + ownerId
       console.log("🔧 [usePublicPublisher] Writing to:", fullPath)
       
       // Estructura mínima para lectura pública
@@ -69,7 +73,9 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
           : `Semana ${options.weekId}`,
         publishedAt: serverTimestamp(),
         days: options.weekData.scheduleData?.assignments || options.weekData.assignments || {},
-        employees: options.weekData.employees || []
+        employees: options.weekData.employees || [],
+        userId: user?.uid, // Requerido por las reglas de Firestore
+        isPublic: true // Flag para identificar como horario público
       }
 
       console.log("🔧 [usePublicPublisher] Datos a publicar:", {
@@ -80,9 +86,9 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
         employeesCount: publicScheduleData.employees.length
       })
 
-      // Usar setDoc con overwrite completo en apps/horarios_public/{ownerId}/current
-      const publicRef = doc(db, "apps", "horarios_public", ownerId, "current")
-      console.log("🔧 [usePublicPublisher] Document reference created for apps/horarios_public/" + ownerId + "/current")
+      // Usar setDoc con overwrite completo en apps/horarios/enlaces_publicos/{ownerId}
+      const publicRef = doc(db, "apps", "horarios", "enlaces_publicos", ownerId)
+      console.log("🔧 [usePublicPublisher] Document reference created for apps/horarios/enlaces_publicos/" + ownerId)
       
       await setDoc(publicRef, publicScheduleData)
       console.log("🔧 [usePublicPublisher] Publish success - document written to:", fullPath)

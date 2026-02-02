@@ -9,6 +9,7 @@ export interface PublicHorarioData {
   publishedAt: any
   days: Record<string, any[]>
   employees: any[]
+  isPublic?: boolean
 }
 
 export interface UsePublicHorarioReturn {
@@ -19,7 +20,7 @@ export interface UsePublicHorarioReturn {
 
 /**
  * Hook para leer horarios públicos SIN autenticación
- * Lee desde: apps/horarios_public/{ownerId}/current
+ * Lee desde: apps/horarios/enlaces_publicos/{ownerId}
  */
 export function usePublicHorario(ownerId: string): UsePublicHorarioReturn {
   const [horario, setHorario] = useState<PublicHorarioData | null>(null)
@@ -48,12 +49,12 @@ export function usePublicHorario(ownerId: string): UsePublicHorarioReturn {
 
       console.log("🔧 [usePublicHorario] Loading public horario for ownerId:", ownerId)
       
-      // Path válido: apps/horarios_public/{ownerId}/current
-      const fullPath = "apps/horarios_public/" + ownerId + "/current"
+      // Path válido: apps/horarios/enlaces_publicos/{ownerId}
+      const fullPath = "apps/horarios/enlaces_publicos/" + ownerId
       console.log("🔧 [usePublicHorario] Reading from:", fullPath)
       
-      const horarioRef = doc(db, "apps", "horarios_public", ownerId, "current")
-      console.log("🔧 [usePublicHorario] Document reference created for apps/horarios_public/" + ownerId + "/current")
+      const horarioRef = doc(db, "apps", "horarios", "enlaces_publicos", ownerId)
+      console.log("🔧 [usePublicHorario] Document reference created for apps/horarios/enlaces_publicos/" + ownerId)
       
       const horarioDoc = await getDoc(horarioRef)
       console.log("🔧 [usePublicHorario] Document fetched, exists:", horarioDoc.exists())
@@ -71,7 +72,8 @@ export function usePublicHorario(ownerId: string): UsePublicHorarioReturn {
         weekLabel: horarioData.weekLabel,
         hasPublishedAt: !!horarioData.publishedAt,
         daysCount: Object.keys(horarioData.days || {}).length,
-        employeesCount: horarioData.employees?.length || 0
+        employeesCount: horarioData.employees?.length || 0,
+        isPublic: horarioData.isPublic
       })
       
       setHorario(horarioData)
