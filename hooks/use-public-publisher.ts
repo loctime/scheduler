@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useOwnerId } from "./use-owner-id"
 import { createValidDocRef, normalizeFirestoreId } from "@/lib/firestore-helpers"
@@ -75,7 +75,14 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
       const publicRef = doc(db, "public/horarios", publicScheduleId)
       await setDoc(publicRef, publicScheduleData)
 
-      console.log("🔧 [usePublicPublisher] Schedule published successfully:", publicScheduleId)
+      // Guardar el publishedScheduleId en settings para que /horario pueda leerlo
+      const settingsRef = createValidDocRef(db, "apps", "horarios", normalizeFirestoreId(ownerId), "settings", "main")
+      await updateDoc(settingsRef, {
+        publishedScheduleId: publicScheduleId,
+        updatedAt: serverTimestamp()
+      })
+
+      console.log("🔧 [usePublicPublisher] Schedule published and settings updated successfully:", publicScheduleId)
       
       return publicScheduleId
     } catch (err) {

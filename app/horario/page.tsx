@@ -8,11 +8,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { DateDisplay, WeekDisplay } from "@/components/ui/date-display"
 import { WeekRangeDisplay } from "@/components/ui/week-range-display"
 import { Badge } from "@/components/ui/badge"
-import { PublicSchedulePublisher } from "@/components/public-schedule-publisher"
+import { ShareScheduleButton } from "@/components/share-schedule-button"
 import { useData } from "@/contexts/data-context"
-import { useWeekNavigation, type WeekData } from "@/hooks/use-week-navigation"
-import { useSettings } from "@/hooks/use-settings"
-import { useWeekData } from "@/hooks/use-week-data"
+import { usePublishedSchedule } from "@/hooks/use-published-schedule"
 import { useToast } from "@/hooks/use-toast"
 
 export default function HorarioPage() {
@@ -21,45 +19,10 @@ export default function HorarioPage() {
   const { userData } = useData()
   console.log("🔧 [HorarioPage] userData:", { role: userData?.role, ownerId: userData?.ownerId, uid: userData?.uid })
   
-  const { settings, isLoading: settingsLoading, updatePublishedWeek } = useSettings()
-  console.log("🔧 [HorarioPage] useSettings result:", { settings, settingsLoading })
-  
-  const { 
-    currentWeek, 
-    isLoading: weekLoading, 
-    goToPreviousWeek, 
-    goToNextWeek,
-    formatWeekDisplay 
-  } = useWeekNavigation(settings?.publishedWeekId)
-  console.log("🔧 [HorarioPage] useWeekNavigation result:", { currentWeek, weekLoading })
-  
-  const { weekData, isLoading: dataLoading, error } = useWeekData(currentWeek?.weekId || null)
-  console.log("🔧 [HorarioPage] useWeekData result:", { weekData, dataLoading, error })
+  const { publishedSchedule, isLoading, error, shareUrl } = usePublishedSchedule()
+  console.log("🔧 [HorarioPage] usePublishedSchedule result:", { publishedSchedule, isLoading, error, shareUrl })
   
   const { toast } = useToast()
-
-  const isLoading = settingsLoading || weekLoading || dataLoading
-
-  const isAdmin = userData?.role === 'admin'
-  const isCurrentWeekPublished = currentWeek?.weekId === settings?.publishedWeekId
-
-  const handlePublishWeek = async () => {
-    if (!currentWeek?.weekId) return
-    
-    try {
-      await updatePublishedWeek(currentWeek.weekId)
-      toast({
-        title: "Semana publicada",
-        description: `La semana ${currentWeek.weekId} ahora es la semana publicada.`,
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo publicar la semana.",
-        variant: "destructive"
-      })
-    }
-  }
 
   useEffect(() => {
     if (error) {
@@ -71,248 +34,171 @@ export default function HorarioPage() {
     }
   }, [error, toast])
 
-  useEffect(() => {
-    // Sincronizar datos de navegación con Firestore cuando cambia la semana
-    if (currentWeek && weekData && !dataLoading) {
-      const needsUpdate = 
-        weekData.startDate !== currentWeek.startDate ||
-        weekData.endDate !== currentWeek.endDate ||
-        weekData.weekNumber !== currentWeek.weekNumber ||
-        weekData.year !== currentWeek.year ||
-        weekData.month !== currentWeek.month
-
-      if (needsUpdate) {
-        // Aquí podríamos llamar a saveWeekData para sincronizar
-        console.log("Week data needs synchronization")
-      }
-    }
-  }, [currentWeek, weekData, dataLoading])
-
-  const handleNavigation = (direction: 'previous' | 'next') => {
-    if (direction === 'previous') {
-      goToPreviousWeek()
-    } else {
-      goToNextWeek()
-    }
-  }
-
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-8 w-64" />
-          <div className="flex items-center space-x-2">
-            <Skeleton className="h-10 w-10" />
-            <Skeleton className="h-10 w-32" />
-            <Skeleton className="h-10 w-10" />
+      <div className="min-h-screen bg-background p-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-6">
+            <Skeleton className="h-8 w-64 mb-2" />
+            <Skeleton className="h-4 w-48" />
           </div>
-        </div>
-        <div className="grid gap-4">
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-32 w-full" />
+          
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-48 mb-2" />
+              <Skeleton className="h-4 w-32" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex items-center space-x-4">
+                    <Skeleton className="h-10 w-24" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-3/4" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     )
   }
 
-  return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header Principal - Estilo Dashboard */}
-      <div className="space-y-4">
-        {/* Navegación y título */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold tracking-tight">Horario Semanal</h1>
-            {currentWeek && (
-              <div className="flex items-center space-x-2 text-muted-foreground">
-                <Calendar className="h-4 w-4" />
-                <WeekRangeDisplay 
-                  startDate={currentWeek.startDate}
-                  endDate={currentWeek.endDate}
-                  className="text-lg font-medium"
-                />
-              </div>
-            )}
-            {userData?.grupoIds && userData.grupoIds.length > 0 && (
-              <p className="text-sm text-muted-foreground">
-                Empresa activa: {userData.grupoIds.join(', ')}
-              </p>
-            )}
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleNavigation('previous')}
-              disabled={!currentWeek}
-              aria-label="Semana anterior"
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Semana anterior
-            </Button>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleNavigation('next')}
-              disabled={!currentWeek}
-              aria-label="Semana siguiente"
-            >
-              Semana siguiente
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        </div>
-
-        {/* UI de Estado - Chips */}
-        {currentWeek && (
-          <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/50 rounded-lg">
-            <div className="flex items-center space-x-2">
-              <Eye className="h-4 w-4 text-blue-600" />
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
-                Semana visualizada: {currentWeek.weekId}
-              </Badge>
+  if (!publishedSchedule) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <div className="text-gray-500 mb-4">
+              <Calendar className="h-12 w-12 mx-auto" />
             </div>
-            
-            <div className="flex items-center space-x-2">
-              <Globe className="h-4 w-4 text-green-600" />
-              <Badge 
-                variant={isCurrentWeekPublished ? "default" : "secondary"}
-                className={isCurrentWeekPublished 
-                  ? "bg-green-100 text-green-800 border-green-200" 
-                  : "bg-orange-100 text-orange-800 border-orange-200"
-                }
-              >
-                {isCurrentWeekPublished && <CheckCircle className="h-3 w-3 mr-1" />}
-                Semana publicada: {settings?.publishedWeekId || "No definida"}
-              </Badge>
-            </div>
-          </div>
-        )}
-
-        {/* Barra de Acciones */}
-        {currentWeek && isAdmin && (
-          <div className="flex items-center justify-between p-4 bg-background border rounded-lg">
-            <div className="flex items-center space-x-2">
-              <Upload className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">
-                {isCurrentWeekPublished 
-                  ? "Esta semana está publicada y visible para todos los usuarios."
-                  : "Esta semana no está publicada. Solo los administradores pueden verla."
-                }
-              </span>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              {/* Botón de publicación pública */}
-              <PublicSchedulePublisher 
-                weekId={currentWeek.weekId} 
-                weekData={weekData}
-              />
-              
-              {!isCurrentWeekPublished && (
-                <Button
-                  onClick={handlePublishWeek}
-                  size="sm"
-                  className="bg-primary text-primary-foreground hover:bg-primary/90"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Publicar esta semana
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Información de la semana */}
-      {currentWeek && (
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">ID de Semana</CardTitle>
-              <Calendar className="ml-auto h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{currentWeek.weekId}</div>
-              <p className="text-xs text-muted-foreground">
-                Semana {currentWeek.weekNumber} de {currentWeek.year}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Fecha Inicio</CardTitle>
-              <Clock className="ml-auto h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                <DateDisplay date={currentWeek.startDate} format="short" />
-              </div>
-              <p className="text-xs text-muted-foreground">Lunes de la semana</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Fecha Fin</CardTitle>
-              <Clock className="ml-auto h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                <DateDisplay date={currentWeek.endDate} format="short" />
-              </div>
-              <p className="text-xs text-muted-foreground">Domingo de la semana</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Placeholder para el contenido del horario */}
-      {currentWeek && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Contenido del Horario</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-12 text-muted-foreground">
-              <Calendar className="mx-auto h-12 w-12 mb-4 opacity-50" />
-              <h3 className="text-lg font-semibold mb-2">Horario de la Semana</h3>
-              <p className="mb-4">
-                Aquí se mostrará el horario correspondiente a la semana {currentWeek.weekId}
-              </p>
-              <p className="text-sm">
-                Las fechas están en formato argentino (DD/MM/AAAA) como solicitaste.
-              </p>
-              <div className="mt-6 p-4 bg-muted rounded-md">
-                <p className="text-sm font-mono">
-                  <DateDisplay date={currentWeek.startDate} format="short" /> - <DateDisplay date={currentWeek.endDate} format="short" />
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Estado de carga inicial */}
-      {!currentWeek && !isLoading && (
-        <Card>
-          <CardContent className="text-center py-12">
-            <Calendar className="mx-auto h-12 w-12 mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold mb-2">No hay semana seleccionada</h3>
-            <p className="text-muted-foreground">
-              No se pudo cargar la información de la semana. 
-              {settings?.publishedWeekId ? (
-                <> La semana configurada es: {settings.publishedWeekId}</>
-              ) : (
-                <> No hay una semana publicada configurada.</>
-              )}
+            <h1 className="text-lg font-semibold mb-2">No hay horario publicado</h1>
+            <p className="text-gray-600 text-sm mb-4">
+              No hay ningún horario publicado para visualizar.
+            </p>
+            <p className="text-gray-500 text-xs">
+              El administrador debe publicar un horario desde el dashboard.
             </p>
           </CardContent>
         </Card>
-      )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="bg-white border-b">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <Calendar className="h-6 w-6" />
+                {publishedSchedule.companyName}
+              </h1>
+              <p className="text-gray-600 text-sm mt-1">
+                Horario semanal publicado
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Publicado
+              </Badge>
+              <ShareScheduleButton shareUrl={shareUrl} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Week Info */}
+      <div className="bg-white border-b">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="text-center">
+            <div className="font-semibold text-gray-900">
+              Semana {publishedSchedule.weekData.weekNumber} de {new Date(publishedSchedule.weekData.year, publishedSchedule.weekData.month).toLocaleDateString('es-AR', { month: 'long' })}
+            </div>
+            <div className="text-sm text-gray-600">
+              {publishedSchedule.weekData.startDate} - {publishedSchedule.weekData.endDate}
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              ID: {publishedSchedule.publishedWeekId}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Schedule Content */}
+      <div className="max-w-4xl mx-auto p-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Horario Semanal Publicado
+            </CardTitle>
+            <p className="text-sm text-gray-600">
+              Semana {publishedSchedule.weekData.weekNumber} - {publishedSchedule.weekData.startDate} al {publishedSchedule.weekData.endDate}
+            </p>
+          </CardHeader>
+          <CardContent>
+            {publishedSchedule.weekData.assignments ? (
+              <div className="space-y-4">
+                {Object.entries(publishedSchedule.weekData.assignments).map(([date, dayAssignments]) => (
+                  <div key={date} className="border rounded-lg p-4">
+                    <h3 className="font-semibold mb-3 text-gray-900">
+                      {new Date(date).toLocaleDateString('es-AR', { 
+                        weekday: 'long', 
+                        day: '2-digit', 
+                        month: '2-digit', 
+                        year: 'numeric' 
+                      })}
+                    </h3>
+                    <div className="grid gap-2">
+                      {Object.entries(dayAssignments).map(([employeeId, assignments]) => (
+                        <div key={employeeId} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <span className="font-medium text-gray-900">
+                            Empleado {employeeId}
+                          </span>
+                          <div className="flex gap-1">
+                            {Array.isArray(assignments) && assignments.length > 0 ? (
+                              assignments.map((assignment, index) => (
+                                <Badge key={index} variant="outline" className="text-xs">
+                                  {assignment.shift || assignment.turno || 'Turno'}
+                                </Badge>
+                              ))
+                            ) : (
+                              <Badge variant="outline" className="text-xs text-gray-500">
+                                Sin asignación
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>No hay asignaciones para esta semana</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Footer */}
+        <div className="mt-6 text-center text-sm text-gray-500">
+          <p>Horario actualizado: {publishedSchedule.updatedAt ? new Date(publishedSchedule.updatedAt.toDate()).toLocaleDateString('es-AR') : 'Desconocido'}</p>
+          <p className="mt-1">Este horario es de solo lectura</p>
+          <div className="mt-2">
+            <ShareScheduleButton shareUrl={shareUrl} />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
