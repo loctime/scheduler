@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { useData } from "@/contexts/data-context"
 import { type WeekData } from "./use-week-navigation"
 
 export interface WeekDocument extends WeekData {
@@ -22,6 +23,7 @@ export function useWeekData(weekId: string | null): UseWeekDataReturn {
   const [weekData, setWeekData] = useState<WeekDocument | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { userData, user } = useData()
 
   const loadWeekData = async () => {
     if (!weekId || !db) {
@@ -34,7 +36,16 @@ export function useWeekData(weekId: string | null): UseWeekDataReturn {
     setError(null)
 
     try {
-      const weekRef = doc(db, "apps/horarios/weeks", weekId)
+      // Determinar el ownerId correcto
+      const ownerId = userData?.role === "invited" && userData?.ownerId 
+        ? userData.ownerId 
+        : user?.uid
+
+      if (!ownerId) {
+        throw new Error("No se pudo determinar el ownerId")
+      }
+
+      const weekRef = doc(db, "apps/horarios", ownerId, "weeks", weekId)
       const weekDoc = await getDoc(weekRef)
 
       if (weekDoc.exists()) {
@@ -74,7 +85,16 @@ export function useWeekData(weekId: string | null): UseWeekDataReturn {
     }
 
     try {
-      const weekRef = doc(db, "apps/horarios/weeks", weekId)
+      // Determinar el ownerId correcto
+      const ownerId = userData?.role === "invited" && userData?.ownerId 
+        ? userData.ownerId 
+        : user?.uid
+
+      if (!ownerId) {
+        throw new Error("No se pudo determinar el ownerId")
+      }
+
+      const weekRef = doc(db, "apps/horarios", ownerId, "weeks", weekId)
       
       const updateData = {
         ...data,

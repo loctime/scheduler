@@ -28,11 +28,20 @@ async function initializeSettings() {
     const app = initializeApp(firebaseConfig)
     const db = getFirestore(app)
 
+    // Obtener ownerId desde variable de entorno o parámetro
+    const ownerId = process.env.OWNER_ID || process.argv[2]
+    
+    if (!ownerId) {
+      throw new Error("Se requiere OWNER_ID. Usar: OWNER_ID=tu_uid node scripts/init-settings.js")
+    }
+
+    console.log(`🔧 Usando ownerId: ${ownerId}`)
+
     // Generar ID de la semana actual
     const currentWeekId = generateWeekId(new Date())
 
     // Crear documento de settings
-    const settingsRef = doc(db, "apps/horarios/settings/main")
+    const settingsRef = doc(db, "apps/horarios", ownerId, "settings/main")
     
     await setDoc(settingsRef, {
       publishedWeekId: currentWeekId,
@@ -58,7 +67,7 @@ async function initializeSettings() {
       updatedAt: serverTimestamp()
     }
 
-    const weekRef = doc(db, "apps/horarios/weeks", currentWeekId)
+    const weekRef = doc(db, "apps/horarios", ownerId, "weeks", currentWeekId)
     await setDoc(weekRef, weekData)
 
     console.log(`✅ Semana ${currentWeekId} creada en Firestore`)
