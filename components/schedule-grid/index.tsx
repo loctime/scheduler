@@ -108,7 +108,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
 
   // Hook para reglas fijas
   const { hasFixedRule, getRuleForDay } = useEmployeeFixedRules({ 
-    ownerId: user?.uid 
+    ownerId: readonly ? undefined : user?.uid 
   })
 
   // Combinar empleados actuales con snapshot cuando el horario está completado
@@ -637,4 +637,3 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     </>
   )
 })
-
