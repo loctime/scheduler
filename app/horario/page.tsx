@@ -1,73 +1,26 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { ChevronLeft, ChevronRight, Calendar, Clock, Eye, Globe, CheckCircle, Upload } from "lucide-react"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { Card, CardContent } from "@/components/ui/card"
+import { Calendar, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { DateDisplay, WeekDisplay } from "@/components/ui/date-display"
-import { WeekRangeDisplay } from "@/components/ui/week-range-display"
-import { Badge } from "@/components/ui/badge"
-import { ShareScheduleButton } from "@/components/share-schedule-button"
 import { useData } from "@/contexts/data-context"
-import { usePublishedSchedule } from "@/hooks/use-published-schedule"
-import { useToast } from "@/hooks/use-toast"
+import { useOwnerId } from "@/hooks/use-owner-id"
 
-export default function HorarioPage() {
-  console.log("🔧 [HorarioPage] Component mounting")
-  
+export default function HorarioRedirectPage() {
+  const router = useRouter()
   const { userData } = useData()
-  console.log("🔧 [HorarioPage] userData:", { role: userData?.role, ownerId: userData?.ownerId, uid: userData?.uid })
-  
-  const { publishedSchedule, isLoading, error, shareUrl } = usePublishedSchedule()
-  console.log("🔧 [HorarioPage] usePublishedSchedule result:", { publishedSchedule, isLoading, error, shareUrl })
-  
-  const { toast } = useToast()
+  const ownerId = useOwnerId()
 
   useEffect(() => {
-    if (error) {
-      toast({
-        title: "Error",
-        description: error,
-        variant: "destructive"
-      })
+    // Si tenemos ownerId, redirigir a la página pública
+    if (ownerId) {
+      router.replace(`/horario/${ownerId}`)
     }
-  }, [error, toast])
+  }, [ownerId, router])
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background p-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-6">
-            <Skeleton className="h-8 w-64 mb-2" />
-            <Skeleton className="h-4 w-48" />
-          </div>
-          
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-48 mb-2" />
-              <Skeleton className="h-4 w-32" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="flex items-center space-x-4">
-                    <Skeleton className="h-10 w-24" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-3/4" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
-  }
-
-  if (!publishedSchedule) {
+  if (!ownerId) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -75,12 +28,9 @@ export default function HorarioPage() {
             <div className="text-gray-500 mb-4">
               <Calendar className="h-12 w-12 mx-auto" />
             </div>
-            <h1 className="text-lg font-semibold mb-2">No hay horario publicado</h1>
-            <p className="text-gray-600 text-sm mb-4">
-              No hay ningún horario publicado para visualizar.
-            </p>
-            <p className="text-gray-500 text-xs">
-              El administrador debe publicar un horario desde el dashboard.
+            <h1 className="text-lg font-semibold mb-2">Cargando...</h1>
+            <p className="text-gray-600 text-sm">
+              Preparando tu horario...
             </p>
           </CardContent>
         </Card>
@@ -89,116 +39,25 @@ export default function HorarioPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Calendar className="h-6 w-6" />
-                {publishedSchedule.companyName}
-              </h1>
-              <p className="text-gray-600 text-sm mt-1">
-                Horario semanal publicado
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                <CheckCircle className="h-3 w-3 mr-1" />
-                Publicado
-              </Badge>
-              <ShareScheduleButton shareUrl={shareUrl} />
-            </div>
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardContent className="pt-6 text-center">
+          <div className="text-gray-500 mb-4">
+            <Calendar className="h-12 w-12 mx-auto" />
           </div>
-        </div>
-      </div>
-
-      {/* Week Info */}
-      <div className="bg-white border-b">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="text-center">
-            <div className="font-semibold text-gray-900">
-              Semana {publishedSchedule.weekData.weekNumber} de {new Date(publishedSchedule.weekData.year, publishedSchedule.weekData.month).toLocaleDateString('es-AR', { month: 'long' })}
-            </div>
-            <div className="text-sm text-gray-600">
-              {publishedSchedule.weekData.startDate} - {publishedSchedule.weekData.endDate}
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              ID: {publishedSchedule.publishedWeekId}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Schedule Content */}
-      <div className="max-w-4xl mx-auto p-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Horario Semanal Publicado
-            </CardTitle>
-            <p className="text-sm text-gray-600">
-              Semana {publishedSchedule.weekData.weekNumber} - {publishedSchedule.weekData.startDate} al {publishedSchedule.weekData.endDate}
-            </p>
-          </CardHeader>
-          <CardContent>
-            {publishedSchedule.weekData.assignments ? (
-              <div className="space-y-4">
-                {Object.entries(publishedSchedule.weekData.assignments).map(([date, dayAssignments]) => (
-                  <div key={date} className="border rounded-lg p-4">
-                    <h3 className="font-semibold mb-3 text-gray-900">
-                      {new Date(date).toLocaleDateString('es-AR', { 
-                        weekday: 'long', 
-                        day: '2-digit', 
-                        month: '2-digit', 
-                        year: 'numeric' 
-                      })}
-                    </h3>
-                    <div className="grid gap-2">
-                      {Object.entries(dayAssignments).map(([employeeId, assignments]) => (
-                        <div key={employeeId} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                          <span className="font-medium text-gray-900">
-                            Empleado {employeeId}
-                          </span>
-                          <div className="flex gap-1">
-                            {Array.isArray(assignments) && assignments.length > 0 ? (
-                              assignments.map((assignment, index) => (
-                                <Badge key={index} variant="outline" className="text-xs">
-                                  {assignment.shift || assignment.turno || 'Turno'}
-                                </Badge>
-                              ))
-                            ) : (
-                              <Badge variant="outline" className="text-xs text-gray-500">
-                                Sin asignación
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>No hay asignaciones para esta semana</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Footer */}
-        <div className="mt-6 text-center text-sm text-gray-500">
-          <p>Horario actualizado: {publishedSchedule.updatedAt ? new Date(publishedSchedule.updatedAt.toDate()).toLocaleDateString('es-AR') : 'Desconocido'}</p>
-          <p className="mt-1">Este horario es de solo lectura</p>
-          <div className="mt-2">
-            <ShareScheduleButton shareUrl={shareUrl} />
-          </div>
-        </div>
-      </div>
+          <h1 className="text-lg font-semibold mb-2">Redirigiendo...</h1>
+          <p className="text-gray-600 text-sm mb-4">
+            Te estamos redirigiendo a tu horario público.
+          </p>
+          <Button
+            onClick={() => router.push(`/horario/${ownerId}`)}
+            className="flex items-center gap-2"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Ver Horario Público
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   )
 }

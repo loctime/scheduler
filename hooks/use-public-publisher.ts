@@ -1,8 +1,8 @@
 import { useState } from "react"
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useOwnerId } from "./use-owner-id"
-import { createWeekRef, createSettingsRef } from "@/lib/firestore-helpers"
+import { createWeekRef } from "@/lib/firestore-helpers"
 
 export interface PublishPublicScheduleOptions {
   companyName: string
@@ -71,19 +71,12 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
         publishedAt: serverTimestamp()
       }
 
-      const publicRef = doc(db, "public/horarios", publicScheduleId)
+      const publicRef = doc(db, "apps", "horarios", "published", ownerId)
       await setDoc(publicRef, publicScheduleData)
 
-      // Guardar el publishedScheduleId en settings para que /horario pueda leerlo
-      const settingsRef = createSettingsRef(db, ownerId)
-      await updateDoc(settingsRef, {
-        publishedScheduleId: publicScheduleId,
-        updatedAt: serverTimestamp()
-      })
-
-      console.log("🔧 [usePublicPublisher] Schedule published and settings updated successfully:", publicScheduleId)
+      console.log("🔧 [usePublicPublisher] Schedule published successfully to apps/horarios/published/" + ownerId)
       
-      return publicScheduleId
+      return ownerId // Retornar el ownerId para generar URL pública
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Error al publicar"
       setError(errorMessage)
