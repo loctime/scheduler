@@ -424,14 +424,15 @@ export default function HorariosMensualesPage() {
                             weekIndex={0}
                             weekSchedule={week.schedule}
                             employees={employees}
+                            allEmployees={employees}
                             shifts={shifts}
-                            monthRange={monthRange}
+                            monthRange={{ start: monthRange.startDate, end: monthRange.endDate }}
                             onExportImage={handleExportWeekImage}
                             onExportPDF={handleExportWeekPDF}
                             onExportExcel={() => handleExportWeekExcel(week.weekStartDate, week.weekDays, week.schedule)}
                             exporting={exporting}
                             mediosTurnos={config?.mediosTurnos}
-                            employeeStats={weekStats}
+                            employeeStats={Object.values(weekStats)}
                             readonly={true}
                           />
                         )
