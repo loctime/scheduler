@@ -47,7 +47,7 @@ async function initializeSettings() {
     const normalizedWeekId = normalizeFirestoreId(currentWeekId)
 
     // Crear documento de settings - path corregido
-    const settingsRef = doc(db, "apps", "horarios", normalizeFirestoreId(ownerId), "settings", "main")
+    const settingsRef = doc(db, "apps", "horarios_settings", normalizeFirestoreId(ownerId))
     
     await setDoc(settingsRef, {
       publishedWeekId: currentWeekId,
@@ -74,9 +74,9 @@ async function initializeSettings() {
       updatedAt: serverTimestamp()
     }
 
-    // Path corregido para weeks: apps/horarios/weeks/{ownerId}_{weekId}
+    // Path corregido para weeks: apps/horarios_weeks/{ownerId}_{weekId}
     const compositeId = `${normalizeFirestoreId(ownerId)}_${normalizeFirestoreId(currentWeekId)}`
-    const weekRef = doc(db, "apps", "horarios", "weeks", compositeId)
+    const weekRef = doc(db, "apps", "horarios_weeks", compositeId)
     await setDoc(weekRef, weekData)
 
     console.log(`✅ Semana ${currentWeekId} creada en Firestore`)

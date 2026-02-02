@@ -18,48 +18,61 @@ export function buildFirestorePath(basePath: string, ...segments: string[]): str
 }
 
 /**
- * Crea una referencia de documento válida con logging defensivo
+ * Helper para crear referencia de settings válida
+ * Path: apps/horarios_settings/{ownerId}
  */
-export function createValidDocRef(dbInstance: any, ...pathSegments: string[]) {
+export function createSettingsRef(dbInstance: any, ownerId: string) {
   if (!dbInstance) {
     throw new Error("Firestore instance not available")
   }
 
-  console.log("🔧 [createValidDocRef] Input segments:", pathSegments)
-
-  const normalizedSegments = pathSegments.map(segment => {
-    if (typeof segment !== 'string') {
-      console.error('🔧 [createValidDocRef] Invalid segment type:', typeof segment, segment)
-      throw new Error(`Invalid segment type: ${typeof segment}`)
-    }
-    
-    if (!segment || segment.trim() === '') {
-      console.error('🔧 [createValidDocRef] Empty segment:', segment)
-      throw new Error("Empty segment not allowed")
-    }
-    
-    const normalized = normalizeFirestoreId(segment)
-    console.log('🔧 [createValidDocRef] Normalizing:', segment, '→', normalized)
-    return normalized
-  })
-
-  const fullPath = normalizedSegments.join('/')
-  console.log('🔧 [createValidDocRef] Final path:', fullPath)
-  
-  // Verificar que tengamos número par de segmentos
-  if (normalizedSegments.length % 2 !== 0) {
-    const errorMsg = `Invalid path: odd number of segments (${normalizedSegments.length}). Path: ${fullPath}`
-    console.error('🔧 [createValidDocRef] ERROR:', errorMsg)
-    throw new Error(errorMsg)
+  if (!ownerId || ownerId.trim() === '') {
+    throw new Error("ownerId is required for settings reference")
   }
 
+  const normalizedOwnerId = normalizeFirestoreId(ownerId)
+  console.log("🔧 [createSettingsRef] Creating settings ref for ownerId:", ownerId, '→', normalizedOwnerId)
+  
   try {
-    const ref = doc(dbInstance, ...normalizedSegments)
-    console.log('🔧 [createValidDocRef] Document reference created successfully')
+    const ref = doc(dbInstance, "apps", "horarios_settings", normalizedOwnerId)
+    console.log("🔧 [createSettingsRef] Settings reference created successfully: apps/horarios_settings/" + normalizedOwnerId)
     return ref
   } catch (error) {
-    console.error('🔧 [createValidDocRef] Failed to create reference:', error)
-    throw new Error(`Failed to create document reference: ${error}`)
+    console.error("🔧 [createSettingsRef] Failed to create settings reference:", error)
+    throw new Error(`Failed to create settings reference: ${error}`)
+  }
+}
+
+/**
+ * Helper para crear referencia de week válida
+ * Path: apps/horarios_weeks/{ownerId}_{weekId}
+ */
+export function createWeekRef(dbInstance: any, ownerId: string, weekId: string) {
+  if (!dbInstance) {
+    throw new Error("Firestore instance not available")
+  }
+
+  if (!ownerId || ownerId.trim() === '') {
+    throw new Error("ownerId is required for week reference")
+  }
+
+  if (!weekId || weekId.trim() === '') {
+    throw new Error("weekId is required for week reference")
+  }
+
+  const normalizedOwnerId = normalizeFirestoreId(ownerId)
+  const normalizedWeekId = normalizeFirestoreId(weekId)
+  const compositeId = `${normalizedOwnerId}_${normalizedWeekId}`
+  
+  console.log("🔧 [createWeekRef] Creating week ref:", { ownerId, weekId, compositeId })
+  
+  try {
+    const ref = doc(dbInstance, "apps", "horarios_weeks", compositeId)
+    console.log("🔧 [createWeekRef] Week reference created successfully: apps/horarios_weeks/" + compositeId)
+    return ref
+  } catch (error) {
+    console.error("🔧 [createWeekRef] Failed to create week reference:", error)
+    throw new Error(`Failed to create week reference: ${error}`)
   }
 }
 

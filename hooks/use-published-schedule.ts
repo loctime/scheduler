@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useOwnerId } from "./use-owner-id"
-import { createValidDocRef, normalizeFirestoreId } from "@/lib/firestore-helpers"
+import { createSettingsRef } from "@/lib/firestore-helpers"
 
 export interface PublishedScheduleData {
   id: string
@@ -54,8 +54,8 @@ export function usePublishedSchedule(): UsePublishedScheduleReturn {
 
       console.log("🔧 [usePublishedSchedule] Loading published schedule for ownerId:", ownerId)
       
-      // Leer settings para obtener el publishedScheduleId
-      const settingsRef = createValidDocRef(db, "apps", "horarios", normalizeFirestoreId(ownerId), "settings", "main")
+      // Leer settings para obtener el publishedScheduleId - path válido
+      const settingsRef = createSettingsRef(db, ownerId)
       const settingsDoc = await getDoc(settingsRef)
       
       if (!settingsDoc.exists()) {

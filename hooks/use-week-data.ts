@@ -3,7 +3,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useData } from "@/contexts/data-context"
 import { useOwnerId } from "./use-owner-id"
-import { createValidDocRef, normalizeFirestoreId } from "@/lib/firestore-helpers"
+import { createWeekRef } from "@/lib/firestore-helpers"
 import { type WeekData } from "./use-week-navigation"
 
 export interface WeekDocument extends WeekData {
@@ -46,11 +46,8 @@ export function useWeekData(weekId: string | null): UseWeekDataReturn {
     try {
       console.log("🔧 [useWeekData] Loading week data (READ-ONLY MODE):", { weekId, ownerId, role: userData?.role })
       
-      // Usar path de documento válido: apps/horarios/weeks/{ownerId}_{weekId}
-      const compositeId = `${normalizeFirestoreId(ownerId)}_${normalizeFirestoreId(weekId)}`
-      console.log("🔧 [useWeekData] Composite ID:", compositeId)
-      
-      const weekRef = createValidDocRef(db, "apps", "horarios", "weeks", compositeId)
+      // Usar path válido: apps/horarios_weeks/{ownerId}_{weekId}
+      const weekRef = createWeekRef(db, ownerId, weekId)
       console.log("🔧 [useWeekData] Week ref created for READ-ONLY access")
       
       const weekDoc = await getDoc(weekRef)

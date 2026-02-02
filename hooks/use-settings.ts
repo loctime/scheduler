@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useOwnerId } from "./use-owner-id"
-import { createValidDocRef, normalizeFirestoreId } from "@/lib/firestore-helpers"
+import { createSettingsRef } from "@/lib/firestore-helpers"
 
 export interface Settings {
   publishedWeekId?: string
@@ -38,8 +38,8 @@ export function useSettings(): UseSettingsReturn {
 
       console.log("🔧 [useSettings] Loading settings for ownerId:", ownerId)
       
-      // Usar path de documento válido: apps/horarios/{ownerId}/settings/main
-      const settingsRef = createValidDocRef(db, "apps", "horarios", normalizeFirestoreId(ownerId), "settings", "main")
+      // Usar path válido: apps/horarios_settings/{ownerId}
+      const settingsRef = createSettingsRef(db, ownerId)
       console.log("🔧 [useSettings] Settings ref created successfully")
       
       const settingsDoc = await getDoc(settingsRef)
@@ -76,7 +76,7 @@ export function useSettings(): UseSettingsReturn {
 
       console.log("🔧 [useSettings] Updating published week:", weekId, "for ownerId:", ownerId)
       
-      const settingsRef = createValidDocRef(db, "apps", "horarios", normalizeFirestoreId(ownerId), "settings", "main")
+      const settingsRef = createSettingsRef(db, ownerId)
       
       await updateDoc(settingsRef, {
         publishedWeekId: weekId,

@@ -2,7 +2,7 @@ import { useState } from "react"
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useOwnerId } from "./use-owner-id"
-import { createValidDocRef, normalizeFirestoreId } from "@/lib/firestore-helpers"
+import { createWeekRef, createSettingsRef } from "@/lib/firestore-helpers"
 
 export interface PublishPublicScheduleOptions {
   companyName: string
@@ -41,11 +41,10 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
       })
 
       // Generate public schedule ID (could be based on ownerId + timestamp or custom)
-      const publicScheduleId = `${normalizeFirestoreId(ownerId)}_${Date.now()}`
+      const publicScheduleId = `${ownerId}_${Date.now()}`
       
       // Get the actual week data from weeks collection (ruta corregida)
-      const compositeId = `${normalizeFirestoreId(ownerId)}_${normalizeFirestoreId(options.weekId)}`
-      const weekRef = createValidDocRef(db, "apps", "horarios", "weeks", compositeId)
+      const weekRef = createWeekRef(db, ownerId, options.weekId)
       const weekDoc = await getDoc(weekRef)
       
       if (!weekDoc.exists()) {
@@ -76,7 +75,7 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
       await setDoc(publicRef, publicScheduleData)
 
       // Guardar el publishedScheduleId en settings para que /horario pueda leerlo
-      const settingsRef = createValidDocRef(db, "apps", "horarios", normalizeFirestoreId(ownerId), "settings", "main")
+      const settingsRef = createSettingsRef(db, ownerId)
       await updateDoc(settingsRef, {
         publishedScheduleId: publicScheduleId,
         updatedAt: serverTimestamp()

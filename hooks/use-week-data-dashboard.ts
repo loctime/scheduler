@@ -3,7 +3,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useData } from "@/contexts/data-context"
 import { useOwnerId } from "./use-owner-id"
-import { createValidDocRef, normalizeFirestoreId } from "@/lib/firestore-helpers"
+import { createWeekRef } from "@/lib/firestore-helpers"
 import { type WeekData } from "./use-week-navigation"
 
 export interface WeekDocument extends WeekData {
@@ -46,11 +46,8 @@ export function useWeekDataDashboard(weekId: string | null): UseWeekDataDashboar
     try {
       console.log("🔧 [useWeekDataDashboard] Loading week data (EDIT MODE):", { weekId, ownerId, role: userData?.role })
       
-      // Usar path de documento válido: apps/horarios/weeks/{ownerId}_{weekId}
-      const compositeId = `${normalizeFirestoreId(ownerId)}_${normalizeFirestoreId(weekId)}`
-      console.log("🔧 [useWeekDataDashboard] Composite ID:", compositeId)
-      
-      const weekRef = createValidDocRef(db, "apps", "horarios", "weeks", compositeId)
+      // Usar path válido: apps/horarios_weeks/{ownerId}_{weekId}
+      const weekRef = createWeekRef(db, ownerId, weekId)
       console.log("🔧 [useWeekDataDashboard] Week ref created for EDIT access")
       
       const weekDoc = await getDoc(weekRef)
@@ -113,8 +110,7 @@ export function useWeekDataDashboard(weekId: string | null): UseWeekDataDashboar
     try {
       console.log("🔧 [useWeekDataDashboard] Saving week data:", { weekId, ownerId })
       
-      const compositeId = `${normalizeFirestoreId(ownerId)}_${normalizeFirestoreId(weekId)}`
-      const weekRef = createValidDocRef(db, "apps", "horarios", "weeks", compositeId)
+      const weekRef = createWeekRef(db, ownerId, weekId)
       
       const updateData = {
         ...data,
