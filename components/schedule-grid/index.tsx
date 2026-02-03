@@ -89,6 +89,14 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
   user: userProp,
   onExportEmployeeImage,
 }, ref) => {
+  console.log("🔧 [ScheduleGrid] Inicializado con:", {
+    mediosTurnosCount: mediosTurnos?.length || 0,
+    mediosTurnos,
+    weekDaysCount: weekDays?.length || 0
+  })
+
+  // Log simple para cada render
+  console.log("🔧 [ScheduleGrid] Render - mediosTurnos:", mediosTurnos?.length || 0)
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
   const [cellUndoHistory, setCellUndoHistory] = useState<Map<string, ShiftAssignment[]>>(new Map())
   const [fixedRuleModalOpen, setFixedRuleModalOpen] = useState(false)

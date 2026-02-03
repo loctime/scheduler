@@ -49,16 +49,16 @@ const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAss
   }))
 }
 
-export default function ScheduleCalendar({ user }: ScheduleCalendarProps) {
+export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarProps) {
   const { toast } = useToast()
   const { publishToPublic } = usePublicPublisher()
-  const { employees, shifts, loading: dataLoading } = useData() 
-  const { config } = useConfig()
+  const { employees, shifts, loading: dataLoading, user: contextUser } = useData() 
+  const { config } = useConfig(contextUser || userProp)
   const { exporting, exportImage, exportPDF, exportExcel, exportMonthPDF } = useExportSchedule()
   const { publishToPublic: publishPublic, isPublishing, error: publishError } = usePublicPublisher()
   
   // Para compatibilidad con el código existente
-  const userData = user
+  const userData = contextUser || userProp
 
   // Estado para almacenar la semana copiada
   const [copiedWeekData, setCopiedWeekData] = useState<any>(null)
@@ -114,14 +114,14 @@ export default function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
   // Usar hook centralizado para listener de schedules
   const { schedules, loading: schedulesLoading, getWeekSchedule } = useSchedulesListener({
-    user,
+    user: userData,
     monthRange,
-    enabled: !!user,
+    enabled: !!userData,
   })
 
   // Hook para generación implícita de reglas fijas
   const { applyFixedRulesIfWeekEmpty, hasFixedRules } = useImplicitFixedRules({
-    user,
+    user: userData,
     employees,
     shifts,
     weekStartsOn,
@@ -138,7 +138,7 @@ export default function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   // Efecto para aplicar reglas fijas implícitamente cuando el usuario navega a semanas
   // Solo se ejecuta si hay reglas fijas configuradas
   useEffect(() => {
-    if (!hasFixedRules || employees.length === 0 || !user) {
+    if (!hasFixedRules || employees.length === 0 || !userData) {
       return
     }
 
@@ -164,7 +164,7 @@ export default function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
     // Ejecutar de forma asíncrona para no bloquear el UI
     applyRulesForVisibleWeeks()
-  }, [hasFixedRules, employees, user, monthWeeks, applyFixedRulesIfWeekEmpty])
+  }, [hasFixedRules, employees, userData, monthWeeks, applyFixedRulesIfWeekEmpty])
 
   const getDateAssignments = useCallback(
     (date: Date) => {
@@ -179,7 +179,7 @@ export default function ScheduleCalendar({ user }: ScheduleCalendarProps) {
 
 
   const { handleAssignmentUpdate, handleMarkWeekComplete, pendingEdit, setPendingEdit } = useScheduleUpdates({
-    user,
+    user: userData,
     employees,
     shifts,
     schedules,
@@ -199,13 +199,13 @@ export default function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
     const ownerId = userData?.role === "invited" && userData?.ownerId 
       ? userData.ownerId 
-      : user?.uid
+      : userData?.uid
     await exportImage(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.png`, {
       nombreEmpresa: config?.nombreEmpresa,
       colorEmpresa: config?.colorEmpresa,
       ownerId,
     })
-  }, [exportImage, config, userData, user])
+  }, [exportImage, config, userData])
 
   const handleExportWeekExcel = useCallback(async (weekStartDate: Date, weekDays: Date[], weekSchedule: Horario | null) => {
     await exportExcel(
@@ -450,11 +450,11 @@ export default function ScheduleCalendar({ user }: ScheduleCalendarProps) {
       startTime: undefined,
       endTime: undefined,
       color: '#808080',
-      userId: user?.uid || '',
+      userId: userData?.uid || '',
       createdAt: null,
       updatedAt: null,
     } as Turno))
-  }, [shifts, schedules, user])
+  }, [shifts, schedules, userData])
 
   // Calcular la última semana completada
   const lastCompletedWeekStart = useMemo(() => {
@@ -753,7 +753,7 @@ export default function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         onExportWeekExcel={handleExportWeekExcel}
         onPreviousMonth={goToPreviousMonth}
         onNextMonth={goToNextMonth}
-        user={user}
+        user={userData}
         onMarkWeekComplete={handleMarkWeekComplete}
         lastCompletedWeekStart={lastCompletedWeekStart}
         allSchedules={schedules}

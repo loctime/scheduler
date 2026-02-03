@@ -43,6 +43,14 @@ export function QuickShiftSelector({
   scheduleId,
   updateEmployeeRequestCache,
 }: QuickShiftSelectorProps) {
+  console.log("🔧 [QuickShiftSelector] Inicializado con:", {
+    shiftsCount: shifts?.length || 0,
+    mediosTurnosCount: mediosTurnos?.length || 0,
+    mediosTurnos,
+    employeeId,
+    date
+  })
+
   const { toast } = useToast()
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("turno")
   const [medioFrancoTime, setMedioFrancoTime] = useState({ startTime: "", endTime: "" })
@@ -105,6 +113,12 @@ export function QuickShiftSelector({
   }
 
   const handleMedioFranco = (time?: { startTime: string; endTime: string }) => {
+    console.log("🔧 [QuickShiftSelector] handleMedioFranco llamado con:", {
+      time,
+      mediosTurnosCount: mediosTurnos?.length || 0,
+      mediosTurnos
+    })
+
     // Si hay un tiempo específico proporcionado, usarlo directamente
     if (time?.startTime && time?.endTime) {
       const medioFrancoAssignment: ShiftAssignment = {
