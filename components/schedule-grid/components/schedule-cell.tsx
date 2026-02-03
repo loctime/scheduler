@@ -71,7 +71,7 @@ interface ScheduleCellProps {
   updateEmployeeRequestCache?: (key: string, request: any) => void
 }
 
-export function ScheduleCell({
+function ScheduleCellComponent({
   date,
   employeeId,
   assignments,
@@ -902,3 +902,58 @@ export function ScheduleCell({
     </>
   )
 }
+
+const areAssignmentsEqual = (nextAssignments: ShiftAssignment[], prevAssignments: ShiftAssignment[]) => {
+  if (nextAssignments === prevAssignments) return true
+  if (nextAssignments.length !== prevAssignments.length) return false
+  for (let i = 0; i < nextAssignments.length; i += 1) {
+    const next = nextAssignments[i]
+    const prev = prevAssignments[i]
+    if (next === prev) continue
+    if (
+      next.type !== prev.type ||
+      next.shiftId !== prev.shiftId ||
+      next.startTime !== prev.startTime ||
+      next.endTime !== prev.endTime ||
+      next.startTime2 !== prev.startTime2 ||
+      next.endTime2 !== prev.endTime2 ||
+      next.text !== prev.text
+    ) {
+      return false
+    }
+  }
+  return true
+}
+
+const areScheduleCellPropsEqual = (prev: ScheduleCellProps, next: ScheduleCellProps) => {
+  return (
+    prev.date === next.date &&
+    prev.employeeId === next.employeeId &&
+    prev.isSelected === next.isSelected &&
+    prev.isClickable === next.isClickable &&
+    prev.readonly === next.readonly &&
+    prev.cellKey === next.cellKey &&
+    prev.scheduleId === next.scheduleId &&
+    prev.hasCellHistory === next.hasCellHistory &&
+    prev.hasFixedSchedule === next.hasFixedSchedule &&
+    prev.suggestionWeeks === next.suggestionWeeks &&
+    prev.isManuallyFixed === next.isManuallyFixed &&
+    prev.hasIncompleteAssignments === next.hasIncompleteAssignments &&
+    prev.backgroundStyle?.backgroundColor === next.backgroundStyle?.backgroundColor &&
+    prev.backgroundStyle?.color === next.backgroundStyle?.color &&
+    areAssignmentsEqual(prev.assignments, next.assignments) &&
+    prev.quickShifts === next.quickShifts &&
+    prev.mediosTurnos === next.mediosTurnos &&
+    prev.getShiftInfo === next.getShiftInfo &&
+    prev.onCellClick === next.onCellClick &&
+    prev.onQuickAssignments === next.onQuickAssignments &&
+    prev.onAssignmentUpdate === next.onAssignmentUpdate &&
+    prev.onCellUndo === next.onCellUndo &&
+    prev.onToggleFixed === next.onToggleFixed &&
+    prev.config === next.config &&
+    prev.updateEmployeeRequestCache === next.updateEmployeeRequestCache &&
+    prev.suggestion === next.suggestion
+  )
+}
+
+export const ScheduleCell = React.memo(ScheduleCellComponent, areScheduleCellPropsEqual)
