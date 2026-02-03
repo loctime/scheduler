@@ -32,6 +32,7 @@ export function useScheduleGridData({
   allEmployees = employees,
   config,
 }: UseScheduleGridDataProps) {
+  const DEBUG = false
   // Cache de employee requests por cacheKey
   const [employeeRequestCache, setEmployeeRequestCache] = useState<Map<string, any>>(new Map())
 
@@ -40,7 +41,9 @@ export function useScheduleGridData({
     cacheKey: string, 
     request: any
   ) => {
-    console.log('💾 [updateEmployeeRequestCache] Guardando:', cacheKey, request?.active ? 'ACTIVE' : 'INACTIVE')
+    if (DEBUG) {
+      console.log('💾 [updateEmployeeRequestCache] Guardando:', cacheKey, request?.active ? 'ACTIVE' : 'INACTIVE')
+    }
     
     setEmployeeRequestCache(prev => {
       const newCache = new Map(prev)
@@ -175,7 +178,9 @@ export function useScheduleGridData({
       const request = employeeRequestCache.get(cacheKey)
       
       if (request && request.active && request.requestedShift) {
-        console.log('✅ [getEmployeeAssignments] Override aplicado:', cacheKey)
+        if (DEBUG) {
+          console.log('✅ [getEmployeeAssignments] Override aplicado:', cacheKey)
+        }
         
         // Convertir requestedShift a ShiftAssignment
         const requestedShift = request.requestedShift

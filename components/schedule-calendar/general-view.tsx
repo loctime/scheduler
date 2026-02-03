@@ -77,6 +77,7 @@ export function GeneralView({
   isPublishingSchedule,
   onWeekScheduleRef,
 }: GeneralViewProps) {
+  const DEBUG = false
   // Create shift map for efficient lookup
   const shiftMap = useMemo(() => {
     return new Map(shifts.map((s) => [s.id, s]))
@@ -128,13 +129,19 @@ export function GeneralView({
   // Función para manejar refs de los ScheduleGrid
   const handleWeekScheduleRef = useCallback((weekStartDate: Date, element: HTMLDivElement | null) => {
     const weekKey = format(weekStartDate, "yyyy-MM-dd")
-    console.log("🔧 [GeneralView] Recibiendo ref:", { weekKey, hasElement: !!element })
+    if (DEBUG) {
+      console.log("🔧 [GeneralView] Recibiendo ref:", { weekKey, hasElement: !!element })
+    }
     if (element && onWeekScheduleRef) {
       // Pasar el ref al componente padre (ScheduleCalendar)
-      console.log("🔧 [GeneralView] Pasando ref al padre:", weekKey)
+      if (DEBUG) {
+        console.log("🔧 [GeneralView] Pasando ref al padre:", weekKey)
+      }
       onWeekScheduleRef(weekKey, element)
     } else {
-      console.log("🔧 [GeneralView] No se pasó ref:", { hasElement: !!element, hasCallback: !!onWeekScheduleRef })
+      if (DEBUG) {
+        console.log("🔧 [GeneralView] No se pasó ref:", { hasElement: !!element, hasCallback: !!onWeekScheduleRef })
+      }
     }
   }, [onWeekScheduleRef])
 

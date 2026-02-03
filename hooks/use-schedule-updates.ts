@@ -30,6 +30,7 @@ export function useScheduleUpdates({
   weekStartsOn,
   getWeekSchedule,
 }: UseScheduleUpdatesProps) {
+  const DEBUG = false
   const { toast } = useToast()
   const { config } = useConfig(user)
   const { buildAssignmentsFromLegacyFixedSchedules } = useFixedRulesEngine()
@@ -351,7 +352,9 @@ export function useScheduleUpdates({
             modifiedByName: userName || null,
           }
 
-          console.log("🔧 [handleAssignmentUpdateInternal] UpdateData con dayStatus:", updateData)
+          if (DEBUG) {
+            console.log("🔧 [handleAssignmentUpdateInternal] UpdateData con dayStatus:", updateData)
+          }
 
           await updateSchedulePreservingFields(targetSchedule.id, targetSchedule, updateData)
 
@@ -415,38 +418,21 @@ export function useScheduleUpdates({
         // Crear Map de turnos para búsqueda rápida
         const shiftsById = new Map(shifts.map((s) => [s.id, s]))
         
-        // Log temporal: antes de hidratar
         const assignmentsWithoutTimes = assignments.filter(
           (a) => a.type === "shift" && a.shiftId && (!a.startTime || !a.endTime)
         )
-        if (assignmentsWithoutTimes.length > 0) {
-          console.debug("[use-schedule-updates] Assignments sin horarios antes de hidratar:", {
-            count: assignmentsWithoutTimes.length,
-            assignments: assignmentsWithoutTimes.map((a) => ({
-              shiftId: a.shiftId,
-              hasStartTime: !!a.startTime,
-              hasEndTime: !!a.endTime,
-            })),
-          })
-        }
         
         // Hidratar assignments con horarios del turno
         const hydratedAssignments = hydrateAssignmentsWithShiftTimes(assignments, shiftsById)
         
-        // Log temporal: después de hidratar
         const assignmentsStillWithoutTimes = hydratedAssignments.filter(
           (a) => a.type === "shift" && a.shiftId && (!a.startTime || !a.endTime)
         )
-        if (assignmentsStillWithoutTimes.length > 0) {
-          console.debug("[use-schedule-updates] Assignments aún sin horarios después de hidratar (huérfanos):", {
-            count: assignmentsStillWithoutTimes.length,
-            assignments: assignmentsStillWithoutTimes.map((a) => ({
-              shiftId: a.shiftId,
-              shiftExists: shiftsById.has(a.shiftId!),
-            })),
+        if (DEBUG && (assignmentsWithoutTimes.length > 0 || assignmentsStillWithoutTimes.length > 0)) {
+          console.debug("[use-schedule-updates] Resumen hidratación assignments:", {
+            beforeCount: assignmentsWithoutTimes.length,
+            afterCount: assignmentsStillWithoutTimes.length,
           })
-        } else if (assignmentsWithoutTimes.length > 0) {
-          console.debug("[use-schedule-updates] Todos los assignments fueron hidratados correctamente")
         }
         
         let finalAssignments: ShiftAssignment[] = hydratedAssignments
