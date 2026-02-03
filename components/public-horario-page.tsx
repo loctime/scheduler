@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect } from "react"
 import { addDays, format, parseISO } from "date-fns"
+import { es } from "date-fns/locale"
 import { Calendar, Check, Copy } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -12,6 +13,30 @@ import { usePublicHorario } from "@/hooks/use-public-horario"
 import { useToast } from "@/hooks/use-toast"
 import type { Empleado, Horario, Turno, ShiftAssignment } from "@/lib/types"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
+
+// Importar getMainMonth desde month-header
+function getMainMonth(startDate: Date, endDate: Date): Date {
+  const monthDays: Map<string, number> = new Map()
+  
+  let currentDate = new Date(startDate)
+  while (currentDate <= endDate) {
+    const monthKey = format(currentDate, "yyyy-MM")
+    monthDays.set(monthKey, (monthDays.get(monthKey) || 0) + 1)
+    currentDate = addDays(currentDate, 1)
+  }
+  
+  let maxDays = 0
+  let mainMonthKey = ""
+  
+  monthDays.forEach((days, monthKey) => {
+    if (days > maxDays) {
+      maxDays = days
+      mainMonthKey = monthKey
+    }
+  })
+  
+  return parseISO(mainMonthKey + "-01")
+}
 
 interface PublicHorarioPageProps {
   scheduleId: string
@@ -157,6 +182,18 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
 
   // Estado de carga unificado - SOLO depende de isLoading
   const isDataLoading = isLoading
+
+  // Calcular el mes principal usando getMainMonth
+  const mainMonth = useMemo(() => {
+    if (!weekStartDate) return null
+    const weekEndDate = addDays(weekStartDate, 6)
+    return getMainMonth(weekStartDate, weekEndDate)
+  }, [weekStartDate])
+
+  const monthLabel = useMemo(() => {
+    if (!mainMonth) return ""
+    return format(mainMonth, "MMMM", { locale: es }).toUpperCase()
+  }, [mainMonth])
 
   const employees = useMemo(() => {
     if (!horario) return []
@@ -327,16 +364,15 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
               <Calendar className="h-6 w-6" />
               Horario Semanal
             </h1>
-            <div className="mt-1 flex items-center gap-4">
-              <div className="font-semibold text-gray-900">
-                {(() => {
-                  const currentWeek = horario.weeks?.[horario.publishedWeekId]
-                  return currentWeek?.weekLabel || 'Semana sin etiqueta'
-                })()}
-              </div>
+            <div className="mt-1 flex items-center justify-between">
               <div className="text-sm text-gray-500">
                 {format(weekStartDate, "dd/MM/yyyy")} – {format(addDays(weekStartDate, 6), "dd/MM/yyyy")}
               </div>
+              {monthLabel && (
+                <div className="text-sm font-medium text-gray-700">
+                  {monthLabel}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-3">
