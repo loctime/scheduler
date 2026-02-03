@@ -296,12 +296,40 @@ export function useWeekActions({
       const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
       const weekEndStr = format(addDays(weekStartDate, 6), "yyyy-MM-dd")
 
-      // Usar el schedule del estado en lugar de leer de Firestore
+      // Si no existe schedule, crear uno vacío primero
       if (!weekSchedule) {
+        const userName = user?.displayName || user?.email || "Usuario desconocido"
+        const userId = user?.uid || ""
+
+        const newScheduleData = {
+          nombre: `Semana del ${weekStartStr}`,
+          weekStart: weekStartStr,
+          semanaInicio: weekStartStr,
+          semanaFin: weekEndStr,
+          assignments: {},
+          dayStatus: {},
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          createdBy: userId,
+          createdByName: userName,
+        }
+
+        const scheduleRef = await addDoc(collection(db, COLLECTIONS.SCHEDULES), newScheduleData)
+        const scheduleId = scheduleRef.id
+
+        // Guardar en historial usando helper
+        const historyEntry = createHistoryEntry(
+          { id: scheduleId, ...newScheduleData } as Horario,
+          "creado",
+          user,
+          weekStartStr,
+          weekEndStr
+        )
+        await saveHistoryEntry(historyEntry)
+
         toast({
-          title: "Error",
-          description: "No se encontró el horario de esta semana.",
-          variant: "destructive",
+          title: "Semana limpiada",
+          description: "La semana fue creada y limpiada correctamente.",
         })
         return
       }
