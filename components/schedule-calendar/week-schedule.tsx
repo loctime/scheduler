@@ -239,41 +239,23 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
             schedule={weekSchedule}
             onAssignmentUpdate={onAssignmentUpdate ? (date: string, employeeId: string, assignments: ShiftAssignment[], options?: { scheduleId?: string }) => {
                 // Adaptador: Convertir firma ScheduleGrid -> Firma WeekSchedule
-                console.log("🔧 [WeekSchedule Adaptador] Recibido:", {
-                  date,
-                  employeeId,
-                  assignments,
-                  options,
-                  firstAssignment: assignments[0]
-                })
-                
                 const assignment = assignments[0] // Tomar primer assignment (edición simple)
                 
                 // Si es Franco o Medio Franco: crear un handler especializado
                 if (assignment && (assignment.type === "franco" || assignment.type === "medio_franco")) {
-                  console.log("🔧 [WeekSchedule Adaptador] Detectado assignment especial:", {
-                    type: assignment.type,
-                    startTime: assignment.startTime,
-                    endTime: assignment.endTime,
-                    "assignment completo": assignment
-                  })
-                  
                   // Llamar directamente use-schedule-updates saltando adaptadores
                   // Necesitamos acceder al handler real de use-schedule-updates
                   // Por ahora, vamos a simularlo pasando un valor especial que el padre reconozca
                   const specialValue = `DAY_STATUS_${assignment.type}_${assignment.startTime || ''}_${assignment.endTime || ''}`
-                  console.log("🔧 [WeekSchedule Adaptador] Enviando valor especial:", specialValue)
                   onAssignmentUpdate(date, employeeId, specialValue, specialValue)
                   return
                 }
                 
                 // Si es turno normal: comportamiento original del adaptador legacy
                 if (assignment && assignment.shiftId) {
-                  console.log("🔧 [WeekSchedule Adaptador] Turno normal, usando adaptador legacy")
                   // Hay asignación: pasar shiftId como valor
                   onAssignmentUpdate(date, employeeId, assignment.shiftId, assignment.shiftId)
                 } else {
-                  console.log("🔧 [WeekSchedule Adaptador] Limpiando celda")
                   // No hay asignación: limpiar celda
                   onAssignmentUpdate(date, employeeId, '', null)
                 }

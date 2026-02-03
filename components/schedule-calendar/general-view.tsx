@@ -288,21 +288,10 @@ export function GeneralView({
               shifts={shifts}
               monthRange={{ start: monthRange.startDate, end: monthRange.endDate }}
               onAssignmentUpdate={onAssignmentUpdate ? (date: string, employeeId: string, shiftId: string, value: string | null) => {
-                console.log("🔧 [GeneralView Adaptador] Recibido:", {
-                  date,
-                  employeeId,
-                  shiftId,
-                  value,
-                  "weekSchedule.id": weekSchedule?.id
-                })
-
                 // Detectar valores especiales de dayStatus
                 if (value && value.startsWith('DAY_STATUS_')) {
-                  console.log("🔧 [GeneralView Adaptador] Detectado dayStatus especial")
-                  
                   // Parsear el valor especial: DAY_STATUS_tipo_startTime_endTime
                   const parts = value.split('_')
-                  console.log("🔧 [GeneralView Adaptador] Parts del split:", parts)
                   
                   // Unir las partes del tipo (medio_franco está dividido en parts[2] y parts[3])
                   let type: "franco" | "medio_franco"
@@ -323,23 +312,11 @@ export function GeneralView({
                     endTime = parts[4] || undefined
                   }
                   
-                  console.log("🔧 [GeneralView Adaptador] Parseado:", {
-                    originalValue: value,
-                    parts,
-                    type,
-                    startTime,
-                    endTime
-                  })
-                  
                   const assignments: ShiftAssignment[] = [{
                     type,
                     ...(startTime && endTime && { startTime, endTime })
                   }]
                   
-                  console.log("🔧 [GeneralView Adaptador] Convertido a assignments:", {
-                    assignments,
-                    "scheduleId para enviar": weekSchedule?.id
-                  })
                   onAssignmentUpdate(date, employeeId, assignments, { scheduleId: weekSchedule?.id })
                   return
                 }

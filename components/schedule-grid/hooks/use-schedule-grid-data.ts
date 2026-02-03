@@ -234,41 +234,23 @@ export function useScheduleGridData({
         const dateDayStatus = schedule.dayStatus[date] || {}
         const employeeDayStatus = dateDayStatus[employeeId]
         
-        console.log("🔧 [getEmployeeAssignments] dayStatus debug:", {
-          date,
-          employeeId,
-          hasDayStatus: !!schedule?.dayStatus,
-          "schedule.dayStatus": schedule.dayStatus,
-          dateDayStatus,
-          employeeDayStatus,
-          "baseAssignments antes": baseAssignments,
-          mediosTurnosConfig: config?.mediosTurnos
-        })
-        
         if (employeeDayStatus === "franco") {
           // Agregar assignment virtual para franco
           baseAssignments.push({
             type: "franco",
           })
-          console.log("🔧 [getEmployeeAssignments] Agregado assignment virtual franco")
         } else if (employeeDayStatus === "medio_franco") {
           // Para medio franco, buscar el medio turno configurado
           const mediosTurnosConfig = config?.mediosTurnos || []
           if (mediosTurnosConfig.length > 0) {
-            // Usar el primer medio turno configurado
             const medioTurno = mediosTurnosConfig[0]
             baseAssignments.push({
               type: "medio_franco",
               startTime: medioTurno.startTime,
               endTime: medioTurno.endTime,
             })
-            console.log("🔧 [getEmployeeAssignments] Agregado assignment virtual medio_franco con horarios:", medioTurno)
           } else {
-            // Si no hay configuración, agregar assignment básico
-            baseAssignments.push({
-              type: "medio_franco",
-            })
-            console.log("🔧 [getEmployeeAssignments] Agregado assignment virtual medio_franco básico")
+            baseAssignments.push({ type: "medio_franco" })
           }
         }
       }
