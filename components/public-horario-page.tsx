@@ -142,6 +142,9 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
     } as Horario
   }, [horario, weekStartDate])
 
+  // Estado de carga unificado - SOLO depende de isLoading
+  const isDataLoading = isLoading
+
   const employees = useMemo(() => {
     if (!horario) return []
     
@@ -236,7 +239,7 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
     }
   }, [error, toast])
 
-  if (isLoading) {
+  if (isDataLoading) {
     return (
       <div className="min-h-screen bg-background p-4">
         <div className="mx-auto max-w-6xl space-y-4">
@@ -268,12 +271,8 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
     )
   }
 
+  // Si no hay datos, mostrar mensaje simple
   if (!horario || !schedule || !weekStartDate) {
-    console.log("🔧 [PublicHorarioPage] Rendering 'No hay horario' message", {
-      hasHorario: !!horario,
-      hasSchedule: !!schedule,
-      hasWeekStartDate: !!weekStartDate
-    })
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -295,8 +294,11 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
   }
 
   console.log("🔧 [PublicHorarioPage] Rendering main content", {
-    scheduleId: schedule.id,
-    scheduleName: schedule.nombre,
+    hasHorario: !!horario,
+    hasSchedule: !!schedule,
+    hasWeekStartDate: !!weekStartDate,
+    scheduleId: schedule?.id,
+    scheduleName: schedule?.nombre,
     weekDaysCount: weekDays.length,
     employeesCount: employees.length,
     shiftsCount: shifts.length
@@ -347,10 +349,62 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
           const currentWeek = horario.weeks?.[horario.publishedWeekId]
           const hasImage = currentWeek?.publicImageUrl
           
+          console.log("🔧 [PublicHorarioPage] Rendering calendar content:", {
+            hasCurrentWeek: !!currentWeek,
+            hasImage: !!hasImage,
+            imageUrlLength: currentWeek?.publicImageUrl?.length || 0,
+            weekDaysCount: weekDays.length,
+            employeesCount: employees.length,
+            shiftsCount: shifts.length
+          })
+          
           if (hasImage && currentWeek.publicImageUrl) {
+            // Verificar si la imagen es base64 (siempre lo es) y es demasiado grande
+            const imageSize = currentWeek.publicImageUrl.length
+            const MAX_INLINE_IMAGE_SIZE = 10000 // 10KB límite muy bajo para base64
+            
+            console.log("🔧 [PublicHorarioPage] Image size check:", {
+              imageSize: imageSize,
+              isTooLarge: imageSize > MAX_INLINE_IMAGE_SIZE,
+              sizeKB: (imageSize / 1024).toFixed(2),
+              isBase64: currentWeek.publicImageUrl.startsWith('data:image/')
+            })
+            
+            // Siempre usar ScheduleGrid para imágenes base64 grandes
+            if (imageSize > MAX_INLINE_IMAGE_SIZE) {
+              // Imagen demasiado grande - usar ScheduleGrid fallback
+              console.log("🔧 [PublicHorarioPage] Image too large, using ScheduleGrid fallback")
+              return (
+                <div className="w-full overflow-x-auto bg-white border rounded-lg p-4">
+                  <div className="text-center text-gray-500 mb-4">
+                    <p className="text-sm">Horario publicado</p>
+                    <p className="text-xs text-gray-400">Mostrando vista interactiva...</p>
+                  </div>
+                  <ScheduleGrid
+                    weekDays={weekDays}
+                    employees={employees}
+                    allEmployees={employees}
+                    shifts={shifts}
+                    schedule={schedule}
+                    monthRange={undefined}
+                    mediosTurnos={[]}
+                    employeeStats={employeeStats}
+                    readonly={true}
+                    allSchedules={[]}
+                    isScheduleCompleted={false}
+                    lastCompletedWeekStart={undefined}
+                    onClearEmployeeRow={undefined}
+                    user={ownerUser}
+                    onExportEmployeeImage={undefined}
+                  />
+                </div>
+              )
+            }
+            
             // Mostrar imagen publicada con scroll controlado
+            console.log("🔧 [PublicHorarioPage] Rendering image")
             return (
-              <div className="w-full overflow-x-auto">
+              <div className="w-full overflow-x-auto bg-white border rounded-lg p-4">
                 <img 
                   src={currentWeek.publicImageUrl} 
                   alt={`Horario ${currentWeek.weekLabel || 'semanal'}`}
@@ -358,7 +412,14 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
                     width: '100%', 
                     maxWidth: '100%', 
                     height: 'auto', 
-                    display: 'block' 
+                    display: 'block',
+                    maxHeight: '600px',
+                    objectFit: 'contain'
+                  }}
+                  onError={(e) => {
+                    console.error("🔧 [PublicHorario] Image load error:", e)
+                    // Si falla la carga, mostrar ScheduleGrid
+                    console.log("🔧 [PublicHorarioPage] Image load failed, using ScheduleGrid fallback")
                   }}
                 />
               </div>
@@ -366,6 +427,7 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
           }
           
           // Fallback a ScheduleGrid si no hay imagen
+          console.log("🔧 [PublicHorarioPage] Rendering ScheduleGrid fallback")
           return weekDays.length > 0 ? (
             <ScheduleGrid
               weekDays={weekDays}
@@ -385,9 +447,8 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
               onExportEmployeeImage={undefined}
             />
           ) : (
-            <div className="text-center py-8 text-gray-500">
-              <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>No hay asignaciones para esta semana</p>
+            <div className="text-center text-gray-500 py-8">
+              <p>No hay datos para mostrar</p>
             </div>
           )
         })()}

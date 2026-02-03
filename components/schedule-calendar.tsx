@@ -315,12 +315,13 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         top: elementRect.top
       })
       
-      // Generar imagen PNG del ScheduleGrid de captura
+      // Generar imagen PNG del ScheduleGrid de captura con calidad reducida
       const dataUrl = await toPng(captureRef.current, {
         cacheBust: true,
-        pixelRatio: 2, // calidad alta
+        pixelRatio: 1, // calidad reducida para reducir tamaño
         backgroundColor: "#ffffff",
-        width: 1400, // ancho fijo para consistencia
+        width: 1200, // ancho reducido para menor tamaño
+        quality: 0.8 // calidad 80% para reducir tamaño
       })
 
       console.log("🔧 [ScheduleCalendar] Imagen generada exitosamente")
