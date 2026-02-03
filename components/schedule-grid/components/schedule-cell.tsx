@@ -917,7 +917,7 @@ const areAssignmentsEqual = (nextAssignments: ShiftAssignment[], prevAssignments
       next.endTime !== prev.endTime ||
       next.startTime2 !== prev.startTime2 ||
       next.endTime2 !== prev.endTime2 ||
-      next.text !== prev.text
+      next.texto !== prev.texto
     ) {
       return false
     }
