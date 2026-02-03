@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from "react"
 import { addDays, format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
-import { Calendar, Check, Copy } from "lucide-react"
+import { Calendar, Check, Copy, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -118,6 +118,8 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
   const [showInstallButton, setShowInstallButton] = useState(false)
   const [showIndividualView, setShowIndividualView] = useState(false)
+  const [showEmployeeSelector, setShowEmployeeSelector] = useState(false)
+  const [currentViewer, setCurrentViewer] = useState<{employeeId: string, employeeName: string} | null>(null)
   const { toast } = useToast()
 
   // Detectar vista móvil
@@ -131,6 +133,25 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  // Cargar identificación del localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedViewer = localStorage.getItem('horario.viewer')
+        if (savedViewer) {
+          const viewer = JSON.parse(savedViewer)
+          setCurrentViewer(viewer)
+        } else {
+          // No hay identificación guardada, mostrar selector
+          setShowEmployeeSelector(true)
+        }
+      } catch (error) {
+        console.error('Error al cargar identificación:', error)
+        setShowEmployeeSelector(true)
+      }
+    }
   }, [])
 
   // PWA: Registrar service worker y manejar instalación
@@ -342,6 +363,34 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
     setShowIndividualView(!showIndividualView)
   }
 
+  // Manejar selección de empleado
+  const handleSelectEmployee = (employeeId: string, employeeName: string) => {
+    const viewer = { employeeId, employeeName }
+    setCurrentViewer(viewer)
+    setShowEmployeeSelector(false)
+    
+    // Guardar en localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('horario.viewer', JSON.stringify(viewer))
+    }
+    
+    toast({
+      title: "Identificación guardada",
+      description: `Hola, ${employeeName}`,
+    })
+  }
+
+  // Cambiar persona
+  const handleChangePerson = () => {
+    setCurrentViewer(null)
+    setShowEmployeeSelector(true)
+    
+    // Limpiar localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('horario.viewer')
+    }
+  }
+
   useEffect(() => {
     console.log("🔧 [PublicHorarioPage] Debug state:", {
       hasHorario: !!horario,
@@ -446,6 +495,13 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
               </div>
             )}
             
+            {/* Saludo personalizado */}
+            {currentViewer && (
+              <div className="text-sm text-gray-600 mb-1">
+                Hola, <span className="font-medium">{currentViewer.employeeName}</span>
+              </div>
+            )}
+            
             <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
               <Calendar className="h-6 w-6" />
               Horario Semanal
@@ -507,6 +563,21 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
               </svg>
               Vista individual
             </Button>
+            
+            {/* Botón Cambiar Persona */}
+            {currentViewer && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleChangePerson}
+                className="text-xs"
+              >
+                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287-.947c.379-1.561 2.6-1.561 2.978 0a1.533 1.533 0 01.947 2.287c1.561.379 1.561 2.6 0 2.978a1.532 1.532 0 01-.947 2.287c.836 1.372-.734 2.942-2.106 2.106a1.532 1.532 0 01-2.287-.947c-.379-1.561-2.6-1.561-2.978 0a1.532 1.532 0 01-.947-2.287c-1.561-.379-1.561-2.6 0-2.978a1.532 1.532 0 01.947-2.287c-.836-1.372.734-2.942 2.106-2.106 1.372.836 2.942-.734 2.106-2.106-.54-.886-.061-2.042.947-2.287 1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287z" clip-rule="evenodd"/>
+                </svg>
+                Cambiar persona
+              </Button>
+            )}
             
             {/* Ocultar chip "Publicado" y botón "Copiar enlace" en móvil */}
             <div className="hidden sm:flex sm:items-center sm:gap-3">
@@ -608,6 +679,45 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
         })()}
       </div>
 
+      {/* Banner "HORARIO DE HOY" - solo si hay empleado identificado */}
+      {currentViewer && (
+        <div className="w-full px-2 py-4">
+          <Card className="bg-blue-50 border-blue-200">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg text-blue-900">HORARIO DE HOY</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center">
+                <p className="text-sm text-blue-700 mb-2">
+                  {currentViewer.employeeName}
+                </p>
+                <p className="text-xs text-blue-600">
+                  {(() => {
+                    const today = new Date()
+                    const todayStr = format(today, "yyyy-MM-dd")
+                    const currentWeek = horario.weeks?.[horario.publishedWeekId]
+                    const dayData = currentWeek?.days?.[todayStr] as any
+                    const todayAssignments = dayData?.[currentViewer.employeeId]
+                    
+                    if (!todayAssignments || todayAssignments.length === 0) {
+                      return "🎉 Hoy tienes franco"
+                    }
+                    
+                    if (Array.isArray(todayAssignments)) {
+                      return todayAssignments.map((assignment: any) => 
+                        typeof assignment === 'string' ? assignment : assignment.shiftId
+                      ).join(' • ')
+                    }
+                    
+                    return todayAssignments
+                  })()}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Footer discreto */}
       <div className="border-t bg-gray-50">
         <div className="w-full px-2 py-4">
@@ -624,6 +734,40 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
           </div>
         </div>
       </div>
+
+      {/* Modal de selección de empleado */}
+      {showEmployeeSelector && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">¿Quién sos?</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowEmployeeSelector(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {employees.map((employee) => (
+                  <Button
+                    key={employee.id}
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => handleSelectEmployee(employee.id, employee.name)}
+                  >
+                    {employee.name}
+                  </Button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
