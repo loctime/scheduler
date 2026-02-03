@@ -77,6 +77,18 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   // Inicializar con el mes correcto basado en la fecha actual y mesInicioDia
   const [currentMonth, setCurrentMonth] = useState(new Date())
   
+  // Refs para WeekSchedule components
+  const weekScheduleRefs = useRef<Record<string, HTMLDivElement>>({})
+
+  // Handler para recibir refs de WeekSchedule
+  const handleWeekScheduleRef = useCallback((weekKey: string, element: HTMLDivElement | null) => {
+    if (element) {
+      weekScheduleRefs.current[weekKey] = element
+    } else {
+      delete weekScheduleRefs.current[weekKey]
+    }
+  }, [])
+
   // Actualizar el mes inicial cuando config esté disponible (si aún no se ha inicializado)
   useEffect(() => {
     if (config && !isInitialized.current) {
@@ -733,6 +745,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
         onPasteCopiedWeek={pasteCopiedWeek}
         onPublishSchedule={handlePublishPwa}
         isPublishingSchedule={isPublishing || publishingWeekId !== null}
+        onWeekScheduleRef={handleWeekScheduleRef}
       />
       </div>
       
