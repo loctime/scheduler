@@ -9,6 +9,7 @@ export interface PublishPublicScheduleOptions {
   weekId: string
   weekData: any
   publicImageUrl?: string
+  employees?: Array<{id: string, name: string}>
 }
 
 export interface UsePublicPublisherReturn {
@@ -75,7 +76,7 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
         publishedAt: serverTimestamp(),
         publicImageUrl: options.publicImageUrl || null,
         days: options.weekData.scheduleData?.assignments || options.weekData.assignments || {},
-        employees: options.weekData.employees || []
+        employees: options.employees || options.weekData.employees || []
       }
       
       const publicScheduleData = {

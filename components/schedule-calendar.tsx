@@ -343,7 +343,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
       
       console.log("🔧 [ScheduleCalendar] publicImageUrl generado, llamando a publishToPublic...")
       
-      // Llamar a publishToPublic con la imagen generada
+      // Llamar a publishToPublic con la imagen generada y empleados con nombres
       const publishedOwnerId = await publishToPublic({
         weekId,
         weekData: {
@@ -352,6 +352,10 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
           endDate: format(weekEndDate, "dd/MM/yyyy"),
         },
         publicImageUrl: publicImageUrl, // Pasar la imagen generada
+        employees: (weekSchedule as any).employees?.map((e: any) => ({
+          id: e.id,
+          name: e.name,
+        })),
       })
 
       console.log("🔧 [ScheduleCalendar] publishToPublic completado:", {

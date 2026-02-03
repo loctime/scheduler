@@ -57,7 +57,7 @@ const buildFallbackEmployees = (ownerId: string, days?: Record<string, any>) => 
 
   return Array.from(employeeIds).map((employeeId) => ({
     id: employeeId,
-    name: `Empleado ${employeeId}`,
+    name: employeeId,
     userId: ownerId,
   })) as Empleado[]
 }
@@ -267,22 +267,34 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
   }, [mainMonth])
 
   const employees = useMemo(() => {
-    if (!horario) return []
-    
-    // Obtener datos de la semana actual desde la nueva estructura
-    const currentWeek = horario.weeks?.[horario.publishedWeekId]
-    const employeesData = currentWeek?.employees
-    
-    if (employeesData?.length) {
-      return employeesData.map((employee: any, index: number) => ({
-        id: employee.id || employee.uid || `employee-${index}`,
-        name: employee.name || employee.nombre || `Empleado ${index + 1}`,
-        email: employee.email,
-        phone: employee.phone,
-        userId: employee.userId || horario.ownerId,
-      })) as Empleado[]
+    // MODELO A: Usar empleados de la semana publicada si existen, sino fallback
+    const currentWeek = horario?.weeks?.[horario.publishedWeekId]
+    if (currentWeek?.employees && currentWeek.employees.length > 0) {
+      console.log("🔧 [PublicHorarioPage] Using published employees:", currentWeek.employees)
+      return currentWeek.employees
     }
-    return buildFallbackEmployees(horario.ownerId, currentWeek?.days)
+    
+    // Fallback: construir empleados desde assignments si no hay empleados guardados
+    console.log("🔧 [PublicHorarioPage] Building fallback employees from assignments")
+    const allEmployeeIds = new Set<string>()
+    
+    if (currentWeek?.days) {
+      Object.values(currentWeek.days).forEach((dayData: any) => {
+        if (dayData && typeof dayData === 'object') {
+          Object.keys(dayData).forEach(employeeId => {
+            allEmployeeIds.add(employeeId)
+          })
+        }
+      })
+    }
+    
+    const builtEmployees = Array.from(allEmployeeIds).map(id => ({
+      id,
+      name: id, // Fallback: usar ID como nombre
+    }))
+    
+    console.log("🔧 [PublicHorarioPage] Built fallback employees:", builtEmployees)
+    return builtEmployees
   }, [horario])
 
   const shifts = useMemo(() => {
@@ -586,7 +598,7 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
                 className="text-xs"
               >
                 <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287-.947c.379-1.561 2.6-1.561 2.978 0a1.533 1.533 0 01.947 2.287c1.561.379 1.561 2.6 0 2.978a1.532 1.532 0 01-.947 2.287c.836 1.372-.734 2.942-2.106 2.106a1.532 1.532 0 01-2.287-.947c-.379-1.561-2.6-1.561-2.978 0a1.532 1.532 0 01-.947-2.287c-1.561-.379-1.561-2.6 0-2.978a1.532 1.532 0 01.947-2.287c-.836-1.372.734-2.942 2.106-2.106 1.372.836 2.942-.734 2.106-2.106-.54-.886-.061-2.042.947-2.287 1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287z" clip-rule="evenodd"/>
+                  <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/>
                 </svg>
                 Cambiar persona
               </Button>
