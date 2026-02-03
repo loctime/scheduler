@@ -9,7 +9,7 @@ import { hexToRgba } from "../utils/schedule-grid-utils"
 
 interface GridHeaderProps {
   weekDays: Date[]
-  user?: any // Usuario opcional (para páginas públicas sin DataProvider)
+  user?: any // .Usuario opcional (para páginas públicas sin DataProvider)
   onCloseSelector?: () => void
 }
 
