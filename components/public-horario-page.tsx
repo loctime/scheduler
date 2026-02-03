@@ -115,6 +115,8 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
   const { horario, isLoading, error } = usePublicHorario(scheduleId)
   const { config } = useConfig()
   const [copied, setCopied] = useState(false)
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+  const [showInstallButton, setShowInstallButton] = useState(false)
   const { toast } = useToast()
 
   // Detectar vista móvil
@@ -128,6 +130,44 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  // PWA: Registrar service worker y manejar instalación
+  useEffect(() => {
+    // Agregar manifest dinámicamente
+    const link = document.createElement('link')
+    link.rel = 'manifest'
+    link.href = '/pwa/horario/manifest.json'
+    document.head.appendChild(link)
+
+    // Registrar service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/pwa/horario/sw.js')
+        .then((registration) => {
+          console.log('Service Worker registrado:', registration)
+        })
+        .catch((error) => {
+          console.error('Error al registrar Service Worker:', error)
+        })
+    }
+
+    // Manejar beforeinstallprompt
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault()
+      setDeferredPrompt(e)
+      setShowInstallButton(true)
+    }
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+      // Limpiar manifest
+      const manifestLink = document.querySelector('link[rel="manifest"][href="/pwa/horario/manifest.json"]')
+      if (manifestLink) {
+        document.head.removeChild(manifestLink)
+      }
+    }
   }, [])
 
   const weekStartDate = useMemo(
@@ -263,6 +303,34 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
       toast({
         title: "Error",
         description: "No se pudo copiar el enlace",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // PWA: Manejar instalación
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) return
+
+    try {
+      deferredPrompt.prompt()
+      const { outcome } = await deferredPrompt.userChoice
+      console.log('Resultado instalación:', outcome)
+      
+      if (outcome === 'accepted') {
+        toast({
+          title: "App instalada",
+          description: "La app se ha instalado correctamente",
+        })
+      }
+      
+      setDeferredPrompt(null)
+      setShowInstallButton(false)
+    } catch (error) {
+      console.error('Error en instalación:', error)
+      toast({
+        title: "Error",
+        description: "No se pudo instalar la app",
         variant: "destructive",
       })
     }
@@ -406,6 +474,21 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {/* Botón de instalación PWA */}
+            {showInstallButton && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleInstallApp}
+                className="text-xs bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+              >
+                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"/>
+                </svg>
+                Descargar app
+              </Button>
+            )}
+            
             {/* Ocultar chip "Publicado" y botón "Copiar enlace" en móvil */}
             <div className="hidden sm:flex sm:items-center sm:gap-3">
               <Badge variant="secondary" className="bg-green-100 text-green-800">
