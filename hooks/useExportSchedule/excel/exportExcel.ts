@@ -1,7 +1,6 @@
 import { useCallback } from "react"
 import { useToast } from "@/hooks/use-toast"
 import type { Empleado, Turno, Horario, Separador } from "@/lib/types"
-import { normalizeAssignments } from "../utils/assignments"
 import { 
   createEmployeeMaps, 
   getOrderedItemIds, 
@@ -135,30 +134,21 @@ export const useExportExcel = () => {
           weekDays.forEach((day, dayIndex) => {
             const dateStr = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
             const assignments = schedule?.assignments[dateStr]?.[employee.id]
+            const dayStatus = schedule?.dayStatus?.[dateStr]?.[employee.id] || "normal"
             
             let hasAssignments = false
             let shiftTexts: any[] = []
             
-            if (assignments && Array.isArray(assignments) && assignments.length > 0) {
+            if (dayStatus === "franco") {
+              hasAssignments = true
+              shiftTexts = [{ text: "FRANCO", color: "#22c55e" }]
+            } else if (assignments && assignments.length > 0) {
               hasAssignments = true
               // Convertir a array de ShiftAssignment
-              let assignmentArray: any[] = []
-              if (assignments.length > 0 && typeof assignments[0] === "string") {
-                assignmentArray = (assignments as string[]).map((shiftId) => ({
-                  shiftId,
-                  type: "shift" as const,
-                }))
-              } else {
-                assignmentArray = assignments as any[]
-              }
+              const assignmentArray = assignments as any[]
               
               // Obtener textos de turnos
               shiftTexts = assignmentArray.map((a) => {
-                if (typeof a === "string") {
-                  const shift = shiftMap.get(a)
-                  return { text: shift?.name || "Horario incompleto", color: shift?.color }
-                }
-                
                 if (a.type === "franco") {
                   return { text: "FRANCO", color: "#22c55e" }
                 }

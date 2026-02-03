@@ -5,6 +5,7 @@ import { hexToRgba, timeToMinutes } from "../utils/schedule-grid-utils"
 
 interface UseCellBackgroundStylesProps {
   getEmployeeAssignments: (employeeId: string, date: string) => ShiftAssignment[]
+  getEmployeeDayStatus: (employeeId: string, date: string) => "normal" | "franco" | "medio_franco"
   getShiftInfo: (shiftId: string) => Turno | undefined
   shifts: Turno[]
   mediosTurnos: MedioTurno[]
@@ -12,6 +13,7 @@ interface UseCellBackgroundStylesProps {
 
 export function useCellBackgroundStyles({
   getEmployeeAssignments,
+  getEmployeeDayStatus,
   getShiftInfo,
   shifts,
   mediosTurnos,
@@ -80,16 +82,22 @@ export function useCellBackgroundStyles({
   // Obtener el color de fondo para una celda basado en las asignaciones
   const getCellBackgroundStyle = useCallback(
     (employeeId: string, date: string): CSSProperties | undefined => {
+      const dayStatus = getEmployeeDayStatus(employeeId, date)
       const assignments = getEmployeeAssignments(employeeId, date)
 
       // Si no hay asignaciones, no aplicar color
-      if (assignments.length === 0) return undefined
+      if (assignments.length === 0) {
+        if (dayStatus === "franco") {
+          return { backgroundColor: "rgba(34, 197, 94, 0.35)" }
+        }
+        return undefined
+      }
 
       // Color verde para franco (opacidad 0.35) - por defecto
       const defaultGreenColor = "rgba(34, 197, 94, 0.35)" // green-500 con opacidad
 
       // Si es franco, aplicar verde
-      if (assignments.some((a) => a.type === "franco")) {
+      if (assignments.some((a) => a.type === "franco") || dayStatus === "franco") {
         return { backgroundColor: defaultGreenColor }
       }
 
@@ -271,11 +279,10 @@ export function useCellBackgroundStyles({
 
       return undefined
     },
-    [getEmployeeAssignments, getShiftInfo, hexToRgba, timeToMinutes, getMedioTurnoColor, findMatchingShift]
+    [getEmployeeAssignments, getEmployeeDayStatus, getShiftInfo, hexToRgba, timeToMinutes, getMedioTurnoColor, findMatchingShift]
   )
 
   return {
     getCellBackgroundStyle,
   }
 }
-

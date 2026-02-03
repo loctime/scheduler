@@ -1,16 +1,17 @@
 "use client"
 
 import React, { useMemo } from "react"
-import { ShiftAssignment, Turno } from "@/lib/types"
+import { ShiftAssignment, Turno, MedioTurno } from "@/lib/types"
 import { getShiftDisplayTime } from "../utils/shift-display-utils"
 import { timeToMinutes } from "../utils/schedule-grid-utils"
 
 interface CellAssignmentsProps {
   assignments: ShiftAssignment[]
   getShiftInfo: (shiftId: string) => Turno | undefined
+  mediosTurnos?: MedioTurno[]
 }
 
-export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsProps) {
+export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }: CellAssignmentsProps) {
   const orderedAssignments = useMemo(() => {
     if (assignments.length === 0) return []
 
@@ -93,11 +94,14 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
           const shift = assignment.shiftId ? getShiftInfo(assignment.shiftId) : undefined
           const displayTimeLines = getShiftDisplayTime(assignment.shiftId || "", shift, assignment)
           const hasTime = assignment.startTime && assignment.endTime
+          const medioTurnoMatch = assignment.startTime && assignment.endTime
+            ? mediosTurnos.find((medio) => medio.startTime === assignment.startTime && medio.endTime === assignment.endTime)
+            : undefined
 
           if (hasTime) {
             // Crear un assignment virtual para el medio turno con color
             const timeText = displayTimeLines[0] || `${assignment.startTime} - ${assignment.endTime}`
-            const medioTurnoColor = shift?.color || '#10b981' // Color verde por defecto para medios turnos
+            const medioTurnoColor = medioTurnoMatch?.color || shift?.color || '#10b981' // Color verde por defecto para medios turnos
             
             return (
               <div key={`medio-franco-${idx}`} className="w-full space-y-0.5">
@@ -218,4 +222,3 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
     </>
   )
 }
-

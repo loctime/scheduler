@@ -44,22 +44,19 @@ export const processEmployeeRow = (
   weekDays.forEach((day) => {
     const dateStr = format(day, "yyyy-MM-dd")
     const assignments = schedule?.assignments[dateStr]?.[employee.id]
-    
-    if (!assignments || (Array.isArray(assignments) && assignments.length === 0)) {
+    const dayStatus = schedule?.dayStatus?.[dateStr]?.[employee.id] || "normal"
+
+    if (dayStatus === "franco") {
+      row.push("FRANCO")
+      return
+    }
+
+    if (!assignments || assignments.length === 0) {
       row.push("-")
     } else {
       // Convertir a array de ShiftAssignment
       let assignmentArray: any[] = []
-      if (Array.isArray(assignments)) {
-        if (assignments.length > 0 && typeof assignments[0] === "string") {
-          assignmentArray = (assignments as string[]).map((shiftId) => ({
-            shiftId,
-            type: "shift" as const,
-          }))
-        } else {
-          assignmentArray = assignments as any[]
-        }
-      }
+      assignmentArray = assignments as any[]
       
       // Convertir asignaciones a texto (múltiples turnos separados por \n)
       const shiftTexts = assignmentArray.map((a) => getShiftText(a, shiftMap)).filter(s => s.text)

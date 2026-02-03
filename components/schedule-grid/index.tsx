@@ -49,7 +49,6 @@ interface ScheduleGridProps {
   allEmployees?: Empleado[]
   shifts: Turno[]
   schedule: Horario | HistorialItem | null
-  onShiftUpdate?: (date: string, employeeId: string, shiftIds: string[]) => void // formato antiguo (compatibilidad)
   onAssignmentUpdate?: (
     date: string,
     employeeId: string,
@@ -75,7 +74,6 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
   allEmployees,
   shifts,
   schedule,
-  onShiftUpdate,
   onAssignmentUpdate,
   readonly = false,
   monthRange,
@@ -195,8 +193,8 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     separadorMap,
     orderedItemIds,
     orderedItems,
-    getEmployeeShifts,
     getEmployeeAssignments,
+    getEmployeeDayStatus,
     getShiftInfo,
     updateEmployeeRequestCache,
   } = useScheduleGridData({
@@ -212,12 +210,12 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     currentWeekStart,
     lastCompletedWeekStart: lastCompletedWeekStart ? new Date(lastCompletedWeekStart) : undefined,
     allEmployees: allEmployees || employees, // Todos los empleados (sin filtrar) para el filtrado correcto
-    config, // Agregar config para acceso a mediosTurnos
   })
 
   // Hook para estilos de celdas
   const { getCellBackgroundStyle } = useCellBackgroundStyles({
     getEmployeeAssignments,
+    getEmployeeDayStatus,
     getShiftInfo,
     shifts,
     mediosTurnos,
@@ -312,7 +310,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
   // Handlers
   const handleCellClick = useCallback(
     (date: string, employeeId: string) => {
-      if (!readonly && (onShiftUpdate || onAssignmentUpdate)) {
+      if (!readonly && onAssignmentUpdate) {
         // Verificar si hay assignments incompletos antes de permitir edición
         if (hasIncompleteAssignments(employeeId, date)) {
           toast({
@@ -326,17 +324,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
         setSelectedCell({ date, employeeId })
       }
     },
-    [readonly, onShiftUpdate, onAssignmentUpdate, saveCellState, hasIncompleteAssignments, toast]
-  )
-
-  const handleShiftUpdate = useCallback(
-    (shiftIds: string[]) => {
-      if (selectedCell && onShiftUpdate) {
-        onShiftUpdate(selectedCell.date, selectedCell.employeeId, shiftIds)
-      }
-      setSelectedCell(null)
-    },
-    [selectedCell, onShiftUpdate]
+    [readonly, onAssignmentUpdate, saveCellState, hasIncompleteAssignments, toast]
   )
 
   const handleAssignmentUpdate = useCallback(
@@ -363,14 +351,9 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
       // Actualizar los assignments después de cerrar
       if (onAssignmentUpdate) {
         onAssignmentUpdate(date, employeeId, assignments, { scheduleId: schedule?.id })
-      } else if (onShiftUpdate) {
-        const shiftIds = assignments
-          .map((a) => a.shiftId)
-          .filter((id): id is string => Boolean(id))
-        onShiftUpdate(date, employeeId, shiftIds)
       }
     },
-    [onAssignmentUpdate, onShiftUpdate, schedule?.id, saveCellState]
+    [onAssignmentUpdate, schedule?.id, saveCellState]
   )
 
   // Función para manejar el toggle de reglas fijas
@@ -453,23 +436,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     [externalOnClearEmployeeRow, onAssignmentUpdate, weekDays, schedule, readonly, employeesToUse, toast]
   )
 
-  // Obtener empleado y fecha seleccionados
-  const selectedEmployee = selectedCell ? employees.find((e) => e.id === selectedCell.employeeId) : null
-  const selectedDate = selectedCell
-    ? weekDays.find((d) => format(d, "yyyy-MM-dd") === selectedCell.date)
-    : null
-
   // Memoizar los valores pasados al diálogo para evitar re-renders infinitos
-  const selectedShiftIds = useMemo(() => {
-    if (!selectedCell) return []
-    return getEmployeeShifts(selectedCell.employeeId, selectedCell.date)
-  }, [selectedCell?.employeeId, selectedCell?.date, schedule?.assignments, getEmployeeShifts])
-
-  const selectedAssignments = useMemo(() => {
-    if (!selectedCell || !onAssignmentUpdate) return undefined
-    return getEmployeeAssignments(selectedCell.employeeId, selectedCell.date)
-  }, [selectedCell?.employeeId, selectedCell?.date, schedule?.assignments, onAssignmentUpdate, getEmployeeAssignments])
-
   // Función para obtener el color del separador que aplica a un empleado
   const getSeparatorColorForEmployee = useCallback(
     (employeeIndex: number): string | undefined => {
@@ -489,7 +456,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     [orderedItems]
   )
 
-  const isClickable = !readonly && !!(onShiftUpdate || onAssignmentUpdate)
+  const isClickable = !readonly && !!onAssignmentUpdate
 
   // Funciones para manejar horarios fijos manuales
   const isManuallyFixed = useCallback(
@@ -594,6 +561,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
                         showAddButton={showAddButton}
                         employeeStats={employeeStats}
                         getEmployeeAssignments={getEmployeeAssignments}
+                        getEmployeeDayStatus={getEmployeeDayStatus}
                         getCellBackgroundStyle={getCellBackgroundStyle}
                         getShiftInfo={getShiftInfo}
                         selectedCell={selectedCell}
@@ -647,6 +615,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
             employees={employeesForMobile}
             weekDaysData={weekDaysData}
             getEmployeeAssignments={getEmployeeAssignments}
+            getEmployeeDayStatus={getEmployeeDayStatus}
             getCellBackgroundStyle={getCellBackgroundStyle}
             getShiftInfo={getShiftInfo}
             selectedCell={selectedCell}
@@ -788,6 +757,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
                         showAddButton={showAddButton}
                         employeeStats={employeeStats}
                         getEmployeeAssignments={getEmployeeAssignments}
+                        getEmployeeDayStatus={getEmployeeDayStatus}
                         getCellBackgroundStyle={getCellBackgroundStyle}
                         getShiftInfo={getShiftInfo}
                         selectedCell={selectedCell}

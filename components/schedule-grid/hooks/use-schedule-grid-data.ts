@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from "react"
-import { Empleado, Separador, ShiftAssignmentValue, Horario, HistorialItem } from "@/lib/types"
-import { toShiftIds, toAssignments } from "../utils/schedule-grid-utils"
+import { Empleado, Separador, Horario, HistorialItem } from "@/lib/types"
+import { toAssignments } from "../utils/schedule-grid-utils"
 import { getEmployeeRequest } from "@/lib/employee-requests"
 
 export type GridItem = { type: "employee"; data: Empleado } | { type: "separator"; data: Separador }
@@ -16,7 +16,6 @@ interface UseScheduleGridDataProps {
   currentWeekStart?: Date
   lastCompletedWeekStart?: Date
   allEmployees?: Empleado[]
-  config?: any
 }
 
 export function useScheduleGridData({
@@ -30,7 +29,6 @@ export function useScheduleGridData({
   currentWeekStart,
   lastCompletedWeekStart,
   allEmployees = employees,
-  config,
 }: UseScheduleGridDataProps) {
   const DEBUG = false
   // Cache de employee requests por cacheKey
@@ -160,16 +158,6 @@ export function useScheduleGridData({
   }, [orderedItemIds, filteredEmployees, separadorMap])
 
   // Memoizar función de obtener turnos de empleado (IDs)
-  const getEmployeeShifts = useMemo(
-    () => (employeeId: string, date: string): string[] => {
-      if (!schedule?.assignments) return []
-      const dateAssignments = schedule.assignments[date] || {}
-      const employeeShifts = dateAssignments[employeeId]
-      return toShiftIds(employeeShifts)
-    },
-    [schedule?.assignments]
-  )
-
   // Función para obtener asignaciones completas con employee requests como overrides
   const getEmployeeAssignments = useMemo(
     () => (employeeId: string, date: string) => {
@@ -234,35 +222,17 @@ export function useScheduleGridData({
         baseAssignments = toAssignments(employeeShifts, shifts)
       }
       
-      // MANEJO ESPECIAL: Agregar assignments virtuales para dayStatus
-      if (schedule?.dayStatus) {
-        const dateDayStatus = schedule.dayStatus[date] || {}
-        const employeeDayStatus = dateDayStatus[employeeId]
-        
-        if (employeeDayStatus === "franco") {
-          // Agregar assignment virtual para franco
-          baseAssignments.push({
-            type: "franco",
-          })
-        } else if (employeeDayStatus === "medio_franco") {
-          // Para medio franco, buscar el medio turno configurado
-          const mediosTurnosConfig = config?.mediosTurnos || []
-          if (mediosTurnosConfig.length > 0) {
-            const medioTurno = mediosTurnosConfig[0]
-            baseAssignments.push({
-              type: "medio_franco",
-              startTime: medioTurno.startTime,
-              endTime: medioTurno.endTime,
-            })
-          } else {
-            baseAssignments.push({ type: "medio_franco" })
-          }
-        }
-      }
-      
       return baseAssignments
     },
-    [schedule?.assignments, schedule?.dayStatus, shifts, shiftMap, scheduleId, employeeRequestCache, config?.mediosTurnos]
+    [schedule?.assignments, shifts, shiftMap, scheduleId, employeeRequestCache]
+  )
+
+  const getEmployeeDayStatus = useMemo(
+    () => (employeeId: string, date: string) => {
+      if (!schedule?.dayStatus) return "normal"
+      return schedule.dayStatus[date]?.[employeeId] || "normal"
+    },
+    [schedule?.dayStatus]
   )
 
   // Memoizar función de obtener info de turno
@@ -278,8 +248,8 @@ export function useScheduleGridData({
     separadorMap,
     orderedItemIds,
     orderedItems,
-    getEmployeeShifts,
     getEmployeeAssignments,
+    getEmployeeDayStatus,
     getShiftInfo,
     updateEmployeeRequestCache,
   }
