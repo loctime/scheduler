@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { doc, setDoc, serverTimestamp } from "firebase/firestore"
+import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useOwnerId } from "./use-owner-id"
 import { useData } from "@/contexts/data-context"
@@ -104,7 +104,33 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
       console.log("🔧 [usePublicPublisher] Document reference created for apps/horarios/enlaces_publicos/" + ownerId)
       
       await setDoc(publicRef, publicScheduleData, { merge: true })
+      
+      // Verificar inmediatamente si el documento se guardó
+      const savedDoc = await getDoc(publicRef)
+      console.log("🔧 [usePublicPublisher] Document exists after save:", savedDoc.exists())
+      if (savedDoc.exists()) {
+        const savedData = savedDoc.data()
+        console.log("🔧 [usePublicPublisher] Saved document keys:", Object.keys(savedData || {}))
+        console.log("🔧 [usePublicPublisher] Has weeks in saved doc:", !!(savedData?.weeks))
+        if (savedData?.weeks) {
+          console.log("🔧 [usePublicPublisher] Saved weeks keys:", Object.keys(savedData.weeks))
+          const weekData = savedData.weeks[options.weekId]
+          if (weekData) {
+            console.log("🔧 [usePublicPublisher] Week has publicImageUrl:", !!weekData.publicImageUrl)
+            console.log("🔧 [usePublicPublisher] Image URL length:", weekData.publicImageUrl?.length || 0)
+          }
+        }
+      }
+      
+      // Logs detallados para verificar qué se guardó
       console.log("🔧 [usePublicPublisher] Publish success - document written to:", fullPath)
+      console.log("🔧 [usePublicPublisher] Document path:", publicRef.path)
+      console.log("🔧 [usePublicPublisher] Saved data keys:", Object.keys(publicScheduleData))
+      console.log("🔧 [usePublicPublisher] Weeks keys:", Object.keys(publicScheduleData.weeks))
+      console.log("🔧 [usePublicPublisher] Week data keys:", Object.keys(publicScheduleData.weeks[options.weekId]))
+      console.log("🔧 [usePublicPublisher] Has publicImageUrl:", !!publicScheduleData.weeks[options.weekId].publicImageUrl)
+      console.log("🔧 [usePublicPublisher] PublicImageUrl length:", publicScheduleData.weeks[options.weekId].publicImageUrl?.length || 0)
+      console.log("🔧 [usePublicPublisher] PublicImageUrl prefix:", publicScheduleData.weeks[options.weekId].publicImageUrl?.substring(0, 50) + "...")
       console.log("🔧 [usePublicPublisher] PublicImageUrl saved successfully:", !!options.publicImageUrl)
       
       return ownerId // Retornar el ownerId para generar URL pública
