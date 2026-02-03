@@ -156,6 +156,12 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
 
   // PWA: Registrar service worker y manejar instalación
   useEffect(() => {
+    // Limpiar cualquier manifest existente
+    const existingManifest = document.querySelector('link[rel="manifest"]')
+    if (existingManifest) {
+      existingManifest.remove()
+    }
+    
     // Agregar manifest exclusivo para horario
     const link = document.createElement('link')
     link.rel = 'manifest'
@@ -178,6 +184,7 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
       e.preventDefault()
       setDeferredPrompt(e)
       setShowInstallButton(true)
+      console.log('beforeinstallprompt capturado para horario')
     }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
@@ -335,6 +342,7 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
     if (!deferredPrompt) return
 
     try {
+      console.log('Iniciando instalación PWA horario...')
       deferredPrompt.prompt()
       const { outcome } = await deferredPrompt.userChoice
       console.log('Resultado instalación:', outcome)
@@ -343,6 +351,11 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
         toast({
           title: "Horario instalado",
           description: "La app del horario se ha instalado correctamente",
+        })
+      } else {
+        toast({
+          title: "Instalación cancelada",
+          description: "La instalación fue cancelada",
         })
       }
       
