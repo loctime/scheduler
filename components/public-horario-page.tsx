@@ -735,13 +735,73 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
                     const todayAssignments = dayData?.[currentViewer.employeeId]
                     
                     if (!todayAssignments || todayAssignments.length === 0) {
-                      return "🎉 Hoy tienes franco"
+                      return "🎉 Hoy tenés franco"
                     }
                     
+                    // Usar la misma lógica que ScheduleGrid para renderizar
                     if (Array.isArray(todayAssignments)) {
-                      return todayAssignments.map((assignment: any) => 
-                        typeof assignment === 'string' ? assignment : assignment.shiftId
-                      ).join(' • ')
+                      console.log("🔧 [PublicHorarioPage] Debug assignments:", {
+                        todayAssignments,
+                        shiftsAvailable: shifts.length,
+                        shiftsData: shifts,
+                        firstAssignment: todayAssignments[0],
+                        firstAssignmentType: typeof todayAssignments[0],
+                        firstAssignmentKeys: Object.keys(todayAssignments[0] || {})
+                      })
+                      
+                      return todayAssignments.map((assignment: any) => {
+                        console.log("🔧 [PublicHorarioPage] Procesando assignment:", assignment)
+                        
+                        // Si es objeto ShiftAssignment
+                        if (assignment && typeof assignment === 'object') {
+                          console.log("🔧 [PublicHorarioPage] Assignment object keys:", Object.keys(assignment))
+                          
+                          if (assignment.type === 'franco') {
+                            return 'Franco'
+                          }
+                          if (assignment.type === 'medio-franco') {
+                            return 'Medio franco'
+                          }
+                          if (assignment.type === 'shift') {
+                            // Si tiene startTime y endTime, usarlos directamente
+                            if (assignment.startTime && assignment.endTime) {
+                              return `${assignment.startTime} a ${assignment.endTime}`
+                            }
+                            // Sino, buscar en shifts por shiftId
+                            if (assignment.shiftId) {
+                              console.log("🔧 [PublicHorarioPage] Buscando shift por ID:", assignment.shiftId)
+                              const shift = shifts.find(s => s.id === assignment.shiftId)
+                              console.log("🔧 [PublicHorarioPage] Shift encontrado:", shift)
+                              if (shift) {
+                                return `${shift.startTime} a ${shift.endTime}`
+                              }
+                            }
+                          }
+                          return assignment.shiftId || 'Turno'
+                        }
+                        
+                        // Si es string, buscar en shifts
+                        if (typeof assignment === 'string') {
+                          console.log("🔧 [PublicHorarioPage] Buscando shift:", assignment)
+                          const shift = shifts.find(s => s.id === assignment)
+                          console.log("🔧 [PublicHorarioPage] Shift encontrado:", shift)
+                          if (shift) {
+                            return `${shift.startTime} a ${shift.endTime}`
+                          }
+                          return assignment
+                        }
+                        
+                        return 'Turno'
+                      }).join(' • ')
+                    }
+                    
+                    // Si no es array, tratar como string simple
+                    if (typeof todayAssignments === 'string') {
+                      const shift = shifts.find(s => s.id === todayAssignments)
+                      if (shift) {
+                        return `${shift.startTime} a ${shift.endTime}`
+                      }
+                      return todayAssignments
                     }
                     
                     return todayAssignments
