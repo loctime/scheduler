@@ -364,30 +364,51 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
               <Calendar className="h-6 w-6" />
               Horario Semanal
             </h1>
-            <div className="mt-1 flex items-center justify-between">
-              <div className="text-sm text-gray-500">
-                {format(weekStartDate, "dd/MM/yyyy")} – {format(addDays(weekStartDate, 6), "dd/MM/yyyy")}
+            <div className="mt-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0">
+              {/* Mobile: rango corto + mes en misma línea */}
+              <div className="flex items-center gap-2 sm:hidden">
+                <span className="text-sm text-gray-500">
+                  {format(weekStartDate, "dd/MM")} – {format(addDays(weekStartDate, 6), "dd/MM")}
+                </span>
+                {monthLabel && (
+                  <>
+                    <span className="text-sm text-gray-400">-</span>
+                    <span className="text-sm font-medium text-gray-700">
+                      {monthLabel}
+                    </span>
+                  </>
+                )}
               </div>
-              {monthLabel && (
-                <div className="text-sm font-medium text-gray-700">
-                  {monthLabel}
+              
+              {/* Desktop: rango completo + mes separados */}
+              <div className="hidden sm:flex sm:items-center sm:justify-between w-full">
+                <div className="text-sm text-gray-500">
+                  {format(weekStartDate, "dd/MM/yyyy")} – {format(addDays(weekStartDate, 6), "dd/MM/yyyy")}
                 </div>
-              )}
+                {monthLabel && (
+                  <div className="text-sm font-medium text-gray-700">
+                    {monthLabel}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Badge variant="secondary" className="bg-green-100 text-green-800">
-              Publicado
-            </Badge>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyUrl}
-              className="flex items-center gap-2"
-            >
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              {copied ? "Copiado" : "Copiar enlace"}
-            </Button>
+            {/* Ocultar chip "Publicado" y botón "Copiar enlace" en móvil */}
+            <div className="hidden sm:flex sm:items-center sm:gap-3">
+              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                Publicado
+              </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyUrl}
+                className="text-xs"
+              >
+                <Copy className="mr-2 h-3 w-3" />
+                Copiar enlace
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -412,10 +433,7 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
             
             return (
               <div className="w-full overflow-x-auto bg-white border rounded-lg p-4">
-                <div className="text-center text-gray-500 mb-4">
-                  <p className="text-sm">Horario publicado</p>
-                  <p className="text-xs text-gray-400">Imagen del horario</p>
-                </div>
+                
                 <img 
                   src={currentWeek.publicImageUrl} 
                   alt={`Horario ${currentWeek.weekLabel || 'semanal'}`}
