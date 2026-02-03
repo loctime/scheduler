@@ -212,6 +212,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     currentWeekStart,
     lastCompletedWeekStart: lastCompletedWeekStart ? new Date(lastCompletedWeekStart) : undefined,
     allEmployees: allEmployees || employees, // Todos los empleados (sin filtrar) para el filtrado correcto
+    config, // Agregar config para acceso a mediosTurnos
   })
 
   // Hook para estilos de celdas

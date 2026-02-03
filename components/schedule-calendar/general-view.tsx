@@ -288,10 +288,37 @@ export function GeneralView({
               shifts={shifts}
               monthRange={{ start: monthRange.startDate, end: monthRange.endDate }}
               onAssignmentUpdate={onAssignmentUpdate ? (date: string, employeeId: string, shiftId: string, value: string | null) => {
-                // Convertir de firma WeekSchedule a firma GeneralView
+                console.log("🔧 [GeneralView Adaptador] Recibido:", {
+                  date,
+                  employeeId,
+                  shiftId,
+                  value
+                })
+
+                // Detectar valores especiales de dayStatus
+                if (value && value.startsWith('DAY_STATUS_')) {
+                  console.log("🔧 [GeneralView Adaptador] Detectado dayStatus especial")
+                  
+                  // Parsear el valor especial: DAY_STATUS_tipo_startTime_endTime
+                  const parts = value.split('_')
+                  const type = parts[2] as "franco" | "medio_franco"
+                  const startTime = parts[3] || undefined
+                  const endTime = parts[4] || undefined
+                  
+                  const assignments: ShiftAssignment[] = [{
+                    type,
+                    ...(startTime && endTime && { startTime, endTime })
+                  }]
+                  
+                  console.log("🔧 [GeneralView Adaptador] Convertido a assignments:", assignments)
+                  onAssignmentUpdate(date, employeeId, assignments, { scheduleId: weekSchedule?.id })
+                  return
+                }
+
+                // Convertir de firma WeekSchedule a firma GeneralView (comportamiento normal)
                 const assignments: ShiftAssignment[] = value ? [{
                   shiftId,
-                  type: 'shift' as const,
+                  type: "shift",
                   startTime: '',
                   endTime: ''
                 }] : []

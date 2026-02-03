@@ -16,6 +16,7 @@ interface UseScheduleGridDataProps {
   currentWeekStart?: Date
   lastCompletedWeekStart?: Date
   allEmployees?: Empleado[]
+  config?: any
 }
 
 export function useScheduleGridData({
@@ -29,6 +30,7 @@ export function useScheduleGridData({
   currentWeekStart,
   lastCompletedWeekStart,
   allEmployees = employees,
+  config,
 }: UseScheduleGridDataProps) {
   // Cache de employee requests por cacheKey
   const [employeeRequestCache, setEmployeeRequestCache] = useState<Map<string, any>>(new Map())
@@ -227,9 +229,51 @@ export function useScheduleGridData({
         baseAssignments = toAssignments(employeeShifts, shifts)
       }
       
+      // MANEJO ESPECIAL: Agregar assignments virtuales para dayStatus
+      if (schedule?.dayStatus) {
+        const dateDayStatus = schedule.dayStatus[date] || {}
+        const employeeDayStatus = dateDayStatus[employeeId]
+        
+        console.log("🔧 [getEmployeeAssignments] dayStatus debug:", {
+          date,
+          employeeId,
+          hasDayStatus: !!schedule?.dayStatus,
+          dateDayStatus,
+          employeeDayStatus,
+          mediosTurnosConfig: config?.mediosTurnos
+        })
+        
+        if (employeeDayStatus === "franco") {
+          // Agregar assignment virtual para franco
+          baseAssignments.push({
+            type: "franco",
+          })
+          console.log("🔧 [getEmployeeAssignments] Agregado assignment virtual franco")
+        } else if (employeeDayStatus === "medio_franco") {
+          // Para medio franco, buscar el medio turno configurado
+          const mediosTurnosConfig = config?.mediosTurnos || []
+          if (mediosTurnosConfig.length > 0) {
+            // Usar el primer medio turno configurado
+            const medioTurno = mediosTurnosConfig[0]
+            baseAssignments.push({
+              type: "medio_franco",
+              startTime: medioTurno.startTime,
+              endTime: medioTurno.endTime,
+            })
+            console.log("🔧 [getEmployeeAssignments] Agregado assignment virtual medio_franco con horarios:", medioTurno)
+          } else {
+            // Si no hay configuración, agregar assignment básico
+            baseAssignments.push({
+              type: "medio_franco",
+            })
+            console.log("🔧 [getEmployeeAssignments] Agregado assignment virtual medio_franco básico")
+          }
+        }
+      }
+      
       return baseAssignments
     },
-    [schedule?.assignments, shifts, shiftMap, scheduleId, employeeRequestCache]
+    [schedule?.assignments, schedule?.dayStatus, shifts, shiftMap, scheduleId, employeeRequestCache, config?.mediosTurnos]
   )
 
   // Memoizar función de obtener info de turno

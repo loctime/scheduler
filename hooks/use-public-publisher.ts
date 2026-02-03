@@ -86,6 +86,7 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
         publishedAt: serverTimestamp(),
         publicImageUrl: options.publicImageUrl || null,
         days: options.weekData.scheduleData?.assignments || options.weekData.assignments || {},
+        dayStatus: options.weekData.scheduleData?.dayStatus || options.weekData.dayStatus || {},
         employees: options.employees || options.weekData.employees || []
       }
       

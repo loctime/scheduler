@@ -205,6 +205,11 @@ export interface Horario {
       [empleadoId: string]: ShiftAssignment[] | string[]
     }
   }
+  dayStatus?: {
+    [date: string]: {
+      [empleadoId: string]: "franco" | "medio_franco"
+    }
+  }
   completada?: boolean
   completadaPor?: string
   completadaPorNombre?: string

@@ -54,8 +54,20 @@ export function QuickShiftSelector({
   }
 
   const handleFranco = () => {
-    onSelectAssignments([{ type: "franco" }])
+    // Crear assignment de franco con estructura completa para el nuevo modelo dayStatus
+    const francoAssignment: ShiftAssignment = {
+      type: "franco",
+    }
+    
+    onSelectAssignments([francoAssignment])
     resetMode()
+    
+    // Mostrar toast de confirmación para feedback visual inmediato
+    toast({
+      title: "Franco asignado",
+      description: "Se asignó franco correctamente",
+      duration: 1500,
+    })
   }
 
   const handleTurno = (shift: Turno) => {
@@ -93,24 +105,46 @@ export function QuickShiftSelector({
   }
 
   const handleMedioFranco = (time?: { startTime: string; endTime: string }) => {
-    if (mediosTurnos.length === 1 && !time) {
-      onSelectAssignments([
-        {
-          type: "medio_franco",
-          startTime: mediosTurnos[0].startTime,
-          endTime: mediosTurnos[0].endTime,
-        },
-      ])
-      resetMode()
-      return
-    }
-
+    // Si hay un tiempo específico proporcionado, usarlo directamente
     if (time?.startTime && time?.endTime) {
-      onSelectAssignments([{ type: "medio_franco", startTime: time.startTime, endTime: time.endTime }])
+      const medioFrancoAssignment: ShiftAssignment = {
+        type: "medio_franco",
+        startTime: time.startTime,
+        endTime: time.endTime,
+      }
+      onSelectAssignments([medioFrancoAssignment])
       resetMode()
+      
+      // Mostrar toast de confirmación
+      toast({
+        title: "Medio franco asignado",
+        description: `Se asignó medio franco (${time.startTime} - ${time.endTime})`,
+        duration: 1500,
+      })
       return
     }
 
+    // Si hay exactamente un medio turno configurado y no se proporcionó tiempo, usarlo
+    if (mediosTurnos.length === 1 && !time) {
+      const medioTurno = mediosTurnos[0]
+      const medioFrancoAssignment: ShiftAssignment = {
+        type: "medio_franco",
+        startTime: medioTurno.startTime,
+        endTime: medioTurno.endTime,
+      }
+      onSelectAssignments([medioFrancoAssignment])
+      resetMode()
+      
+      // Mostrar toast de confirmación
+      toast({
+        title: "Medio franco asignado",
+        description: `Se asignó ${medioTurno.nombre || "medio franco"} (${medioTurno.startTime} - ${medioTurno.endTime})`,
+        duration: 1500,
+      })
+      return
+    }
+
+    // Si no hay medios turnos configurados o hay múltiples, mostrar el selector
     setSelectionMode(selectionMode === "medio_franco" ? "none" : "medio_franco")
   }
 

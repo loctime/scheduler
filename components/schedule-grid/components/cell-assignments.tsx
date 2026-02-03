@@ -83,7 +83,7 @@ export function CellAssignments({ assignments, getShiftInfo }: CellAssignmentsPr
 
         if (assignment.type === "franco") {
           return (
-            <span key={`franco-${idx}`} className="text-center text-xs sm:text-sm md:text-base font-bold block">
+            <span key={`franco-${idx}`} className="text-center text-xs sm:text-sm md:text-base font-bold block bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
               FRANCO
             </span>
           )

@@ -270,6 +270,108 @@ export function useScheduleUpdates({
       let weekSchedule: Horario | null = null
       
       try {
+        // MANEJO ESPECIAL: Detectar y procesar dayStatus para Franco y Medio Franco
+        const assignment = assignments[0]
+        if (assignment && (assignment.type === "franco" || assignment.type === "medio_franco")) {
+          // Determinar la semana basada en la fecha
+          const dateObj = new Date(date)
+          const weekStartDate = startOfWeek(dateObj, { weekStartsOn })
+          const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+          const weekEndStr = format(addDays(weekStartDate, 6), "yyyy-MM-dd")
+          const userName = user?.displayName || user?.email || "Usuario desconocido"
+          const userId = user?.uid || ""
+
+          // Obtener o crear el horario de la semana
+          let targetSchedule = getWeekSchedule(weekStartDate)
+          if (options?.scheduleId) {
+            targetSchedule = schedules.find((s) => s.id === options.scheduleId) || null
+          }
+
+          if (!targetSchedule) {
+            // Crear nuevo horario si no existe
+            if (!db) {
+              toast({
+                title: "Error",
+                description: "Firebase no está configurado",
+                variant: "destructive",
+              })
+              return
+            }
+
+            const newScheduleData = {
+              nombre: `Semana del ${weekStartStr}`,
+              weekStart: weekStartStr,
+              semanaInicio: weekStartStr,
+              semanaFin: weekEndStr,
+              assignments: {},
+              dayStatus: {
+                [date]: {
+                  [employeeId]: assignment.type as "franco" | "medio_franco"
+                }
+              },
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+              createdBy: userId,
+              createdByName: userName,
+            }
+
+            const scheduleRef = await addDoc(collection(db, COLLECTIONS.SCHEDULES), newScheduleData)
+            const scheduleId = scheduleRef.id
+
+            toast({
+              title: assignment.type === "franco" ? "Franco asignado" : "Medio franco asignado",
+              description: assignment.type === "franco" ? "Se asignó franco correctamente" : "Se asignó medio franco correctamente",
+            })
+            return
+          }
+
+          // Actualizar horario existente
+          const currentDayStatus = targetSchedule.dayStatus || {}
+          const updatedDayStatus = {
+            ...currentDayStatus,
+            [date]: {
+              ...currentDayStatus[date],
+              [employeeId]: assignment.type as "franco" | "medio_franco"
+            }
+          }
+
+          console.log("🔧 [handleAssignmentUpdateInternal] Guardando dayStatus:", {
+            date,
+            employeeId,
+            assignmentType: assignment.type,
+            currentDayStatus,
+            updatedDayStatus,
+            targetScheduleId: targetSchedule.id
+          })
+
+          // Limpiar assignments para este día/empleado (solo turnos reales)
+          const updatedAssignments = { ...targetSchedule.assignments }
+          if (updatedAssignments[date]?.[employeeId]) {
+            delete updatedAssignments[date][employeeId]
+            if (Object.keys(updatedAssignments[date]).length === 0) {
+              delete updatedAssignments[date]
+            }
+          }
+
+          const updateData = {
+            assignments: updatedAssignments,
+            dayStatus: updatedDayStatus,
+            updatedAt: serverTimestamp(),
+            modifiedBy: userId || null,
+            modifiedByName: userName || null,
+          }
+
+          console.log("🔧 [handleAssignmentUpdateInternal] UpdateData con dayStatus:", updateData)
+
+          await updateSchedulePreservingFields(targetSchedule.id, targetSchedule, updateData)
+
+          toast({
+            title: assignment.type === "franco" ? "Franco asignado" : "Medio franco asignado",
+            description: assignment.type === "franco" ? "Se asignó franco correctamente" : "Se asignó medio franco correctamente",
+          })
+          return
+        }
+
         if (!db) {
           toast({
             title: "Error",
@@ -286,6 +388,34 @@ export function useScheduleUpdates({
         const weekEndStr = format(addDays(weekStartDate, 6), "yyyy-MM-dd")
         const userName = user?.displayName || user?.email || "Usuario desconocido"
         const userId = user?.uid || ""
+
+        // MANEJO ESPECIAL: Si se está guardando un turno normal, limpiar dayStatus
+        if (assignment && assignment.type === "shift" && assignment.shiftId) {
+          // Obtener el horario para limpiar dayStatus si existe
+          let targetSchedule = getWeekSchedule(weekStartDate)
+          if (options?.scheduleId) {
+            targetSchedule = schedules.find((s) => s.id === options.scheduleId) || null
+          }
+
+          if (targetSchedule?.dayStatus?.[date]?.[employeeId]) {
+            // Limpiar dayStatus para este día/empleado
+            const updatedDayStatus = { ...targetSchedule.dayStatus }
+            delete updatedDayStatus[date][employeeId]
+            if (Object.keys(updatedDayStatus[date]).length === 0) {
+              delete updatedDayStatus[date]
+            }
+
+            // Actualizar solo dayStatus sin afectar assignments
+            const updateData = {
+              dayStatus: updatedDayStatus,
+              updatedAt: serverTimestamp(),
+              modifiedBy: userId || null,
+              modifiedByName: userName || null,
+            }
+
+            await updateSchedulePreservingFields(targetSchedule.id, targetSchedule, updateData)
+          }
+        }
 
         let scheduleId: string
         let currentAssignments: Record<string, Record<string, any>> = {}
