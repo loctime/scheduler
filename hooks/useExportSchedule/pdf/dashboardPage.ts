@@ -110,8 +110,14 @@ export const addDashboardPage = (
         if (day < monthRange.startDate || day > monthRange.endDate) return
 
         const dateStr = format(day, "yyyy-MM-dd")
+        const dayStatus = weekSchedule.dayStatus?.[dateStr]?.[employee.id] || "normal"
+        if (dayStatus === "franco") {
+          francosCount += 1
+          return
+        }
+
         const assignments = weekSchedule.assignments[dateStr]?.[employee.id]
-        if (!assignments || (Array.isArray(assignments) && assignments.length === 0)) return
+        if (!assignments || assignments.length === 0) return
 
         const normalizedAssignments = normalizeAssignments(assignments)
         if (normalizedAssignments.length === 0) return
@@ -128,16 +134,13 @@ export const addDashboardPage = (
 
         // Contar francos y medio francos
         normalizedAssignments.forEach((assignment) => {
-          if (assignment.type === "franco") {
-            francosCount += 1
-          } else if (assignment.type === "medio_franco") {
+          if (assignment.type === "medio_franco") {
             medioFrancos += 0.5
           }
         })
 
         // Si no es franco completo, contar como día trabajado y calcular horas
-        const hasFullFranco = normalizedAssignments.some(a => a.type === "franco")
-        if (!hasFullFranco) {
+        if (dayStatus !== "franco") {
           daysWorked++
           const dailyHours = calculateDailyHours(
             normalizedAssignments,

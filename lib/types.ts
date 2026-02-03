@@ -185,7 +185,7 @@ export interface ShiftAssignment {
   licenciaType?: "embarazo" | "vacaciones" | "otro"
 }
 
-export type ShiftAssignmentValue = ShiftAssignment | ShiftAssignment[] | string[]
+export type ShiftAssignmentValue = ShiftAssignment[]
 
 export interface ShiftOverlap {
   employeeId: string
@@ -202,12 +202,12 @@ export interface Horario {
   semanaFin: string
   assignments: {
     [date: string]: {
-      [empleadoId: string]: ShiftAssignment[] | string[]
+      [empleadoId: string]: ShiftAssignment[]
     }
   }
   dayStatus?: {
     [date: string]: {
-      [empleadoId: string]: "franco" | "medio_franco"
+      [empleadoId: string]: "normal" | "franco" | "medio_franco"
     }
   }
   completada?: boolean
@@ -248,7 +248,7 @@ export interface HistorialItem {
   semanaFin: string
   assignments: {
     [date: string]: {
-      [empleadoId: string]: ShiftAssignment[] | string[]
+      [empleadoId: string]: ShiftAssignment[]
     }
   }
   empleadosSnapshot?: Array<{

@@ -3,9 +3,6 @@ import type { ShiftAssignment, ShiftAssignmentValue, Turno } from "@/lib/types"
 // Función helper para normalizar asignaciones
 export const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAssignment[] => {
   if (!value || !Array.isArray(value) || value.length === 0) return []
-  if (typeof value[0] === "string") {
-    return (value as string[]).map((shiftId) => ({ shiftId, type: "shift" as const }))
-  }
   return (value as ShiftAssignment[]).map((assignment) => ({
     ...assignment,
     type: assignment.type || "shift",
@@ -14,16 +11,7 @@ export const normalizeAssignments = (value: ShiftAssignmentValue | undefined): S
 
 // Función helper para obtener el texto del turno (CONTRATO v1.0)
 // Usa SOLO datos del assignment, nunca el turno base como fallback
-export const getShiftText = (assignment: ShiftAssignment | string, shiftMap: Map<string, Turno>): { text: string, color?: string } => {
-  // Caso legacy: assignment como string (shiftId)
-  // En este caso, no tenemos datos del assignment, solo el ID
-  // Por contrato, deberíamos mostrar "Horario incompleto", pero para compatibilidad
-  // mostramos el nombre del turno (esto debería migrarse eventualmente)
-  if (typeof assignment === "string") {
-    const shift = shiftMap.get(assignment)
-    return { text: shift?.name || "Horario incompleto", color: shift?.color }
-  }
-  
+export const getShiftText = (assignment: ShiftAssignment, shiftMap: Map<string, Turno>): { text: string, color?: string } => {
   if (assignment.type === "franco") {
     return { text: "FRANCO", color: "#22c55e" } // Verde (igual que medio franco) - hardcodeado
   }

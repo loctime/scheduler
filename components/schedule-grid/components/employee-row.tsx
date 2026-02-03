@@ -19,6 +19,7 @@ interface EmployeeRowProps {
   showAddButton: boolean
   employeeStats?: Record<string, EmployeeMonthlyStats>
   getEmployeeAssignments: (employeeId: string, date: string) => ShiftAssignment[]
+  getEmployeeDayStatus: (employeeId: string, date: string) => "normal" | "franco" | "medio_franco"
   getCellBackgroundStyle: (employeeId: string, date: string) => React.CSSProperties | undefined
   getShiftInfo: (shiftId: string) => any
   selectedCell: { date: string; employeeId: string } | null
@@ -70,6 +71,7 @@ function EmployeeRowComponent({
   showAddButton,
   employeeStats,
   getEmployeeAssignments,
+  getEmployeeDayStatus,
   getCellBackgroundStyle,
   getShiftInfo,
   selectedCell,
@@ -208,6 +210,7 @@ function EmployeeRowComponent({
         const isOutOfRange = monthRange ? day < monthRange.startDate || day > monthRange.endDate : false
         const backgroundStyle = getCellBackgroundStyle(employee.id, dateStr)
         const assignments = getEmployeeAssignments(employee.id, dateStr)
+        const dayStatus = getEmployeeDayStatus(employee.id, dateStr)
 
         const cellKey = `${employee.id}-${dateStr}`
 
@@ -231,6 +234,7 @@ function EmployeeRowComponent({
             date={dateStr}
             employeeId={employee.id}
             assignments={assignments}
+            dayStatus={dayStatus}
             backgroundStyle={backgroundStyle}
             isSelected={isSelected}
             isClickable={isClickable}
@@ -315,6 +319,7 @@ const areEmployeeRowPropsEqual = (prev: EmployeeRowProps, next: EmployeeRowProps
   if (prev.showAddButton !== next.showAddButton) return false
   if (!areEmployeeStatsEqual(prev.employeeStats?.[prev.employee.id], next.employeeStats?.[next.employee.id])) return false
   if (prev.getEmployeeAssignments !== next.getEmployeeAssignments) return false
+  if (prev.getEmployeeDayStatus !== next.getEmployeeDayStatus) return false
   if (prev.getCellBackgroundStyle !== next.getCellBackgroundStyle) return false
   if (prev.getShiftInfo !== next.getShiftInfo) return false
   if (prev.isClickable !== next.isClickable) return false

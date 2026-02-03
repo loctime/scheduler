@@ -32,6 +32,7 @@ interface ScheduleGridMobileProps {
     dayNumber: string
   }>
   getEmployeeAssignments: (employeeId: string, date: string) => ShiftAssignment[]
+  getEmployeeDayStatus: (employeeId: string, date: string) => "normal" | "franco" | "medio_franco"
   getCellBackgroundStyle: (employeeId: string, date: string) => React.CSSProperties | undefined
   getShiftInfo: (shiftId: string) => Turno | undefined
   selectedCell: { date: string; employeeId: string } | null
@@ -64,6 +65,7 @@ export function ScheduleGridMobile({
   employees,
   weekDaysData,
   getEmployeeAssignments,
+  getEmployeeDayStatus,
   getCellBackgroundStyle,
   getShiftInfo,
   selectedCell,
@@ -200,6 +202,7 @@ export function ScheduleGridMobile({
               {weekDaysData.map((dayData, dayIndex) => {
                 const { date, dateStr, dayName, dayNumber } = dayData
                 const assignments = getEmployeeAssignments(employee.id, dateStr)
+                const dayStatus = getEmployeeDayStatus(employee.id, dateStr)
                 const backgroundStyle = getCellBackgroundStyle(employee.id, dateStr)
                 const isCellSelected = selectedCell?.date === dateStr && selectedCell?.employeeId === employee.id
                 const dayOfWeek = getDay(parseISO(dateStr))
@@ -249,7 +252,13 @@ export function ScheduleGridMobile({
                             <CellAssignments
                               assignments={assignments}
                               getShiftInfo={getShiftInfo}
+                              mediosTurnos={mediosTurnos}
                             />
+                            {dayStatus === "franco" && (
+                              <span className="block text-center text-xs sm:text-sm md:text-base font-bold bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
+                                FRANCO
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -358,4 +367,3 @@ export function ScheduleGridMobile({
     </div>
   )
 }
-

@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react"
-import { collection, addDoc, doc, serverTimestamp, getDoc, updateDoc } from "firebase/firestore"
+import { collection, addDoc, doc, serverTimestamp, getDoc } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { format, startOfWeek, addDays } from "date-fns"
-import { Empleado, Turno, Horario, ShiftAssignment, Configuracion } from "@/lib/types"
+import { Empleado, Turno, Horario, ShiftAssignment } from "@/lib/types"
 import { validateScheduleAssignments, validateDailyHours } from "@/lib/validations"
 import { useToast } from "@/hooks/use-toast"
 import { useConfig } from "@/hooks/use-config"
@@ -11,7 +11,6 @@ import { updateAssignmentInAssignments, normalizeAssignments, hydrateAssignments
 import { logger } from "@/lib/logger"
 import { isAssignmentIncomplete, getIncompletenessReason } from "@/lib/assignment-utils"
 import { validateBeforePersist, validateCellAssignments } from "@/lib/assignment-validators"
-import { useFixedRulesEngine } from "@/hooks/use-fixed-rules-engine"
 
 interface UseScheduleUpdatesProps {
   user: any
@@ -33,26 +32,6 @@ export function useScheduleUpdates({
   const DEBUG = false
   const { toast } = useToast()
   const { config } = useConfig(user)
-  const { buildAssignmentsFromLegacyFixedSchedules } = useFixedRulesEngine()
-
-  // Función para aplicar horarios fijos automáticamente al crear una nueva semana
-  const applyFixedSchedules = async (
-    weekStartDate: Date,
-    weekStartStr: string,
-    employees: Empleado[],
-    schedules: Horario[],
-    config: Configuracion | null,
-    weekStartsOn: number
-  ): Promise<Record<string, Record<string, ShiftAssignment[]>>> => {
-    return buildAssignmentsFromLegacyFixedSchedules({
-      weekStartDate,
-      weekStartStr,
-      employees,
-      schedules,
-      fixedSchedules: config?.fixedSchedules,
-      shifts,
-    })
-  }
   const [pendingEdit, setPendingEdit] = useState<{
     date: string
     employeeId: string
@@ -282,6 +261,36 @@ export function useScheduleUpdates({
           const userName = user?.displayName || user?.email || "Usuario desconocido"
           const userId = user?.uid || ""
 
+          const medioTurnos = config?.mediosTurnos || []
+          const matchingMedioTurno = assignment.type === "medio_franco"
+            ? medioTurnos.find((medio) => {
+                if (assignment.startTime && assignment.endTime) {
+                  return medio.startTime === assignment.startTime && medio.endTime === assignment.endTime
+                }
+                return false
+              })
+            : undefined
+          const medioTurnoToUse = assignment.type === "medio_franco"
+            ? matchingMedioTurno || (medioTurnos.length === 1 ? medioTurnos[0] : undefined)
+            : undefined
+
+          if (assignment.type === "medio_franco" && !medioTurnoToUse) {
+            toast({
+              title: "Medio franco inválido",
+              description: "No hay medio turno configurado para asignar medio franco.",
+              variant: "destructive",
+            })
+            return
+          }
+
+          const medioFrancoAssignment: ShiftAssignment | null = assignment.type === "medio_franco"
+            ? {
+                type: "medio_franco",
+                startTime: medioTurnoToUse?.startTime || assignment.startTime,
+                endTime: medioTurnoToUse?.endTime || assignment.endTime,
+              }
+            : null
+
           // Obtener o crear el horario de la semana
           let targetSchedule = getWeekSchedule(weekStartDate)
           if (options?.scheduleId) {
@@ -304,7 +313,13 @@ export function useScheduleUpdates({
               weekStart: weekStartStr,
               semanaInicio: weekStartStr,
               semanaFin: weekEndStr,
-              assignments: {},
+              assignments: assignment.type === "medio_franco" && medioFrancoAssignment
+                ? {
+                    [date]: {
+                      [employeeId]: [medioFrancoAssignment],
+                    },
+                  }
+                : {},
               dayStatus: {
                 [date]: {
                   [employeeId]: assignment.type as "franco" | "medio_franco"
@@ -337,7 +352,12 @@ export function useScheduleUpdates({
           }
 
           const updatedAssignments = { ...targetSchedule.assignments }
-          if (updatedAssignments[date]?.[employeeId]) {
+          if (assignment.type === "medio_franco" && medioFrancoAssignment) {
+            updatedAssignments[date] = {
+              ...(updatedAssignments[date] || {}),
+              [employeeId]: [medioFrancoAssignment],
+            }
+          } else if (updatedAssignments[date]?.[employeeId]) {
             delete updatedAssignments[date][employeeId]
             if (Object.keys(updatedAssignments[date]).length === 0) {
               delete updatedAssignments[date]
@@ -350,10 +370,6 @@ export function useScheduleUpdates({
             updatedAt: serverTimestamp(),
             modifiedBy: userId || null,
             modifiedByName: userName || null,
-          }
-
-          if (DEBUG) {
-            console.log("🔧 [handleAssignmentUpdateInternal] UpdateData con dayStatus:", updateData)
           }
 
           await updateSchedulePreservingFields(targetSchedule.id, targetSchedule, updateData)
@@ -381,34 +397,6 @@ export function useScheduleUpdates({
         const weekEndStr = format(addDays(weekStartDate, 6), "yyyy-MM-dd")
         const userName = user?.displayName || user?.email || "Usuario desconocido"
         const userId = user?.uid || ""
-
-        // MANEJO ESPECIAL: Si se está guardando un turno normal, limpiar dayStatus
-        if (assignment && assignment.type === "shift" && assignment.shiftId) {
-          // Obtener el horario para limpiar dayStatus si existe
-          let targetSchedule = getWeekSchedule(weekStartDate)
-          if (options?.scheduleId) {
-            targetSchedule = schedules.find((s) => s.id === options.scheduleId) || null
-          }
-
-          if (targetSchedule?.dayStatus?.[date]?.[employeeId]) {
-            // Limpiar dayStatus para este día/empleado
-            const updatedDayStatus = { ...targetSchedule.dayStatus }
-            delete updatedDayStatus[date][employeeId]
-            if (Object.keys(updatedDayStatus[date]).length === 0) {
-              delete updatedDayStatus[date]
-            }
-
-            // Actualizar solo dayStatus sin afectar assignments
-            const updateData = {
-              dayStatus: updatedDayStatus,
-              updatedAt: serverTimestamp(),
-              modifiedBy: userId || null,
-              modifiedByName: userName || null,
-            }
-
-            await updateSchedulePreservingFields(targetSchedule.id, targetSchedule, updateData)
-          }
-        }
 
         let scheduleId: string
         let currentAssignments: Record<string, Record<string, any>> = {}
@@ -452,15 +440,7 @@ export function useScheduleUpdates({
         // Si no existe horario, crearlo. Si existe, actualizarlo
         if (!weekSchedule) {
           // Crear nuevo horario con formato nuevo
-          // Primero aplicar horarios fijos automáticamente
-          currentAssignments = await applyFixedSchedules(
-            weekStartDate,
-            weekStartStr,
-            employees,
-            schedules,
-            config,
-            weekStartsOn
-          )
+          currentAssignments = {}
           
           // Luego agregar/sobrescribir con la asignación actual
           if (!currentAssignments[date]) {
@@ -506,6 +486,11 @@ export function useScheduleUpdates({
             semanaInicio: weekStartStr,
             semanaFin: weekEndStr,
             assignments: currentAssignments,
+            dayStatus: assignments.length > 0 ? {
+              [date]: {
+                [employeeId]: "normal",
+              },
+            } : {},
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             createdBy: userId,
@@ -723,6 +708,19 @@ export function useScheduleUpdates({
             }
           }
           
+          const updatedDayStatus = { ...(weekSchedule.dayStatus || {}) }
+          if (assignments.length > 0) {
+            updatedDayStatus[date] = {
+              ...(updatedDayStatus[date] || {}),
+              [employeeId]: "normal",
+            }
+          } else if (updatedDayStatus[date]?.[employeeId]) {
+            delete updatedDayStatus[date][employeeId]
+            if (Object.keys(updatedDayStatus[date]).length === 0) {
+              delete updatedDayStatus[date]
+            }
+          }
+
           // Actualizar existente
           const updateData: any = {
             nombre: (weekSchedule.nombre?.trim() && weekSchedule.nombre.trim()) || scheduleNombre,
@@ -730,6 +728,7 @@ export function useScheduleUpdates({
             semanaInicio: (weekSchedule.semanaInicio?.trim() && weekSchedule.semanaInicio.trim()) || weekStartStr,
             semanaFin: (weekSchedule.semanaFin?.trim() && weekSchedule.semanaFin.trim()) || weekEndStr,
             assignments: currentAssignments,
+            dayStatus: updatedDayStatus,
             updatedAt: serverTimestamp(),
             modifiedBy: userId || null,
             modifiedByName: userName || null,

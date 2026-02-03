@@ -40,18 +40,8 @@ export function isAssignmentIncomplete(assignment: ShiftAssignment): boolean {
       const hasFirstSegment = assignment.startTime && assignment.endTime
       const hasSecondSegment = assignment.startTime2 && assignment.endTime2
       
-      // CRÍTICO: Un assignment { type: "shift", shiftId } sin horarios NO es incompleto
-      // Es un "placeholder pendiente de hidratar" (normalizado desde string[])
-      // No debe marcarse como error, sino como válido pero sin expandir
       if (!hasFirstSegment && !hasSecondSegment) {
-        // Si tiene shiftId pero no horarios, es un placeholder válido (no incompleto)
-        // Estos se crean cuando normalizeAssignments() convierte string[] a ShiftAssignment[]
-        // Ya sabemos que shiftId existe porque pasamos la verificación anterior
-        logger.debug("[Assignment] Placeholder sin hidratar detectado", {
-          shiftId: assignment.shiftId,
-          type: assignment.type
-        })
-        return false // No es incompleto, solo pendiente de hidratar
+        return true
       }
       
       // Si tiene alguna parte de la segunda franja, debe tener ambas partes
@@ -206,21 +196,13 @@ export function getIncompletenessReason(assignment: ShiftAssignment): string {
 }
 
 /**
- * Normaliza assignments (puede ser string[] o ShiftAssignment[])
+ * Normaliza assignments
  */
 function normalizeAssignments(
-  assignments: ShiftAssignment[] | string[] | undefined
+  assignments: ShiftAssignment[] | undefined
 ): ShiftAssignment[] {
   if (!assignments || !Array.isArray(assignments) || assignments.length === 0) {
     return []
-  }
-
-  // Si es string[], convertir a ShiftAssignment[]
-  if (typeof assignments[0] === "string") {
-    return (assignments as string[]).map((shiftId) => ({
-      shiftId,
-      type: "shift" as const
-    }))
   }
 
   // Ya es ShiftAssignment[]

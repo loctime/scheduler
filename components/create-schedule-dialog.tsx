@@ -74,10 +74,6 @@ export function CreateScheduleDialog({
   // Función para convertir ShiftAssignmentValue a ShiftAssignment[]
   const convertToAssignments = (value: ShiftAssignmentValue): ShiftAssignment[] => {
     if (Array.isArray(value) && value.length > 0) {
-      // Si el primer elemento es string, es string[] - convertir a assignments completos
-      if (typeof value[0] === "string") {
-        return (value as string[]).map((shiftId) => buildAssignmentFromShift(shiftId))
-      }
       // Si ya es ShiftAssignment[], usarlo directamente
       return value as ShiftAssignment[]
     }

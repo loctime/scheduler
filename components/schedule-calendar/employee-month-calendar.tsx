@@ -9,7 +9,7 @@ import { es } from "date-fns/locale"
 import type { Empleado, Turno, Horario, MedioTurno, ShiftAssignmentValue, ShiftAssignment } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { getShiftDisplayTime } from "@/components/schedule-grid/utils/shift-display-utils"
-import { normalizeAssignmentFromShift, isAssignmentIncomplete } from "@/lib/assignment-utils"
+import { isAssignmentIncomplete } from "@/lib/assignment-utils"
 
 interface EmployeeMonthCalendarProps {
   selectedEmployeeId: string
@@ -23,42 +23,17 @@ interface EmployeeMonthCalendarProps {
 }
 
 // CONTRATO v1.0: Normalizar preservando TODOS los campos del assignment
-// Si los datos están en formato legacy (strings), normalizarlos desde el turno base
 const normalizeAssignments = (
   value: ShiftAssignmentValue | null | undefined,
   shifts: Turno[]
 ): ShiftAssignment[] => {
   if (!value || !Array.isArray(value) || value.length === 0) return []
-  
-  // Formato legacy: array de strings (solo shiftId)
-  if (typeof value[0] === "string") {
-    return (value as string[]).map((shiftId) => {
-      const shift = shifts.find((s) => s.id === shiftId)
-      if (!shift) {
-        // Si no existe el turno, retornar assignment incompleto
-        return { shiftId, type: "shift" as const }
-      }
-      // Normalizar desde el turno base para datos legacy
-      return normalizeAssignmentFromShift(
-        { shiftId, type: "shift" as const },
-        shift
-      )
-    })
-  }
-  
+
   // Formato nuevo: array de ShiftAssignment
   return (value as ShiftAssignment[]).map((assignment) => {
     const normalized = {
       ...assignment,
       type: assignment.type || "shift",
-    }
-    
-    // Si el assignment está incompleto y tiene shiftId, normalizarlo desde el turno base
-    if (normalized.shiftId && normalized.type === "shift") {
-      const shift = shifts.find((s) => s.id === normalized.shiftId)
-      if (shift && (!normalized.startTime || !normalized.endTime)) {
-        return normalizeAssignmentFromShift(normalized, shift)
-      }
     }
     
     return normalized
@@ -96,6 +71,13 @@ export function EmployeeMonthCalendar({
     if (!weekSchedule?.assignments) return null
     const dateStr = format(date, "yyyy-MM-dd")
     return weekSchedule.assignments[dateStr]?.[selectedEmployeeId] || null
+  }
+
+  const getDateDayStatus = (date: Date) => {
+    const weekStartDate = startOfWeek(date, { weekStartsOn })
+    const weekSchedule = getWeekSchedule(weekStartDate)
+    const dateStr = format(date, "yyyy-MM-dd")
+    return weekSchedule?.dayStatus?.[dateStr]?.[selectedEmployeeId] || "normal"
   }
 
   // Función para obtener información del turno (solo para color, no para display)
@@ -191,6 +173,7 @@ export function EmployeeMonthCalendar({
                   const isSelected = selectedDate && isSameDay(day, selectedDate)
                   const assignments = getDateAssignments(day)
                   const normalizedAssignments = normalizeAssignments(assignments, shifts)
+                  const dayStatus = getDateDayStatus(day)
 
                   return (
                     <button
@@ -218,6 +201,16 @@ export function EmployeeMonthCalendar({
 
                       {/* Asignaciones de turnos */}
                       <div className="space-y-0.5 mt-1">
+                        {dayStatus === "franco" && normalizedAssignments.length === 0 && (
+                          <div className="text-[10px] px-1 py-0.5 rounded bg-muted text-muted-foreground text-center truncate">
+                            Franco
+                          </div>
+                        )}
+                        {dayStatus === "medio_franco" && (
+                          <div className="text-[10px] px-1 py-0.5 rounded bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-center truncate font-medium">
+                            1/2 Franco
+                          </div>
+                        )}
                         {normalizedAssignments.slice(0, 2).map((assignment, idx) => {
                           if (assignment.type === "nota") {
                             return (
@@ -229,17 +222,6 @@ export function EmployeeMonthCalendar({
                               </div>
                             )
                           }
-                          if (assignment.type === "franco") {
-                            return (
-                              <div
-                                key={idx}
-                                className="text-[10px] px-1 py-0.5 rounded bg-muted text-muted-foreground text-center truncate"
-                              >
-                                Franco
-                              </div>
-                            )
-                          }
-                          
                           // Medio franco con horario (CONTRATO v1.0)
                           if (assignment.type === "medio_franco") {
                             const displayTimeLines = getShiftDisplayTime("", undefined, assignment)
@@ -326,4 +308,3 @@ export function EmployeeMonthCalendar({
     </Card>
   )
 }
-

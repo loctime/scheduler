@@ -3,22 +3,18 @@ import { format, subDays, addDays } from "date-fns"
 import { serverTimestamp, addDoc, collection } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
-import type { Empleado, Horario, ShiftAssignment, ShiftAssignmentValue, Configuracion } from "@/lib/types"
+import type { Empleado, Horario, ShiftAssignment } from "@/lib/types"
 import {
   normalizeAssignments,
   cloneAssignments,
-  updateAssignmentInAssignments,
   removeAssignmentFromAssignments,
-  isScheduleCompleted,
   shouldRequestConfirmation,
 } from "@/lib/schedule-utils"
 import {
-  getLatestScheduleFromFirestore,
   createHistoryEntry,
   saveHistoryEntry,
   updateSchedulePreservingFields,
 } from "@/lib/firestore-helpers"
-import { useFixedRulesEngine } from "@/hooks/use-fixed-rules-engine"
 
 interface UseWeekActionsProps {
   weekDays: Date[]
@@ -28,30 +24,22 @@ interface UseWeekActionsProps {
   user: any
   readonly: boolean
   getWeekSchedule?: (weekStartDate: Date) => Horario | null
-  config?: Configuracion | null
-  allSchedules?: Horario[]
-  weekStartsOn?: number
 }
 
 export interface WeekActionsReturn {
   // Estados de loading
   isCopying: boolean
   isClearing: boolean
-  isSuggesting: boolean
-  isPasting: boolean
   
   // Funciones de acción
   executeCopyPreviousWeek: () => Promise<void>
   executeClearWeek: () => Promise<void>
   executeClearEmployeeRow: (employeeId: string) => Promise<boolean>
-  executeSuggestSchedules: () => Promise<void>
-  executeReplaceWeekAssignments: (targetWeekStart: Date, weekData: any) => Promise<void>
   
   // Funciones wrapper que manejan confirmaciones
   handleCopyPreviousWeek: () => Promise<void>
   handleClearWeek: () => Promise<void>
   handleClearEmployeeRow: (employeeId: string) => Promise<boolean>
-  handleSuggestSchedules: () => Promise<void>
 }
 
 export function useWeekActions({
@@ -62,16 +50,10 @@ export function useWeekActions({
   user,
   readonly,
   getWeekSchedule,
-  config,
-  allSchedules = [],
-  weekStartsOn = 1,
 }: UseWeekActionsProps): WeekActionsReturn {
   const { toast } = useToast()
-  const { buildSuggestedAssignmentsFromLegacyFixedSchedules } = useFixedRulesEngine()
   const [isCopying, setIsCopying] = useState(false)
   const [isClearing, setIsClearing] = useState(false)
-  const [isSuggesting, setIsSuggesting] = useState(false)
-  const [isPasting, setIsPasting] = useState(false)
 
   const executeCopyPreviousWeek = useCallback(async () => {
     if (!getWeekSchedule || readonly || !db || !user) {
@@ -102,6 +84,7 @@ export function useWeekActions({
         employeeId: string
         assignments: ShiftAssignment[]
       }> = []
+      const dayStatusToApply: Record<string, Record<string, "normal" | "franco" | "medio_franco">> = {}
 
       // Recolectar todas las actualizaciones
       for (let i = 0; i < weekDays.length; i++) {
@@ -112,6 +95,17 @@ export function useWeekActions({
 
         const previousDayAssignments = previousWeekSchedule.assignments[previousDateStr]
         if (!previousDayAssignments) {
+          // Aún podemos tener dayStatus para este día
+          const previousDayStatus = previousWeekSchedule.dayStatus?.[previousDateStr] || {}
+          for (const [employeeId, status] of Object.entries(previousDayStatus)) {
+            if (!currentEmployeeIds.has(employeeId)) {
+              continue
+            }
+            if (!dayStatusToApply[currentDateStr]) {
+              dayStatusToApply[currentDateStr] = {}
+            }
+            dayStatusToApply[currentDateStr][employeeId] = status
+          }
           continue
         }
 
@@ -132,6 +126,12 @@ export function useWeekActions({
               assignments: normalizedAssignments,
             })
           }
+
+          const previousDayStatus = previousWeekSchedule.dayStatus?.[previousDateStr]?.[employeeId]
+          if (!dayStatusToApply[currentDateStr]) {
+            dayStatusToApply[currentDateStr] = {}
+          }
+          dayStatusToApply[currentDateStr][employeeId] = previousDayStatus || "normal"
         }
       }
 
@@ -171,6 +171,7 @@ export function useWeekActions({
           semanaInicio: weekStartStr,
           semanaFin: weekEndStr,
           assignments: newAssignments,
+          dayStatus: dayStatusToApply,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           createdBy: userId,
@@ -221,8 +222,17 @@ export function useWeekActions({
       await saveHistoryEntry(historyEntry)
 
       // Preparar datos de actualización
+      const updatedDayStatus = { ...(currentSchedule.dayStatus || {}) }
+      Object.entries(dayStatusToApply).forEach(([date, statuses]) => {
+        updatedDayStatus[date] = {
+          ...(updatedDayStatus[date] || {}),
+          ...statuses,
+        }
+      })
+
       const updateData: any = {
         assignments: newAssignments,
+        dayStatus: updatedDayStatus,
         updatedAt: serverTimestamp(),
         modifiedBy: userId,
         modifiedByName: userName,
@@ -269,7 +279,12 @@ export function useWeekActions({
         }
       }
 
-      if (updatesToClear.length === 0) {
+      const hasDayStatusEntries = weekDays.some((day) => {
+        const dateStr = format(day, "yyyy-MM-dd")
+        return !!weekSchedule?.dayStatus?.[dateStr]
+      })
+
+      if (updatesToClear.length === 0 && !hasDayStatusEntries) {
         toast({
           title: "No hay asignaciones",
           description: "La semana no tiene asignaciones para limpiar.",
@@ -301,6 +316,14 @@ export function useWeekActions({
         newAssignments = removeAssignmentFromAssignments(newAssignments, date, employeeId)
       }
 
+      const updatedDayStatus = { ...(weekSchedule.dayStatus || {}) }
+      for (const day of weekDays) {
+        const dateStr = format(day, "yyyy-MM-dd")
+        if (updatedDayStatus[dateStr]) {
+          delete updatedDayStatus[dateStr]
+        }
+      }
+
       const scheduleId = weekSchedule.id
       const userName = user?.displayName || user?.email || "Usuario desconocido"
       const userId = user?.uid || ""
@@ -312,6 +335,7 @@ export function useWeekActions({
       // Preparar datos de actualización
       const updateData: any = {
         assignments: newAssignments,
+        dayStatus: updatedDayStatus,
         updatedAt: serverTimestamp(),
         modifiedBy: userId,
         modifiedByName: userName,
@@ -359,7 +383,12 @@ export function useWeekActions({
           }
         }
 
-        if (updatesToClear.length === 0) {
+        const hasDayStatusEntries = weekDays.some((day) => {
+          const dateStr = format(day, "yyyy-MM-dd")
+          return !!weekSchedule?.dayStatus?.[dateStr]?.[employeeId]
+        })
+
+        if (updatesToClear.length === 0 && !hasDayStatusEntries) {
           toast({
             title: "No hay asignaciones",
             description: `${employeeName} no tiene asignaciones para limpiar.`,
@@ -381,6 +410,16 @@ export function useWeekActions({
           newAssignments = removeAssignmentFromAssignments(newAssignments, date, employeeId)
         }
 
+        const updatedDayStatus = { ...(weekSchedule.dayStatus || {}) }
+        for (const { date } of updatesToClear) {
+          if (updatedDayStatus[date]?.[employeeId]) {
+            delete updatedDayStatus[date][employeeId]
+            if (Object.keys(updatedDayStatus[date]).length === 0) {
+              delete updatedDayStatus[date]
+            }
+          }
+        }
+
         const scheduleId = weekSchedule.id
         const userName = user?.displayName || user?.email || "Usuario desconocido"
         const userId = user?.uid || ""
@@ -392,6 +431,7 @@ export function useWeekActions({
         // Preparar datos de actualización
         const updateData: any = {
           assignments: newAssignments,
+          dayStatus: updatedDayStatus,
           updatedAt: serverTimestamp(),
           modifiedBy: userId,
           modifiedByName: userName,
@@ -461,298 +501,14 @@ export function useWeekActions({
     [readonly, db, user, weekSchedule, executeClearEmployeeRow]
   )
 
-  const executeSuggestSchedules = useCallback(async () => {
-    if (readonly || !db || !user) {
-      return
-    }
-
-    setIsSuggesting(true)
-    try {
-      const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
-      const weekEndStr = format(addDays(weekStartDate, 6), "yyyy-MM-dd")
-
-      if (!config?.fixedSchedules || config.fixedSchedules.length === 0) {
-        toast({
-          title: "No hay horarios fijos",
-          description: "No hay horarios marcados como fijos para sugerir.",
-          variant: "default",
-        })
-        return
-      }
-
-      const suggestedAssignments = buildSuggestedAssignmentsFromLegacyFixedSchedules({
-        weekStartDate,
-        weekStartStr,
-        employees,
-        allSchedules,
-        weekSchedule,
-        fixedSchedules: config.fixedSchedules,
-      })
-
-      if (Object.keys(suggestedAssignments).length === 0) {
-        toast({
-          title: "No se encontraron sugerencias",
-          description: "No se encontraron horarios fijos para aplicar en esta semana.",
-          variant: "default",
-        })
-        return
-      }
-
-      // Crear o actualizar el schedule
-      const userName = user?.displayName || user?.email || "Usuario desconocido"
-      const userId = user?.uid || ""
-
-      if (!weekSchedule) {
-        // Crear nuevo schedule
-        const newScheduleData = {
-          nombre: `Semana del ${weekStartStr}`,
-          weekStart: weekStartStr,
-          semanaInicio: weekStartStr,
-          semanaFin: weekEndStr,
-          assignments: suggestedAssignments,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          createdBy: userId,
-          createdByName: userName,
-        }
-
-        const scheduleRef = await addDoc(collection(db, COLLECTIONS.SCHEDULES), newScheduleData)
-        const scheduleId = scheduleRef.id
-
-        // Guardar en historial
-        const historyEntry = createHistoryEntry(
-          { id: scheduleId, ...newScheduleData } as Horario,
-          "creado",
-          user,
-          weekStartStr,
-          weekEndStr
-        )
-        await saveHistoryEntry(historyEntry)
-
-        toast({
-          title: "Horarios sugeridos aplicados",
-          description: "Se aplicaron los horarios fijos a la semana.",
-        })
-      } else {
-        // Actualizar schedule existente
-        const scheduleId = weekSchedule.id
-
-        // Combinar con asignaciones existentes (las sugerencias no sobrescriben)
-        const currentAssignments = weekSchedule.assignments
-          ? cloneAssignments(weekSchedule.assignments)
-          : {}
-
-        // Aplicar solo donde no hay asignaciones existentes
-        for (const [date, dateAssignments] of Object.entries(suggestedAssignments)) {
-          if (!currentAssignments[date]) {
-            currentAssignments[date] = {}
-          }
-          for (const [employeeId, assignments] of Object.entries(dateAssignments)) {
-            // Solo aplicar si no hay asignaciones existentes para este empleado en este día
-            if (!currentAssignments[date][employeeId] || 
-                (Array.isArray(currentAssignments[date][employeeId]) && 
-                 currentAssignments[date][employeeId].length === 0)) {
-              currentAssignments[date][employeeId] = assignments
-            }
-          }
-        }
-
-        // Guardar versión anterior en historial
-        const historyEntry = createHistoryEntry(weekSchedule, "modificado", user, weekStartStr, weekEndStr)
-        await saveHistoryEntry(historyEntry)
-
-        // Actualizar
-        const updateData: any = {
-          assignments: currentAssignments,
-          updatedAt: serverTimestamp(),
-          modifiedBy: userId,
-          modifiedByName: userName,
-        }
-
-        await updateSchedulePreservingFields(scheduleId, weekSchedule, updateData)
-
-        toast({
-          title: "Horarios sugeridos aplicados",
-          description: "Se aplicaron los horarios fijos donde no había asignaciones.",
-        })
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Ocurrió un error al aplicar las sugerencias",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSuggesting(false)
-    }
-  }, [readonly, db, user, weekStartDate, employees, config, allSchedules, weekSchedule, toast])
-
-  const handleSuggestSchedules = useCallback(async () => {
-    if (readonly || !db || !user) {
-      return
-    }
-
-    // Si la semana está completada, retornar señal para mostrar confirmación
-    if (shouldRequestConfirmation(weekSchedule, "edit")) {
-      throw new Error("NEEDS_CONFIRMATION")
-    }
-
-    await executeSuggestSchedules()
-  }, [readonly, db, user, weekSchedule, executeSuggestSchedules])
-
-  const executeReplaceWeekAssignments = useCallback(async (targetWeekStart: Date, weekData: any) => {
-    if (readonly || !db || !user || !weekData?.assignments) {
-      return
-    }
-
-    setIsPasting(true)
-    try {
-      const weekStartStr = format(targetWeekStart, "yyyy-MM-dd")
-      const weekEndStr = format(addDays(targetWeekStart, 6), "yyyy-MM-dd")
-
-      // Crear un mapa de empleados actuales para verificación rápida
-      const currentEmployeeIds = new Set(employees.map((emp) => emp.id))
-
-      // Obtener las fechas de la semana objetivo (7 días)
-      const targetWeekDates: Date[] = []
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(targetWeekStart)
-        date.setDate(date.getDate() + i)
-        targetWeekDates.push(date)
-      }
-
-      // Obtener las fechas de la semana copiada
-      const copiedWeekStartDate = new Date(weekData.weekStartDate)
-      const copiedWeekDates: Date[] = []
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(copiedWeekStartDate)
-        date.setDate(date.getDate() + i)
-        copiedWeekDates.push(date)
-      }
-
-      // Construir el objeto completo de assignments para la semana objetivo
-      const newAssignments: Record<string, Record<string, ShiftAssignment[]>> = {}
-
-      // Mapear las asignaciones por día de la semana (lunes, martes, etc.)
-      copiedWeekDates.forEach((date, dayIndex) => {
-        const dateStr = format(date, "yyyy-MM-dd")
-        const assignments = weekData.assignments[dateStr]
-        
-        if (assignments && typeof assignments === 'object') {
-          // Mapear al día correspondiente de la semana objetivo
-          const targetDate = targetWeekDates[dayIndex]
-          const targetDateStr = format(targetDate, "yyyy-MM-dd")
-          
-          // Filtrar solo empleados que existen actualmente
-          const filteredAssignments: Record<string, ShiftAssignment[]> = {}
-          
-          for (const [employeeId, assignmentValue] of Object.entries(assignments)) {
-            if (currentEmployeeIds.has(employeeId)) {
-              const normalizedAssignments = normalizeAssignments(assignmentValue as ShiftAssignmentValue)
-              if (normalizedAssignments.length > 0) {
-                filteredAssignments[employeeId] = normalizedAssignments
-              }
-            }
-          }
-          
-          if (Object.keys(filteredAssignments).length > 0) {
-            newAssignments[targetDateStr] = filteredAssignments
-          }
-        }
-      })
-
-      if (Object.keys(newAssignments).length === 0) {
-        toast({
-          title: "No se pegó nada",
-          description: "No se encontraron asignaciones válidas para empleados actuales.",
-          variant: "default",
-        })
-        return
-      }
-
-      const userName = user?.displayName || user?.email || "Usuario desconocido"
-      const userId = user?.uid || ""
-
-      // Crear o actualizar el schedule
-      if (!weekSchedule) {
-        // Crear nuevo schedule
-        const newScheduleData = {
-          nombre: `Semana del ${weekStartStr}`,
-          weekStart: weekStartStr,
-          semanaInicio: weekStartStr,
-          semanaFin: weekEndStr,
-          assignments: newAssignments,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          createdBy: userId,
-          createdByName: userName,
-        }
-
-        const scheduleRef = await addDoc(collection(db, COLLECTIONS.SCHEDULES), newScheduleData)
-        const scheduleId = scheduleRef.id
-
-        // Guardar en historial
-        const historyEntry = createHistoryEntry(
-          { id: scheduleId, ...newScheduleData } as Horario,
-          "creado",
-          user,
-          weekStartStr,
-          weekEndStr
-        )
-        await saveHistoryEntry(historyEntry)
-
-        toast({
-          title: "Semana pegada",
-          description: `Se pegaron ${Object.keys(newAssignments).length} día${Object.keys(newAssignments).length !== 1 ? 's' : ''} con asignaciones.`,
-        })
-      } else {
-        // Actualizar schedule existente
-        const scheduleId = weekSchedule.id
-
-        // Guardar versión anterior en historial
-        const historyEntry = createHistoryEntry(weekSchedule, "modificado", user, weekStartStr, weekEndStr)
-        await saveHistoryEntry(historyEntry)
-
-        // Preparar datos de actualización
-        const updateData: any = {
-          assignments: newAssignments,
-          updatedAt: serverTimestamp(),
-          modifiedBy: userId,
-          modifiedByName: userName,
-        }
-
-        // Actualizar usando helper que preserva campos
-        await updateSchedulePreservingFields(scheduleId, weekSchedule, updateData)
-
-        toast({
-          title: "Semana pegada",
-          description: `Se pegaron ${Object.keys(newAssignments).length} día${Object.keys(newAssignments).length !== 1 ? 's' : ''} con asignaciones.`,
-        })
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Ocurrió un error al pegar la semana",
-        variant: "destructive",
-      })
-    } finally {
-      setIsPasting(false)
-    }
-  }, [readonly, employees, weekSchedule, user, toast])
-
   return {
     isCopying,
     isClearing,
-    isSuggesting,
-    isPasting,
     executeCopyPreviousWeek,
     executeClearWeek,
     executeClearEmployeeRow,
-    executeSuggestSchedules,
-    executeReplaceWeekAssignments,
     handleCopyPreviousWeek,
     handleClearWeek,
     handleClearEmployeeRow,
-    handleSuggestSchedules,
   }
 }

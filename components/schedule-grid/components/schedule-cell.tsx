@@ -42,6 +42,7 @@ interface ScheduleCellProps {
   date: string
   employeeId: string
   assignments: ShiftAssignment[]
+  dayStatus: "normal" | "franco" | "medio_franco"
   backgroundStyle?: CSSProperties
   isSelected: boolean
   isClickable: boolean
@@ -75,6 +76,7 @@ function ScheduleCellComponent({
   date,
   employeeId,
   assignments,
+  dayStatus,
   backgroundStyle,
   isSelected,
   isClickable,
@@ -508,7 +510,14 @@ function ScheduleCellComponent({
               updateEmployeeRequestCache={updateEmployeeRequestCache}
             />
           ) : (
-            <CellAssignments assignments={assignments} getShiftInfo={getShiftInfo} />
+            <>
+              <CellAssignments assignments={assignments} getShiftInfo={getShiftInfo} mediosTurnos={mediosTurnos} />
+              {dayStatus === "franco" && (
+                <span className="text-center text-xs sm:text-sm md:text-base font-bold block bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
+                  FRANCO
+                </span>
+              )}
+            </>
           )}
         </div>
         {/* Marcador visual único abajo al centro */}
@@ -932,6 +941,7 @@ const areScheduleCellPropsEqual = (prev: ScheduleCellProps, next: ScheduleCellPr
     prev.isSelected === next.isSelected &&
     prev.isClickable === next.isClickable &&
     prev.readonly === next.readonly &&
+    prev.dayStatus === next.dayStatus &&
     prev.cellKey === next.cellKey &&
     prev.scheduleId === next.scheduleId &&
     prev.hasCellHistory === next.hasCellHistory &&

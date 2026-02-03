@@ -40,9 +40,6 @@ interface ScheduleCalendarProps {
 
 const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAssignment[] => {
   if (!value || !Array.isArray(value) || value.length === 0) return []
-  if (typeof value[0] === "string") {
-    return (value as string[]).map((shiftId) => ({ shiftId, type: "shift" as const }))
-  }
   return (value as ShiftAssignment[]).map((assignment) => ({
     ...assignment,
     type: assignment.type || "shift",
@@ -60,9 +57,6 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
   // Para compatibilidad con el código existente
   const userData = contextUser || userProp
 
-  // Estado para almacenar la semana copiada
-  const [copiedWeekData, setCopiedWeekData] = useState<any>(null)
-  
   // Estado para PWA publishing
   const [publishingWeekId, setPublishingWeekId] = useState<string | null>(null)
 
@@ -603,119 +597,6 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
     )
   }, [exportMonthPDF, monthWeeks, getWeekSchedule, employees, shiftsToUse, monthRange, config, employeeMonthlyStats])
 
-  // Función para copiar la semana actual
-  const copyCurrentWeek = useCallback((weekStartDate: Date) => {
-    const weekSchedule = getWeekSchedule(weekStartDate)
-    if (weekSchedule?.assignments) {
-      setCopiedWeekData({
-        assignments: weekSchedule.assignments,
-        weekStartDate: weekStartDate.toISOString(),
-        copiedAt: new Date().toISOString()
-      })
-      toast({
-        title: "Semana copiada",
-        description: "La semana ha sido copiada exitosamente",
-        duration: 2000,
-      })
-    } else {
-      toast({
-        title: "Error",
-        description: "No hay datos para copiar en esta semana",
-        variant: "destructive",
-      })
-    }
-  }, [getWeekSchedule, toast])
-
-  // Función para pegar la semana copiada
-  const pasteCopiedWeek = useCallback(async (targetWeekStartDate: Date) => {
-    if (!copiedWeekData) {
-      toast({
-        title: "Error",
-        description: "No hay una semana copiada para pegar",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      // Obtener el schedule de la semana objetivo para pasarlo a weekActions
-      const targetWeekSchedule = getWeekSchedule(targetWeekStartDate)
-      
-      // Llamar a la función atómica de weekActions
-      // Nota: Esto requiere que WeekSchedule exponga weekActions.executeReplaceWeekAssignments
-      // Por ahora, implementaremos una versión simplificada aquí
-      
-      // Crear un mapa de empleados actuales para verificación rápida
-      const currentEmployeeIds = new Set(employees.map((emp) => emp.id))
-
-      // Obtener las fechas de la semana objetivo (7 días)
-      const targetWeekDates: Date[] = []
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(targetWeekStartDate)
-        date.setDate(date.getDate() + i)
-        targetWeekDates.push(date)
-      }
-
-      // Obtener las fechas de la semana copiada
-      const copiedWeekStartDate = new Date(copiedWeekData.weekStartDate)
-      const copiedWeekDates: Date[] = []
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(copiedWeekStartDate)
-        date.setDate(date.getDate() + i)
-        copiedWeekDates.push(date)
-      }
-
-      // Construir el objeto completo de assignments para la semana objetivo
-      const newAssignments: Record<string, Record<string, any>> = {}
-
-      // Mapear las asignaciones por día de la semana (lunes, martes, etc.)
-      copiedWeekDates.forEach((date, dayIndex) => {
-        const dateStr = format(date, "yyyy-MM-dd")
-        const assignments = copiedWeekData.assignments[dateStr]
-        
-        if (assignments && typeof assignments === 'object') {
-          // Mapear al día correspondiente de la semana objetivo
-          const targetDate = targetWeekDates[dayIndex]
-          const targetDateStr = format(targetDate, "yyyy-MM-dd")
-          
-          // Filtrar solo empleados que existen actualmente
-          const filteredAssignments: Record<string, any> = {}
-          
-          for (const [employeeId, assignmentValue] of Object.entries(assignments)) {
-            if (currentEmployeeIds.has(employeeId)) {
-              filteredAssignments[employeeId] = assignmentValue
-            }
-          }
-          
-          if (Object.keys(filteredAssignments).length > 0) {
-            newAssignments[targetDateStr] = filteredAssignments
-          }
-        }
-      })
-
-      // Aplicar todos los cambios de una sola vez usando handleAssignmentUpdate para cada día
-      // Esto es más atómico que celda por celda
-      for (const [dateStr, assignments] of Object.entries(newAssignments)) {
-        for (const [employeeId, assignmentValue] of Object.entries(assignments)) {
-          await handleAssignmentUpdate(dateStr, employeeId, assignmentValue)
-        }
-      }
-      
-      toast({
-        title: "Semana pegada",
-        description: "La semana copiada ha sido aplicada exitosamente",
-        duration: 2000,
-      })
-    } catch (error) {
-      console.error('Error al pegar semana:', error)
-      toast({
-        title: "Error",
-        description: "Ocurrió un error al pegar la semana",
-        variant: "destructive",
-      })
-    }
-  }, [copiedWeekData, handleAssignmentUpdate, toast, employees, getWeekSchedule])
-
   return (
     <>
       <ExportOverlay isExporting={exporting} message="Exportando horario..." />
@@ -758,9 +639,6 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
         lastCompletedWeekStart={lastCompletedWeekStart}
         allSchedules={schedules}
         config={config}
-        copiedWeekData={copiedWeekData}
-        onCopyCurrentWeek={copyCurrentWeek}
-        onPasteCopiedWeek={pasteCopiedWeek}
         onPublishSchedule={handlePublishPwa}
         isPublishingSchedule={isPublishing || publishingWeekId !== null}
         onWeekScheduleRef={handleWeekScheduleRef}

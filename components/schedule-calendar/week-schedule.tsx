@@ -21,7 +21,6 @@ import { WeekScheduleHeader } from "./week-schedule-header"
 import { WeekScheduleActions } from "./week-schedule-actions"
 import { isScheduleCompleted, shouldRequestConfirmation } from "@/lib/schedule-utils"
 import { logger } from "@/lib/logger"
-import { useConfig } from "@/hooks/use-config"
 
 interface WeekScheduleProps {
   weekDays: Date[]
@@ -31,7 +30,7 @@ interface WeekScheduleProps {
   allEmployees: Empleado[]
   shifts: Turno[]
   monthRange: { start: Date; end: Date }
-  onAssignmentUpdate?: (date: string, employeeId: string, shiftId: string, value: string | null) => void
+  onAssignmentUpdate?: (date: string, employeeId: string, assignments: ShiftAssignment[], options?: { scheduleId?: string }) => void
   onExportImage?: (weekStartDate: Date, weekEndDate: Date) => void
   onExportPDF?: (weekStartDate: Date, weekEndDate: Date) => void
   onExportExcel?: (weekStartDate: Date, weekEndDate: Date) => void
@@ -49,9 +48,6 @@ interface WeekScheduleProps {
   lastCompletedWeekStart?: Date | null
   getWeekSchedule?: (weekStartDate: Date) => Horario | null
   allSchedules?: Horario[]
-  config?: any
-  onCopyCurrentWeek?: () => void
-  onPasteCopiedWeek?: () => void
   onPublishSchedule?: (weekStartDate: Date, weekEndDate: Date) => Promise<void> | void
   isPublishingSchedule?: boolean
 }
@@ -82,8 +78,6 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
   lastCompletedWeekStart,
   getWeekSchedule,
   allSchedules = [],
-  onCopyCurrentWeek,
-  onPasteCopiedWeek,
   onPublishSchedule,
   isPublishingSchedule = false,
 }, ref) => {
@@ -109,10 +103,6 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
   const isOpen = open !== undefined ? open : internalOpen
   const handleOpenChange = onOpenChange || setInternalOpen
 
-  // Obtener configuración
-  const { config } = useConfig(user)
-  const weekStartsOn = (config?.semanaInicioDia || 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
-
   // Hook para acciones de semana
   const weekActions = useWeekActions({
     weekDays,
@@ -122,9 +112,6 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
     user: user || null,
     readonly,
     getWeekSchedule,
-    config,
-    allSchedules,
-    weekStartsOn,
   })
 
   const handleMarkComplete = useCallback(async () => {
@@ -203,24 +190,12 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
           isCompleted={isCompleted}
           isMarkingComplete={isMarkingComplete}
           user={user}
-          getWeekSchedule={getWeekSchedule}
-          onAssignmentUpdate={onAssignmentUpdate ? (date: string, employeeId: string, assignments: ShiftAssignment[], options?: { scheduleId?: string }) => {
-                // Convertir de firma ScheduleGrid a firma WeekSchedule
-                const assignment = assignments[0]
-                if (assignment && assignment.shiftId) {
-                  onAssignmentUpdate(date, employeeId, assignment.shiftId, assignment.shiftId)
-                } else {
-                  onAssignmentUpdate(date, employeeId, '', null)
-                }
-              } : undefined}
+          onAssignmentUpdate={onAssignmentUpdate}
           onMarkComplete={handleMarkComplete}
           onExportImage={handleExportImage}
           onExportPDF={handleExportPDF}
           onExportExcel={undefined}
           weekActions={weekActions}
-          onCopyCurrentWeek={onCopyCurrentWeek}
-          onPasteCopiedWeek={undefined}
-          weekStartDate={weekStartDate}
           onPublishSchedule={onPublishSchedule ? () => onPublishSchedule(weekStartDate, weekEndDate) : undefined}
           isPublishingSchedule={isPublishingSchedule}
         />
@@ -237,29 +212,7 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
             allEmployees={allEmployees || employees}
             shifts={shifts}
             schedule={weekSchedule}
-            onAssignmentUpdate={onAssignmentUpdate ? (date: string, employeeId: string, assignments: ShiftAssignment[], options?: { scheduleId?: string }) => {
-                // Adaptador: Convertir firma ScheduleGrid -> Firma WeekSchedule
-                const assignment = assignments[0] // Tomar primer assignment (edición simple)
-                
-                // Si es Franco o Medio Franco: crear un handler especializado
-                if (assignment && (assignment.type === "franco" || assignment.type === "medio_franco")) {
-                  // Llamar directamente use-schedule-updates saltando adaptadores
-                  // Necesitamos acceder al handler real de use-schedule-updates
-                  // Por ahora, vamos a simularlo pasando un valor especial que el padre reconozca
-                  const specialValue = `DAY_STATUS_${assignment.type}_${assignment.startTime || ''}_${assignment.endTime || ''}`
-                  onAssignmentUpdate(date, employeeId, specialValue, specialValue)
-                  return
-                }
-                
-                // Si es turno normal: comportamiento original del adaptador legacy
-                if (assignment && assignment.shiftId) {
-                  // Hay asignación: pasar shiftId como valor
-                  onAssignmentUpdate(date, employeeId, assignment.shiftId, assignment.shiftId)
-                } else {
-                  // No hay asignación: limpiar celda
-                  onAssignmentUpdate(date, employeeId, '', null)
-                }
-              } : undefined}
+            onAssignmentUpdate={onAssignmentUpdate}
             monthRange={{ startDate: monthRange.start, endDate: monthRange.end }}
             mediosTurnos={mediosTurnos}
             employeeStats={employeeStats && employees ? Object.fromEntries(employees.map((emp, index) => [emp.id, employeeStats[index] || {}])) : undefined}

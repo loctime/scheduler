@@ -26,9 +26,6 @@ import { Share2 } from "lucide-react"
 
 const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAssignment[] => {
   if (!value || !Array.isArray(value) || value.length === 0) return []
-  if (typeof value[0] === "string") {
-    return (value as string[]).map((shiftId) => ({ shiftId, type: "shift" as const }))
-  }
   return (value as ShiftAssignment[]).map((assignment) => ({
     ...assignment,
     type: assignment.type || "shift",

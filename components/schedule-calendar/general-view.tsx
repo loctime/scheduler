@@ -39,9 +39,6 @@ interface GeneralViewProps {
   lastCompletedWeekStart?: string | null
   allSchedules?: Horario[]
   config?: Configuracion | null
-  copiedWeekData?: any
-  onCopyCurrentWeek?: (weekStartDate: Date) => void
-  onPasteCopiedWeek?: (targetWeekStartDate: Date) => Promise<void>
   onPublishSchedule?: (weekStartDate: Date, weekEndDate: Date) => Promise<void> | void
   isPublishingSchedule?: boolean
   onWeekScheduleRef?: (weekKey: string, element: HTMLDivElement) => void
@@ -70,9 +67,6 @@ export function GeneralView({
   lastCompletedWeekStart,
   allSchedules = [],
   config,
-  copiedWeekData,
-  onCopyCurrentWeek,
-  onPasteCopiedWeek,
   onPublishSchedule,
   isPublishingSchedule,
   onWeekScheduleRef,
@@ -228,9 +222,6 @@ export function GeneralView({
           if (weekSchedule?.assignments) {
             const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAssignment[] => {
               if (!value || !Array.isArray(value) || value.length === 0) return []
-              if (typeof value[0] === "string") {
-                return (value as string[]).map((shiftId) => ({ shiftId, type: "shift" as const }))
-              }
               return (value as ShiftAssignment[]).map((assignment) => ({
                 ...assignment,
                 type: assignment.type || "shift",
@@ -252,20 +243,18 @@ export function GeneralView({
                   }
                 }
 
-                const normalizedAssignments = normalizeAssignments(assignmentValue)
-                if (normalizedAssignments.length === 0) {
-                  // Count as francos if no assignments
+                const dayStatus = weekSchedule?.dayStatus?.[dateStr]?.[employeeId] || "normal"
+                if (dayStatus === "franco") {
                   weekStats[employeeId].francosSemana += 1
                   return
                 }
+                if (dayStatus === "medio_franco") {
+                  weekStats[employeeId].francosSemana += 0.5
+                }
 
-                // Check if all assignments are francos (day off)
-                const allFrancos = normalizedAssignments.every(assignment => 
-                  assignment.type === 'franco' || assignment.type === 'medio_franco'
-                )
-                
-                if (allFrancos) {
-                  weekStats[employeeId].francosSemana += 1
+                const normalizedAssignments = normalizeAssignments(assignmentValue)
+                if (normalizedAssignments.length === 0) {
+                  return
                 }
 
                 // Calcular horas extras y horas totales para este día usando el nuevo servicio de dominio
@@ -294,47 +283,7 @@ export function GeneralView({
               allEmployees={employees}
               shifts={shifts}
               monthRange={{ start: monthRange.startDate, end: monthRange.endDate }}
-              onAssignmentUpdate={onAssignmentUpdate ? (date: string, employeeId: string, shiftId: string, value: string | null) => {
-                // Detectar valores especiales de dayStatus
-                if (value && value.startsWith('DAY_STATUS_')) {
-                  // Parsear el valor especial: DAY_STATUS_tipo_startTime_endTime
-                  const parts = value.split('_')
-                  
-                  // Unir las partes del tipo (medio_franco está dividido en parts[2] y parts[3])
-                  let type: "franco" | "medio_franco"
-                  let startTime: string | undefined
-                  let endTime: string | undefined
-                  
-                  if (parts[2] === 'medio' && parts[3] === 'franco') {
-                    type = 'medio_franco'
-                    startTime = parts[4] || undefined
-                    endTime = parts[5] || undefined
-                  } else if (parts[2] === 'franco') {
-                    type = 'franco'
-                    startTime = parts[3] || undefined
-                    endTime = parts[4] || undefined
-                  } else {
-                    type = parts[2] as "franco" | "medio_franco"
-                    startTime = parts[3] || undefined
-                    endTime = parts[4] || undefined
-                  }
-                  
-                  const assignments: ShiftAssignment[] = [{
-                    type,
-                    ...(startTime && endTime && { startTime, endTime })
-                  }]
-                  
-                  onAssignmentUpdate(date, employeeId, assignments, { scheduleId: weekSchedule?.id })
-                  return
-                }
-
-                // Convertir de firma WeekSchedule a firma GeneralView (comportamiento normal)
-                const assignments: ShiftAssignment[] = value ? [{
-                  shiftId,
-                  type: "shift",
-                  startTime: '',
-                  endTime: ''
-                }] : []
+              onAssignmentUpdate={onAssignmentUpdate ? (date, employeeId, assignments, options) => {
                 onAssignmentUpdate(date, employeeId, assignments, { scheduleId: weekSchedule?.id })
               } : undefined}
               onExportImage={onExportWeekImage}
@@ -349,8 +298,6 @@ export function GeneralView({
               lastCompletedWeekStart={undefined}
               getWeekSchedule={getWeekSchedule}
               allSchedules={allSchedules}
-              onCopyCurrentWeek={undefined}
-              onPasteCopiedWeek={undefined}
               onPublishSchedule={onPublishSchedule}
               isPublishingSchedule={isPublishingSchedule}
             />
