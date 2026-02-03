@@ -287,7 +287,16 @@ export function GeneralView({
               allEmployees={employees}
               shifts={shifts}
               monthRange={{ start: monthRange.startDate, end: monthRange.endDate }}
-              onAssignmentUpdate={undefined}
+              onAssignmentUpdate={onAssignmentUpdate ? (date: string, employeeId: string, shiftId: string, value: string | null) => {
+                // Convertir de firma WeekSchedule a firma GeneralView
+                const assignments: ShiftAssignment[] = value ? [{
+                  shiftId,
+                  type: 'shift' as const,
+                  startTime: '',
+                  endTime: ''
+                }] : []
+                onAssignmentUpdate(date, employeeId, assignments, { scheduleId: weekSchedule?.id })
+              } : undefined}
               onExportImage={onExportWeekImage}
               onExportPDF={onExportWeekPDF}
               onExportExcel={() => onExportWeekExcel(weekStartDate, weekDays, weekSchedule)}

@@ -4,7 +4,7 @@ import { useState, useCallback, forwardRef } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { ScheduleGrid, type EmployeeMonthlyStats } from "@/components/schedule-grid"
-import { Empleado, Turno, Horario, MedioTurno } from "@/lib/types"
+import { Empleado, Turno, Horario, MedioTurno, ShiftAssignment } from "@/lib/types"
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible"
 import {
   AlertDialog,
@@ -204,7 +204,15 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
           isMarkingComplete={isMarkingComplete}
           user={user}
           getWeekSchedule={getWeekSchedule}
-          onAssignmentUpdate={undefined}
+          onAssignmentUpdate={onAssignmentUpdate ? (date: string, employeeId: string, assignments: ShiftAssignment[], options?: { scheduleId?: string }) => {
+                // Convertir de firma ScheduleGrid a firma WeekSchedule
+                const assignment = assignments[0]
+                if (assignment && assignment.shiftId) {
+                  onAssignmentUpdate(date, employeeId, assignment.shiftId, assignment.shiftId)
+                } else {
+                  onAssignmentUpdate(date, employeeId, '', null)
+                }
+              } : undefined}
           onMarkComplete={handleMarkComplete}
           onExportImage={handleExportImage}
           onExportPDF={handleExportPDF}
@@ -229,7 +237,18 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
             allEmployees={allEmployees || employees}
             shifts={shifts}
             schedule={weekSchedule}
-            onAssignmentUpdate={undefined}
+            onAssignmentUpdate={onAssignmentUpdate ? (date: string, employeeId: string, assignments: ShiftAssignment[], options?: { scheduleId?: string }) => {
+                // Adaptador: Convertir firma ScheduleGrid -> firma WeekSchedule
+                // ScheduleGrid pasa assignments[], WeekSchedule espera shiftId + value
+                const assignment = assignments[0] // Tomar primer assignment (edición simple)
+                if (assignment && assignment.shiftId) {
+                  // Hay asignación: pasar shiftId como valor
+                  onAssignmentUpdate(date, employeeId, assignment.shiftId, assignment.shiftId)
+                } else {
+                  // No hay asignación: limpiar celda
+                  onAssignmentUpdate(date, employeeId, '', null)
+                }
+              } : undefined}
             monthRange={{ startDate: monthRange.start, endDate: monthRange.end }}
             mediosTurnos={mediosTurnos}
             employeeStats={employeeStats && employees ? Object.fromEntries(employees.map((emp, index) => [emp.id, employeeStats[index] || {}])) : undefined}
