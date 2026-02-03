@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ScheduleGrid } from "@/components/schedule-grid"
 import { usePublicHorario } from "@/hooks/use-public-horario"
+import { useConfig } from "@/hooks/use-config"
 import { useToast } from "@/hooks/use-toast"
 import type { Empleado, Horario, Turno, ShiftAssignment } from "@/lib/types"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
@@ -112,6 +113,7 @@ const getWeekStartDate = (weekId?: string, days?: Record<string, any>) => {
 
 export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps) {
   const { horario, isLoading, error } = usePublicHorario(scheduleId)
+  const { config } = useConfig()
   const [copied, setCopied] = useState(false)
   const { toast } = useToast()
 
@@ -275,9 +277,12 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
       publishedWeekId: horario?.publishedWeekId,
       currentWeek: horario ? horario.weeks?.[horario.publishedWeekId] : null,
       weekDays: weekDays,
-      weekStartDate: weekStartDate?.toISOString()
+      weekStartDate: weekStartDate?.toISOString(),
+      config: config,
+      hasNombreEmpresa: !!config?.nombreEmpresa,
+      nombreEmpresa: config?.nombreEmpresa
     })
-  }, [horario, schedule, weekStartDate, weekDays])
+  }, [horario, schedule, weekStartDate, weekDays, config])
 
   useEffect(() => {
     if (error) {
@@ -360,6 +365,13 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
       <div className="border-b bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex-1">
+            {/* Nombre de la empresa */}
+            {config?.nombreEmpresa && (
+              <div className="text-sm font-semibold text-gray-700 mb-2 sm:mb-1">
+                {config.nombreEmpresa}
+              </div>
+            )}
+            
             <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
               <Calendar className="h-6 w-6" />
               Horario Semanal
@@ -432,7 +444,8 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
             console.log("🔧 [PublicHorarioPage] Rendering published image")
             
             return (
-              <div className="w-full overflow-x-auto bg-white border rounded-lg p-4">
+              <div className="w-full overflow-x-auto overflow-y-auto bg-white border rounded-lg p-4 sm:p-6"
+                   style={{ touchAction: 'pan-x pan-y pinch-zoom' }}>
                 
                 <img 
                   src={currentWeek.publicImageUrl} 
@@ -443,7 +456,8 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
                     height: 'auto', 
                     display: 'block',
                     maxHeight: '80vh',
-                    objectFit: 'contain'
+                    objectFit: 'contain',
+                    touchAction: 'pan-x pan-y pinch-zoom'
                   }}
                   onError={(e) => {
                     console.error("🔧 [PublicHorarioPage] Image load error:", e)
@@ -458,23 +472,26 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
           // Fallback a ScheduleGrid si no hay imagen
           console.log("🔧 [PublicHorarioPage] Rendering ScheduleGrid fallback")
           return weekDays.length > 0 ? (
-            <ScheduleGrid
-              weekDays={weekDays}
-              employees={employees}
-              allEmployees={employees}
-              shifts={shifts}
-              schedule={schedule}
-              monthRange={undefined}
-              mediosTurnos={[]}
-              employeeStats={employeeStats}
-              readonly={true}
-              allSchedules={[]}
-              isScheduleCompleted={false}
-              lastCompletedWeekStart={undefined}
-              onClearEmployeeRow={undefined}
-              user={ownerUser}
-              onExportEmployeeImage={undefined}
-            />
+            <div className="w-full overflow-x-auto overflow-y-auto bg-white border rounded-lg p-4 sm:p-6"
+                 style={{ touchAction: 'pan-x pan-y pinch-zoom' }}>
+              <ScheduleGrid
+                weekDays={weekDays}
+                employees={employees}
+                allEmployees={employees}
+                shifts={shifts}
+                schedule={schedule}
+                monthRange={undefined}
+                mediosTurnos={[]}
+                employeeStats={employeeStats}
+                readonly={true}
+                allSchedules={[]}
+                isScheduleCompleted={false}
+                lastCompletedWeekStart={undefined}
+                onClearEmployeeRow={undefined}
+                user={ownerUser}
+                onExportEmployeeImage={undefined}
+              />
+            </div>
           ) : (
             <div className="text-center text-gray-500 py-8">
               <p>No hay datos para mostrar</p>
