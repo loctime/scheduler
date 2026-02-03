@@ -269,6 +269,16 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
   const employees = useMemo(() => {
     // MODELO A: Usar empleados de la semana publicada si existen, sino fallback
     const currentWeek = horario?.weeks?.[horario.publishedWeekId]
+    
+    console.log("🔧 [PublicHorarioPage] Debug employees:", {
+      hasHorario: !!horario,
+      publishedWeekId: horario?.publishedWeekId,
+      currentWeek: currentWeek,
+      currentWeekEmployees: currentWeek?.employees,
+      hasEmployees: !!(currentWeek?.employees),
+      employeesLength: currentWeek?.employees?.length
+    })
+    
     if (currentWeek?.employees && currentWeek.employees.length > 0) {
       console.log("🔧 [PublicHorarioPage] Using published employees:", currentWeek.employees)
       return currentWeek.employees

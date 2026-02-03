@@ -67,6 +67,16 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
       const fullPath = "apps/horarios/enlaces_publicos/" + ownerId
       console.log("🔧 [usePublicPublisher] Writing to:", fullPath)
       
+      console.log("🔧 [usePublicPublisher] Datos a guardar:", {
+        weekId: options.weekId,
+        hasEmployees: !!(options.employees),
+        employeesCount: options.employees?.length || 0,
+        employees: options.employees,
+        hasWeekDataEmployees: !!(options.weekData.employees),
+        weekDataEmployeesCount: options.weekData.employees?.length || 0,
+        weekDataEmployees: options.weekData.employees
+      })
+      
       // Estructura con weeks y publicImageUrl
       const weekData = {
         weekId: options.weekId,
@@ -78,6 +88,8 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
         days: options.weekData.scheduleData?.assignments || options.weekData.assignments || {},
         employees: options.employees || options.weekData.employees || []
       }
+      
+      console.log("🔧 [usePublicPublisher] weekData.employees final:", weekData.employees)
       
       const publicScheduleData = {
         ownerId: ownerId,

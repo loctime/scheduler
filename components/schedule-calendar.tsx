@@ -6,8 +6,8 @@ import { format, subMonths, addMonths, startOfWeek } from "date-fns"
 import { es } from "date-fns/locale"
 import { usePublicPublisher } from "@/hooks/use-public-publisher"
 import { useData } from "@/contexts/data-context"
-import { Horario, ShiftAssignment, ShiftAssignmentValue, Turno } from "@/lib/types"
 import { useConfig } from "@/hooks/use-config"
+import { Horario, ShiftAssignment, ShiftAssignmentValue, Turno } from "@/lib/types"
 import { getCustomMonthRange, getMonthWeeks, getInitialMonthForRange } from "@/lib/utils"
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { useScheduleUpdates } from "@/hooks/use-schedule-updates"
@@ -49,12 +49,16 @@ const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAss
   }))
 }
 
-export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
-  const { employees, shifts, loading: dataLoading, userData } = useData()
-  const { config } = useConfig(user)
+export default function ScheduleCalendar({ user }: ScheduleCalendarProps) {
   const { toast } = useToast()
+  const { publishToPublic } = usePublicPublisher()
+  const { employees, shifts, loading: dataLoading } = useData() 
+  const { config } = useConfig()
   const { exporting, exportImage, exportPDF, exportExcel, exportMonthPDF } = useExportSchedule()
-  const { publishToPublic, isPublishing, error: publishError } = usePublicPublisher()
+  const { publishToPublic: publishPublic, isPublishing, error: publishError } = usePublicPublisher()
+  
+  // Para compatibilidad con el código existente
+  const userData = user
 
   // Estado para almacenar la semana copiada
   const [copiedWeekData, setCopiedWeekData] = useState<any>(null)
@@ -344,6 +348,19 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
       console.log("🔧 [ScheduleCalendar] publicImageUrl generado, llamando a publishToPublic...")
       
       // Llamar a publishToPublic con la imagen generada y empleados con nombres
+      console.log("🔧 [ScheduleCalendar] weekSchedule completo:", weekSchedule)
+      console.log("🔧 [ScheduleCalendar] weekSchedule.employees:", (weekSchedule as any).employees)
+      console.log("🔧 [ScheduleCalendar] weekSchedule keys:", Object.keys(weekSchedule))
+      console.log("🔧 [ScheduleCalendar] employees from context:", employees)
+      
+      // Usar empleados del contexto con nombres reales
+      const employeesToPublish = employees?.map((e: any) => ({
+        id: e.id,
+        name: e.name,
+      }))
+      
+      console.log("🔧 [ScheduleCalendar] employeesToPublish:", employeesToPublish)
+      
       const publishedOwnerId = await publishToPublic({
         weekId,
         weekData: {
@@ -352,10 +369,7 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
           endDate: format(weekEndDate, "dd/MM/yyyy"),
         },
         publicImageUrl: publicImageUrl, // Pasar la imagen generada
-        employees: (weekSchedule as any).employees?.map((e: any) => ({
-          id: e.id,
-          name: e.name,
-        })),
+        employees: employeesToPublish,
       })
 
       console.log("🔧 [ScheduleCalendar] publishToPublic completado:", {
