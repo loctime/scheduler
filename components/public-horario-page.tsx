@@ -117,6 +117,7 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
   const [copied, setCopied] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
   const [showInstallButton, setShowInstallButton] = useState(false)
+  const [showIndividualView, setShowIndividualView] = useState(false)
   const { toast } = useToast()
 
   // Detectar vista móvil
@@ -134,20 +135,20 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
 
   // PWA: Registrar service worker y manejar instalación
   useEffect(() => {
-    // Agregar manifest dinámicamente
+    // Agregar manifest exclusivo para horario
     const link = document.createElement('link')
     link.rel = 'manifest'
-    link.href = '/pwa/horario/manifest.json'
+    link.href = '/manifest-horario.json'
     document.head.appendChild(link)
 
-    // Registrar service worker
+    // Registrar service worker exclusivo para horario
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/pwa/horario/sw.js')
+      navigator.serviceWorker.register('/sw-horario.js', { scope: '/horario/' })
         .then((registration) => {
-          console.log('Service Worker registrado:', registration)
+          console.log('SW Horario registrado:', registration)
         })
         .catch((error) => {
-          console.error('Error al registrar Service Worker:', error)
+          console.error('Error al registrar SW Horario:', error)
         })
     }
 
@@ -163,7 +164,7 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
       // Limpiar manifest
-      const manifestLink = document.querySelector('link[rel="manifest"][href="/pwa/horario/manifest.json"]')
+      const manifestLink = document.querySelector('link[rel="manifest"][href="/manifest-horario.json"]')
       if (manifestLink) {
         document.head.removeChild(manifestLink)
       }
@@ -319,8 +320,8 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
       
       if (outcome === 'accepted') {
         toast({
-          title: "App instalada",
-          description: "La app se ha instalado correctamente",
+          title: "Horario instalado",
+          description: "La app del horario se ha instalado correctamente",
         })
       }
       
@@ -330,10 +331,15 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
       console.error('Error en instalación:', error)
       toast({
         title: "Error",
-        description: "No se pudo instalar la app",
+        description: "No se pudo instalar la app del horario",
         variant: "destructive",
       })
     }
+  }
+
+  // Toggle vista individual
+  const handleToggleIndividualView = () => {
+    setShowIndividualView(!showIndividualView)
   }
 
   useEffect(() => {
@@ -395,7 +401,7 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
   }
 
   // Si no hay datos, mostrar mensaje simple
-  if (!horario || !schedule || !weekStartDate) {
+  if (!horario || !schedule || !weekStartDate || !horario.publishedWeekId) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -485,9 +491,22 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
                 <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"/>
                 </svg>
-                Descargar app
+                Instalar Horario
               </Button>
             )}
+            
+            {/* Botón Vista Individual */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleToggleIndividualView}
+              className="text-xs"
+            >
+              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM13 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2h-2z"/>
+              </svg>
+              Vista individual
+            </Button>
             
             {/* Ocultar chip "Publicado" y botón "Copiar enlace" en móvil */}
             <div className="hidden sm:flex sm:items-center sm:gap-3">
@@ -520,64 +539,70 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
             imageUrlLength: currentWeek?.publicImageUrl?.length || 0,
             weekDaysCount: weekDays.length,
             employeesCount: employees.length,
-            shiftsCount: shifts.length
+            shiftsCount: shifts.length,
+            showIndividualView: showIndividualView
           })
           
-          if (hasImage && currentWeek.publicImageUrl) {
-            console.log("🔧 [PublicHorarioPage] Rendering published image")
-            
+          // MODELO A: Solo usar publishedWeekId
+          if (showIndividualView || !hasImage || !currentWeek.publicImageUrl) {
+            // Vista individual o fallback: Mostrar ScheduleGrid readonly
+            console.log("🔧 [PublicHorarioPage] Rendering ScheduleGrid individual view")
             return (
               <div className="w-full overflow-x-auto overflow-y-auto bg-white border rounded-lg p-4 sm:p-6"
                    style={{ touchAction: 'pan-x pan-y pinch-zoom' }}>
-                
-                <img 
-                  src={currentWeek.publicImageUrl} 
-                  alt={`Horario ${currentWeek.weekLabel || 'semanal'}`}
-                  style={{ 
-                    width: '100%', 
-                    maxWidth: '100%', 
-                    height: 'auto', 
-                    display: 'block',
-                    maxHeight: '80vh',
-                    objectFit: 'contain',
-                    touchAction: 'pan-x pan-y pinch-zoom'
-                  }}
-                  onError={(e) => {
-                    console.error("🔧 [PublicHorarioPage] Image load error:", e)
-                    // Si falla la carga, mostrar ScheduleGrid como fallback
-                    console.log("🔧 [PublicHorarioPage] Image failed, using ScheduleGrid fallback")
-                  }}
+                <div className="text-center text-gray-500 mb-4">
+                  <p className="text-sm font-medium">
+                    {showIndividualView ? "Vista individual del horario" : "Horario publicado"}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {showIndividualView ? "Grilla interactiva de solo lectura" : "Mostrando vista de grilla"}
+                  </p>
+                </div>
+                <ScheduleGrid
+                  weekDays={weekDays}
+                  employees={employees}
+                  allEmployees={employees}
+                  shifts={shifts}
+                  schedule={schedule}
+                  monthRange={undefined}
+                  mediosTurnos={[]}
+                  employeeStats={employeeStats}
+                  readonly={true}
+                  allSchedules={[]}
+                  isScheduleCompleted={false}
+                  lastCompletedWeekStart={undefined}
+                  onClearEmployeeRow={undefined}
+                  user={ownerUser}
+                  onExportEmployeeImage={undefined}
                 />
               </div>
             )
           }
           
-          // Fallback a ScheduleGrid si no hay imagen
-          console.log("🔧 [PublicHorarioPage] Rendering ScheduleGrid fallback")
-          return weekDays.length > 0 ? (
+          // Vista por defecto: Imagen publicada
+          console.log("🔧 [PublicHorarioPage] Rendering published image")
+          return (
             <div className="w-full overflow-x-auto overflow-y-auto bg-white border rounded-lg p-4 sm:p-6"
                  style={{ touchAction: 'pan-x pan-y pinch-zoom' }}>
-              <ScheduleGrid
-                weekDays={weekDays}
-                employees={employees}
-                allEmployees={employees}
-                shifts={shifts}
-                schedule={schedule}
-                monthRange={undefined}
-                mediosTurnos={[]}
-                employeeStats={employeeStats}
-                readonly={true}
-                allSchedules={[]}
-                isScheduleCompleted={false}
-                lastCompletedWeekStart={undefined}
-                onClearEmployeeRow={undefined}
-                user={ownerUser}
-                onExportEmployeeImage={undefined}
+              
+              <img 
+                src={currentWeek.publicImageUrl} 
+                alt={`Horario ${currentWeek.weekLabel || 'semanal'}`}
+                style={{ 
+                  width: '100%', 
+                  maxWidth: '100%', 
+                  height: 'auto', 
+                  display: 'block',
+                  maxHeight: '80vh',
+                  objectFit: 'contain',
+                  touchAction: 'pan-x pan-y pinch-zoom'
+                }}
+                onError={(e) => {
+                  console.error("🔧 [PublicHorarioPage] Image load error:", e)
+                  // Si falla la carga, mostrar ScheduleGrid como fallback
+                  console.log("🔧 [PublicHorarioPage] Image failed, using ScheduleGrid fallback")
+                }}
               />
-            </div>
-          ) : (
-            <div className="text-center text-gray-500 py-8">
-              <p>No hay datos para mostrar</p>
             </div>
           )
         })()}

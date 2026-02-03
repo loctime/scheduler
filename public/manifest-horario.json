@@ -1,13 +1,13 @@
 {
-  "name": "Horario del día",
+  "name": "Horario de Trabajo",
   "short_name": "Horario",
   "description": "Visualización del horario semanal del personal",
-  "start_url": "/pwa/horario",
+  "start_url": "/horario",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
   "orientation": "portrait-primary",
-  "scope": "/pwa/horario",
+  "scope": "/horario",
   "icons": [
     {
       "src": "/icon-light-32x32.png",
@@ -41,7 +41,7 @@
       "name": "Ver Horario",
       "short_name": "Horario",
       "description": "Ver el horario semanal",
-      "url": "/pwa/horario",
+      "url": "/horario",
       "icons": [
         {
           "src": "/icon-light-32x32.png",
