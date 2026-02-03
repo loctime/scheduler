@@ -270,58 +270,57 @@ export function ScheduleCalendar({ user }: ScheduleCalendarProps) {
     setPublishingWeekId(weekId)
     
     try {
-      console.log("🔧 [ScheduleCalendar] Iniciando captura robusta...")
+      console.log("🔧 [ScheduleCalendar] Capturando WeekSchedule visible...")
       
-      // Validar que existe el elemento de captura
-      if (!captureRef.current) {
-        console.error("🔧 [ScheduleCalendar] Error: No se encontró el elemento de captura")
+      // Obtener el WeekSchedule visible usando las refs existentes
+      const weekKey = format(weekStartDate, "yyyy-MM-dd")
+      const visibleWeekSchedule = weekScheduleRefs.current[weekKey]
+      
+      if (!visibleWeekSchedule) {
+        console.error("🔧 [ScheduleCalendar] Error: No se encontró el WeekSchedule visible para la semana", weekKey)
         toast({
           title: "Error",
-          description: "No se encontró el elemento de captura para generar la imagen",
+          description: "No se encontró el horario visible para capturar",
           variant: "destructive",
         })
         return
       }
-
-      console.log("🔧 [ScheduleCalendar] Elemento de captura encontrado:", {
-        hasElement: !!captureRef.current,
-        elementTag: captureRef.current.tagName,
-        elementClass: captureRef.current.className,
+      
+      console.log("🔧 [ScheduleCalendar] WeekSchedule visible encontrado:", {
+        weekKey,
+        hasElement: !!visibleWeekSchedule,
+        elementTag: visibleWeekSchedule.tagName,
+        elementClass: visibleWeekSchedule.className
       })
-
-      // Esperar un frame para asegurar que el componente está renderizado
+      
+      // Esperar un frame para asegurar renderizado
       await new Promise(resolve => requestAnimationFrame(resolve))
       
-      // Validación adicional: verificar que el elemento tiene dimensiones
-      const elementRect = captureRef.current.getBoundingClientRect()
+      // Validar dimensiones del elemento visible
+      const elementRect = visibleWeekSchedule.getBoundingClientRect()
       if (elementRect.width === 0 || elementRect.height === 0) {
-        console.error("🔧 [ScheduleCalendar] Error: Elemento de captura sin dimensiones válidas", {
+        console.error("🔧 [ScheduleCalendar] Error: WeekSchedule visible sin dimensiones", {
           width: elementRect.width,
           height: elementRect.height
         })
         toast({
           title: "Error",
-          description: "El elemento de captura no tiene dimensiones válidas",
+          description: "El horario visible no tiene dimensiones válidas",
           variant: "destructive",
         })
         return
       }
-
-      console.log("🔧 [ScheduleCalendar] Generando imagen del ScheduleGrid...")
+      
+      console.log("🔧 [ScheduleCalendar] Generando imagen del WeekSchedule visible...")
       console.log("🔧 [ScheduleCalendar] Dimensiones del elemento:", {
         width: elementRect.width,
-        height: elementRect.height,
-        left: elementRect.left,
-        top: elementRect.top
+        height: elementRect.height
       })
       
-      // Generar imagen PNG del ScheduleGrid de captura con calidad muy reducida
-      const dataUrl = await toPng(captureRef.current, {
+      // Generar imagen del WeekSchedule visible
+      const dataUrl = await toPng(visibleWeekSchedule, {
         cacheBust: true,
-        pixelRatio: 0.5, // calidad muy baja
-        backgroundColor: "#ffffff",
-        width: 800, // ancho mucho más pequeño
-        quality: 0.5 // calidad 50% para tamaño mínimo
+        backgroundColor: "#ffffff"
       })
 
       console.log("🔧 [ScheduleCalendar] Imagen generada exitosamente")
