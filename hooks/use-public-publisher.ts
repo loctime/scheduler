@@ -103,7 +103,7 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
       const publicRef = doc(db, "apps", "horarios", "enlaces_publicos", ownerId)
       console.log("🔧 [usePublicPublisher] Document reference created for apps/horarios/enlaces_publicos/" + ownerId)
       
-      await setDoc(publicRef, publicScheduleData)
+      await setDoc(publicRef, publicScheduleData, { merge: true })
       console.log("🔧 [usePublicPublisher] Publish success - document written to:", fullPath)
       console.log("🔧 [usePublicPublisher] PublicImageUrl saved successfully:", !!options.publicImageUrl)
       
