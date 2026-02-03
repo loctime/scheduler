@@ -111,7 +111,11 @@ export const addDashboardPage = (
 
         const dateStr = format(day, "yyyy-MM-dd")
         const dayStatus = weekSchedule.dayStatus?.[dateStr]?.[employee.id] || "normal"
-        if (dayStatus === "franco") {
+        
+        // Type guard to ensure proper type checking
+        const isFranco = dayStatus === "franco"
+        
+        if (isFranco) {
           francosCount += 1
           return
         }
@@ -140,7 +144,7 @@ export const addDashboardPage = (
         })
 
         // Si no es franco completo, contar como día trabajado y calcular horas
-        if (dayStatus !== "franco") {
+        if (!isFranco) {
           daysWorked++
           const dailyHours = calculateDailyHours(
             normalizedAssignments,
