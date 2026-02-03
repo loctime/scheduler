@@ -99,7 +99,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
   } | null>(null)
 
   // Estado para controlar vista en móvil
-  const [mobileView, setMobileView] = useState<"full" | "individual">("full")
+  const [isIndividualView, setIsIndividualView] = useState(false)
   
   // Refs para generación de imagen
   const gridRef = useRef<HTMLDivElement>(null)
@@ -177,7 +177,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
 
   // Obtener la fecha de inicio de la semana actual
   const currentWeekStart = useMemo(() => {
-    return format(weekDays[0], "yyyy-MM-dd")
+    return weekDays[0]
   }, [weekDays])
 
   // Hook para sugerencias de patrones (después de employeesToUse)
@@ -202,7 +202,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
   } = useScheduleGridData({
     employees: employeesToUse,
     shifts,
-    separadores: config?.separadores,
+    separadores: config?.separadores || [],
     ordenEmpleados: isScheduleCompleted && schedule && !('horarioId' in schedule) && (schedule as Horario).ordenEmpleadosSnapshot
       ? (schedule as Horario).ordenEmpleadosSnapshot
       : config?.ordenEmpleados,
@@ -210,7 +210,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     scheduleId: schedule?.id,
     isScheduleCompleted,
     currentWeekStart,
-    lastCompletedWeekStart,
+    lastCompletedWeekStart: lastCompletedWeekStart ? new Date(lastCompletedWeekStart) : undefined,
     allEmployees: allEmployees || employees, // Todos los empleados (sin filtrar) para el filtrado correcto
   })
 
@@ -638,7 +638,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     const weekStartDate = weekDays[0]
     
     // Renderizar vista individual solo si está seleccionada
-    if (mobileView === "individual") {
+    if (isIndividualView) {
       return (
         <>
           <ScheduleGridMobile
@@ -677,9 +677,9 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
         {/* Botones de toggle solo en móvil */}
         <div className="flex justify-center mb-4 gap-2">
           <button
-            onClick={() => setMobileView("full" as const)}
+            onClick={() => setIsIndividualView(false)}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              mobileView === "full"
+              !isIndividualView
                 ? "bg-blue-600 text-white"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
@@ -688,9 +688,9 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
             Grilla completa
           </button>
           <button
-            onClick={() => setMobileView("individual" as const)}
+            onClick={() => setIsIndividualView(true)}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              mobileView === "individual"
+              isIndividualView
                 ? "bg-blue-600 text-white"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}

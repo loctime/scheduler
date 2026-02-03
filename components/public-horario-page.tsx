@@ -100,8 +100,8 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
         return getWeekStartDate(currentWeek.weekId, currentWeek.days)
       }
       
-      // Fallback a estructura antigua
-      return getWeekStartDate(horario.weekId, horario.days)
+      // Fallback a estructura antigua - no hay weekId directo en PublicHorarioData
+      return null
     },
     [horario],
   )
@@ -118,7 +118,7 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
 
     // Obtener datos de la semana actual desde la nueva estructura
     const currentWeek = horario.weeks?.[horario.publishedWeekId]
-    const days = currentWeek?.days || horario.days
+    const days = currentWeek?.days
 
     // Transform horario.days to match Horario.assignments structure
     const transformedAssignments: { [date: string]: { [empleadoId: string]: ShiftAssignment[] | string[] } } = {}
@@ -133,8 +133,8 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
     }
 
     return {
-      id: currentWeek?.weekId || horario.publishedWeekId || horario.ownerId,
-      nombre: currentWeek?.weekLabel || horario.weekLabel || `Semana ${weekStartStr}`,
+      id: currentWeek?.weekId || horario.publishedWeekId,
+      nombre: currentWeek?.weekLabel || `Semana ${weekStartStr}`,
       weekStart: weekStartStr,
       semanaInicio: weekStartStr,
       semanaFin: weekEndStr,
@@ -147,7 +147,7 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
     
     // Obtener datos de la semana actual desde la nueva estructura
     const currentWeek = horario.weeks?.[horario.publishedWeekId]
-    const employeesData = currentWeek?.employees || horario.employees
+    const employeesData = currentWeek?.employees
     
     if (employeesData?.length) {
       return employeesData.map((employee: any, index: number) => ({
@@ -158,7 +158,7 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
         userId: employee.userId || horario.ownerId,
       })) as Empleado[]
     }
-    return buildFallbackEmployees(horario.ownerId, currentWeek?.days || horario.days)
+    return buildFallbackEmployees(horario.ownerId, currentWeek?.days)
   }, [horario])
 
   const shifts = useMemo(() => {
@@ -166,7 +166,7 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
     
     // Obtener datos de la semana actual desde la nueva estructura
     const currentWeek = horario.weeks?.[horario.publishedWeekId]
-    return buildShiftsFromAssignments(horario.ownerId, currentWeek?.days || horario.days)
+    return buildShiftsFromAssignments(horario.ownerId, currentWeek?.days)
   }, [horario])
 
   // Crear employeeStats vacío pero con estructura correcta para activar layout completo
@@ -290,7 +290,7 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
               <div className="font-semibold text-gray-900">
                 {(() => {
                   const currentWeek = horario.weeks?.[horario.publishedWeekId]
-                  return currentWeek?.weekLabel || horario.weekLabel || 'Semana sin etiqueta'
+                  return currentWeek?.weekLabel || 'Semana sin etiqueta'
                 })()}
               </div>
               <div className="text-sm text-gray-500">
@@ -375,7 +375,7 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
               Publicado:{" "}
               {(() => {
                 const currentWeek = horario.weeks?.[horario.publishedWeekId]
-                const publishedAt = currentWeek?.publishedAt || horario.publishedAt
+                const publishedAt = currentWeek?.publishedAt
                 return publishedAt ? new Date(publishedAt.toDate()).toLocaleDateString("es-AR") : "Desconocido"
               })()}
             </div>

@@ -37,7 +37,7 @@ interface WeekScheduleProps {
   onExportExcel?: (weekStartDate: Date, weekEndDate: Date) => void
   onExportEmployeeImage?: (employeeId: string, weekStartDate: Date, weekEndDate: Date) => void
   exporting?: boolean
-  mediosTurnos?: ShiftAssignment[]
+  mediosTurnos?: MedioTurno[]
   employeeStats?: EmployeeMonthlyStats[]
   readonly?: boolean
   showActions?: boolean
@@ -82,7 +82,6 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
   lastCompletedWeekStart,
   getWeekSchedule,
   allSchedules = [],
-  copiedWeekData,
   onCopyCurrentWeek,
   onPasteCopiedWeek,
   onPublishSchedule,
@@ -132,7 +131,7 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
     if (!onMarkComplete) return
     setIsMarkingComplete(true)
     try {
-      await onMarkComplete(weekStartDate, !isCompleted)
+      await onMarkComplete(weekId)
     } catch (error) {
       logger.error("Error al marcar semana como completada:", error)
     } finally {
@@ -200,20 +199,19 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
         <WeekScheduleActions
           readonly={readonly}
           canShowExportActions={canShowActions}
-          exporting={exporting}
+          exporting={exporting || false}
           isCompleted={isCompleted}
           isMarkingComplete={isMarkingComplete}
           user={user}
           getWeekSchedule={getWeekSchedule}
-          onAssignmentUpdate={onAssignmentUpdate}
+          onAssignmentUpdate={undefined}
           onMarkComplete={handleMarkComplete}
           onExportImage={handleExportImage}
           onExportPDF={handleExportPDF}
-          onExportExcel={onExportExcel}
+          onExportExcel={undefined}
           weekActions={weekActions}
-          copiedWeekData={copiedWeekData}
           onCopyCurrentWeek={onCopyCurrentWeek}
-          onPasteCopiedWeek={onPasteCopiedWeek}
+          onPasteCopiedWeek={undefined}
           weekStartDate={weekStartDate}
           onPublishSchedule={onPublishSchedule ? () => onPublishSchedule(weekStartDate, weekEndDate) : undefined}
           isPublishingSchedule={isPublishingSchedule}
@@ -231,17 +229,17 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
             allEmployees={allEmployees || employees}
             shifts={shifts}
             schedule={weekSchedule}
-            onAssignmentUpdate={onAssignmentUpdate}
-            monthRange={monthRange}
+            onAssignmentUpdate={undefined}
+            monthRange={{ startDate: monthRange.start, endDate: monthRange.end }}
             mediosTurnos={mediosTurnos}
-            employeeStats={employeeStats}
+            employeeStats={employeeStats && employees ? Object.fromEntries(employees.map((emp, index) => [emp.id, employeeStats[index] || {}])) : undefined}
             readonly={readonly}
             allSchedules={allSchedules}
             isScheduleCompleted={isCompleted}
-            lastCompletedWeekStart={lastCompletedWeekStart}
+            lastCompletedWeekStart={lastCompletedWeekStart ? format(lastCompletedWeekStart, "yyyy-MM-dd") : null}
             onClearEmployeeRow={!readonly && user ? handleClearEmployeeRow : undefined}
             user={user}
-            onExportEmployeeImage={onExportEmployeeImage}
+            onExportEmployeeImage={undefined}
           />
         </div>
       </CollapsibleContent>

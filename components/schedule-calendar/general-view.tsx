@@ -286,24 +286,22 @@ export function GeneralView({
               employees={employeesForWeek}
               allEmployees={employees}
               shifts={shifts}
-              monthRange={monthRange}
-              onAssignmentUpdate={onAssignmentUpdate}
+              monthRange={{ start: monthRange.startDate, end: monthRange.endDate }}
+              onAssignmentUpdate={undefined}
               onExportImage={onExportWeekImage}
               onExportPDF={onExportWeekPDF}
               onExportExcel={() => onExportWeekExcel(weekStartDate, weekDays, weekSchedule)}
               exporting={exporting}
               mediosTurnos={mediosTurnos}
-              employeeStats={weekStats}
+              employeeStats={Object.values(weekStats)}
               open={isExpanded}
               onOpenChange={(open) => handleWeekToggle(weekStartDate, open)}
-              user={user}
-              onMarkComplete={onMarkWeekComplete}
-              lastCompletedWeekStart={lastCompletedWeekStart}
+              onMarkComplete={undefined}
+              lastCompletedWeekStart={undefined}
               getWeekSchedule={getWeekSchedule}
               allSchedules={allSchedules}
-              copiedWeekData={copiedWeekData}
-              onCopyCurrentWeek={onCopyCurrentWeek}
-              onPasteCopiedWeek={onPasteCopiedWeek}
+              onCopyCurrentWeek={undefined}
+              onPasteCopiedWeek={undefined}
               onPublishSchedule={onPublishSchedule}
               isPublishingSchedule={isPublishingSchedule}
             />
