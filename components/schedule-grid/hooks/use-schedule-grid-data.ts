@@ -238,8 +238,10 @@ export function useScheduleGridData({
           date,
           employeeId,
           hasDayStatus: !!schedule?.dayStatus,
+          "schedule.dayStatus": schedule.dayStatus,
           dateDayStatus,
           employeeDayStatus,
+          "baseAssignments antes": baseAssignments,
           mediosTurnosConfig: config?.mediosTurnos
         })
         

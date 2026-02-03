@@ -251,12 +251,18 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
                 
                 // Si es Franco o Medio Franco: crear un handler especializado
                 if (assignment && (assignment.type === "franco" || assignment.type === "medio_franco")) {
-                  console.log("🔧 [WeekSchedule Adaptador] Detectado assignment especial:", assignment.type)
+                  console.log("🔧 [WeekSchedule Adaptador] Detectado assignment especial:", {
+                    type: assignment.type,
+                    startTime: assignment.startTime,
+                    endTime: assignment.endTime,
+                    "assignment completo": assignment
+                  })
                   
                   // Llamar directamente use-schedule-updates saltando adaptadores
                   // Necesitamos acceder al handler real de use-schedule-updates
                   // Por ahora, vamos a simularlo pasando un valor especial que el padre reconozca
                   const specialValue = `DAY_STATUS_${assignment.type}_${assignment.startTime || ''}_${assignment.endTime || ''}`
+                  console.log("🔧 [WeekSchedule Adaptador] Enviando valor especial:", specialValue)
                   onAssignmentUpdate(date, employeeId, specialValue, specialValue)
                   return
                 }

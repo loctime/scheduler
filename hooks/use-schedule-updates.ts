@@ -175,6 +175,14 @@ export function useScheduleUpdates({
       assignments: ShiftAssignment[],
       options?: { scheduleId?: string },
     ) => {
+      console.log("🔧 [handleAssignmentUpdate] Llamado:", {
+        date,
+        employeeId,
+        assignments,
+        options,
+        "firstAssignment": assignments[0]
+      })
+
       try {
         // Validaciones básicas
         if (employees.length === 0) {
@@ -341,7 +349,10 @@ export function useScheduleUpdates({
             assignmentType: assignment.type,
             currentDayStatus,
             updatedDayStatus,
-            targetScheduleId: targetSchedule.id
+            targetScheduleId: targetSchedule.id,
+            "targetSchedule.dayStatus": targetSchedule.dayStatus,
+            "dateDayStatus antes": targetSchedule.dayStatus?.[date],
+            "employeeDayStatus antes": targetSchedule.dayStatus?.[date]?.[employeeId]
           })
 
           // Limpiar assignments para este día/empleado (solo turnos reales)

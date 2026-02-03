@@ -292,7 +292,8 @@ export function GeneralView({
                   date,
                   employeeId,
                   shiftId,
-                  value
+                  value,
+                  "weekSchedule.id": weekSchedule?.id
                 })
 
                 // Detectar valores especiales de dayStatus
@@ -301,16 +302,44 @@ export function GeneralView({
                   
                   // Parsear el valor especial: DAY_STATUS_tipo_startTime_endTime
                   const parts = value.split('_')
-                  const type = parts[2] as "franco" | "medio_franco"
-                  const startTime = parts[3] || undefined
-                  const endTime = parts[4] || undefined
+                  console.log("🔧 [GeneralView Adaptador] Parts del split:", parts)
+                  
+                  // Unir las partes del tipo (medio_franco está dividido en parts[2] y parts[3])
+                  let type: "franco" | "medio_franco"
+                  let startTime: string | undefined
+                  let endTime: string | undefined
+                  
+                  if (parts[2] === 'medio' && parts[3] === 'franco') {
+                    type = 'medio_franco'
+                    startTime = parts[4] || undefined
+                    endTime = parts[5] || undefined
+                  } else if (parts[2] === 'franco') {
+                    type = 'franco'
+                    startTime = parts[3] || undefined
+                    endTime = parts[4] || undefined
+                  } else {
+                    type = parts[2] as "franco" | "medio_franco"
+                    startTime = parts[3] || undefined
+                    endTime = parts[4] || undefined
+                  }
+                  
+                  console.log("🔧 [GeneralView Adaptador] Parseado:", {
+                    originalValue: value,
+                    parts,
+                    type,
+                    startTime,
+                    endTime
+                  })
                   
                   const assignments: ShiftAssignment[] = [{
                     type,
                     ...(startTime && endTime && { startTime, endTime })
                   }]
                   
-                  console.log("🔧 [GeneralView Adaptador] Convertido a assignments:", assignments)
+                  console.log("🔧 [GeneralView Adaptador] Convertido a assignments:", {
+                    assignments,
+                    "scheduleId para enviar": weekSchedule?.id
+                  })
                   onAssignmentUpdate(date, employeeId, assignments, { scheduleId: weekSchedule?.id })
                   return
                 }
