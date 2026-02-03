@@ -214,6 +214,19 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
   }
 
   useEffect(() => {
+    console.log("🔧 [PublicHorarioPage] Debug state:", {
+      hasHorario: !!horario,
+      hasSchedule: !!schedule,
+      hasWeekStartDate: !!weekStartDate,
+      horarioKeys: horario ? Object.keys(horario) : null,
+      publishedWeekId: horario?.publishedWeekId,
+      currentWeek: horario ? horario.weeks?.[horario.publishedWeekId] : null,
+      weekDays: weekDays,
+      weekStartDate: weekStartDate?.toISOString()
+    })
+  }, [horario, schedule, weekStartDate, weekDays])
+
+  useEffect(() => {
     if (error) {
       toast({
         title: "Error",
@@ -256,6 +269,11 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
   }
 
   if (!horario || !schedule || !weekStartDate) {
+    console.log("🔧 [PublicHorarioPage] Rendering 'No hay horario' message", {
+      hasHorario: !!horario,
+      hasSchedule: !!schedule,
+      hasWeekStartDate: !!weekStartDate
+    })
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -275,6 +293,14 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
       </div>
     )
   }
+
+  console.log("🔧 [PublicHorarioPage] Rendering main content", {
+    scheduleId: schedule.id,
+    scheduleName: schedule.nombre,
+    weekDaysCount: weekDays.length,
+    employeesCount: employees.length,
+    shiftsCount: shifts.length
+  })
 
   return (
     <div className="min-h-screen bg-background">

@@ -81,13 +81,18 @@ export function usePublicHorario(ownerId: string): UsePublicHorarioReturn {
         currentWeekLabel: currentWeek?.weekLabel,
         hasPublishedAt: !!currentWeek?.publishedAt,
         hasPublicImageUrl: !!currentWeek?.publicImageUrl,
+        publicImageUrlLength: currentWeek?.publicImageUrl?.length || 0,
+        publicImageUrlPrefix: currentWeek?.publicImageUrl?.substring(0, 50) + "...",
         daysCount: Object.keys(currentWeek?.days || {}).length,
         employeesCount: currentWeek?.employees?.length || 0,
         isPublic: horarioData.isPublic,
-        weeksCount: Object.keys(horarioData.weeks).length
+        weeksCount: Object.keys(horarioData.weeks).length,
+        allWeeksIds: Object.keys(horarioData.weeks)
       })
       
+      console.log("🔧 [usePublicHorario] Setting horario state:", !!horarioData)
       setHorario(horarioData)
+      console.log("🔧 [usePublicHorario] Horario state set successfully")
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Error al cargar horario"
