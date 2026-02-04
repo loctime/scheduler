@@ -24,51 +24,55 @@ export const saveEmployeeRequest = async (
   requestData: EmployeeRequestData,
   ownerId: string
 ): Promise<void> => {
-  if (!db) {
-    throw new Error('Firestore no está inicializado');
-  }
+  // 🔥 DESACTIVADO: Employee requests completamente deshabilitados
+  console.warn('🚫 [saveEmployeeRequest] Employee requests desactivados - no se guardará en Firestore')
+  return Promise.resolve()
+  
+  // if (!db) {
+  //   throw new Error('Firestore no está inicializado');
+  // }
 
-  try {
-    // VALIDACIÓN Y LOGS DE DEPURACIÓN
-    console.log('EMPLOYEE REQUEST – PAYLOAD DEBUG');
-    console.log('auth.currentUser?.uid:', auth?.currentUser?.uid);
-    console.log('ownerId enviado:', ownerId);
-    console.log('userId enviado:', auth?.currentUser?.uid);
-    console.log('employeeId (si existe):', employeeId);
+  // try {
+  //   // VALIDACIÓN Y LOGS DE DEPURACIÓN
+  //   console.log('EMPLOYEE REQUEST – PAYLOAD DEBUG');
+  //   console.log('auth.currentUser?.uid:', auth?.currentUser?.uid);
+  //   console.log('ownerId enviado:', ownerId);
+  //   console.log('userId enviado:', auth?.currentUser?.uid);
+  //   console.log('employeeId (si existe):', employeeId);
     
-    // Verificar explícitamente que ownerId exista y sea válido
-    if (!ownerId || ownerId === 'undefined' || ownerId === 'null' || ownerId === '') {
-      console.error('EMPLOYEE REQUEST – ownerId MISSING OR INVALID');
-      throw new Error('ownerId es requerido y no puede estar vacío');
-    }
+  //   // Verificar explícitamente que ownerId exista y sea válido
+  //   if (!ownerId || ownerId === 'undefined' || ownerId === 'null' || ownerId === '') {
+  //     console.error('EMPLOYEE REQUEST – ownerId MISSING OR INVALID');
+  //     throw new Error('ownerId es requerido y no puede estar vacío');
+  //   }
 
-    // Verificar que el usuario esté autenticado
-    if (!auth?.currentUser?.uid) {
-      console.error('EMPLOYEE REQUEST – USER NOT AUTHENTICATED');
-      throw new Error('Usuario no autenticado');
-    }
+  //   // Verificar que el usuario esté autenticado
+  //   if (!auth?.currentUser?.uid) {
+  //     console.error('EMPLOYEE REQUEST – USER NOT AUTHENTICATED');
+  //     throw new Error('Usuario no autenticado');
+  //   }
 
-    const docId = `${scheduleId}_${employeeId}_${date}`;
-    const docRef = doc(db, COLLECTION_NAME, docId);
+  //   const docId = `${scheduleId}_${employeeId}_${date}`;
+  //   const docRef = doc(db, COLLECTION_NAME, docId);
     
-    const employeeRequest: EmployeeRequest = {
-      ...requestData,
-      userId: auth.currentUser.uid, // UID del usuario autenticado
-      scheduleId,
-      employeeId, // ID real del empleado solicitado
-      date,
-      ownerId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+  //   const employeeRequest: EmployeeRequest = {
+  //     ...requestData,
+  //     userId: auth.currentUser.uid, // UID del usuario autenticado
+  //     scheduleId,
+  //     employeeId, // ID real del empleado solicitado
+  //     date,
+  //     ownerId,
+  //     createdAt: new Date().toISOString(),
+  //     updatedAt: new Date().toISOString()
+  //   };
 
-    console.log('EMPLOYEE REQUEST – DOCUMENTO COMPLETO:', employeeRequest);
+  //   console.log('EMPLOYEE REQUEST – DOCUMENTO COMPLETO:', employeeRequest);
 
-    await setDoc(docRef, employeeRequest);
-  } catch (error) {
-    console.error('Error saving employee request:', error);
-    throw error;
-  }
+  //   await setDoc(docRef, employeeRequest);
+  // } catch (error) {
+  //   console.error('Error saving employee request:', error);
+  //   throw error;
+  // }
 };
 
 /**
@@ -107,22 +111,26 @@ export const deleteEmployeeRequest = async (
   date: string,
   ownerId?: string
 ): Promise<void> => {
-  if (!db) {
-    throw new Error('Firestore no está inicializado');
-  }
+  // 🔥 DESACTIVADO: Employee requests completamente deshabilitados
+  console.warn('🚫 [deleteEmployeeRequest] Employee requests desactivados - no se eliminará en Firestore')
+  return Promise.resolve()
+  
+  // if (!db) {
+  //   throw new Error('Firestore no está inicializado');
+  // }
 
-  try {
-    const docId = `${scheduleId}_${employeeId}_${date}`;
-    const docRef = doc(db, COLLECTION_NAME, docId);
-    if (ownerId) {
-      const docSnap = await getDoc(docRef);
-      if (!docSnap.exists() || docSnap.data()?.ownerId !== ownerId) {
-        throw new Error('ownerId no válido para eliminar el pedido');
-      }
-    }
-    await deleteDoc(docRef);
-  } catch (error) {
-    console.error('Error deleting employee request:', error);
-    throw error;
-  }
+  // try {
+  //   const docId = `${scheduleId}_${employeeId}_${date}`;
+  //   const docRef = doc(db, COLLECTION_NAME, docId);
+  //   if (ownerId) {
+  //     const docSnap = await getDoc(docRef);
+  //     if (!docSnap.exists() || docSnap.data()?.ownerId !== ownerId) {
+  //       throw new Error('ownerId no válido para eliminar el pedido');
+  //     }
+  //   }
+  //   await deleteDoc(docRef);
+  // } catch (error) {
+  //   console.error('Error deleting employee request:', error);
+  //   throw error;
+  // }
 };

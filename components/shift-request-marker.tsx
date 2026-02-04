@@ -121,24 +121,24 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
         ? userData.ownerId 
         : userData?.uid || '';
 
-      // Usar la función que actualiza el caché y asigna en el schedule
+      // 🔥 DESACTIVADO: Employee requests completamente deshabilitados
+      console.warn('🚫 [ShiftRequestMarker] Employee requests desactivados - no se guardará en Firestore')
+      
+      // Simular éxito sin escribir en Firestore
       if (updateEmployeeRequestCache) {
-        const success = await saveEmployeeRequestWithCache(
-          scheduleId, 
-          employeeId, 
-          date, 
-          data, 
-          ownerId, 
-          updateEmployeeRequestCache,
-          onAssignmentUpdate
-        );
-        
-        if (!success) {
-          throw new Error('Error al guardar el request');
-        }
+        console.warn('🚫 [ShiftRequestMarker] saveEmployeeRequestWithCache desactivado')
+        // const success = await saveEmployeeRequestWithCache(
+        //   scheduleId, 
+        //   employeeId, 
+        //   date, 
+        //   data, 
+        //   ownerId,
+        //   updateEmployeeRequestCache,
+        //   onAssignmentUpdate
+        // )
       } else {
-        // Fallback a método original
-        await saveEmployeeRequest(scheduleId, employeeId, date, data, ownerId);
+        console.warn('🚫 [ShiftRequestMarker] saveEmployeeRequest desactivado')
+        // await saveEmployeeRequest(scheduleId, employeeId, date, data, ownerId);
       }
       
       // Actualizar estado local
@@ -158,11 +158,14 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
 
   const handleDeleteRequest = async () => {
     try {
-      const ownerId = userData?.role === 'invited' && userData?.ownerId 
-        ? userData.ownerId 
-        : userData?.uid || '';
+      // 🔥 DESACTIVADO: Employee requests completamente deshabilitados
+      console.warn('🚫 [ShiftRequestMarker] deleteEmployeeRequest desactivado')
+      
+      // const ownerId = userData?.role === 'invited' && userData?.ownerId 
+      //   ? userData.ownerId 
+      //   : userData?.uid || '';
 
-      await deleteEmployeeRequest(scheduleId, employeeId, date, ownerId);
+      // await deleteEmployeeRequest(scheduleId, employeeId, date, ownerId);
       
       // Actualizar estado local
       if (active) {
