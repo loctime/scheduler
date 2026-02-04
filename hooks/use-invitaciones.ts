@@ -34,20 +34,8 @@ export function useInvitaciones(user: any, userData?: { grupoIds?: string[] } | 
         createdAt: serverTimestamp(),
       }
 
-      // Si se especifica un rol, agregarlo al link
-      if (role) {
-        linkData.role = role
-      }
-
-      // Determinar el grupoId a usar:
-      // 1. Si se especifica explícitamente, usarlo
-      // 2. Si no, heredar el grupoId del usuario que crea el link (si pertenece a un grupo)
-      // Esto asegura que todos los links creados por usuarios del mismo grupo pertenezcan al mismo grupo
-      const grupoIdFinal = grupoId || (userData?.grupoIds && userData.grupoIds.length > 0 ? userData.grupoIds[0] : undefined)
-      
-      if (grupoIdFinal) {
-        linkData.grupoId = grupoIdFinal
-      }
+      // En Horarios, las invitaciones siempre son para colaboradores
+      linkData.role = "invited"
 
       // Si se especifican permisos, agregarlos al link
       if (permisos) {
@@ -62,8 +50,7 @@ export function useInvitaciones(user: any, userData?: { grupoIds?: string[] } | 
         ownerId: user.uid,
         activo: true,
         usado: false,
-        role: role,
-        grupoId: grupoIdFinal,
+        role: "invited",
         permisos: permisos,
       }
 
@@ -228,4 +215,3 @@ export function useInvitaciones(user: any, userData?: { grupoIds?: string[] } | 
     cargarLinks,
   }
 }
-
