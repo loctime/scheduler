@@ -190,9 +190,18 @@ export function useStockConsole(user: any) {
     }))
   }, [])
 
+  const decrementarCantidad = useCallback((productoId: string) => {
+    setState(prev => ({
+      ...prev,
+      cantidades: {
+        ...prev.cantidades,
+        [productoId]: (prev.cantidades[productoId] || 0) - 1
+      }
+    }))
+  }, [])
+
   const setCantidad = useCallback((productoId: string, cantidad: number) => {
-    if (cantidad < 0) return
-    
+    // Permitir cualquier valor numérico (positivo, negativo o cero)
     setState(prev => ({
       ...prev,
       cantidades: {
@@ -209,31 +218,35 @@ export function useStockConsole(user: any) {
   // Resumen de movimientos pendientes
   const movimientosPendientes = useMemo(() => {
     return Object.entries(state.cantidades)
-      .filter(([_, cantidad]) => cantidad > 0)
+      .filter(([_, cantidad]) => cantidad !== 0) // Incluir positivos y negativos
       .map(([productoId, cantidad]) => {
         const producto = productos.find(p => p.id === productoId)
         if (!producto) return null
         
+        // Determinar tipo según signo de cantidad
+        const tipo: MovimientoStockTipo = cantidad > 0 ? "INGRESO" : "EGRESO"
+        
         const movimiento: MovimientoInput = {
           productoId,
           productoNombre: producto.nombre,
-          cantidad,
-          tipo: state.tipo,
+          cantidad: Math.abs(cantidad), // Usar valor absoluto para persistencia
+          tipo,
           pedidoId: state.selectedPedidoId || undefined,
         }
         
         return movimiento
       })
       .filter(Boolean) as MovimientoInput[]
-  }, [state.cantidades, state.tipo, state.selectedPedidoId, productos])
+  }, [state.cantidades, state.selectedPedidoId, productos])
 
   const totalProductos = useMemo(() => {
     return movimientosPendientes.length
   }, [movimientosPendientes])
 
   const totalCantidad = useMemo(() => {
-    return movimientosPendientes.reduce((sum, mov) => sum + mov.cantidad, 0)
-  }, [movimientosPendientes])
+    // Suma directa de las cantidades con signo
+    return Object.values(state.cantidades).reduce((sum, cantidad) => sum + cantidad, 0)
+  }, [state.cantidades])
 
   // Confirmar movimientos
   const confirmarMovimientos = useCallback(async (): Promise<boolean> => {
@@ -314,8 +327,8 @@ export function useStockConsole(user: any) {
     
     // Acciones
     setSelectedPedidoId,
-    setTipo,
     incrementarCantidad,
+    decrementarCantidad,
     setCantidad,
     limpiarCantidades,
     confirmarMovimientos,

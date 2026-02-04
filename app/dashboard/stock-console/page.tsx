@@ -5,10 +5,8 @@ import { useStockConsole } from "@/hooks/use-stock-console"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
-import { Plus, Minus, Check, X, Package } from "lucide-react"
+import { Check, X, Package } from "lucide-react"
 
 export default function StockConsolePage() {
   const { user, userData } = useData()
@@ -23,38 +21,22 @@ export default function StockConsolePage() {
     totalProductos,
     totalCantidad,
     setSelectedPedidoId,
-    setTipo,
     incrementarCantidad,
+    decrementarCantidad,
     setCantidad,
     limpiarCantidades,
     confirmarMovimientos,
   } = stockConsole
 
-  const isIngreso = state.tipo === "INGRESO"
-  const headerColor = isIngreso ? "bg-green-500" : "bg-red-500"
-  const buttonColor = isIngreso ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+  // El total ya está calculado correctamente en el hook (totalCantidad)
+  // No necesitamos recalcular aquí
 
   return (
     <DashboardLayout user={user}>
       <div className="min-h-screen bg-gray-100 pb-24">
-        {/* Header con modo */}
-        <div className={`${headerColor} text-white p-4 shadow-lg`}>
-          <div className="flex items-center justify-between mb-2">
-            <h1 className="text-xl font-bold">Stock Rápido</h1>
-            <div className="flex items-center gap-3">
-              <span className={`text-sm font-medium ${!isIngreso ? "opacity-50" : ""}`}>
-                INGRESO
-              </span>
-              <Switch
-                checked={!isIngreso}
-                onCheckedChange={(checked) => setTipo(checked ? "EGRESO" : "INGRESO")}
-                className="scale-110"
-              />
-              <span className={`text-sm font-medium ${isIngreso ? "opacity-50" : ""}`}>
-                EGRESO
-              </span>
-            </div>
-          </div>
+        {/* Header simple */}
+        <div className="bg-blue-500 text-white p-4 shadow-lg">
+          <h1 className="text-xl font-bold">Stock Rápido</h1>
         </div>
 
         {/* Selector de Pedido (compacto) */}
@@ -121,7 +103,7 @@ export default function StockConsolePage() {
                     {/* Zona IZQUIERDA (rojo) */}
                     <div 
                       className="flex-[0.46] bg-red-500 hover:bg-red-600 active:bg-red-700 transition-colors flex items-center justify-center cursor-pointer"
-                      onClick={() => setCantidad(producto.id, Math.max(0, cantidad - 1))}
+                      onClick={() => decrementarCantidad(producto.id)}
                     >
                     </div>
 
@@ -137,7 +119,6 @@ export default function StockConsolePage() {
                       <Input
                         id={`input-${producto.id}`}
                         type="number"
-                        min="0"
                         value={cantidad}
                         onChange={(e) => {
                           e.stopPropagation()
@@ -192,17 +173,17 @@ export default function StockConsolePage() {
                 Limpiar
               </Button>
               
-              <div className={`text-2xl font-bold ${isIngreso ? "text-green-600" : "text-red-600"}`}>
-                {isIngreso ? "+" : "-"}{totalCantidad}
+              <div className={`text-2xl font-bold ${totalCantidad >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {totalCantidad >= 0 ? "+" : ""}{totalCantidad}
               </div>
               
               <Button
                 onClick={confirmarMovimientos}
                 disabled={state.loading}
-                className={`h-10 px-4 ${buttonColor}`}
+                className="h-10 px-4 bg-blue-600 hover:bg-blue-700"
               >
                 <Check className="w-4 h-4 mr-2" />
-                {state.loading ? "Procesando..." : `Confirmar ${isIngreso ? "ingreso" : "egreso"}`}
+                {state.loading ? "Procesando..." : "Confirmar"}
               </Button>
             </div>
 

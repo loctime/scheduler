@@ -71,19 +71,26 @@ export async function confirmarMovimientos(
     const stockActualizado: Record<string, number> = {}
 
     const transactionResult = await runTransaction(db!, async (transaction) => {
-      // Procesar cada movimiento
-      for (const movimiento of movimientos) {
-        // Obtener stock actual del producto
-        const productRef = doc(db!, COLLECTIONS.PRODUCTS, movimiento.productoId)
-        const productDoc = await transaction.get(productRef)
-        
-        if (!productDoc.exists()) {
-          throw new Error(`Producto ${movimiento.productoId} no encontrado`)
-        }
+      // PRIMERO: Leer todos los productos necesarios
+      const productosRefs = movimientos.map(m => doc(db!, COLLECTIONS.PRODUCTS, m.productoId))
+      const productosDocs = await Promise.all(
+        productosRefs.map(ref => transaction.get(ref))
+      )
 
-        const stockActual = productDoc.data().stockActual || 0
-        
-        // Validar stock negativo para egresos
+      // Validar que todos los productos existan
+      const productosData = productosDocs.map((doc, index) => {
+        if (!doc.exists()) {
+          throw new Error(`Producto ${movimientos[index].productoId} no encontrado`)
+        }
+        return {
+          doc,
+          stockActual: doc.data().stockActual || 0,
+          movimiento: movimientos[index]
+        }
+      })
+
+      // SEGUNDO: Validar stock negativo para todos los egresos
+      for (const { stockActual, movimiento } of productosData) {
         const validacion = validarStockNegativo(
           stockActual, 
           movimiento.cantidad, 
@@ -92,14 +99,17 @@ export async function confirmarMovimientos(
         if (!validacion.ok) {
           throw new Error(validacion.error)
         }
+      }
 
+      // TERCERO: Escribir todos los cambios
+      for (const { doc: productDoc, stockActual, movimiento } of productosData) {
         // Calcular nuevo stock
         const nuevoStock = movimiento.tipo === "INGRESO" 
           ? stockActual + movimiento.cantidad
           : stockActual - movimiento.cantidad
 
         // Actualizar stock del producto
-        transaction.update(productRef, {
+        transaction.update(productDoc.ref, {
           stockActual: nuevoStock,
           updatedAt: serverTimestamp(),
         })
@@ -118,13 +128,12 @@ export async function confirmarMovimientos(
           origen: "stock_console",
         }
 
-        const movimientoRef = await addDoc(
-          collection(db!, COLLECTIONS.STOCK_MOVEMENTS),
-          {
-            ...movimientoData,
-            createdAt: serverTimestamp(),
-          }
-        )
+        // Para crear el documento dentro de la transacción, necesitamos un nuevo docRef
+        const movimientoRef = doc(collection(db!, COLLECTIONS.STOCK_MOVEMENTS))
+        transaction.set(movimientoRef, {
+          ...movimientoData,
+          createdAt: serverTimestamp(),
+        })
 
         const movimientoGuardado: MovimientoStock = {
           id: movimientoRef.id,
