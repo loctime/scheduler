@@ -204,7 +204,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     ordenEmpleados: isScheduleCompleted && schedule && !('horarioId' in schedule) && (schedule as Horario).ordenEmpleadosSnapshot
       ? (schedule as Horario).ordenEmpleadosSnapshot
       : config?.ordenEmpleados,
-    schedule,
+    schedule: schedule && !('horarioId' in schedule) ? schedule as Horario : null,
     scheduleId: schedule?.id,
     isScheduleCompleted,
     currentWeekStart,

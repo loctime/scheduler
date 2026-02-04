@@ -494,10 +494,12 @@ export default function PedidosPage() {
       where("ownerId", "==", ownerId)
     )
 
-    const enlaceRef = doc(db, COLLECTIONS.ENLACES_PUBLICOS, selectedPedido.enlacePublicoId)
-    const unsubscribe = onSnapshot(
-      enlaceRef,
-      (snapshot) => {
+    const enlaceRef = selectedPedido.enlacePublicoId ? doc(db, COLLECTIONS.ENLACES_PUBLICOS, selectedPedido.enlacePublicoId) : null
+    
+    if (enlaceRef) {
+      const unsubscribe = onSnapshot(
+        enlaceRef,
+        (snapshot: any) => {
         if (!snapshot.exists()) {
           setEnlaceActivo(null)
           return
@@ -505,12 +507,17 @@ export default function PedidosPage() {
         const data = snapshot.data() as any
         setEnlaceActivo(data.activo ? { id: snapshot.id } : null)
       },
-      (error) => {
+      (error: any) => {
         console.error("Error en listener de enlaces:", error)
       }
     )
 
     return () => unsubscribe()
+    } else {
+      // No hay enlacePublicoId, limpiar enlace activo
+      setEnlaceActivo(null)
+      return () => {}
+    }
   }, [selectedPedido?.id, selectedPedido?.enlacePublicoId, db, user])
 
   // Handlers

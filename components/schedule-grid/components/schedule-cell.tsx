@@ -266,6 +266,10 @@ function ScheduleCellComponent({
       .map((a) => {
         // Si tiene horario real, crear turno virtual con esos horarios
         // Si no, crear turno virtual genérico (aunque esto es raro para medio_franco)
+        // Obtener ownerId de algún turno disponible o usar fallback
+        const firstShift = shifts.find(item => item.shift)?.shift
+        const ownerId = firstShift?.ownerId || ""
+        
         const virtualShift: Turno = {
           id: "medio_franco_virtual",
           name: "1/2 Franco",
@@ -275,6 +279,7 @@ function ScheduleCellComponent({
           endTime2: a.endTime2,
           color: "#22c55e",
           userId: "",
+          ownerId,
         }
         return { assignment: a, shift: virtualShift }
       })
