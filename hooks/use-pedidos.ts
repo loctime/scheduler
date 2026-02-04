@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
 import { Pedido, Producto } from "@/lib/types"
 import { useData } from "@/contexts/data-context"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
 const DEFAULT_FORMAT = "{nombre} ({cantidad})"
 
@@ -32,25 +33,21 @@ export function usePedidos(user: any) {
   const [loading, setLoading] = useState(true)
   const [stockActual, setStockActual] = useState<Record<string, number>>({})
 
-  // Helper para obtener el userId efectivo (unificado para lectura y escritura)
-  const getEffectiveUserId = useCallback((): string | null => {
-    if (!user) return null
-    return userData?.role === "invited" && userData?.ownerId 
-      ? userData.ownerId 
-      : user.uid
-  }, [user, userData])
+  const ownerId = useMemo(
+    () => getOwnerIdForActor(user, userData),
+    [user, userData]
+  )
 
   // Cargar pedidos
   const loadPedidos = useCallback(async () => {
     if (!user || !db) return
     
     try {
-      const userIdToQuery = getEffectiveUserId()
-      if (!userIdToQuery) return
+      if (!ownerId) return
       
       const pedidosQuery = query(
         collection(db, COLLECTIONS.PEDIDOS),
-        where("userId", "==", userIdToQuery)
+        where("ownerId", "==", ownerId)
       )
       const snapshot = await getDocs(pedidosQuery)
       const pedidosData = snapshot.docs.map((doc) => ({
@@ -72,7 +69,7 @@ export function usePedidos(user: any) {
         variant: "destructive",
       })
     }
-  }, [user, getEffectiveUserId, selectedPedido, toast])
+  }, [user, ownerId, selectedPedido, toast])
 
   // Cargar productos del pedido seleccionado - 100% READ-ONLY
   // NO hace escrituras automáticas. Solo lee desde Firestore.
@@ -83,15 +80,14 @@ export function usePedidos(user: any) {
     }
     
     try {
-      const userIdToQuery = getEffectiveUserId()
-      if (!userIdToQuery) {
+      if (!ownerId) {
         setProducts([])
         return
       }
       
       const productsQuery = query(
         collection(db, COLLECTIONS.PRODUCTS),
-        where("userId", "==", userIdToQuery),
+        where("ownerId", "==", ownerId),
         where("pedidoId", "==", selectedPedido.id)
       )
       const snapshot = await getDocs(productsQuery)
@@ -119,15 +115,14 @@ export function usePedidos(user: any) {
         variant: "destructive",
       })
     }
-  }, [user, selectedPedido, getEffectiveUserId, toast])
+  }, [user, selectedPedido, ownerId, toast])
 
   // Corregir orden de productos sin orden - función separada, solo se llama explícitamente
   const fixProductsOrder = useCallback(async (): Promise<boolean> => {
     if (!db || !selectedPedido || products.length === 0) return false
 
     try {
-      const userIdToUse = getEffectiveUserId()
-      if (!userIdToUse) return false
+      if (!ownerId || !user?.uid) return false
 
       // Identificar productos sin orden
       const productosSinOrden = products.filter(p => p.orden === undefined)
@@ -142,13 +137,15 @@ export function usePedidos(user: any) {
         ? Math.max(...productosConOrden.map(p => p.orden ?? 0), -1) + 1
         : 0
       
-      // Escribir en Firestore usando userId efectivo unificado
+      // Escribir en Firestore usando ownerId resuelto
       const dbInstance = db // TypeScript ahora sabe que db no es undefined
       const batch = writeBatch(dbInstance)
       productosSinOrden.forEach((product, index) => {
         const productRef = doc(dbInstance, COLLECTIONS.PRODUCTS, product.id)
         batch.update(productRef, {
           orden: maxOrden + index,
+          ownerId,
+          userId: user.uid,
           updatedAt: serverTimestamp(),
         })
       })
@@ -161,27 +158,28 @@ export function usePedidos(user: any) {
       logger.error("Error al corregir orden de productos:", error)
       return false
     }
-  }, [db, selectedPedido, products, getEffectiveUserId, loadProducts])
+  }, [db, selectedPedido, products, ownerId, user, loadProducts])
 
   // Corregir unidad de productos sin unidad - función separada, solo se llama explícitamente
   const fixProductsUnit = useCallback(async (): Promise<boolean> => {
     if (!db || !selectedPedido || products.length === 0) return false
 
     try {
-      const userIdToUse = getEffectiveUserId()
-      if (!userIdToUse) return false
+      if (!ownerId || !user?.uid) return false
 
       // Identificar productos sin unidad
       const productosSinUnidad = products.filter(p => !p.unidad || p.unidad.trim() === "")
       if (productosSinUnidad.length === 0) return true
 
-      // Escribir en Firestore usando userId efectivo unificado
+      // Escribir en Firestore usando ownerId resuelto
       const dbInstance = db // TypeScript ahora sabe que db no es undefined
       const batch = writeBatch(dbInstance)
       productosSinUnidad.forEach((product) => {
         const productRef = doc(dbInstance, COLLECTIONS.PRODUCTS, product.id)
         batch.update(productRef, {
           unidad: "U",
+          ownerId,
+          userId: user.uid,
           updatedAt: serverTimestamp(),
         })
       })
@@ -194,7 +192,7 @@ export function usePedidos(user: any) {
       logger.error("Error al corregir unidad de productos:", error)
       return false
     }
-  }, [db, selectedPedido, products, getEffectiveUserId, loadProducts])
+  }, [db, selectedPedido, products, ownerId, user, loadProducts])
 
   // Inicialización
   useEffect(() => {
@@ -271,11 +269,17 @@ export function usePedidos(user: any) {
     }
 
     try {
+      if (!ownerId) {
+        toast({ title: "Error", description: "Owner no válido", variant: "destructive" })
+        return null
+      }
+
       const docRef = await addDoc(collection(db, COLLECTIONS.PEDIDOS), {
         nombre: nombre.trim(),
         stockMinimoDefault,
         formatoSalida: formatoSalida || DEFAULT_FORMAT,
         estado: "creado",
+        ownerId,
         userId: user.uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -287,6 +291,7 @@ export function usePedidos(user: any) {
         stockMinimoDefault,
         formatoSalida: formatoSalida || DEFAULT_FORMAT,
         estado: "creado",
+        ownerId,
         userId: user.uid,
       }
       
@@ -300,13 +305,18 @@ export function usePedidos(user: any) {
       toast({ title: "Error", description: "No se pudo crear el pedido", variant: "destructive" })
       return null
     }
-  }, [user, userData, toast])
+  }, [user, userData, ownerId, toast])
 
   // Actualizar pedido
   const updatePedido = useCallback(async (nombre: string, stockMinimoDefault: number, formatoSalida: string, mensajePrevio?: string, sheetUrl?: string) => {
     if (!db || !selectedPedido) return false
 
     try {
+      if (!ownerId) {
+        toast({ title: "Error", description: "Owner no válido", variant: "destructive" })
+        return false
+      }
+
       // Primero escribir en Firestore - solo actualizar estado local si la escritura es exitosa
       await updateDoc(doc(db, COLLECTIONS.PEDIDOS, selectedPedido.id), {
         nombre: nombre.trim(),
@@ -314,6 +324,8 @@ export function usePedidos(user: any) {
         formatoSalida: formatoSalida || DEFAULT_FORMAT,
         mensajePrevio: mensajePrevio ?? selectedPedido.mensajePrevio ?? null,
         sheetUrl: sheetUrl !== undefined ? (sheetUrl.trim() || null) : selectedPedido.sheetUrl ?? null,
+        ownerId,
+        userId: user?.uid ?? selectedPedido.userId,
         updatedAt: serverTimestamp(),
       })
       
@@ -338,7 +350,7 @@ export function usePedidos(user: any) {
       toast({ title: "Error", description: "No se pudo actualizar", variant: "destructive" })
       return false
     }
-  }, [selectedPedido, toast])
+  }, [selectedPedido, ownerId, user, toast])
 
   // Eliminar pedido
   const deletePedido = useCallback(async () => {
@@ -410,8 +422,7 @@ export function usePedidos(user: any) {
         }
       })
 
-      const userIdToUse = getEffectiveUserId()
-      if (!userIdToUse) {
+      if (!ownerId) {
         toast({ title: "Error", description: "Usuario no válido", variant: "destructive" })
         return false
       }
@@ -424,7 +435,8 @@ export function usePedidos(user: any) {
           stockMinimo: selectedPedido.stockMinimoDefault,
           unidad: "U",
           orden: nombresMap.get(nombre) ?? maxOrden + nuevos.indexOf(nombre),
-          userId: userIdToUse,
+          ownerId,
+          userId: user.uid,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         })
@@ -443,14 +455,19 @@ export function usePedidos(user: any) {
       toast({ title: "Error", description: "No se pudo importar", variant: "destructive" })
       return false
     }
-  }, [user, getEffectiveUserId, selectedPedido, products, loadProducts, toast])
+  }, [user, ownerId, selectedPedido, products, loadProducts, toast])
 
   // Actualizar producto
   const updateProduct = useCallback(async (productId: string, field: string, value: string) => {
     if (!db) return false
+    if (!ownerId) return false
 
     try {
-      const updateData: any = { updatedAt: serverTimestamp() }
+      const updateData: any = {
+        updatedAt: serverTimestamp(),
+        ownerId,
+        userId: user?.uid,
+      }
 
       if (field === "nombre") {
         if (!value.trim()) {
@@ -477,7 +494,7 @@ export function usePedidos(user: any) {
       toast({ title: "Error", description: "No se pudo actualizar", variant: "destructive" })
       return false
     }
-  }, [loadProducts, toast])
+  }, [loadProducts, ownerId, user, toast])
 
   // Crear producto individual
   const createProduct = useCallback(async (nombre: string, stockMinimo?: number, unidad?: string) => {
@@ -501,8 +518,7 @@ export function usePedidos(user: any) {
         ? Math.max(...products.map(p => p.orden ?? 0), -1) + 1
         : 0
 
-      const userIdToUse = getEffectiveUserId()
-      if (!userIdToUse) {
+      if (!ownerId) {
         toast({ title: "Error", description: "Usuario no válido", variant: "destructive" })
         return null
       }
@@ -513,7 +529,8 @@ export function usePedidos(user: any) {
         stockMinimo: stockMinimo ?? selectedPedido.stockMinimoDefault,
         unidad: unidad?.trim() || "U",
         orden: maxOrden,
-        userId: userIdToUse,
+        ownerId,
+        userId: user.uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
@@ -528,7 +545,7 @@ export function usePedidos(user: any) {
       toast({ title: "Error", description: "No se pudo crear el producto", variant: "destructive" })
       return null
     }
-  }, [user, getEffectiveUserId, selectedPedido, products, loadProducts, toast])
+  }, [user, ownerId, selectedPedido, products, loadProducts, toast])
 
   // Eliminar producto
   const deleteProduct = useCallback(async (productId: string) => {
@@ -560,6 +577,7 @@ export function usePedidos(user: any) {
   // Actualizar orden de productos
   const updateProductsOrder = useCallback(async (newOrder: string[]) => {
     if (!db) return false
+    if (!ownerId) return false
 
     try {
       const dbInstance = db // TypeScript ahora sabe que db no es undefined
@@ -569,6 +587,8 @@ export function usePedidos(user: any) {
         const productRef = doc(dbInstance, COLLECTIONS.PRODUCTS, productId)
         batch.update(productRef, {
           orden: index,
+          ownerId,
+          userId: user?.uid,
           updatedAt: serverTimestamp(),
         })
       })
@@ -592,7 +612,7 @@ export function usePedidos(user: any) {
       await loadProducts()
       return false
     }
-  }, [db, loadProducts, toast])
+  }, [db, ownerId, user, loadProducts, toast])
 
   // Generar texto del pedido
   const generarTextoPedido = useCallback((): string => {
@@ -621,10 +641,13 @@ export function usePedidos(user: any) {
     fechaRecepcion?: Date
   ) => {
     if (!db) return false
+    if (!ownerId) return false
 
     try {
       const updateData: any = {
         estado,
+        ownerId,
+        userId: user?.uid,
         updatedAt: serverTimestamp(),
       }
       
@@ -661,7 +684,7 @@ export function usePedidos(user: any) {
       })
       return false
     }
-  }, [selectedPedido, toast])
+  }, [ownerId, user, selectedPedido, toast])
 
   // Actualizar remito de envío
   const updateRemitoEnvio = useCallback(async (
@@ -669,11 +692,14 @@ export function usePedidos(user: any) {
     remitoEnvioId: string
   ) => {
     if (!db) return false
+    if (!ownerId) return false
 
     try {
       // Primero escribir en Firestore - solo actualizar estado local si la escritura es exitosa
       await updateDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId), {
         remitoEnvioId,
+        ownerId,
+        userId: user?.uid,
         updatedAt: serverTimestamp(),
       })
       
@@ -693,7 +719,7 @@ export function usePedidos(user: any) {
       // No actualizar estado local - el listener de onSnapshot mantendrá el estado correcto
       return false
     }
-  }, [selectedPedido])
+  }, [ownerId, user, selectedPedido])
 
   // Actualizar enlace público
   const updateEnlacePublico = useCallback(async (
@@ -701,11 +727,14 @@ export function usePedidos(user: any) {
     enlacePublicoId: string
   ) => {
     if (!db) return false
+    if (!ownerId) return false
 
     try {
       // Primero escribir en Firestore - solo actualizar estado local si la escritura es exitosa
       await updateDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId), {
         enlacePublicoId,
+        ownerId,
+        userId: user?.uid,
         updatedAt: serverTimestamp(),
       })
       
@@ -725,7 +754,7 @@ export function usePedidos(user: any) {
       // No actualizar estado local - el listener de onSnapshot mantendrá el estado correcto
       return false
     }
-  }, [selectedPedido])
+  }, [ownerId, user, selectedPedido])
 
   return {
     // Estado
@@ -761,4 +790,3 @@ export function usePedidos(user: any) {
     fixProductsUnit,
   }
 }
-

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
@@ -17,6 +17,7 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import type { Recepcion } from "@/lib/types"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
 export default function RecepcionPage() {
   const params = useParams()
@@ -24,6 +25,7 @@ export default function RecepcionPage() {
   const pedidoId = params.id as string
   const { user, userData } = useData()
   const { toast } = useToast()
+  const ownerId = useMemo(() => getOwnerIdForActor(user, userData), [user, userData])
 
   const { pedidos, stockActual, calcularPedido, updatePedidoEstado } = usePedidos(user)
   const { crearRecepcion } = useRecepciones(user)
@@ -98,14 +100,12 @@ export default function RecepcionPage() {
             
             // Cargar TODOS los productos del pedido primero
             const { collection: col, query: q, where: w, getDocs: getDocsProducts } = await import("firebase/firestore")
-            const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
-              ? userData.ownerId 
-              : user.uid
-            
+            if (!ownerId) return
+
             const productosQuery = q(
               col(db, COLLECTIONS.PRODUCTS),
               w("pedidoId", "==", pedidoId),
-              w("userId", "==", userIdToQuery)
+              w("ownerId", "==", ownerId)
             )
             const productosSnapshot = await getDocsProducts(productosQuery)
             const todosLosProductos = productosSnapshot.docs.map((doc) => ({
@@ -173,14 +173,12 @@ export default function RecepcionPage() {
               // Cargar TODOS los productos del pedido
               if (db) {
                 const { collection: col, query: q, where: w, getDocs: getDocsProducts } = await import("firebase/firestore")
-                const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
-                  ? userData.ownerId 
-                  : user.uid
-                
+                if (!ownerId) return
+
                 const productosQuery = q(
                   col(db, COLLECTIONS.PRODUCTS),
                   w("pedidoId", "==", pedidoId),
-                  w("userId", "==", userIdToQuery)
+                  w("ownerId", "==", ownerId)
                 )
                 const productosSnapshot = await getDocsProducts(productosQuery)
                 const todosLosProductos = productosSnapshot.docs.map((doc) => ({
@@ -239,13 +237,14 @@ export default function RecepcionPage() {
   const handleConfirmarRecepcion = async (
     recepcionData: Omit<Recepcion, "id" | "createdAt">
   ) => {
-    if (!pedido) return
+    if (!pedido || !ownerId) return
 
     try {
       // Crear recepción
       const recepcion = await crearRecepcion({
         ...recepcionData,
         pedidoId: pedido.id,
+        ownerId,
         userId: user.uid,
       })
 
@@ -256,7 +255,7 @@ export default function RecepcionPage() {
         for (const productoRecepcion of recepcion.productos) {
           // Sumar la cantidad recibida al stock
           if (productoRecepcion.cantidadRecibida > 0) {
-            const stockDocId = `${user.uid}_${productoRecepcion.productoId}`
+            const stockDocId = `${ownerId}_${productoRecepcion.productoId}`
             const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
             
             // Obtener stock actual
@@ -270,6 +269,8 @@ export default function RecepcionPage() {
               await updateDoc(stockDocRef, {
                 cantidad: nuevoStock,
                 ultimaActualizacion: serverTimestamp(),
+                ownerId,
+                userId: user.uid,
               })
             } else {
               // Crear nuevo documento
@@ -278,6 +279,7 @@ export default function RecepcionPage() {
                 pedidoId: pedido.id,
                 cantidad: nuevoStock,
                 ultimaActualizacion: serverTimestamp(),
+                ownerId,
                 userId: user.uid,
               })
             }

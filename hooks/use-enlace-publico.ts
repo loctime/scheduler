@@ -18,6 +18,7 @@ import { logger } from "@/lib/logger"
 import { EnlacePublico, Producto } from "@/lib/types"
 import { useContext } from "react"
 import { DataContext } from "@/contexts/data-context"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
 // Helper para obtener userData de forma segura sin lanzar error
 function useUserDataSafe() {
@@ -38,16 +39,14 @@ export function useEnlacePublico(user: any) {
   const userData = useUserDataSafe()
   
   // Determinar el userId a usar: si es invitado, usar ownerId, sino usar su propio uid
-  const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
-    ? userData.ownerId 
-    : user?.uid
+  const ownerId = getOwnerIdForActor(user, userData)
 
   // Crear enlace público
   const crearEnlacePublico = useCallback(async (
     pedidoId: string,
     cantidadesPedidas?: Record<string, number> // Mapa de productoId -> cantidad a pedir
   ): Promise<EnlacePublico | null> => {
-    if (!db || !user) return null
+    if (!db || !user || !ownerId) return null
 
     setLoading(true)
     try {
@@ -61,7 +60,7 @@ export function useEnlacePublico(user: any) {
       }
       const pedidoData = pedidoDoc.data()
       // Verificar que el pedido pertenece al usuario o a su ownerId (si es invitado)
-      if (pedidoData.userId !== userIdToQuery) {
+      if (!ownerId || pedidoData.ownerId !== ownerId) {
         throw new Error("No tienes permiso para crear enlaces de este pedido")
       }
 
@@ -82,7 +81,7 @@ export function useEnlacePublico(user: any) {
       // Verificar si hay otro pedido en estado "creado" o "processing" para este usuario
       const pedidosActivosQuery = query(
         collection(db, COLLECTIONS.PEDIDOS),
-        where("userId", "==", userIdToQuery),
+        where("ownerId", "==", ownerId),
         where("estado", "in", ["creado", "processing"])
       )
       const pedidosActivosSnapshot = await getDocs(pedidosActivosQuery)
@@ -111,7 +110,7 @@ export function useEnlacePublico(user: any) {
                 collection(db, COLLECTIONS.ENLACES_PUBLICOS),
                 where("pedidoId", "==", p.id),
                 where("activo", "==", true),
-                where("userId", "==", userIdToQuery)
+                where("ownerId", "==", ownerId)
               )
               const enlacesSnapshotPrev = await getDocs(enlacesQueryPrev)
               const desactivarPrev = enlacesSnapshotPrev.docs.map((doc) =>
@@ -149,7 +148,7 @@ export function useEnlacePublico(user: any) {
         collection(db, COLLECTIONS.ENLACES_PUBLICOS),
         where("pedidoId", "==", pedidoId),
         where("activo", "==", true),
-        where("userId", "==", userIdToQuery)
+        where("ownerId", "==", ownerId)
       )
       const enlacesActivosSnapshot = await getDocs(enlacesActivosQuery)
       const desactivarPromesas = enlacesActivosSnapshot.docs.map((doc) =>
@@ -162,7 +161,7 @@ export function useEnlacePublico(user: any) {
       const productosQuery = query(
         collection(db, COLLECTIONS.PRODUCTS),
         where("pedidoId", "==", pedidoId),
-        where("userId", "==", userIdToQuery)
+        where("ownerId", "==", ownerId)
       )
       const productosSnapshot = await getDocs(productosQuery)
       const productosData = productosSnapshot.docs.map((doc) => ({
@@ -196,7 +195,8 @@ export function useEnlacePublico(user: any) {
         pedidoId,
         token: idSimple, // Usar el mismo ID como token
         activo: true,
-        userId: userIdToQuery, // Incluir userId para las reglas de seguridad (puede ser ownerId si es invitado)
+        ownerId,
+        userId: user?.uid, // Auditoría del actor real
         productosSnapshot: productosSnapshotData, // Guardar snapshot
         createdAt: serverTimestamp(),
       }
@@ -316,19 +316,15 @@ export function useEnlacePublico(user: any) {
     pedidoId: string
   ): Promise<boolean> => {
     if (!db || !user) return false
+    if (!ownerId) return false
 
     try {
-      // Determinar el userId a usar: si es invitado, usar ownerId, sino usar su propio uid
-      const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
-        ? userData.ownerId 
-        : user?.uid
-
       // Buscar todos los enlaces activos del pedido
       const enlacesQuery = query(
         collection(db, COLLECTIONS.ENLACES_PUBLICOS),
         where("pedidoId", "==", pedidoId),
         where("activo", "==", true),
-        where("userId", "==", userIdToQuery)
+        where("ownerId", "==", ownerId)
       )
       const enlacesSnapshot = await getDocs(enlacesQuery)
       
@@ -347,25 +343,21 @@ export function useEnlacePublico(user: any) {
       logger.error("Error al desactivar enlaces del pedido:", error)
       return false
     }
-  }, [user])
+  }, [user, ownerId])
 
   // Buscar enlaces públicos activos por pedidoId
   const buscarEnlacesActivosPorPedido = useCallback(async (
     pedidoId: string
   ): Promise<EnlacePublico[]> => {
     if (!db || !user) return []
+    if (!ownerId) return []
 
     try {
-      // Determinar el userId a usar: si es invitado, usar ownerId, sino usar su propio uid
-      const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
-        ? userData.ownerId 
-        : user?.uid
-      
       const enlacesQuery = query(
         collection(db, COLLECTIONS.ENLACES_PUBLICOS),
         where("pedidoId", "==", pedidoId),
         where("activo", "==", true),
-        where("userId", "==", userIdToQuery)
+        where("ownerId", "==", ownerId)
       )
       const snapshot = await getDocs(enlacesQuery)
       return snapshot.docs.map((doc) => ({
@@ -376,7 +368,7 @@ export function useEnlacePublico(user: any) {
       logger.error("Error al buscar enlaces activos:", error)
       return []
     }
-  }, [user])
+  }, [user, ownerId])
 
   return {
     loading,

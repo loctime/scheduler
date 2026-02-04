@@ -8,6 +8,7 @@ export type MovimientoStock = {
   cantidad: number
   stockAntes: number
   stockDespues: number
+  ownerId: string
   userId: string
   fecha: Date
   pedidoId?: string
@@ -24,7 +25,6 @@ export type MovimientoInput = {
 
 export type StockConsoleState = {
   selectedPedidoId: string | null
-  tipo: MovimientoStockTipo
   cantidades: Record<string, number>
   loading: boolean
   error: string | null

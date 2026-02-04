@@ -57,9 +57,9 @@ export default function FabricaPedidoDetailPage() {
         setPedido(pedidoData)
 
         // Obtener configuración para nombre de empresa
-        if (pedidoData.userId) {
+        if (pedidoData.ownerId) {
           try {
-            const configDoc = await getDoc(doc(db, COLLECTIONS.CONFIG, pedidoData.userId))
+            const configDoc = await getDoc(doc(db, COLLECTIONS.CONFIG, pedidoData.ownerId))
             if (configDoc.exists()) {
               const config = configDoc.data() as Configuracion
               setNombreEmpresa(config.nombreEmpresa || "Empresa")
@@ -90,7 +90,7 @@ export default function FabricaPedidoDetailPage() {
         const productosQuery = query(
           collection(db, COLLECTIONS.PRODUCTS),
           where("pedidoId", "==", pedidoId),
-          where("userId", "==", pedidoData.userId)
+          where("ownerId", "==", pedidoData.ownerId)
         )
         const productosSnapshot = await getDocs(productosQuery)
         const productosData = productosSnapshot.docs.map((doc) => ({
@@ -338,4 +338,3 @@ export default function FabricaPedidoDetailPage() {
     </DashboardLayout>
   )
 }
-

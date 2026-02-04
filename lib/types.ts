@@ -94,6 +94,7 @@ export interface StockMovimiento {
   tipo: "entrada" | "salida"
   cantidad: number
   unidad?: string
+  ownerId: string
   userId: string
   userName?: string
   motivo?: string
@@ -106,6 +107,7 @@ export interface StockActual {
   productoId: string
   cantidad: number
   ultimaActualizacion: any
+  ownerId: string
   userId: string
   pedidoId?: string
 }
@@ -272,6 +274,7 @@ export interface Pedido {
   formatoSalida: string
   mensajePrevio?: string
   sheetUrl?: string
+  ownerId: string
   userId: string
   estado?: string
   assignedTo?: string
@@ -293,6 +296,7 @@ export interface Producto {
   unidad?: string
   orden?: number
   cantidadPedida?: number
+  ownerId: string
   userId: string
   createdAt?: any
   updatedAt?: any
@@ -303,6 +307,7 @@ export interface EnlacePublico {
   pedidoId: string
   token: string
   activo: boolean
+  ownerId: string
   userId?: string
   productosSnapshot?: Array<{
     id: string
@@ -327,6 +332,7 @@ export interface Remito {
   pedidoId: string
   numero: string
   tipo: "envio" | "recepcion" | "pedido"
+  ownerId: string
   productos: Array<{
     productoId: string
     productoNombre: string
@@ -360,6 +366,7 @@ export interface Recepcion {
   id: string
   pedidoId: string
   fecha: any
+  ownerId: string
   productos: Array<{
     productoId: string
     productoNombre: string
