@@ -95,6 +95,7 @@ export function crearRemitoPedido(
     hacia: pedido.destinoDefault || "LOCAL",
     productos: productosAPedir,
     userId: pedido.userId,
+    ownerId: pedido.userId,
   }
 }
 
@@ -128,6 +129,7 @@ export function crearRemitoEnvio(
     hacia: pedido.destinoDefault || "LOCAL",
     productos: productosAPedir,
     userId: pedido.userId,
+    ownerId: pedido.userId,
   }
 }
 
@@ -203,6 +205,7 @@ export function crearRemitoEnvioDesdeDisponibles(
     hacia: pedido.destinoDefault || "LOCAL",
     productos: productosRemito,
     userId: pedido.userId,
+    ownerId: pedido.userId,
   }
 
   // Solo incluir observaciones generales si hay contenido
@@ -390,6 +393,7 @@ export function crearRemitoRecepcion(
     productos: productosConsolidados,
     final: true, // Marcar como remito final
     userId: pedido.userId,
+    ownerId: pedido.userId,
     // Usar hora actual automáticamente
     horaRetiroFabrica: horaActual,
     horaRecepcionLocal: horaActual,
