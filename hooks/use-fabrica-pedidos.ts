@@ -197,7 +197,7 @@ export function useFabricaPedidos(user: any) {
           pedidosQuery = query(
             collection(db, COLLECTIONS.PEDIDOS),
             where("estado", "in", ["creado", "processing"]),
-            where("userId", "in", userIdsDelGrupo.slice(0, 10))
+            where("ownerId", "in", userIdsDelGrupo.slice(0, 10))
           )
         } else {
           // Si hay más de 10, cargamos todos y filtramos después
@@ -250,7 +250,7 @@ export function useFabricaPedidos(user: any) {
       let pedidosFiltrados = pedidosData
       logger.info("[FABRICA] Pedidos antes de filtrar:", { 
         total: pedidosData.length,
-        pedidos: pedidosData.map(p => ({ id: p.id, nombre: p.nombre, userId: p.userId, estado: p.estado, enlacePublicoId: p.enlacePublicoId })),
+        pedidos: pedidosData.map(p => ({ id: p.id, nombre: p.nombre, ownerId: p.ownerId, estado: p.estado, enlacePublicoId: p.enlacePublicoId })),
         userIdsDelGrupo,
         enlacesActivosCount: enlacesActivosIds.size
       })
@@ -279,15 +279,15 @@ export function useFabricaPedidos(user: any) {
       })
         
         pedidosFiltrados = pedidosData.filter(pedido => {
-          const enGrupo = pedido.userId && userIdsDelGrupo.includes(pedido.userId)
+          const enGrupo = pedido.ownerId && userIdsDelGrupo.includes(pedido.ownerId)
           const tieneEnlaceActivo = enlacesActivosIds.has(pedido.id)
           const coincide = enGrupo && tieneEnlaceActivo
           
-          if (!coincide && pedido.userId && enGrupo) {
+          if (!coincide && pedido.ownerId && enGrupo) {
             logger.info("[FABRICA] Pedido excluido del filtro:", {
               pedidoId: pedido.id,
               pedidoNombre: pedido.nombre,
-              pedidoUserId: pedido.userId,
+              pedidoOwnerId: pedido.ownerId,
               pedidoEstado: pedido.estado,
               enGrupo,
               tieneEnlaceActivo,
@@ -300,7 +300,7 @@ export function useFabricaPedidos(user: any) {
         })
         logger.info("[FABRICA] Pedidos después de filtrar por grupo y enlace activo:", { 
           total: pedidosFiltrados.length,
-          pedidos: pedidosFiltrados.map(p => ({ id: p.id, nombre: p.nombre, userId: p.userId }))
+          pedidos: pedidosFiltrados.map(p => ({ id: p.id, nombre: p.nombre, ownerId: p.ownerId }))
         })
       } else if (userData?.role === "factory") {
         // Si el usuario factory no tiene grupos asignados, no mostrar ningún pedido
@@ -318,7 +318,7 @@ export function useFabricaPedidos(user: any) {
       setPedidos(pedidosFiltrados)
 
       // Cargar información de usuarios únicos (solo de los pedidos filtrados)
-      const userIdsUnicos = [...new Set(pedidosFiltrados.map(p => p.userId).filter(Boolean))]
+      const userIdsUnicos = [...new Set(pedidosFiltrados.map(p => p.ownerId).filter(Boolean))]
       if (userIdsUnicos.length > 0) {
         const usuarios = await cargarUsuarios(userIdsUnicos)
         setUsuariosMap(usuarios)
@@ -402,7 +402,7 @@ export function useFabricaPedidos(user: any) {
       
       if (userIdsDelGrupo.length > 0) {
         pedidosFiltrados = pedidosData.filter(pedido => {
-          const enGrupo = pedido.userId && userIdsDelGrupo.includes(pedido.userId)
+          const enGrupo = pedido.ownerId && userIdsDelGrupo.includes(pedido.ownerId)
           const tieneEnlaceActivo = enlacesActivosIds.has(pedido.id)
           const coincide = enGrupo && tieneEnlaceActivo
           
@@ -410,7 +410,7 @@ export function useFabricaPedidos(user: any) {
           logger.info("[FABRICA] Evaluando pedido:", {
             pedidoId: pedido.id,
             pedidoNombre: pedido.nombre,
-            pedidoUserId: pedido.userId,
+            pedidoOwnerId: pedido.ownerId,
             pedidoEstado: pedido.estado,
             enGrupo,
             tieneEnlaceActivo,
@@ -418,11 +418,11 @@ export function useFabricaPedidos(user: any) {
             userIdsDelGrupo
           })
           
-          if (!coincide && pedido.userId && enGrupo) {
+          if (!coincide && pedido.ownerId && enGrupo) {
             logger.info("[FABRICA] Pedido excluido del filtro (listener):", {
               pedidoId: pedido.id,
               pedidoNombre: pedido.nombre,
-              pedidoUserId: pedido.userId,
+              pedidoOwnerId: pedido.ownerId,
               pedidoEstado: pedido.estado,
               enGrupo,
               tieneEnlaceActivo,
@@ -446,7 +446,7 @@ export function useFabricaPedidos(user: any) {
       setPedidos(pedidosFiltrados)
 
       // Actualizar usuarios si hay nuevos (solo de los pedidos filtrados)
-      const userIdsUnicos = [...new Set(pedidosFiltrados.map(p => p.userId).filter(Boolean))]
+      const userIdsUnicos = [...new Set(pedidosFiltrados.map(p => p.ownerId).filter(Boolean))]
       if (userIdsUnicos.length > 0) {
         const usuarios = await cargarUsuarios(userIdsUnicos)
         setUsuariosMap(prev => ({ ...prev, ...usuarios }))
@@ -460,7 +460,7 @@ export function useFabricaPedidos(user: any) {
       pedidosQuery = query(
         collection(db, COLLECTIONS.PEDIDOS),
         where("estado", "in", ["creado", "processing"]),
-        where("userId", "in", userIdsDelGrupo.slice(0, 10))
+        where("ownerId", "in", userIdsDelGrupo.slice(0, 10))
       )
     } else {
       pedidosQuery = query(
@@ -611,4 +611,3 @@ export function useFabricaPedidos(user: any) {
     sucursalesDelGrupo, // Lista de sucursales del grupo con nombres de empresa
   }
 }
-
