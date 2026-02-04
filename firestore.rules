@@ -544,6 +544,93 @@ service cloud.firestore {
         && canActFor(resource.data.ownerId);
     }
     
+    // =========================================================
+    // ============== CALENDAR SPECIAL DAYS ====================
+    // =========================================================
+    match /apps/horarios/calendarSpecialDays/{specialDayId} {
+    
+      // Lectura:
+      // - cualquier usuario autenticado puede leer (datos públicos de feriados)
+      // - información útil para generación de horarios
+      allow read: if isAuth();
+    
+      // Creación:
+      // - admin o manager pueden crear días especiales
+      // - usuarios invitados pueden crear locales solo para su owner
+      allow create: if isAuth()
+        // admin/manager pueden crear cualquier día especial
+        && (isAdmin() || isManager())
+        // o invitados pueden crear días locales para su owner
+        || (isInvited()
+            && request.resource.data.source == 'manual'
+            && request.resource.data.scope in ['municipal', 'provincial']
+            && request.resource.data.ownerId == myOwnerId())
+        // validaciones de datos
+        && validSpecialDayData(request.resource.data);
+    
+      // Actualización:
+      // - admin/manager pueden actualizar cualquier día especial
+      // - invitados pueden actualizar solo días manuales y locales
+      allow update: if isAuth()
+        // admin/manager pueden actualizar cualquier día
+        && (isAdmin() || isManager())
+        // o invitados pueden actualizar días manuales locales/provinciales
+        || (isInvited()
+            && resource.data.source == 'manual'
+            && resource.data.scope in ['municipal', 'provincial']
+            && resource.data.ownerId == myOwnerId())
+        // no permitir cambiar ID ni fecha (clave del documento)
+        && protectFieldUnchanged('date')
+        && protectFieldUnchanged('city')
+        // validaciones de datos
+        && validSpecialDayData(request.resource.data);
+    
+      // Eliminación:
+      // - solo admin/manager pueden eliminar
+      // - invitados pueden eliminar solo días manuales que crearon
+      allow delete: if isAuth()
+        // admin/manager pueden eliminar cualquier día
+        && (isAdmin() || isManager())
+        // o invitados pueden eliminar días manuales locales/provinciales
+        || (isInvited()
+            && resource.data.source == 'manual'
+            && resource.data.scope in ['municipal', 'provincial']
+            && resource.data.ownerId == myOwnerId());
+    }
+    
+    // Validador de datos para días especiales
+    function validSpecialDayData(data) {
+      return data.keys().hasAll([
+        'date', 'city', 'province', 'country', 
+        'title', 'type', 'scope', 'severity', 
+        'affectsScheduling', 'source'
+      ])
+      // fecha en formato YYYY-MM-DD
+      && data.date is string
+      && data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+      // campos de texto obligatorios
+      && data.city is string
+      && data.city.size() > 0
+      && data.province is string
+      && data.province.size() > 0
+      && data.country is string
+      && data.country.size() > 0
+      && data.title is string
+      && data.title.size() > 0
+      // tipo y alcance válidos
+      && data.type in ['feriado', 'no_laborable', 'local', 'evento']
+      && data.scope in ['nacional', 'provincial', 'municipal']
+      && data.severity in ['info', 'warning', 'critical']
+      // booleanos
+      && data.affectsScheduling is bool
+      && data.source in ['api', 'manual']
+      // descripción opcional
+      && (!('description' in data) || data.description is string)
+      // timestamps
+      && data.createdAt is timestamp
+      && data.updatedAt is timestamp;
+    }
+    
         // =========================================================
         // ===================== DEFAULT DENY ======================
         // =========================================================
