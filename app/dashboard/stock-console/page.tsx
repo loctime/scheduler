@@ -105,26 +105,23 @@ export default function StockConsolePage() {
                 >
                   {/* Header del producto */}
                   <div className="bg-white p-3 border-b">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {producto.nombre}
-                    </h3>
-                    <div className="flex items-center gap-3 text-sm text-gray-600">
-                      <span>
-                        Stock: <span className={`font-medium ${isStockBajo ? "text-red-600" : ""}`}>
-                          {stock}
-                        </span>
-                      </span>
-                      <span>Mín: {stockMinimo}</span>
-                      <span>{producto.unidad || "U"}</span>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-semibold text-gray-900">{producto.nombre}</span>
+                      <span className="text-gray-600">·</span>
+                      <span className="text-gray-600">Stock: <span className={`font-medium ${isStockBajo ? "text-red-600" : ""}`}>{stock}</span></span>
+                      <span className="text-gray-600">·</span>
+                      <span className="text-gray-600">Mín: {stockMinimo}</span>
+                      <span className="text-gray-600">·</span>
+                      <span className="text-gray-600">{producto.unidad || "U"}</span>
                     </div>
                   </div>
 
                   {/* Zonas de interacción */}
                   <div className="flex h-20">
-                    {/* Zona INGRESO (verde) */}
+                    {/* Zona IZQUIERDA (rojo) */}
                     <div 
-                      className="flex-[0.46] bg-green-500 hover:bg-green-600 active:bg-green-700 transition-colors flex items-center justify-center cursor-pointer"
-                      onClick={() => incrementarCantidad(producto.id)}
+                      className="flex-[0.46] bg-red-500 hover:bg-red-600 active:bg-red-700 transition-colors flex items-center justify-center cursor-pointer"
+                      onClick={() => setCantidad(producto.id, Math.max(0, cantidad - 1))}
                     >
                     </div>
 
@@ -152,10 +149,10 @@ export default function StockConsolePage() {
                       />
                     </div>
 
-                    {/* Zona EGRESO (rojo) */}
+                    {/* Zona DERECHA (verde) */}
                     <div 
-                      className="flex-[0.46] bg-red-500 hover:bg-red-600 active:bg-red-700 transition-colors flex items-center justify-center cursor-pointer"
-                      onClick={() => setCantidad(producto.id, Math.max(0, cantidad - 1))}
+                      className="flex-[0.46] bg-green-500 hover:bg-green-600 active:bg-green-700 transition-colors flex items-center justify-center cursor-pointer"
+                      onClick={() => incrementarCantidad(producto.id)}
                     >
                     </div>
                   </div>
