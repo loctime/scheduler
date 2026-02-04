@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react"
 import { useData } from "@/contexts/data-context"
 import { Horario } from "@/lib/types"
 import { useConfig } from "@/hooks/use-config"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import { useToast } from "@/hooks/use-toast"
 import { format, parseISO, startOfWeek, addDays } from "date-fns"
 import { es } from "date-fns/locale"
@@ -50,6 +51,7 @@ interface WeekGroup {
 export default function HorariosMensualesPage() {
   const [schedules, setSchedules] = useState<Horario[]>([])
   const { employees, shifts, loading: dataLoading, user, userData } = useData()
+  const ownerId = useMemo(() => getOwnerIdForActor(user, userData), [user, userData])
   const { config } = useConfig(user)
   const { toast } = useToast()
   const { exporting, exportImage, exportPDF, exportExcel } = useExportSchedule()
@@ -59,11 +61,11 @@ export default function HorariosMensualesPage() {
 
 
   useEffect(() => {
-    if (!user || !db) return
+    if (!user || !db || !ownerId) return
 
     const schedulesQuery = query(
       collection(db, COLLECTIONS.SCHEDULES),
-      where("createdBy", "==", user.uid),
+      where("ownerId", "==", ownerId),
       orderBy("weekStart", "desc")
     )
     const unsubscribeSchedules = onSnapshot(
@@ -88,7 +90,7 @@ export default function HorariosMensualesPage() {
     return () => {
       unsubscribeSchedules()
     }
-  }, [user, toast])
+  }, [user, ownerId, toast])
 
   // Agrupar horarios por mes y semana
   const monthGroups = useMemo<MonthGroup[]>(() => {

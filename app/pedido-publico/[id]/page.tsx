@@ -60,9 +60,9 @@ export default function PedidoPublicoPage() {
         setPedido(pedidoData)
 
         // Obtener configuración para nombre de empresa
-        if (pedidoData.userId) {
+        if (pedidoData.ownerId) {
           try {
-            const configDoc = await getDoc(doc(db, COLLECTIONS.CONFIG, pedidoData.userId))
+            const configDoc = await getDoc(doc(db, COLLECTIONS.CONFIG, pedidoData.ownerId))
             if (configDoc.exists()) {
               const config = configDoc.data() as Configuracion
               setNombreEmpresa(config.nombreEmpresa || "Empresa")

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useMemo } from "react"
 import { format, subDays, addDays } from "date-fns"
 import { serverTimestamp, addDoc, collection } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
@@ -15,6 +15,8 @@ import {
   saveHistoryEntry,
   updateSchedulePreservingFields,
 } from "@/lib/firestore-helpers"
+import { useData } from "@/contexts/data-context"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
 interface UseWeekActionsProps {
   weekDays: Date[]
@@ -52,11 +54,21 @@ export function useWeekActions({
   getWeekSchedule,
 }: UseWeekActionsProps): WeekActionsReturn {
   const { toast } = useToast()
+  const { userData } = useData()
+  const ownerId = useMemo(() => getOwnerIdForActor(user, userData), [user, userData])
   const [isCopying, setIsCopying] = useState(false)
   const [isClearing, setIsClearing] = useState(false)
 
   const executeCopyPreviousWeek = useCallback(async () => {
     if (!getWeekSchedule || readonly || !db || !user) {
+      return
+    }
+    if (!ownerId) {
+      toast({
+        title: "Error",
+        description: "Owner no válido",
+        variant: "destructive",
+      })
       return
     }
 
@@ -170,6 +182,7 @@ export function useWeekActions({
           weekStart: weekStartStr,
           semanaInicio: weekStartStr,
           semanaFin: weekEndStr,
+          ownerId,
           assignments: newAssignments,
           dayStatus: dayStatusToApply,
           createdAt: serverTimestamp(),
@@ -254,10 +267,18 @@ export function useWeekActions({
     } finally {
       setIsCopying(false)
     }
-  }, [getWeekSchedule, weekStartDate, weekDays, employees, weekSchedule, user, readonly, toast])
+  }, [getWeekSchedule, weekStartDate, weekDays, employees, weekSchedule, user, readonly, toast, ownerId])
 
   const executeClearWeek = useCallback(async () => {
     if (readonly || !db || !user) {
+      return
+    }
+    if (!ownerId) {
+      toast({
+        title: "Error",
+        description: "Owner no válido",
+        variant: "destructive",
+      })
       return
     }
 
@@ -306,6 +327,7 @@ export function useWeekActions({
           weekStart: weekStartStr,
           semanaInicio: weekStartStr,
           semanaFin: weekEndStr,
+          ownerId,
           assignments: {},
           dayStatus: {},
           createdAt: serverTimestamp(),
@@ -385,7 +407,7 @@ export function useWeekActions({
     } finally {
       setIsClearing(false)
     }
-  }, [weekDays, employees, weekSchedule, weekStartDate, user, readonly, toast])
+  }, [weekDays, employees, weekSchedule, weekStartDate, user, readonly, toast, ownerId])
 
   const executeClearEmployeeRow = useCallback(
     async (employeeId: string): Promise<boolean> => {

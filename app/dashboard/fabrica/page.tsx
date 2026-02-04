@@ -102,7 +102,7 @@ export default function FabricaPage() {
 
   // Obtener nombre de la sucursal
   const obtenerNombreSucursal = (pedido: any) => {
-    const usuario = usuariosMap[pedido.userId]
+    const usuario = usuariosMap[pedido.ownerId]
     return usuario?.displayName || usuario?.email?.split("@")[0] || "Sucursal desconocida"
   }
 
@@ -134,9 +134,9 @@ export default function FabricaPage() {
     try {
       // Obtener configuración para nombre de empresa
       let nombreEmpresa = "Empresa"
-      if (pedido.userId) {
+      if (pedido.ownerId) {
         try {
-          const configDoc = await getDoc(doc(db, COLLECTIONS.CONFIG, pedido.userId))
+          const configDoc = await getDoc(doc(db, COLLECTIONS.CONFIG, pedido.ownerId))
           if (configDoc.exists()) {
             const config = configDoc.data() as Configuracion
             nombreEmpresa = config.nombreEmpresa || "Empresa"
@@ -170,7 +170,7 @@ export default function FabricaPage() {
       const productosQuery = query(
         collection(db, COLLECTIONS.PRODUCTS),
         where("pedidoId", "==", pedido.id),
-        where("userId", "==", pedido.userId)
+        where("ownerId", "==", pedido.ownerId)
       )
       const productosSnapshot = await getDocs(productosQuery)
       const productos = productosSnapshot.docs.map((doc) => ({
@@ -580,4 +580,3 @@ export default function FabricaPage() {
     </DashboardLayout>
   )
 }
-

@@ -19,6 +19,7 @@ import { useRecepciones } from "@/hooks/use-recepciones"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { doc, setDoc, serverTimestamp, getDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where } from "firebase/firestore"
 import type { Remito, Recepcion } from "@/lib/types"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import { PedidoTimeline } from "@/components/pedidos/pedido-timeline"
 import { crearRemitoPedido, crearRemitoRecepcion } from "@/lib/remito-utils"
 import Link from "next/link"
@@ -55,6 +56,7 @@ const FORMAT_EXAMPLES = [
 export default function PedidosPage() {
   const { user, userData } = useData()
   const { toast } = useToast()
+  const ownerId = useMemo(() => getOwnerIdForActor(user, userData), [user, userData])
   
   // Obtener stockActual del contexto global del chat
   const { stockActual: stockActualGlobal } = useStockChatContext()
@@ -117,10 +119,14 @@ export default function PedidosPage() {
       }
       
       // 2. Actualizar el pedido: cambiar estado a "creado" y eliminar remitoEnvioId y fechaEnvio
+      if (!ownerId) return
+
       await updateDoc(doc(db, COLLECTIONS.PEDIDOS, selectedPedido.id), {
         estado: "creado",
         remitoEnvioId: null,
         fechaEnvio: null,
+        ownerId,
+        userId: user.uid,
         updatedAt: serverTimestamp(),
       })
       
@@ -302,14 +308,12 @@ export default function PedidosPage() {
           
           // Cargar TODOS los productos del pedido primero
           const { collection: col, query: q, where: w, getDocs: getDocsProducts } = await import("firebase/firestore")
-          const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
-            ? userData.ownerId 
-            : user.uid
-          
+          if (!ownerId) return
+
           const productosQuery = q(
             col(db, COLLECTIONS.PRODUCTS),
             w("pedidoId", "==", selectedPedido.id),
-            w("userId", "==", userIdToQuery)
+            w("ownerId", "==", ownerId)
           )
           const productosSnapshot = await getDocsProducts(productosQuery)
           const todosLosProductos = productosSnapshot.docs.map((doc) => ({
@@ -374,14 +378,12 @@ export default function PedidosPage() {
             
             // Cargar TODOS los productos del pedido
             const { collection: col, query: q, where: w, getDocs: getDocsProducts } = await import("firebase/firestore")
-            const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
-              ? userData.ownerId 
-              : user.uid
-            
+            if (!ownerId) return
+
             const productosQuery = q(
               col(db, COLLECTIONS.PRODUCTS),
               w("pedidoId", "==", selectedPedido.id),
-              w("userId", "==", userIdToQuery)
+              w("ownerId", "==", ownerId)
             )
             const productosSnapshot = await getDocsProducts(productosQuery)
             const todosLosProductos = productosSnapshot.docs.map((doc) => ({
@@ -483,37 +485,21 @@ export default function PedidosPage() {
       return
     }
 
-    // Determinar userId a usar (puede ser ownerId si es invitado)
-    const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
-      ? userData.ownerId 
-      : user.uid
+    if (!selectedPedido.enlacePublicoId) {
+      setEnlaceActivo(null)
+      return
+    }
 
-    const enlacesQuery = query(
-      collection(db, COLLECTIONS.ENLACES_PUBLICOS),
-      where("pedidoId", "==", selectedPedido.id),
-      where("activo", "==", true),
-      where("userId", "==", userIdToQuery)
-    )
-
+    const enlaceRef = doc(db, COLLECTIONS.ENLACES_PUBLICOS, selectedPedido.enlacePublicoId)
     const unsubscribe = onSnapshot(
-      enlacesQuery,
+      enlaceRef,
       (snapshot) => {
-        const enlacesActivos = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
-        
-        if (enlacesActivos.length > 0) {
-          // Usar el enlace más reciente
-          const enlaceMasReciente = enlacesActivos.sort((a: any, b: any) => {
-            const aTime = a.createdAt?.toMillis?.() || 0
-            const bTime = b.createdAt?.toMillis?.() || 0
-            return bTime - aTime
-          })[0]
-          setEnlaceActivo({ id: enlaceMasReciente.id })
-        } else {
+        if (!snapshot.exists()) {
           setEnlaceActivo(null)
+          return
         }
+        const data = snapshot.data() as any
+        setEnlaceActivo(data.activo ? { id: snapshot.id } : null)
       },
       (error) => {
         console.error("Error en listener de enlaces:", error)
@@ -521,7 +507,7 @@ export default function PedidosPage() {
     )
 
     return () => unsubscribe()
-  }, [selectedPedido?.id, db, user, userData])
+  }, [selectedPedido?.id, selectedPedido?.enlacePublicoId, db, user])
 
   // Handlers
   const handleOpenCreate = () => {
@@ -786,7 +772,7 @@ export default function PedidosPage() {
   const handleConfirmarRecepcion = async (
     recepcionData: Omit<Recepcion, "id" | "createdAt">
   ) => {
-    if (!selectedPedido) return
+    if (!selectedPedido || !ownerId) return
 
     setLoadingRecepcion(true)
     try {
@@ -794,6 +780,7 @@ export default function PedidosPage() {
       const recepcion = await crearRecepcion({
         ...recepcionData,
         pedidoId: selectedPedido.id,
+        ownerId,
         userId: user.uid,
       })
 
@@ -805,7 +792,7 @@ export default function PedidosPage() {
           // Sumar la cantidad recibida al stock
           if (productoRecepcion.cantidadRecibida > 0) {
             try {
-              const stockDocId = `${user.uid}_${productoRecepcion.productoId}`
+              const stockDocId = `${ownerId}_${productoRecepcion.productoId}`
               const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
               
               // Intentar actualizar usando transacción o incremento
@@ -818,6 +805,8 @@ export default function PedidosPage() {
                   await updateDoc(stockDocRef, {
                     cantidad: nuevoStock,
                     ultimaActualizacion: serverTimestamp(),
+                    ownerId,
+                    userId: user.uid,
                   })
                   setStockActual(prev => ({ ...prev, [productoRecepcion.productoId]: nuevoStock }))
                 } else {
@@ -827,6 +816,7 @@ export default function PedidosPage() {
                     pedidoId: selectedPedido.id,
                     cantidad: productoRecepcion.cantidadRecibida,
                     ultimaActualizacion: serverTimestamp(),
+                    ownerId,
                     userId: user.uid,
                   })
                   setStockActual(prev => ({ ...prev, [productoRecepcion.productoId]: productoRecepcion.cantidadRecibida }))
@@ -839,6 +829,7 @@ export default function PedidosPage() {
                     pedidoId: selectedPedido.id,
                     cantidad: productoRecepcion.cantidadRecibida,
                     ultimaActualizacion: serverTimestamp(),
+                    ownerId,
                     userId: user.uid,
                   })
                   setStockActual(prev => ({ ...prev, [productoRecepcion.productoId]: productoRecepcion.cantidadRecibida }))
@@ -981,9 +972,9 @@ export default function PedidosPage() {
     
     // Actualizar en Firestore para sincronizar con el contexto global
     try {
-      if (!db || !user || !selectedPedido) return
+      if (!db || !user || !selectedPedido || !ownerId) return
       
-      const stockDocId = `${user.uid}_${productId}`
+      const stockDocId = `${ownerId}_${productId}`
       const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
       
       await setDoc(stockDocRef, {
@@ -991,6 +982,7 @@ export default function PedidosPage() {
         pedidoId: selectedPedido.id, // Agregar pedidoId
         cantidad: value,
         ultimaActualizacion: serverTimestamp(),
+        ownerId,
         userId: user.uid,
       }, { merge: true })
     } catch (error) {

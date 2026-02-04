@@ -19,6 +19,7 @@ import { MedioTurno } from "@/lib/types"
 import { ProfileCard } from "./components/profile-card"
 import { InvitationsCard } from "./components/invitations-card"
 import { FirmaDigital } from "@/components/remitos/firma-digital"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
 // Función helper para determinar el color de texto según el contraste
 const getContrastColor = (hexColor: string): string => {
@@ -39,6 +40,7 @@ const getContrastColor = (hexColor: string): string => {
 
 export default function ConfiguracionPage() {
   const { user, userData, shifts } = useData()
+  const ownerId = useMemo(() => getOwnerIdForActor(user, userData), [user, userData])
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -85,7 +87,7 @@ export default function ConfiguracionPage() {
   }, [shifts])
 
   useEffect(() => {
-    if (!user) return
+    if (!user || !ownerId) return
 
     const loadConfig = async () => {
       if (!db) {
@@ -95,7 +97,7 @@ export default function ConfiguracionPage() {
 
       try {
         setLoading(true)
-        const configRef = doc(db, COLLECTIONS.CONFIG, user.uid)
+        const configRef = doc(db, COLLECTIONS.CONFIG, ownerId)
         const configSnap = await getDoc(configRef)
 
         if (configSnap.exists()) {
@@ -142,7 +144,7 @@ export default function ConfiguracionPage() {
           }
           // No incluir colorEmpresa si es undefined
           
-          await setDoc(configRef, configToSave)
+          await setDoc(configRef, { ...configToSave, ownerId })
           setConfig(defaultConfig)
         }
       } catch (error: any) {
@@ -158,10 +160,10 @@ export default function ConfiguracionPage() {
     }
 
     loadConfig()
-  }, [user, toast])
+  }, [user, ownerId, toast])
 
   const handleSave = async () => {
-    if (!user) {
+    if (!user || !ownerId) {
       toast({
         title: "Error",
         description: "No estás autenticado",
@@ -181,7 +183,7 @@ export default function ConfiguracionPage() {
 
     try {
       setSaving(true)
-      const configRef = doc(db, COLLECTIONS.CONFIG, user.uid)
+      const configRef = doc(db, COLLECTIONS.CONFIG, ownerId)
       
       // Preparar datos asegurándonos de que todos los campos estén presentes
       // Eliminar campos undefined ya que Firestore no los acepta
@@ -220,7 +222,7 @@ export default function ConfiguracionPage() {
         dataToSave.createdAt = serverTimestamp()
       }
 
-      await setDoc(configRef, dataToSave, { merge: true })
+      await setDoc(configRef, { ...dataToSave, ownerId }, { merge: true })
 
       toast({
         title: "Configuración guardada",
@@ -796,4 +798,3 @@ export default function ConfiguracionPage() {
     </DashboardLayout>
   )
 }
-

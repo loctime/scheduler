@@ -4,6 +4,8 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import type { Horario } from "@/lib/types"
 import { format, subMonths, addMonths } from "date-fns"
 import { logger } from "@/lib/logger"
+import { useData } from "@/contexts/data-context"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
 interface UseSchedulesListenerProps {
   user: any
@@ -23,9 +25,11 @@ export function useSchedulesListener({
   const [schedules, setSchedules] = useState<Horario[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const { userData } = useData()
+  const ownerId = useMemo(() => getOwnerIdForActor(user, userData), [user, userData])
 
   useEffect(() => {
-    if (!enabled || !user || !db) {
+    if (!enabled || !user || !db || !ownerId) {
       setSchedules([])
       setLoading(false)
       setError(null)
@@ -47,10 +51,10 @@ export function useSchedulesListener({
       ? format(addMonths(monthRange.endDate, 3), "yyyy-MM-dd")
       : format(defaultEndDate, "yyyy-MM-dd")
 
-    // Query base - filtrado por createdBy y ordenado por weekStart descendente
+    // Query base - filtrado por ownerId y ordenado por weekStart descendente
     const schedulesQuery = query(
       collection(db, COLLECTIONS.SCHEDULES),
-      where("createdBy", "==", user.uid),
+      where("ownerId", "==", ownerId),
       orderBy("weekStart", "desc"),
     )
 
@@ -87,7 +91,7 @@ export function useSchedulesListener({
     return () => {
       unsubscribe()
     }
-  }, [user, enabled, monthRange?.startDate, monthRange?.endDate])
+  }, [user, ownerId, enabled, monthRange?.startDate, monthRange?.endDate])
 
   // Función para obtener schedule de una semana específica
   const getWeekSchedule = useMemo(
@@ -105,5 +109,4 @@ export function useSchedulesListener({
     getWeekSchedule,
   }
 }
-
 

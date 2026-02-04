@@ -18,19 +18,21 @@ import { Remito } from "@/lib/types"
 import { generarNumeroRemito, generarPDFRemito, eliminarRemitosAnteriores } from "@/lib/remito-utils"
 import { useData } from "@/contexts/data-context"
 import { useConfig } from "@/hooks/use-config"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
 export function useRemitos(user: any) {
   const { toast } = useToast()
   const { userData } = useData()
   const { config } = useConfig(user)
   const [loading, setLoading] = useState(false)
+  const ownerId = getOwnerIdForActor(user, userData)
 
   // Crear remito
   const crearRemito = useCallback(async (
-    remitoData: Omit<Remito, "id" | "numero" | "createdAt">,
+    remitoData: Omit<Remito, "id" | "numero" | "createdAt" | "ownerId" | "userId">,
     nombrePedido?: string
   ): Promise<Remito | null> => {
-    if (!db || !user) return null
+    if (!db || !user || !ownerId) return null
 
     setLoading(true)
     try {
@@ -49,6 +51,8 @@ export function useRemitos(user: any) {
       // Crear remito en Firestore
       const remitoRef = await addDoc(collection(db, COLLECTIONS.REMITOS), {
         ...remitoData,
+        ownerId,
+        userId: user.uid,
         numero,
         createdAt: serverTimestamp(),
       })
@@ -56,6 +60,8 @@ export function useRemitos(user: any) {
       const nuevoRemito: Remito = {
         id: remitoRef.id,
         ...remitoData,
+        ownerId,
+        userId: user.uid,
         numero,
       }
 
@@ -81,21 +87,15 @@ export function useRemitos(user: any) {
     } finally {
       setLoading(false)
     }
-  }, [user, toast])
+  }, [user, ownerId, toast])
 
   // Obtener remitos de un pedido
   const obtenerRemitosPorPedido = useCallback(async (
     pedidoId: string
   ): Promise<Remito[]> => {
-    if (!db || !user) return []
+    if (!db || !user || !ownerId) return []
 
     try {
-      // Si el usuario es invitado, usar ownerId para consultar remitos
-      // Si no, usar userId normal
-      const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
-        ? userData.ownerId 
-        : user.uid
-
       // Primero verificar que el pedido pertenece al usuario
       const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId))
       if (!pedidoDoc.exists()) {
@@ -103,11 +103,11 @@ export function useRemitos(user: any) {
         return []
       }
 
-      const pedidoUserId = pedidoDoc.data().userId
+      const pedidoOwnerId = pedidoDoc.data().ownerId
       
       // Verificar que el pedido pertenece al usuario o a su ownerId
-      if (pedidoUserId !== userIdToQuery) {
-        logger.warn(`Pedido ${pedidoId} no pertenece al usuario ${userIdToQuery}`)
+      if (pedidoOwnerId !== ownerId) {
+        logger.warn(`Pedido ${pedidoId} no pertenece al owner ${ownerId}`)
         return []
       }
 
@@ -116,7 +116,7 @@ export function useRemitos(user: any) {
       const remitosQuery = query(
         collection(db, COLLECTIONS.REMITOS),
         where("pedidoId", "==", pedidoId),
-        where("userId", "==", userIdToQuery)
+        where("ownerId", "==", ownerId)
       )
       const snapshot = await getDocs(remitosQuery)
       const remitos = snapshot.docs.map((doc) => ({
@@ -134,7 +134,7 @@ export function useRemitos(user: any) {
       }
       return []
     }
-  }, [user, userData])
+  }, [user, ownerId])
 
   // Obtener un remito por ID
   const obtenerRemito = useCallback(async (
