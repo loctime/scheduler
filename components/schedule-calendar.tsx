@@ -59,6 +59,13 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
 
   // Estado para PWA publishing
   const [publishingWeekId, setPublishingWeekId] = useState<string | null>(null)
+  const [copiedWeekData, setCopiedWeekData] = useState<{
+    assignments: Horario["assignments"]
+    dayStatus: Horario["dayStatus"]
+    weekStartDate: string
+    copiedAt: string
+  } | null>(null)
+  const [isPastingWeek, setIsPastingWeek] = useState(false)
 
   const monthStartDay = config?.mesInicioDia || 1
   const weekStartsOn = (config?.semanaInicioDia || 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
@@ -224,6 +231,140 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
       colorEmpresa: config?.colorEmpresa,
     })
   }, [exportPDF, config])
+
+  const copyCurrentWeek = useCallback((weekStartDate: Date) => {
+    const weekSchedule = getWeekSchedule(weekStartDate)
+
+    if (!weekSchedule?.assignments && !weekSchedule?.dayStatus) {
+      toast({
+        title: "Error",
+        description: "No hay datos para copiar en esta semana",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const assignments = weekSchedule?.assignments
+      ? JSON.parse(JSON.stringify(weekSchedule.assignments))
+      : {}
+    const dayStatus = weekSchedule?.dayStatus
+      ? JSON.parse(JSON.stringify(weekSchedule.dayStatus))
+      : {}
+
+    setCopiedWeekData({
+      assignments,
+      dayStatus,
+      weekStartDate: weekStartDate.toISOString(),
+      copiedAt: new Date().toISOString(),
+    })
+
+    toast({
+      title: "Semana copiada",
+      description: "La semana ha sido copiada exitosamente",
+      duration: 2000,
+    })
+  }, [getWeekSchedule, toast])
+
+  const pasteCopiedWeek = useCallback(async (targetWeekStartDate: Date) => {
+    if (!copiedWeekData) {
+      toast({
+        title: "Error",
+        description: "No hay una semana copiada para pegar",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!handleAssignmentUpdate) {
+      toast({
+        title: "Error",
+        description: "No se puede pegar en esta semana",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsPastingWeek(true)
+
+    try {
+      const targetWeekDates = []
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(targetWeekStartDate)
+        date.setDate(date.getDate() + i)
+        targetWeekDates.push(date)
+      }
+
+      const copiedWeekStartDate = new Date(copiedWeekData.weekStartDate)
+      const copiedWeekDates = []
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(copiedWeekStartDate)
+        date.setDate(date.getDate() + i)
+        copiedWeekDates.push(date)
+      }
+
+      const assignmentsByDayOfWeek: Record<number, Record<string, ShiftAssignment[]>> = {}
+      const dayStatusByDayOfWeek: Record<number, Record<string, "normal" | "franco" | "medio_franco">> = {}
+
+      copiedWeekDates.forEach((date, index) => {
+        const dateStr = format(date, "yyyy-MM-dd")
+        const assignments = copiedWeekData.assignments[dateStr]
+        if (assignments && typeof assignments === "object") {
+          assignmentsByDayOfWeek[index] = assignments as Record<string, ShiftAssignment[]>
+        }
+
+        const dayStatus = copiedWeekData.dayStatus?.[dateStr]
+        if (dayStatus && typeof dayStatus === "object") {
+          dayStatusByDayOfWeek[index] = dayStatus
+        }
+      })
+
+      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+        const targetDate = targetWeekDates[dayIndex]
+        const targetDateStr = format(targetDate, "yyyy-MM-dd")
+        const assignments = assignmentsByDayOfWeek[dayIndex]
+        const dayStatuses = dayStatusByDayOfWeek[dayIndex]
+
+        if (assignments) {
+          for (const [employeeId, assignmentValue] of Object.entries(assignments)) {
+            await handleAssignmentUpdate(targetDateStr, employeeId, assignmentValue)
+          }
+        }
+
+        if (dayStatuses) {
+          for (const [employeeId, status] of Object.entries(dayStatuses)) {
+            if (status === "franco") {
+              await handleAssignmentUpdate(targetDateStr, employeeId, [{ type: "franco" }])
+            }
+
+            if (status === "medio_franco") {
+              const sourceAssignments = assignments?.[employeeId] || []
+              const medioFrancoAssignment = sourceAssignments.find((assignment) => assignment.type === "medio_franco")
+              await handleAssignmentUpdate(
+                targetDateStr,
+                employeeId,
+                medioFrancoAssignment ? [medioFrancoAssignment] : [{ type: "medio_franco" }]
+              )
+            }
+          }
+        }
+      }
+
+      toast({
+        title: "Semana pegada",
+        description: "La semana copiada ha sido aplicada exitosamente",
+        duration: 2000,
+      })
+    } catch (error) {
+      logger.error("Error al pegar semana:", error)
+      toast({
+        title: "Error",
+        description: "Ocurrió un error al pegar la semana",
+        variant: "destructive",
+      })
+    } finally {
+      setIsPastingWeek(false)
+    }
+  }, [copiedWeekData, handleAssignmentUpdate, toast])
 
   const handlePublishPwa = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
     console.log("🔧 [ScheduleCalendar] handlePublishPwa iniciado")
@@ -642,6 +783,10 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
         onPublishSchedule={handlePublishPwa}
         isPublishingSchedule={isPublishing || publishingWeekId !== null}
         onWeekScheduleRef={handleWeekScheduleRef}
+        copiedWeekData={copiedWeekData}
+        onCopyCurrentWeek={copyCurrentWeek}
+        onPasteCopiedWeek={pasteCopiedWeek}
+        isPastingWeek={isPastingWeek}
       />
       </div>
       

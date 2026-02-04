@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Loader2, Copy, Trash2, CheckCircle2, Circle, Download, ChevronDown, Upload } from "lucide-react"
+import { Loader2, Copy, Trash2, CheckCircle2, Circle, Download, ChevronDown, Upload, Clipboard } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import type { WeekActionsReturn } from "@/hooks/use-week-actions"
+import type { Horario } from "@/lib/types"
 
 interface WeekScheduleActionsProps {
   readonly: boolean
@@ -36,6 +37,16 @@ interface WeekScheduleActionsProps {
   weekActions: WeekActionsReturn
   onPublishSchedule?: () => Promise<void> | void
   isPublishingSchedule?: boolean
+  copiedWeekData?: {
+    assignments: Horario["assignments"]
+    dayStatus: Horario["dayStatus"]
+    weekStartDate: string
+    copiedAt: string
+  } | null
+  onCopyCurrentWeek?: (weekStartDate: Date) => void
+  onPasteCopiedWeek?: (targetWeekStartDate: Date) => Promise<void>
+  weekStartDate: Date
+  isPastingWeek?: boolean
 }
 
 export function WeekScheduleActions({
@@ -53,19 +64,14 @@ export function WeekScheduleActions({
   weekActions,
   onPublishSchedule,
   isPublishingSchedule = false,
+  copiedWeekData,
+  onCopyCurrentWeek,
+  onPasteCopiedWeek,
+  weekStartDate,
+  isPastingWeek = false,
 }: WeekScheduleActionsProps) {
-  const [confirmCopyDialogOpen, setConfirmCopyDialogOpen] = useState(false)
   const [confirmClearDialogOpen, setConfirmClearDialogOpen] = useState(false)
-
-  const handleCopyPreviousWeek = useCallback(async () => {
-    try {
-      await weekActions.handleCopyPreviousWeek()
-    } catch (error: any) {
-      if (error.message === "NEEDS_CONFIRMATION") {
-        setConfirmCopyDialogOpen(true)
-      }
-    }
-  }, [weekActions])
+  const [confirmPasteDialogOpen, setConfirmPasteDialogOpen] = useState(false)
 
   const handleClearWeek = useCallback(async () => {
     try {
@@ -77,15 +83,27 @@ export function WeekScheduleActions({
     }
   }, [weekActions])
 
-  const handleConfirmCopy = useCallback(async () => {
-    setConfirmCopyDialogOpen(false)
-    await weekActions.executeCopyPreviousWeek()
-  }, [weekActions])
-
   const handleConfirmClear = useCallback(async () => {
     setConfirmClearDialogOpen(false)
     await weekActions.executeClearWeek()
   }, [weekActions])
+
+  const handleCopyCurrentWeek = useCallback(() => {
+    if (onCopyCurrentWeek) {
+      onCopyCurrentWeek(weekStartDate)
+    }
+  }, [onCopyCurrentWeek, weekStartDate])
+
+  const handlePasteCopiedWeek = useCallback(async () => {
+    if (onPasteCopiedWeek) {
+      await onPasteCopiedWeek(weekStartDate)
+    }
+  }, [onPasteCopiedWeek, weekStartDate])
+
+  const handleConfirmPaste = useCallback(async () => {
+    setConfirmPasteDialogOpen(false)
+    await handlePasteCopiedWeek()
+  }, [handlePasteCopiedWeek])
 
   const handlePublishSchedule = useCallback(() => {
     if (onPublishSchedule) {
@@ -97,12 +115,36 @@ export function WeekScheduleActions({
   return (
     <>
       <div className="flex flex-wrap gap-1 sm:gap-2 ml-2 sm:ml-4" onClick={(e) => e.stopPropagation()}>
+        {!readonly && onAssignmentUpdate && onCopyCurrentWeek && onPasteCopiedWeek && (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyCurrentWeek}
+              disabled={exporting || weekActions.isClearing || isPastingWeek}
+              aria-label="Copiar semana"
+            >
+              <Copy className="mr-2 h-4 w-4" />
+              Copiar
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setConfirmPasteDialogOpen(true)}
+              disabled={!copiedWeekData || exporting || weekActions.isClearing || isPastingWeek}
+              aria-label="Pegar semana"
+            >
+              <Clipboard className="mr-2 h-4 w-4" />
+              Pegar
+            </Button>
+          </>
+        )}
         {!readonly && onAssignmentUpdate && (
           <Button
             variant="outline"
             size="sm"
             onClick={handleClearWeek}
-            disabled={weekActions.isClearing || exporting || weekActions.isCopying}
+            disabled={weekActions.isClearing || exporting || isPastingWeek}
             aria-label="Limpiar semana"
           >
             {weekActions.isClearing ? (
@@ -209,7 +251,7 @@ export function WeekScheduleActions({
             variant="default"
             size="sm"
             onClick={handlePublishSchedule}
-            disabled={isPublishingSchedule || exporting || weekActions.isCopying || weekActions.isClearing}
+            disabled={isPublishingSchedule || exporting || weekActions.isClearing || isPastingWeek}
             aria-label="Publicar horario"
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
@@ -227,46 +269,9 @@ export function WeekScheduleActions({
           </Button>
         )}
 
-        {/* Menú secundario para acciones técnicas */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              aria-label="Más acciones"
-            >
-              <ChevronDown className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={handleCopyPreviousWeek}
-              disabled={weekActions.isCopying || exporting || weekActions.isClearing}
-            >
-              <Copy className="mr-2 h-4 w-4" />
-              Copiar semana anterior
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
 
       {/* Diálogos de confirmación para semanas completadas */}
-      <AlertDialog open={confirmCopyDialogOpen} onOpenChange={setConfirmCopyDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Confirmar copia de semana anterior?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta semana está marcada como completada. Al copiar la semana anterior, se modificarán las asignaciones actuales.
-              ¿Estás seguro de que deseas continuar?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmCopy}>Confirmar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <AlertDialog open={confirmClearDialogOpen} onOpenChange={setConfirmClearDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -279,6 +284,29 @@ export function WeekScheduleActions({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmClear}>Confirmar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmPasteDialogOpen} onOpenChange={setConfirmPasteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Confirmar pegado de semana?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Al pegar la semana copiada, se reemplazarán las asignaciones actuales de esta semana.
+              {copiedWeekData && (
+                <span className="block mt-2 text-sm">
+                  Semana a pegar: {new Date(copiedWeekData.weekStartDate).toLocaleDateString("es-AR")}
+                </span>
+              )}
+              ¿Estás seguro de que deseas continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmPaste} disabled={isPastingWeek}>
+              Confirmar
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
