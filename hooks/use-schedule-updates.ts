@@ -753,8 +753,14 @@ export function useScheduleUpdates({
             assignments: currentAssignments,
             dayStatus: updatedDayStatus,
             updatedAt: serverTimestamp(),
-            modifiedBy: userId || null,
-            modifiedByName: userName || null,
+          }
+          
+          // 🔥 CRÍTICO: Solo agregar modifiedBy/modifiedByName si userId existe (evitar null)
+          if (userId) {
+            updateData.modifiedBy = userId
+          }
+          if (userName) {
+            updateData.modifiedByName = userName
           }
           
           // createdBy ya debe estar establecido en schedules existentes

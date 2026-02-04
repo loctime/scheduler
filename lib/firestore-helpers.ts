@@ -110,46 +110,58 @@ export function preserveScheduleFields(
 ): any {
   const preserved: any = {}
 
-  // Campos inmutables que siempre se deben preservar
+  // 🔥 Campos inmutables que siempre se deben preservar (SOLO si existen en el original)
   if (currentSchedule.createdAt !== undefined && currentSchedule.createdAt !== null) {
     preserved.createdAt = currentSchedule.createdAt
   }
   // createdBy SIEMPRE debe preservarse si existe en el schedule actual
   // Esto es crítico para las reglas de seguridad
-  if (currentSchedule.createdBy) {
+  if (currentSchedule.createdBy !== undefined && currentSchedule.createdBy !== null) {
     preserved.createdBy = currentSchedule.createdBy
   }
-  if (currentSchedule.createdByName) {
-    preserved.createdByName = currentSchedule.createdByName
-  }
-  if (currentSchedule.createdByName !== undefined) {
+  if (currentSchedule.createdByName !== undefined && currentSchedule.createdByName !== null) {
     preserved.createdByName = currentSchedule.createdByName
   }
 
-  // Campos de completado - preservar si existen
-  if (currentSchedule.completada !== undefined) {
+  // 🔥 Campos de completado - preservar solo si existen y no son null
+  if (currentSchedule.completada !== undefined && currentSchedule.completada !== null) {
     preserved.completada = currentSchedule.completada
   }
-  if (currentSchedule.completadaPor !== undefined) {
+  if (currentSchedule.completadaPor !== undefined && currentSchedule.completadaPor !== null) {
     preserved.completadaPor = currentSchedule.completadaPor
   }
-  if (currentSchedule.completadaPorNombre !== undefined) {
+  if (currentSchedule.completadaPorNombre !== undefined && currentSchedule.completadaPorNombre !== null) {
     preserved.completadaPorNombre = currentSchedule.completadaPorNombre
   }
-  if (currentSchedule.completadaEn !== undefined) {
+  if (currentSchedule.completadaEn !== undefined && currentSchedule.completadaEn !== null) {
     preserved.completadaEn = currentSchedule.completadaEn
   }
 
-  // Snapshots de empleados - preservar si existen
-  if (currentSchedule.empleadosSnapshot !== undefined) {
+  // 🔥 Snapshots de empleados - preservar solo si existen y no son null
+  if (currentSchedule.empleadosSnapshot !== undefined && currentSchedule.empleadosSnapshot !== null) {
     preserved.empleadosSnapshot = currentSchedule.empleadosSnapshot
   }
-  if (currentSchedule.ordenEmpleadosSnapshot !== undefined) {
+  if (currentSchedule.ordenEmpleadosSnapshot !== undefined && currentSchedule.ordenEmpleadosSnapshot !== null) {
     preserved.ordenEmpleadosSnapshot = currentSchedule.ordenEmpleadosSnapshot
   }
 
+  // 🔥 NEVER preserve ownerId - debe ser immutable desde creación
+  // No incluir ownerId aquí para evitar violar reglas unchanged()
+
   // Combinar campos preservados con los nuevos datos de actualización
-  return { ...preserved, ...updateData }
+  const result = { ...preserved, ...updateData }
+  
+  // 🔥 LOG DEFENSIVO: Depuración de combinación
+  console.debug("🔥 [preserveScheduleFields] Combinación:", {
+    preservedKeys: Object.keys(preserved),
+    updateKeys: Object.keys(updateData),
+    resultKeys: Object.keys(result),
+    hasOwnerId: 'ownerId' in result,
+    hasCreatedBy: 'createdBy' in result,
+    hasNullValues: Object.values(result).some(v => v === null)
+  })
+  
+  return result
 }
 
 /**
@@ -229,24 +241,46 @@ export async function updateSchedulePreservingFields(
     throw new Error("Firebase no está configurado")
   }
 
-  // Eliminar valores undefined del objeto (Firestore no los acepta)
-  const cleanUpdateData: any = {}
+  // 🔥 CRÍTICO: Excluir campos protegidos ANTES de cualquier procesamiento
+  // Estos campos NUNCA deben enviarse en updates
+  const protectedFields = ['ownerId', 'createdBy', 'createdAt', 'createdByName']
+  const safeUpdateData: any = {}
   Object.keys(updateData).forEach((key) => {
-    if (updateData[key] !== undefined) {
-      cleanUpdateData[key] = updateData[key]
+    if (!protectedFields.includes(key) && updateData[key] !== undefined) {
+      safeUpdateData[key] = updateData[key]
+    }
+  })
+
+  // 🔥 CRÍTICO: Eliminar valores null problemáticos (Firestore rules rechazan null en campos que deberían unchanged)
+  const cleanUpdateData: any = {}
+  Object.keys(safeUpdateData).forEach((key) => {
+    const value = safeUpdateData[key]
+    // Solo incluir si no es undefined ni null
+    if (value !== undefined && value !== null) {
+      cleanUpdateData[key] = value
     }
   })
 
   const finalUpdateData = preserveScheduleFields(currentSchedule, cleanUpdateData)
   
-  // Limpiar valores undefined y null problemáticos del objeto final (Firestore no acepta undefined)
+  // 🔥 CRÍTICO: Limpieza final - eliminar cualquier undefined/null residual
   const finalCleanData: any = {}
   Object.keys(finalUpdateData).forEach((key) => {
     const value = finalUpdateData[key]
-    // Solo incluir si no es undefined
-    if (value !== undefined) {
+    // Solo incluir si no es undefined ni null
+    if (value !== undefined && value !== null) {
       finalCleanData[key] = value
     }
+  })
+  
+  // 🔥 LOG DEFENSIVO: Payload final enviado a Firestore
+  console.debug("🔥 [updateSchedulePreservingFields] Payload final:", {
+    scheduleId,
+    payloadKeys: Object.keys(finalCleanData),
+    payload: finalCleanData,
+    hasProtectedFields: protectedFields.some(field => field in finalCleanData),
+    hasNullValues: Object.values(finalCleanData).some(v => v === null),
+    hasUndefinedValues: Object.values(finalCleanData).some(v => v === undefined)
   })
   
   await updateDoc(doc(db, COLLECTIONS.SCHEDULES, scheduleId), finalCleanData)
