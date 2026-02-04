@@ -16,6 +16,13 @@ type AssignmentUpdateHandler = (
   options?: { scheduleId?: string },
 ) => Promise<void>
 
+type CopiedWeekData = {
+  assignments: Horario["assignments"]
+  dayStatus: Horario["dayStatus"]
+  weekStartDate: string
+  copiedAt: string
+}
+
 interface GeneralViewProps {
   dataLoading: boolean
   employees: Empleado[]
@@ -42,6 +49,10 @@ interface GeneralViewProps {
   onPublishSchedule?: (weekStartDate: Date, weekEndDate: Date) => Promise<void> | void
   isPublishingSchedule?: boolean
   onWeekScheduleRef?: (weekKey: string, element: HTMLDivElement) => void
+  copiedWeekData?: CopiedWeekData | null
+  onCopyCurrentWeek?: (weekStartDate: Date) => void
+  onPasteCopiedWeek?: (targetWeekStartDate: Date) => Promise<void>
+  isPastingWeek?: boolean
 }
 
 export function GeneralView({
@@ -70,6 +81,10 @@ export function GeneralView({
   onPublishSchedule,
   isPublishingSchedule,
   onWeekScheduleRef,
+  copiedWeekData,
+  onCopyCurrentWeek,
+  onPasteCopiedWeek,
+  isPastingWeek = false,
 }: GeneralViewProps) {
   const DEBUG = false
   // Create shift map for efficient lookup
@@ -300,6 +315,10 @@ export function GeneralView({
               allSchedules={allSchedules}
               onPublishSchedule={onPublishSchedule}
               isPublishingSchedule={isPublishingSchedule}
+              copiedWeekData={copiedWeekData}
+              onCopyCurrentWeek={onCopyCurrentWeek}
+              onPasteCopiedWeek={onPasteCopiedWeek}
+              isPastingWeek={isPastingWeek}
             />
           )
         })}

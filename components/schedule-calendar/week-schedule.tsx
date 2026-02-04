@@ -50,6 +50,15 @@ interface WeekScheduleProps {
   allSchedules?: Horario[]
   onPublishSchedule?: (weekStartDate: Date, weekEndDate: Date) => Promise<void> | void
   isPublishingSchedule?: boolean
+  copiedWeekData?: {
+    assignments: Horario["assignments"]
+    dayStatus: Horario["dayStatus"]
+    weekStartDate: string
+    copiedAt: string
+  } | null
+  onCopyCurrentWeek?: (weekStartDate: Date) => void
+  onPasteCopiedWeek?: (targetWeekStartDate: Date) => Promise<void>
+  isPastingWeek?: boolean
 }
 
 export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
@@ -80,6 +89,10 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
   allSchedules = [],
   onPublishSchedule,
   isPublishingSchedule = false,
+  copiedWeekData,
+  onCopyCurrentWeek,
+  onPasteCopiedWeek,
+  isPastingWeek = false,
 }, ref) => {
   const weekStartDate = weekDays[0]
   const weekEndDate = weekDays[weekDays.length - 1]
@@ -198,6 +211,11 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
           weekActions={weekActions}
           onPublishSchedule={onPublishSchedule ? () => onPublishSchedule(weekStartDate, weekEndDate) : undefined}
           isPublishingSchedule={isPublishingSchedule}
+          copiedWeekData={copiedWeekData}
+          onCopyCurrentWeek={onCopyCurrentWeek}
+          onPasteCopiedWeek={onPasteCopiedWeek}
+          weekStartDate={weekStartDate}
+          isPastingWeek={isPastingWeek}
         />
       </div>
       <CollapsibleContent
