@@ -12,6 +12,7 @@ import { db } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
 import { confirmarMovimientos } from "@/src/services/stock/movimientosService"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import type { 
   StockConsoleState,
   MovimientoInput,
@@ -30,7 +31,6 @@ export function useStockConsole(user: any) {
   // Estado local aislado
   const [state, setState] = useState<StockConsoleState>({
     selectedPedidoId: null,
-    tipo: "INGRESO",
     cantidades: {},
     loading: false,
     error: null,
@@ -40,25 +40,21 @@ export function useStockConsole(user: any) {
   const [productos, setProductos] = useState<Producto[]>([])
   const [stockActual, setStockActual] = useState<Record<string, number>>({})
 
-  // Helper para obtener el userId efectivo
-  const getEffectiveUserId = useCallback((): string | null => {
-    if (!user) return null
-    return userData?.role === "invited" && userData?.ownerId 
-      ? userData.ownerId 
-      : user.uid
-  }, [user, userData])
+  const ownerId = useMemo(
+    () => getOwnerIdForActor(user, userData),
+    [user, userData]
+  )
 
   // Cargar pedidos
   const loadPedidos = useCallback(async () => {
     if (!user || !db) return
     
     try {
-      const userIdToQuery = getEffectiveUserId()
-      if (!userIdToQuery) return
+      if (!ownerId) return
       
       const pedidosQuery = query(
         collection(db, "apps/horarios/pedidos"),
-        where("userId", "==", userIdToQuery)
+        where("ownerId", "==", ownerId)
       )
       const snapshot = await getDocs(pedidosQuery)
       const pedidosData = snapshot.docs.map((doc) => ({
@@ -76,7 +72,7 @@ export function useStockConsole(user: any) {
         variant: "destructive",
       })
     }
-  }, [user, getEffectiveUserId, toast])
+  }, [user, ownerId, toast])
 
   // Cargar productos del pedido seleccionado
   const loadProductos = useCallback(async () => {
@@ -87,12 +83,11 @@ export function useStockConsole(user: any) {
     }
     
     try {
-      const userIdToQuery = getEffectiveUserId()
-      if (!userIdToQuery) return
+      if (!ownerId) return
       
       const productsQuery = query(
         collection(db, "apps/horarios/products"),
-        where("userId", "==", userIdToQuery),
+        where("ownerId", "==", ownerId),
         where("pedidoId", "==", state.selectedPedidoId)
       )
       const snapshot = await getDocs(productsQuery)
@@ -129,18 +124,17 @@ export function useStockConsole(user: any) {
         variant: "destructive",
       })
     }
-  }, [user, state.selectedPedidoId, getEffectiveUserId, toast])
+  }, [user, state.selectedPedidoId, ownerId, toast])
 
   // Listener para stock en tiempo real
   useEffect(() => {
     if (!state.selectedPedidoId || !db || !user) return
 
-    const userIdToQuery = getEffectiveUserId()
-    if (!userIdToQuery) return
+    if (!ownerId) return
 
     const productsQuery = query(
       collection(db, "apps/horarios/products"),
-      where("userId", "==", userIdToQuery),
+      where("ownerId", "==", ownerId),
       where("pedidoId", "==", state.selectedPedidoId)
     )
 
@@ -160,7 +154,7 @@ export function useStockConsole(user: any) {
     )
 
     return () => unsubscribe()
-  }, [state.selectedPedidoId, user, getEffectiveUserId])
+  }, [state.selectedPedidoId, user, ownerId])
 
   // Inicialización
   useEffect(() => {
@@ -174,10 +168,6 @@ export function useStockConsole(user: any) {
   // Acciones
   const setSelectedPedidoId = useCallback((pedidoId: string | null) => {
     setState(prev => ({ ...prev, selectedPedidoId: pedidoId }))
-  }, [])
-
-  const setTipo = useCallback((tipo: MovimientoStockTipo) => {
-    setState(prev => ({ ...prev, tipo }))
   }, [])
 
   const incrementarCantidad = useCallback((productoId: string) => {
@@ -291,8 +281,7 @@ export function useStockConsole(user: any) {
       return false
     }
 
-    const userIdToUse = getEffectiveUserId()
-    if (!userIdToUse) {
+    if (!ownerId || !user?.uid) {
       toast({
         title: "Error",
         description: "Usuario no válido",
@@ -306,7 +295,8 @@ export function useStockConsole(user: any) {
     try {
       const result = await confirmarMovimientosService(
         movimientosPendientes,
-        userIdToUse
+        ownerId,
+        user.uid
       )
 
       if (!result.ok) {
@@ -345,7 +335,7 @@ export function useStockConsole(user: any) {
       
       return false
     }
-  }, [movimientosPendientes, getEffectiveUserId, toast, totalProductos])
+  }, [movimientosPendientes, ownerId, user, toast, totalProductos])
 
   return {
     // Estado

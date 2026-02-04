@@ -139,6 +139,7 @@ export function RecepcionForm({
     await onConfirmar({
       pedidoId: "", // Se completará en el componente padre
       fecha: new Date(),
+      ownerId: "", // Se completará en el componente padre
       productos: resultado.productos,
       esParcial: esParcial || false,
       completada: true,

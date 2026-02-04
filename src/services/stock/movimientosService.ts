@@ -57,6 +57,7 @@ function validarStockNegativo(
  */
 export async function confirmarMovimientos(
   movimientos: MovimientoInput[],
+  ownerId: string,
   userId: string
 ): Promise<ConfirmarMovimientoResult> {
   if (!db) {
@@ -122,6 +123,7 @@ export async function confirmarMovimientos(
           cantidad: movimiento.cantidad,
           stockAntes: stockActual,
           stockDespues: nuevoStock,
+          ownerId,
           userId,
           fecha: new Date(),
           pedidoId: movimiento.pedidoId,

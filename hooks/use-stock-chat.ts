@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
+import { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import { 
   collection, 
   query, 
@@ -28,6 +28,7 @@ import type {
 import { useToast } from "@/hooks/use-toast"
 import { useConfig } from "@/hooks/use-config"
 import { useData } from "@/contexts/data-context"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
 interface UseStockChatOptions {
   userId?: string
@@ -54,10 +55,11 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
   const nombreEmpresa = config?.nombreEmpresa
   const nombreAsistente = nombreEmpresa ? `${nombreEmpresa} Assistant` : "Stock Assistant"
   
-  // Determinar el userId a usar: si es invitado, usar ownerId, sino usar su propio uid
-  const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
-    ? userData.ownerId 
-    : (userId || user?.uid)
+  const ownerId = useMemo(
+    () => getOwnerIdForActor(user, userData),
+    [user, userData]
+  )
+  const actorUserId = userId || user?.uid
   
   // Estados del chat
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -157,10 +159,10 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
 
   // Cargar pedidos del usuario
   useEffect(() => {
-    if (!db || !userIdToQuery) return
+    if (!db || !ownerId) return
 
     const pedidosRef = collection(db, COLLECTIONS.PEDIDOS)
-    const q = query(pedidosRef, where("userId", "==", userIdToQuery))
+    const q = query(pedidosRef, where("ownerId", "==", ownerId))
 
     const unsubscribe = onSnapshot(
       q,
@@ -182,17 +184,17 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     )
 
     return () => unsubscribe()
-  }, [userIdToQuery])
+  }, [ownerId])
 
   // Cargar productos del usuario
   useEffect(() => {
-    if (!db || !userIdToQuery) {
+    if (!db || !ownerId) {
       setLoadingStock(false)
       return
     }
 
     const productosRef = collection(db, COLLECTIONS.PRODUCTS)
-    const q = query(productosRef, where("userId", "==", userIdToQuery))
+    const q = query(productosRef, where("ownerId", "==", ownerId))
 
     const unsubscribe = onSnapshot(
       q,
@@ -237,14 +239,14 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     )
 
     return () => unsubscribe()
-  }, [userIdToQuery, pedidos])
+  }, [ownerId, pedidos])
 
   // Cargar stock actual
   useEffect(() => {
-    if (!db || !userIdToQuery) return
+    if (!db || !ownerId) return
 
     const stockRef = collection(db, COLLECTIONS.STOCK_ACTUAL)
-    const q = query(stockRef, where("userId", "==", userIdToQuery))
+    const q = query(stockRef, where("ownerId", "==", ownerId))
 
     const unsubscribe = onSnapshot(
       q,
@@ -267,16 +269,16 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     )
 
     return () => unsubscribe()
-  }, [userIdToQuery])
+  }, [ownerId])
 
   // Cargar historial de movimientos recientes
   useEffect(() => {
-    if (!db || !userIdToQuery) return
+    if (!db || !ownerId) return
 
     const movimientosRef = collection(db, COLLECTIONS.STOCK_MOVIMIENTOS)
     const q = query(
       movimientosRef, 
-      where("userId", "==", userIdToQuery),
+      where("ownerId", "==", ownerId),
       orderBy("createdAt", "desc"),
       limit(50)
     )
@@ -290,7 +292,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     })
 
     return () => unsubscribe()
-  }, [userIdToQuery])
+  }, [ownerId])
 
   // Agregar mensaje al chat
   const addMessage = useCallback((mensaje: Omit<ChatMessage, "id" | "timestamp">) => {
@@ -384,7 +386,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     stockMinimo?: number,
     pedidoId?: string
   ) => {
-    if (!db || !userIdToQuery) throw new Error("No hay conexión")
+    if (!db || !ownerId || !actorUserId) throw new Error("No hay conexión")
 
     // Usar el primer pedido si no se especifica
     const pedidoIdFinal = pedidoId || pedidos[0]?.id
@@ -397,43 +399,46 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       nombre,
       stockMinimo: stockMinimo || 1,
       unidad: unidad || "u",
-      userId: userIdToQuery,
+      ownerId,
+      userId: actorUserId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }
 
     const docRef = await addDoc(collection(db, COLLECTIONS.PRODUCTS), nuevoProducto)
     return { id: docRef.id, ...nuevoProducto }
-  }, [db, userIdToQuery, pedidos])
+  }, [db, ownerId, actorUserId, pedidos])
 
   // Editar producto
   const editarProducto = useCallback(async (
     productoId: string,
     cambios: Partial<Pick<Producto, "nombre" | "unidad" | "stockMinimo">>
   ) => {
-    if (!db || !userIdToQuery) throw new Error("No hay conexión")
+    if (!db || !ownerId || !actorUserId) throw new Error("No hay conexión")
 
     const docRef = doc(db, COLLECTIONS.PRODUCTS, productoId)
     await updateDoc(docRef, {
       ...cambios,
+      ownerId,
+      userId: actorUserId,
       updatedAt: serverTimestamp(),
     })
-  }, [db, userIdToQuery])
+  }, [db, ownerId, actorUserId])
 
   // Eliminar producto
   const eliminarProducto = useCallback(async (productoId: string) => {
-    if (!db || !userIdToQuery) throw new Error("No hay conexión")
+    if (!db || !ownerId) throw new Error("No hay conexión")
 
     await deleteDoc(doc(db, COLLECTIONS.PRODUCTS, productoId))
     
     // También eliminar el stock actual
-    const stockDocId = `${userIdToQuery}_${productoId}`
+    const stockDocId = `${ownerId}_${productoId}`
     try {
       await deleteDoc(doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId))
     } catch (e) {
       // Puede no existir
     }
-  }, [db, userIdToQuery])
+  }, [db, ownerId])
 
   // Actualizar stock
   const actualizarStock = useCallback(async (
@@ -442,7 +447,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     cantidad: number,
     motivo?: string
   ) => {
-    if (!db || !userIdToQuery) throw new Error("No hay conexión")
+    if (!db || !ownerId || !actorUserId) throw new Error("No hay conexión")
 
     const producto = productos.find(p => p.id === productoId)
     if (!producto) throw new Error("Producto no encontrado")
@@ -466,7 +471,8 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       tipo,
       cantidad,
       unidad: producto.unidad || "u", // Valor por defecto si no tiene unidad
-      userId: userIdToQuery,
+      ownerId,
+      userId: actorUserId,
       userName,
       createdAt: serverTimestamp(),
       // Solo incluir campos opcionales si tienen valor
@@ -475,7 +481,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     }
 
     console.log(`[STOCK] Intentando crear movimiento:`, {
-      userIdToQuery,
+      ownerId,
       userUid: user?.uid,
       userDataRole: userData?.role,
       userDataOwnerId: userData?.ownerId,
@@ -490,28 +496,29 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
         error,
         code: error?.code,
         message: error?.message,
-        userIdToQuery,
+        ownerId,
         userUid: user?.uid
       })
       throw error
     }
 
     // Actualizar stock actual
-    const stockDocId = `${userIdToQuery}_${productoId}`
+    const stockDocId = `${ownerId}_${productoId}`
     const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
     
     const stockData = {
       productoId,
       cantidad: nuevoStock,
       ultimaActualizacion: serverTimestamp(),
-      userId: userIdToQuery,
+      ownerId,
+      userId: actorUserId,
       // Solo incluir pedidoId si tiene valor
       ...(producto.pedidoId && { pedidoId: producto.pedidoId }),
     }
     
     console.log(`[STOCK] Intentando crear/actualizar stock:`, {
       stockDocId,
-      userIdToQuery,
+      ownerId,
       userUid: user?.uid,
       userDataRole: userData?.role,
       userDataOwnerId: userData?.ownerId,
@@ -527,14 +534,14 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
         code: error?.code,
         message: error?.message,
         stockDocId,
-        userIdToQuery,
+        ownerId,
         userUid: user?.uid
       })
       throw error
     }
 
     return { stockAnterior, nuevoStock, producto }
-  }, [db, userIdToQuery, userName, productos, stockActual])
+  }, [db, ownerId, actorUserId, userName, productos, stockActual, user, userData])
 
   // Actualizar stock directamente (reemplazar valor)
   const actualizarStockDirecto = useCallback(async (
@@ -542,7 +549,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     cantidad: number,
     motivo?: string
   ) => {
-    if (!db || !userIdToQuery) throw new Error("No hay conexión")
+    if (!db || !ownerId || !actorUserId) throw new Error("No hay conexión")
 
     const producto = productos.find(p => p.id === productoId)
     if (!producto) throw new Error("Producto no encontrado")
@@ -566,7 +573,8 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
         tipo: tipoMovimiento,
         cantidad: cantidadMovimiento,
         unidad: producto.unidad || "u",
-        userId: userIdToQuery,
+        ownerId,
+        userId: actorUserId,
         userName,
         createdAt: serverTimestamp(),
         motivo: motivo || `Actualización directa: ${stockAnterior} → ${cantidad}`,
@@ -577,29 +585,30 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     }
 
     // Actualizar stock actual
-    const stockDocId = `${userIdToQuery}_${productoId}`
+    const stockDocId = `${ownerId}_${productoId}`
     const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
     
     await setDoc(stockDocRef, {
       productoId,
       cantidad: cantidad,
       ultimaActualizacion: serverTimestamp(),
-      userId: userIdToQuery,
+      ownerId,
+      userId: actorUserId,
       // Solo incluir pedidoId si tiene valor
       ...(producto.pedidoId && { pedidoId: producto.pedidoId }),
     })
 
     return { stockAnterior, nuevoStock: cantidad, producto }
-  }, [db, userIdToQuery, userName, productos, stockActual])
+  }, [db, ownerId, actorUserId, userName, productos, stockActual])
 
   // Inicializar stock de productos
   const inicializarStockProductos = useCallback(async (cantidadInicial: number = 0) => {
-    if (!db || !userIdToQuery) throw new Error("No hay conexión")
+    if (!db || !ownerId || !actorUserId) throw new Error("No hay conexión")
     if (productos.length === 0) throw new Error("No hay productos para inicializar")
 
     let inicializados = 0
     for (const producto of productos) {
-      const stockDocId = `${userIdToQuery}_${producto.id}`
+      const stockDocId = `${ownerId}_${producto.id}`
       const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
       
       // Solo inicializar si no tiene stock aún
@@ -608,7 +617,8 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
           productoId: producto.id,
           cantidad: cantidadInicial,
           ultimaActualizacion: serverTimestamp(),
-          userId: userIdToQuery,
+          ownerId,
+          userId: actorUserId,
           // Solo incluir pedidoId si tiene valor
           ...(producto.pedidoId && { pedidoId: producto.pedidoId }),
         })
@@ -616,7 +626,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       }
     }
     return inicializados
-  }, [db, userIdToQuery, productos, stockActual])
+  }, [db, ownerId, actorUserId, productos, stockActual])
 
   // ==================== EJECUTAR ACCIÓN ====================
 
