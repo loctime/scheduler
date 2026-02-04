@@ -21,7 +21,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Factory, Shield, UserCog, MessageSquare } from "lucide-react"
+import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Factory, Shield, UserCog, MessageSquare, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -39,6 +39,7 @@ const navItems = [
   { href: "/dashboard/empleados", label: "Empleados", icon: Users },
   { href: "/dashboard/pedidos", label: "Pedidos", icon: ShoppingCart },
   { href: "/mensajeria", label: "Mensajería", icon: MessageSquare },
+  { href: "/dashboard/dias-especiales", label: "Días Especiales", icon: AlertTriangle, role: "admin" },
   { href: "/dashboard/fabrica", label: "Fábrica", icon: Factory, role: "factory" },
   { href: "/dashboard/gerente", label: "Gerente", icon: UserCog, role: "manager" },
   { href: "/dashboard/admin", label: "Administración", icon: Shield, role: "admin" },
@@ -79,6 +80,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     "/dashboard/configuracion": "configuracion",
     "/dashboard/gerente": "gerente",
     "/dashboard/admin": "admin",
+    "/dashboard/dias-especiales": "admin", // Solo admin puede gestionar días especiales
   }
 
   // Filtrar navItems según el role del usuario y permisos

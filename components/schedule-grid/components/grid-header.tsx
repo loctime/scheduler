@@ -5,6 +5,8 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { useConfig } from "@/hooks/use-config"
 import { DataContext } from "@/contexts/data-context"
+import { useCalendarSpecialDays } from "@/hooks/use-calendar-special-days"
+import { SpecialDayBadgeCompact } from "@/components/calendar/special-day-badge"
 import { hexToRgba } from "../utils/schedule-grid-utils"
 
 interface GridHeaderProps {
@@ -21,6 +23,16 @@ export function GridHeader({ weekDays, user: userProp, onCloseSelector }: GridHe
   const { config } = useConfig(user)
   const nombreEmpresa = config?.nombreEmpresa || "Empleado"
   const colorEmpresa = config?.colorEmpresa
+
+  // Hook para días especiales
+  const { isSpecialDay } = useCalendarSpecialDays({
+    autoSubscribe: true,
+    initialFilter: {
+      city: 'viedma', // TODO: obtener de configuración
+      province: 'río negro',
+      country: 'argentina'
+    }
+  })
 
   // Calcular el tamaño de fuente y si necesitamos truncar
   // Ancho disponible: 220px (min-w) - 48px (px-6 = 24px cada lado) = ~172px
@@ -78,23 +90,36 @@ export function GridHeader({ weekDays, user: userProp, onCloseSelector }: GridHe
             {displayText}
           </div>
         </th>
-        {weekDays.map((day) => (
-          <th
-            key={day.toISOString()}
-            className="min-w-[90px] sm:min-w-[110px] md:min-w-[130px] lg:min-w-[140px] border-r-2 border-black px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 md:py-2 text-center font-bold text-foreground last:border-r-0"
-            onClick={(e) => {
-              if (onCloseSelector) {
-                e.stopPropagation()
-                onCloseSelector()
-              }
-            }}
-          >
-            <div className="flex flex-col">
-              <span className="capitalize text-[10px] sm:text-xs md:text-sm lg:text-base font-bold">{format(day, "EEEE", { locale: es })}</span>
-              <span className="text-[9px] sm:text-[10px] md:text-xs lg:text-sm font-semibold text-muted-foreground">{format(day, "d MMM", { locale: es })}</span>
-            </div>
-          </th>
-        ))}
+        {weekDays.map((day) => {
+          const dateStr = format(day, 'yyyy-MM-dd')
+          const specialDay = isSpecialDay(dateStr, 'viedma') // TODO: obtener ciudad de configuración
+          
+          return (
+            <th
+              key={day.toISOString()}
+              className="min-w-[90px] sm:min-w-[110px] md:min-w-[130px] lg:min-w-[140px] border-r-2 border-black px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 md:py-2 text-center font-bold text-foreground last:border-r-0"
+              onClick={(e) => {
+                if (onCloseSelector) {
+                  e.stopPropagation()
+                  onCloseSelector()
+                }
+              }}
+            >
+              <div className="flex flex-col">
+                <span className="capitalize text-[10px] sm:text-xs md:text-sm lg:text-base font-bold">{format(day, "EEEE", { locale: es })}</span>
+                <div className="flex items-center justify-center gap-1">
+                  <span className="text-[9px] sm:text-[10px] md:text-xs lg:text-sm font-semibold text-muted-foreground">{format(day, "d MMM", { locale: es })}</span>
+                  {specialDay && (
+                    <SpecialDayBadgeCompact 
+                      specialDay={specialDay}
+                      className="shrink-0"
+                    />
+                  )}
+                </div>
+              </div>
+            </th>
+          )
+        })}
       </tr>
     </thead>
   )

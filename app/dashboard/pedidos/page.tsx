@@ -485,10 +485,14 @@ export default function PedidosPage() {
       return
     }
 
-    if (!selectedPedido.enlacePublicoId) {
-      setEnlaceActivo(null)
-      return
-    }
+    if (!ownerId) return
+
+    const enlacesQuery = query(
+      collection(db, COLLECTIONS.ENLACES_PUBLICOS),
+      where("pedidoId", "==", selectedPedido.id),
+      where("activo", "==", true),
+      where("ownerId", "==", ownerId)
+    )
 
     const enlaceRef = doc(db, COLLECTIONS.ENLACES_PUBLICOS, selectedPedido.enlacePublicoId)
     const unsubscribe = onSnapshot(

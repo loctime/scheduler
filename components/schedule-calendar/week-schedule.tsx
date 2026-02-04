@@ -19,6 +19,7 @@ import {
 import { useWeekActions } from "@/hooks/use-week-actions"
 import { WeekScheduleHeader } from "./week-schedule-header"
 import { WeekScheduleActions } from "./week-schedule-actions"
+import { SchedulingWarnings } from "@/components/calendar/scheduling-warnings"
 import { isScheduleCompleted, shouldRequestConfirmation } from "@/lib/schedule-utils"
 import { logger } from "@/lib/logger"
 
@@ -110,6 +111,7 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
   const [isMarkingComplete, setIsMarkingComplete] = useState(false)
   const [confirmClearRowDialogOpen, setConfirmClearRowDialogOpen] = useState(false)
   const [pendingClearRowEmployeeId, setPendingClearRowEmployeeId] = useState<string | null>(null)
+  const [showSchedulingWarnings, setShowSchedulingWarnings] = useState(false)
 
   // Si no se proporciona open/onOpenChange, usar estado interno
   const [internalOpen, setInternalOpen] = useState(false)
@@ -129,6 +131,15 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
 
   const handleMarkComplete = useCallback(async () => {
     if (!onMarkComplete) return
+    
+    // Mostrar advertencias de días especiales primero
+    setShowSchedulingWarnings(true)
+  }, [onMarkComplete, weekStartDate, isCompleted])
+
+  const handleConfirmMarkComplete = useCallback(async () => {
+    if (!onMarkComplete) return
+    
+    setShowSchedulingWarnings(false)
     setIsMarkingComplete(true)
     try {
       await onMarkComplete(weekId)
@@ -137,7 +148,7 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
     } finally {
       setIsMarkingComplete(false)
     }
-  }, [onMarkComplete, weekStartDate, isCompleted])
+  }, [onMarkComplete, weekId])
 
   // Handler para exportar que abre la semana si está cerrada
   const handleExportImage = useCallback(async () => {
@@ -244,6 +255,26 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
           />
         </div>
       </CollapsibleContent>
+
+      {/* Diálogo de advertencias de días especiales */}
+      <AlertDialog open={showSchedulingWarnings} onOpenChange={setShowSchedulingWarnings}>
+        <AlertDialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Advertencias de Días Especiales</AlertDialogTitle>
+          </AlertDialogHeader>
+          
+          <SchedulingWarnings
+            startDate={format(weekStartDate, 'yyyy-MM-dd')}
+            endDate={format(weekEndDate, 'yyyy-MM-dd')}
+            city="viedma" // TODO: obtener de configuración
+            province="río negro"
+            country="argentina"
+            onContinue={handleConfirmMarkComplete}
+            onCancel={() => setShowSchedulingWarnings(false)}
+            showContinueButton={true}
+          />
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Diálogo de confirmación para limpiar fila de empleado */}
       <AlertDialog open={confirmClearRowDialogOpen} onOpenChange={setConfirmClearRowDialogOpen}>

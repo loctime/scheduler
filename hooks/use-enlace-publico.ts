@@ -106,10 +106,17 @@ export function useEnlacePublico(user: any) {
 
             // Intentar desactivar enlace asociado a ese pedido (no bloquear si falla)
             try {
-              const enlacePrevId = p.enlacePublicoId
-              if (enlacePrevId) {
-                await setDoc(doc(db, COLLECTIONS.ENLACES_PUBLICOS, enlacePrevId), { activo: false }, { merge: true })
-              }
+              const enlacesQueryPrev = query(
+                collection(db, COLLECTIONS.ENLACES_PUBLICOS),
+                where("pedidoId", "==", p.id),
+                where("activo", "==", true),
+                where("ownerId", "==", ownerId)
+              )
+              const enlacesSnapshotPrev = await getDocs(enlacesQueryPrev)
+              const desactivarPrev = enlacesSnapshotPrev.docs.map((doc) =>
+                setDoc(doc.ref, { activo: false }, { merge: true })
+              )
+              await Promise.all(desactivarPrev)
             } catch (err) {
               logger.error("No se pudieron desactivar enlaces del pedido activo:", err)
             }
@@ -136,10 +143,18 @@ export function useEnlacePublico(user: any) {
         // No bloquear, solo advertir - continuar con la creación del enlace
       }
 
-      // Desactivar enlace activo anterior si existe
-      if (pedidoData.enlacePublicoId) {
-        await setDoc(doc(db, COLLECTIONS.ENLACES_PUBLICOS, pedidoData.enlacePublicoId), { activo: false }, { merge: true })
-      }
+      // Desactivar todos los enlaces activos anteriores para este pedido
+      const enlacesActivosQuery = query(
+        collection(db, COLLECTIONS.ENLACES_PUBLICOS),
+        where("pedidoId", "==", pedidoId),
+        where("activo", "==", true),
+        where("ownerId", "==", ownerId)
+      )
+      const enlacesActivosSnapshot = await getDocs(enlacesActivosQuery)
+      const desactivarPromesas = enlacesActivosSnapshot.docs.map((doc) =>
+        setDoc(doc.ref, { activo: false }, { merge: true })
+      )
+      await Promise.all(desactivarPromesas)
 
       // Obtener productos del pedido para guardar snapshot
       // Filtrar por pedidoId Y userId para que las reglas de seguridad permitan la lectura
@@ -304,14 +319,23 @@ export function useEnlacePublico(user: any) {
     if (!ownerId) return false
 
     try {
-      const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId))
-      if (!pedidoDoc.exists()) return false
-      const pedidoData = pedidoDoc.data()
-      if (pedidoData.ownerId !== ownerId) return false
-
-      if (pedidoData.enlacePublicoId) {
-        await setDoc(doc(db, COLLECTIONS.ENLACES_PUBLICOS, pedidoData.enlacePublicoId), { activo: false }, { merge: true })
-        logger.info(`Desactivado enlace del pedido ${pedidoId}`)
+      // Buscar todos los enlaces activos del pedido
+      const enlacesQuery = query(
+        collection(db, COLLECTIONS.ENLACES_PUBLICOS),
+        where("pedidoId", "==", pedidoId),
+        where("activo", "==", true),
+        where("ownerId", "==", ownerId)
+      )
+      const enlacesSnapshot = await getDocs(enlacesQuery)
+      
+      // Desactivar todos los enlaces encontrados
+      const desactivarPromesas = enlacesSnapshot.docs.map((doc) =>
+        setDoc(doc.ref, { activo: false }, { merge: true })
+      )
+      await Promise.all(desactivarPromesas)
+      
+      if (enlacesSnapshot.docs.length > 0) {
+        logger.info(`Desactivados ${enlacesSnapshot.docs.length} enlaces del pedido ${pedidoId}`)
       }
       
       return true
@@ -329,17 +353,17 @@ export function useEnlacePublico(user: any) {
     if (!ownerId) return []
 
     try {
-      const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId))
-      if (!pedidoDoc.exists()) return []
-      const pedidoData = pedidoDoc.data()
-      if (pedidoData.ownerId !== ownerId) return []
-
-      if (!pedidoData.enlacePublicoId) return []
-      const enlaceDoc = await getDoc(doc(db, COLLECTIONS.ENLACES_PUBLICOS, pedidoData.enlacePublicoId))
-      if (!enlaceDoc.exists()) return []
-      const enlaceData = enlaceDoc.data() as EnlacePublico
-      if (!enlaceData.activo) return []
-      return [{ id: enlaceDoc.id, ...enlaceData }]
+      const enlacesQuery = query(
+        collection(db, COLLECTIONS.ENLACES_PUBLICOS),
+        where("pedidoId", "==", pedidoId),
+        where("activo", "==", true),
+        where("ownerId", "==", ownerId)
+      )
+      const snapshot = await getDocs(enlacesQuery)
+      return snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as EnlacePublico[]
     } catch (error: any) {
       logger.error("Error al buscar enlaces activos:", error)
       return []
