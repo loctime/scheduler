@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useData } from "@/contexts/data-context"
 import { useStockConsole } from "@/hooks/use-stock-console"
 import { DashboardLayout } from "@/components/dashboard-layout"
@@ -11,6 +12,36 @@ import { Check, X, Package } from "lucide-react"
 export default function StockConsolePage() {
   const { user, userData } = useData()
   const stockConsole = useStockConsole(user)
+  const [isPWA, setIsPWA] = useState(false)
+
+  // Detectar si estamos corriendo como PWA y registrar service worker
+  useEffect(() => {
+    // Registrar service worker solo en stock-console
+    if (typeof window !== "undefined" && window.location.pathname === "/dashboard/stock-console") {
+      // Detectar PWA
+      setIsPWA(window.matchMedia("(display-mode: standalone)").matches || 
+               (window.navigator as any).standalone === true)
+      
+      // Registrar service worker
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/sw-stock-console.js")
+          .then((registration) => {
+            console.log("Stock Console SW registrado:", registration)
+          })
+          .catch((error) => {
+            console.error("Stock Console SW error:", error)
+          })
+      }
+    }
+  }, [])
+
+  // Redirección si no está autenticado (ya manejado por DashboardLayout)
+  useEffect(() => {
+    if (!user && typeof window !== "undefined") {
+      // DashboardLayout ya maneja la redirección al login
+      console.log("Usuario no autenticado, DashboardLayout redirigirá al login")
+    }
+  }, [user])
 
   const {
     state,
@@ -35,7 +66,16 @@ export default function StockConsolePage() {
 
   return (
     <DashboardLayout user={user}>
-      <div className="min-h-screen bg-gray-100 pb-24">
+      {/* Meta tags para PWA */}
+      {!isPWA && (
+        <>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+          <meta name="theme-color" content="#3b82f6" />
+          <link rel="manifest" href="/manifest-stock-console.json" />
+        </>
+      )}
+      
+      <div className={`min-h-screen bg-gray-100 ${isPWA ? "pb-20" : "pb-24"}`}>
         {/* Header simple */}
         <div className="bg-blue-500 text-white p-4 shadow-lg">
           <h1 className="text-xl font-bold">Stock Rápido</h1>
@@ -163,24 +203,24 @@ export default function StockConsolePage() {
 
         {/* Botón de confirmación sticky */}
         {totalProductos > 0 && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-3 z-50">
-            <div className="max-w-md mx-auto flex items-center justify-between">
+          <div className={`fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-3 z-50 ${isPWA ? "p-2" : "p-3"}`}>
+            <div className={`max-w-md mx-auto flex items-center justify-between ${isPWA ? "gap-1" : ""}`}>
               <Button
                 variant="outline"
                 onClick={limpiarCantidades}
                 disabled={state.loading}
-                className="h-10 px-4"
+                className={`h-10 ${isPWA ? "px-2 text-xs" : "px-4"}`}
               >
-                <X className="w-4 h-4 mr-2" />
-                Limpiar
+                <X className={`w-4 h-4 ${isPWA ? "mr-1" : "mr-2"}`} />
+                {isPWA ? "Limpiar" : "Limpiar"}
               </Button>
               
-              <div className="flex items-center gap-1">
-                <span className="text-2xl font-bold text-red-600">
+              <div className={`flex items-center ${isPWA ? "gap-0.5" : "gap-1"}`}>
+                <span className={`font-bold text-red-600 ${isPWA ? "text-lg" : "text-2xl"}`}>
                   -{totalEgresos}
                 </span>
-                <span className="text-xl text-gray-500">|</span>
-                <span className="text-2xl font-bold text-green-600">
+                <span className={`text-gray-500 ${isPWA ? "text-sm" : "text-xl"}`}>|</span>
+                <span className={`font-bold text-green-600 ${isPWA ? "text-lg" : "text-2xl"}`}>
                   +{totalIngresos}
                 </span>
               </div>
@@ -188,10 +228,10 @@ export default function StockConsolePage() {
               <Button
                 onClick={confirmarMovimientos}
                 disabled={state.loading}
-                className="h-10 px-4 bg-blue-600 hover:bg-blue-700"
+                className={`h-10 bg-blue-600 hover:bg-blue-700 ${isPWA ? "px-2 text-xs" : "px-4"}`}
               >
-                <Check className="w-4 h-4 mr-2" />
-                {state.loading ? "Procesando..." : "Confirmar"}
+                <Check className={`w-4 h-4 ${isPWA ? "mr-1" : "mr-2"}`} />
+                {state.loading ? "Procesando..." : (isPWA ? "Confirmar" : "Confirmar")}
               </Button>
             </div>
 
