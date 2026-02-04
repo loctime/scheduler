@@ -1,12 +1,14 @@
-import { useEffect, useCallback, useMemo } from "react"
-import { format, startOfWeek, addDays } from "date-fns"
-import { collection, doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore"
+import { useCallback, useMemo } from "react"
+import { format, addDays } from "date-fns"
+import { collection, doc, serverTimestamp, getDoc, addDoc } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { ShiftAssignment, Horario, Turno } from "@/lib/types"
 import { useEmployeeFixedRules } from "./use-employee-fixed-rules"
 import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
 import { useFixedRulesEngine } from "@/hooks/use-fixed-rules-engine"
+import { useData } from "@/contexts/data-context"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
 interface UseImplicitFixedRulesProps {
   user: any
@@ -34,6 +36,8 @@ export function useImplicitFixedRules({
   onWeekScheduleCreated,
 }: UseImplicitFixedRulesProps) {
   const { toast } = useToast()
+  const { userData } = useData()
+  const ownerId = useMemo(() => getOwnerIdForActor(user, userData), [user, userData])
   
   // GUARD: Solo ejecutar en dashboard (usuario autenticado con rol adecuado)
   const isDashboardContext = useMemo(() => {
@@ -48,7 +52,7 @@ export function useImplicitFixedRules({
   }, [user])
 
   const { rules: fixedRules } = useEmployeeFixedRules({ 
-    ownerId: user?.uid 
+    ownerId: ownerId ?? undefined
   })
   const { buildAssignmentsFromFixedRulesForEmployee } = useFixedRulesEngine()
 
@@ -109,6 +113,12 @@ export function useImplicitFixedRules({
       logger.error("[ImplicitFixedRules] No hay conexión a base de datos o usuario", {
         hasDb: !!db,
         hasUser: !!user,
+        userId: user?.uid
+      })
+      return null
+    }
+    if (!ownerId) {
+      logger.error("[ImplicitFixedRules] No hay ownerId disponible para crear schedule", {
         userId: user?.uid
       })
       return null
@@ -203,6 +213,7 @@ export function useImplicitFixedRules({
         semanaInicio: weekStartStr,
         semanaFin: weekEndStr,
         assignments: scheduleAssignments,
+        ownerId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdBy: userId,
@@ -218,10 +229,9 @@ export function useImplicitFixedRules({
         createdBy: userId
       })
 
-      const docRef = doc(collection(db, COLLECTIONS.SCHEDULES), weekStartStr)
-      await setDoc(docRef, newScheduleData)
+      const docRef = await addDoc(collection(db, COLLECTIONS.SCHEDULES), newScheduleData)
       
-      const newSchedule = { id: weekStartStr, ...newScheduleData } as Horario
+      const newSchedule = { id: docRef.id, ...newScheduleData } as Horario
 
       logger.info("[ImplicitFixedRules] Schedule creado con éxito", {
         weekStart: weekStartStr,

@@ -104,7 +104,8 @@ export const getEmployeeRequest = async (
 export const deleteEmployeeRequest = async (
   scheduleId: string,
   employeeId: string,
-  date: string
+  date: string,
+  ownerId?: string
 ): Promise<void> => {
   if (!db) {
     throw new Error('Firestore no está inicializado');
@@ -113,6 +114,12 @@ export const deleteEmployeeRequest = async (
   try {
     const docId = `${scheduleId}_${employeeId}_${date}`;
     const docRef = doc(db, COLLECTION_NAME, docId);
+    if (ownerId) {
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists() || docSnap.data()?.ownerId !== ownerId) {
+        throw new Error('ownerId no válido para eliminar el pedido');
+      }
+    }
     await deleteDoc(docRef);
   } catch (error) {
     console.error('Error deleting employee request:', error);
