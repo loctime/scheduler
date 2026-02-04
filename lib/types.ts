@@ -245,6 +245,7 @@ export interface Separador {
 
 export interface HistorialItem {
   id: string
+  ownerId?: string
   horarioId: string
   version: number
   nombre: string

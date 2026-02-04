@@ -158,7 +158,11 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
 
   const handleDeleteRequest = async () => {
     try {
-      await deleteEmployeeRequest(scheduleId, employeeId, date);
+      const ownerId = userData?.role === 'invited' && userData?.ownerId 
+        ? userData.ownerId 
+        : userData?.uid || '';
+
+      await deleteEmployeeRequest(scheduleId, employeeId, date, ownerId);
       
       // Actualizar estado local
       if (active) {

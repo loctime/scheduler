@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { EmployeeFixedRule, Turno, Empleado } from "@/lib/types"
 import { useEmployeeFixedRules } from "@/hooks/use-employee-fixed-rules"
 import { Lock, Calendar, User } from "lucide-react"
+import { useData } from "@/contexts/data-context"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
 interface FixedRuleModalProps {
   isOpen: boolean
@@ -36,9 +38,11 @@ export function FixedRuleModal({
   const [ruleType, setRuleType] = useState<"SHIFT" | "OFF">("SHIFT")
   const [selectedShiftId, setSelectedShiftId] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const { userData } = useData()
+  const resolvedOwnerId = getOwnerIdForActor(user, userData)
   
   const { createOrUpdateRule, deleteRule, getRuleForDay } = useEmployeeFixedRules({ 
-    ownerId: user?.uid 
+    ownerId: resolvedOwnerId ?? undefined
   })
   
   const dayOfWeek = getDay(date) // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
@@ -68,7 +72,7 @@ export function FixedRuleModal({
     try {
       const ruleData: Omit<EmployeeFixedRule, "id" | "createdAt" | "updatedAt"> = {
         employeeId,
-        ownerId: user?.uid || "", // ID de la empresa/cuenta (misma que userId por ahora)
+        ownerId: resolvedOwnerId || "", // ID de la empresa/cuenta
         createdBy: user?.uid || "", // ID del usuario que crea
         dayOfWeek: dayOfWeek as 0 | 1 | 2 | 3 | 4 | 5 | 6,
         type: ruleType,

@@ -45,19 +45,20 @@ export function usePublicSchedule(publicScheduleId: string): UsePublicScheduleRe
       try {
         console.log("🔧 [usePublicSchedule] Loading public schedule:", publicScheduleId)
         
-        const scheduleRef = doc(db, "public/horarios", publicScheduleId)
-        console.log("🔧 [usePublicSchedule] Path:", `public/horarios/${publicScheduleId}`)
+        const scheduleRef = doc(db, "apps", "horarios", "enlaces_publicos", publicScheduleId)
+        console.log("🔧 [usePublicSchedule] Path:", `apps/horarios/enlaces_publicos/${publicScheduleId}`)
         
         const scheduleDoc = await getDoc(scheduleRef)
 
         if (scheduleDoc.exists()) {
           const data = scheduleDoc.data()
+          const publishedWeek = data.weeks?.[data.publishedWeekId]
           const schedule: PublicSchedule = {
             id: scheduleDoc.id,
             companyName: data.companyName || "",
             ownerId: data.ownerId || "",
             publishedWeekId: data.publishedWeekId || "",
-            weekData: data.weekData,
+            weekData: publishedWeek,
             updatedAt: data.updatedAt
           }
           

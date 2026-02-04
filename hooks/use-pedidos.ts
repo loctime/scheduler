@@ -11,6 +11,7 @@ import {
   query,
   where,
   getDocs,
+  getDoc,
   writeBatch,
   onSnapshot,
 } from "firebase/firestore"
@@ -357,6 +358,16 @@ export function usePedidos(user: any) {
     if (!db || !selectedPedido) return false
 
     try {
+      if (!ownerId) {
+        toast({ title: "Error", description: "Owner no válido", variant: "destructive" })
+        return false
+      }
+      const pedidoDoc = await getDoc(doc(db, COLLECTIONS.PEDIDOS, selectedPedido.id))
+      if (!pedidoDoc.exists() || pedidoDoc.data()?.ownerId !== ownerId) {
+        toast({ title: "Error", description: "No tienes permiso para eliminar este pedido", variant: "destructive" })
+        return false
+      }
+
       const batch = writeBatch(db)
       for (const product of products) {
         batch.delete(doc(db, COLLECTIONS.PRODUCTS, product.id))
@@ -376,7 +387,7 @@ export function usePedidos(user: any) {
       toast({ title: "Error", description: "No se pudo eliminar", variant: "destructive" })
       return false
     }
-  }, [selectedPedido, products, pedidos, toast])
+  }, [selectedPedido, products, pedidos, toast, ownerId])
 
   // Importar productos
   const importProducts = useCallback(async (text: string) => {
