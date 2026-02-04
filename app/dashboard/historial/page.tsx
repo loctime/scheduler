@@ -40,12 +40,12 @@ export default function HistorialPage() {
   const [compareDialogOpen, setCompareDialogOpen] = useState(false)
 
   useEffect(() => {
-    if (!user || !db) return
+    if (!user || !db || !ownerId) return
 
     // Obtener historial ordenado por fecha descendente, filtrado por usuario
     const historialQuery = query(
       collection(db, COLLECTIONS.HISTORIAL),
-      where("createdBy", "==", user.uid),
+      where("ownerId", "==", ownerId),
       orderBy("createdAt", "desc"),
       limit(50)
     )
@@ -56,8 +56,6 @@ export default function HistorialPage() {
     })
 
     // Obtener horarios actuales (solo los necesarios para el historial), filtrados por usuario
-    if (!ownerId) return
-
     const schedulesQuery = query(
       collection(db, COLLECTIONS.SCHEDULES),
       where("ownerId", "==", ownerId),

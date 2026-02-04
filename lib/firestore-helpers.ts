@@ -166,6 +166,7 @@ export function createHistoryEntry(
   const userId = user?.uid || ""
 
   return {
+    ownerId: schedule.ownerId,
     horarioId: schedule.id,
     version: 0, // Se asignará cuando se guarde en Firestore
     nombre: schedule.nombre || `Semana del ${weekStartStr || schedule.weekStart || schedule.semanaInicio}`,
@@ -300,4 +301,3 @@ export async function batchUpdateSchedules(
     await batch.commit()
   }
 }
-

@@ -40,6 +40,14 @@ export function useEnlacePublico(user: any) {
   
   // Determinar el userId a usar: si es invitado, usar ownerId, sino usar su propio uid
   const ownerId = getOwnerIdForActor(user, userData)
+  const ensureEnlaceOwner = useCallback(async (enlaceId: string): Promise<boolean> => {
+    if (!db || !ownerId) return false
+
+    const enlaceDoc = await getDoc(doc(db, COLLECTIONS.ENLACES_PUBLICOS, enlaceId))
+    if (!enlaceDoc.exists()) return false
+    const data = enlaceDoc.data()
+    return data.ownerId === ownerId
+  }, [db, ownerId])
 
   // Crear enlace público
   const crearEnlacePublico = useCallback(async (
@@ -244,7 +252,7 @@ export function useEnlacePublico(user: any) {
       logger.error("Error al obtener enlace público:", error)
       return null
     }
-  }, [])
+  }, [ensureEnlaceOwner])
 
   // Actualizar productos disponibles en el enlace
   const actualizarProductosDisponibles = useCallback(async (
@@ -254,6 +262,12 @@ export function useEnlacePublico(user: any) {
     if (!db) return false
 
     try {
+      const isOwner = await ensureEnlaceOwner(enlaceId)
+      if (!isOwner) {
+        logger.warn("Owner no válido para actualizar enlace público", { enlaceId })
+        return false
+      }
+
       // Limpiar campos undefined antes de guardar (Firebase no permite undefined)
       const productosDisponiblesLimpios = productosDisponibles 
         ? Object.entries(productosDisponibles).reduce((acc, [key, value]) => {
@@ -288,7 +302,7 @@ export function useEnlacePublico(user: any) {
       logger.error("Error al actualizar productos disponibles:", error)
       return false
     }
-  }, [])
+  }, [ensureEnlaceOwner])
 
   // Desactivar enlace público
   const desactivarEnlace = useCallback(async (
@@ -297,6 +311,12 @@ export function useEnlacePublico(user: any) {
     if (!db) return false
 
     try {
+      const isOwner = await ensureEnlaceOwner(enlaceId)
+      if (!isOwner) {
+        logger.warn("Owner no válido para desactivar enlace público", { enlaceId })
+        return false
+      }
+
       await setDoc(
         doc(db, COLLECTIONS.ENLACES_PUBLICOS, enlaceId),
         {
@@ -309,7 +329,7 @@ export function useEnlacePublico(user: any) {
       logger.error("Error al desactivar enlace:", error)
       return false
     }
-  }, [])
+  }, [ensureEnlaceOwner])
 
   // Desactivar todos los enlaces activos de un pedido
   const desactivarEnlacesPorPedido = useCallback(async (
