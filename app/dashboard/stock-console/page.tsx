@@ -20,6 +20,8 @@ export default function StockConsolePage() {
     movimientosPendientes,
     totalProductos,
     totalCantidad,
+    totalIngresos,
+    totalEgresos,
     setSelectedPedidoId,
     incrementarCantidad,
     decrementarCantidad,
@@ -173,8 +175,14 @@ export default function StockConsolePage() {
                 Limpiar
               </Button>
               
-              <div className={`text-2xl font-bold ${totalCantidad >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {totalCantidad >= 0 ? "+" : ""}{totalCantidad}
+              <div className="flex items-center gap-1">
+                <span className="text-2xl font-bold text-red-600">
+                  -{totalEgresos}
+                </span>
+                <span className="text-xl text-gray-500">|</span>
+                <span className="text-2xl font-bold text-green-600">
+                  +{totalIngresos}
+                </span>
               </div>
               
               <Button

@@ -267,6 +267,19 @@ export function useStockConsole(user: any) {
     return Object.values(state.cantidades).reduce((sum, cantidad) => sum + cantidad, 0)
   }, [state.cantidades])
 
+  // Totales separados para el footer
+  const totalIngresos = useMemo(() => {
+    return Object.values(state.cantidades)
+      .filter(cantidad => cantidad > 0)
+      .reduce((sum, cantidad) => sum + cantidad, 0)
+  }, [state.cantidades])
+
+  const totalEgresos = useMemo(() => {
+    return Math.abs(Object.values(state.cantidades)
+      .filter(cantidad => cantidad < 0)
+      .reduce((sum, cantidad) => sum + cantidad, 0))
+  }, [state.cantidades])
+
   // Confirmar movimientos
   const confirmarMovimientos = useCallback(async (): Promise<boolean> => {
     if (movimientosPendientes.length === 0) {
@@ -343,6 +356,8 @@ export function useStockConsole(user: any) {
     movimientosPendientes,
     totalProductos,
     totalCantidad,
+    totalIngresos,
+    totalEgresos,
     
     // Acciones
     setSelectedPedidoId,
