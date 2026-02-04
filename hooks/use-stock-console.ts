@@ -191,25 +191,44 @@ export function useStockConsole(user: any) {
   }, [])
 
   const decrementarCantidad = useCallback((productoId: string) => {
-    setState(prev => ({
-      ...prev,
-      cantidades: {
-        ...prev.cantidades,
-        [productoId]: (prev.cantidades[productoId] || 0) - 1
+    setState(prev => {
+      const cantidadActual = prev.cantidades[productoId] || 0
+      const stockDisponible = stockActual[productoId] || 0
+      const cantidadMinimaPermitida = -stockDisponible
+      
+      // No permitir ir más abajo del stock disponible
+      const nuevaCantidad = cantidadActual - 1
+      if (nuevaCantidad < cantidadMinimaPermitida) {
+        return prev // No hacer nada si viola la regla
       }
-    }))
-  }, [])
+      
+      return {
+        ...prev,
+        cantidades: {
+          ...prev.cantidades,
+          [productoId]: nuevaCantidad
+        }
+      }
+    })
+  }, [stockActual])
 
   const setCantidad = useCallback((productoId: string, cantidad: number) => {
-    // Permitir cualquier valor numérico (positivo, negativo o cero)
-    setState(prev => ({
-      ...prev,
-      cantidades: {
-        ...prev.cantidades,
-        [productoId]: cantidad
+    setState(prev => {
+      const stockDisponible = stockActual[productoId] || 0
+      const cantidadMinimaPermitida = -stockDisponible
+      
+      // Clamp al mínimo permitido para egresos
+      const cantidadFinal = cantidad < cantidadMinimaPermitida ? cantidadMinimaPermitida : cantidad
+      
+      return {
+        ...prev,
+        cantidades: {
+          ...prev.cantidades,
+          [productoId]: cantidadFinal
+        }
       }
-    }))
-  }, [])
+    })
+  }, [stockActual])
 
   const limpiarCantidades = useCallback(() => {
     setState(prev => ({ ...prev, cantidades: {} }))
