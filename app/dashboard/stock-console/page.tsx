@@ -3,12 +3,12 @@
 import { useData } from "@/contexts/data-context"
 import { useStockConsole } from "@/hooks/use-stock-console"
 import { DashboardLayout } from "@/components/dashboard-layout"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
-import { Plus, Check, X, Package } from "lucide-react"
+import { Plus, Minus, Check, X, Package } from "lucide-react"
 
 export default function StockConsolePage() {
   const { user, userData } = useData()
@@ -30,32 +30,44 @@ export default function StockConsolePage() {
     confirmarMovimientos,
   } = stockConsole
 
+  const isIngreso = state.tipo === "INGRESO"
+  const headerColor = isIngreso ? "bg-green-500" : "bg-red-500"
+  const buttonColor = isIngreso ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+
   return (
     <DashboardLayout user={user}>
-      <div className="min-h-screen bg-gray-50 p-4 pb-20">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Consola Rápida de Stock
-          </h1>
-          <p className="text-gray-600">
-            Registra ingresos y egresos de stock de forma táctil
-          </p>
+      <div className="min-h-screen bg-gray-100 pb-24">
+        {/* Header con modo */}
+        <div className={`${headerColor} text-white p-4 shadow-lg`}>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-xl font-bold">Stock Rápido</h1>
+            <div className="flex items-center gap-3">
+              <span className={`text-sm font-medium ${!isIngreso ? "opacity-50" : ""}`}>
+                INGRESO
+              </span>
+              <Switch
+                checked={!isIngreso}
+                onCheckedChange={(checked) => setTipo(checked ? "EGRESO" : "INGRESO")}
+                className="scale-110"
+              />
+              <span className={`text-sm font-medium ${isIngreso ? "opacity-50" : ""}`}>
+                EGRESO
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Selector de Pedido */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-lg">Pedido (Opcional)</CardTitle>
-          </CardHeader>
-          <CardContent>
+        {/* Selector de Pedido (compacto) */}
+        <div className="bg-white border-b">
+          <div className="p-4">
+            <div className="text-sm text-gray-600 mb-2">Pedido (opcional)</div>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setSelectedPedidoId(null)}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   !state.selectedPedidoId
                     ? "bg-blue-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    : "bg-gray-200 text-gray-700"
                 }`}
               >
                 Sin pedido
@@ -64,189 +76,155 @@ export default function StockConsolePage() {
                 <button
                   key={pedido.id}
                   onClick={() => setSelectedPedidoId(pedido.id)}
-                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                     state.selectedPedidoId === pedido.id
                       ? "bg-blue-600 text-white"
-                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      : "bg-gray-200 text-gray-700"
                   }`}
                 >
                   {pedido.nombre}
                 </button>
               ))}
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Toggle INGRESO/EGRESO */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-center space-x-4">
-              <span className={`text-lg font-medium ${
-                state.tipo === "INGRESO" ? "text-green-600" : "text-gray-400"
-              }`}>
-                INGRESO
-              </span>
-              <Switch
-                checked={state.tipo === "EGRESO"}
-                onCheckedChange={(checked) => setTipo(checked ? "EGRESO" : "INGRESO")}
-                className="scale-125"
-              />
-              <span className={`text-lg font-medium ${
-                state.tipo === "EGRESO" ? "text-red-600" : "text-gray-400"
-              }`}>
-                EGRESO
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Lista de Productos */}
         {state.selectedPedidoId && productos.length > 0 && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Package className="w-5 h-5" />
-                Productos
-                <Badge variant="secondary">
-                  {productos.filter(p => stockActual[p.id] < (p.stockMinimo || 0)).length} bajos
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {productos.map((producto) => {
-                  const cantidad = state.cantidades[producto.id] || 0
-                  const stock = stockActual[producto.id] || 0
-                  const stockMinimo = producto.stockMinimo || 0
-                  const isStockBajo = stock < stockMinimo
+          <div className="p-4 space-y-4">
+            {productos.map((producto) => {
+              const cantidad = state.cantidades[producto.id] || 0
+              const stock = stockActual[producto.id] || 0
+              const stockMinimo = producto.stockMinimo || 0
+              const isStockBajo = stock < stockMinimo
 
-                  return (
-                    <div
-                      key={producto.id}
-                      className="border rounded-lg p-4 bg-white hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-900">
-                            {producto.nombre}
-                          </h3>
-                          <div className="flex items-center gap-4 mt-1">
-                            <span className="text-sm text-gray-600">
-                              Stock: <span className={`font-medium ${isStockBajo ? "text-red-600" : ""}`}>
-                                {stock}
-                              </span>
-                            </span>
-                            <span className="text-sm text-gray-600">
-                              Mínimo: {stockMinimo}
-                            </span>
-                            <span className="text-sm text-gray-500">
-                              Unidad: {producto.unidad || "U"}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => incrementarCantidad(producto.id)}
-                          className="flex-shrink-0 h-10 w-10 p-0"
-                          disabled={state.loading}
-                        >
-                          <Plus className="w-4 h-4" />
-                        </Button>
-                        
-                        <Input
-                          type="number"
-                          min="0"
-                          value={cantidad}
-                          onChange={(e) => setCantidad(producto.id, parseInt(e.target.value) || 0)}
-                          className="w-20 text-center"
-                          placeholder="0"
-                          disabled={state.loading}
-                        />
-                        
-                        <div className="flex-1 text-right">
-                          {cantidad > 0 && (
-                            <Badge 
-                              variant={state.tipo === "INGRESO" ? "default" : "destructive"}
-                              className="text-sm"
-                            >
-                              {state.tipo === "INGRESO" ? "+" : "-"}{cantidad}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
+              return (
+                <Card 
+                  key={producto.id} 
+                  className="overflow-hidden shadow-md hover:shadow-lg transition-shadow"
+                >
+                  {/* Header del producto */}
+                  <div className="bg-white p-3 border-b">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {producto.nombre}
+                    </h3>
+                    <div className="flex items-center gap-3 text-sm text-gray-600">
+                      <span>
+                        Stock: <span className={`font-medium ${isStockBajo ? "text-red-600" : ""}`}>
+                          {stock}
+                        </span>
+                      </span>
+                      <span>Mín: {stockMinimo}</span>
+                      <span>{producto.unidad || "U"}</span>
                     </div>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                  </div>
 
-        {/* Resumen y Acciones */}
-        {totalProductos > 0 && (
-          <Card className="fixed bottom-0 left-0 right-0 rounded-t-2xl shadow-lg border-t-2 z-50">
-            <CardContent className="pt-4 pb-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <div className="text-sm text-gray-600">
-                    {totalProductos} producto{totalProductos !== 1 ? "s" : ""}
+                  {/* Zonas de interacción */}
+                  <div className="flex h-20">
+                    {/* Zona INGRESO (verde) */}
+                    <div 
+                      className="flex-[0.46] bg-green-500 hover:bg-green-600 active:bg-green-700 transition-colors flex items-center justify-center cursor-pointer"
+                      onClick={() => incrementarCantidad(producto.id)}
+                    >
+                    </div>
+
+                    {/* Zona CENTRO (neutro - mínima) */}
+                    <div 
+                      className="flex-[0.08] bg-gray-50 hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center cursor-pointer"
+                      onClick={() => {
+                        const input = document.getElementById(`input-${producto.id}`) as HTMLInputElement
+                        input?.focus()
+                        input?.click()
+                      }}
+                    >
+                      <Input
+                        id={`input-${producto.id}`}
+                        type="number"
+                        min="0"
+                        value={cantidad}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          setCantidad(producto.id, parseInt(e.target.value) || 0)
+                        }}
+                        className="text-3xl font-bold text-center border-0 bg-transparent h-auto w-full p-0 focus:ring-0"
+                        placeholder="0"
+                        disabled={state.loading}
+                      />
+                    </div>
+
+                    {/* Zona EGRESO (rojo) */}
+                    <div 
+                      className="flex-[0.46] bg-red-500 hover:bg-red-600 active:bg-red-700 transition-colors flex items-center justify-center cursor-pointer"
+                      onClick={() => setCantidad(producto.id, Math.max(0, cantidad - 1))}
+                    >
+                    </div>
                   </div>
-                  <div className="text-lg font-bold text-gray-900">
-                    Total: {state.tipo === "INGRESO" ? "+" : "-"}{totalCantidad}
-                  </div>
-                </div>
-                
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={limpiarCantidades}
-                    disabled={state.loading}
-                    className="flex items-center gap-2"
-                  >
-                    <X className="w-4 h-4" />
-                    Limpiar
-                  </Button>
-                  
-                  <Button
-                    onClick={confirmarMovimientos}
-                    disabled={state.loading}
-                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
-                  >
-                    <Check className="w-4 h-4" />
-                    {state.loading ? "Procesando..." : "Confirmar"}
-                  </Button>
-                </div>
-              </div>
-              
-              {state.error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-sm text-red-600">{state.error}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                </Card>
+              )
+            })}
+          </div>
         )}
 
         {/* Estado vacío */}
         {(!state.selectedPedidoId || productos.length === 0) && (
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {state.selectedPedidoId ? "No hay productos" : "Selecciona un pedido"}
-              </h3>
-              <p className="text-gray-600">
-                {state.selectedPedidoId 
-                  ? "Este pedido no tiene productos configurados"
-                  : "Selecciona un pedido para ver sus productos y registrar movimientos"
-                }
-              </p>
-            </CardContent>
-          </Card>
+          <div className="p-8 text-center">
+            <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {state.selectedPedidoId ? "No hay productos" : "Selecciona un pedido"}
+            </h3>
+            <p className="text-gray-600 text-lg">
+              {state.selectedPedidoId 
+                ? "Este pedido no tiene productos configurados"
+                : "Selecciona un pedido para ver sus productos"
+              }
+            </p>
+          </div>
+        )}
+
+        {/* Botón de confirmación sticky */}
+        {totalProductos > 0 && (
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4 z-50">
+            <div className="max-w-md mx-auto">
+              {/* Resumen */}
+              <div className="text-center mb-3">
+                <div className="text-sm text-gray-600">
+                  {totalProductos} producto{totalProductos !== 1 ? "s" : ""}
+                </div>
+                <div className={`text-2xl font-bold ${isIngreso ? "text-green-600" : "text-red-600"}`}>
+                  {isIngreso ? "+" : "-"}{totalCantidad}
+                </div>
+              </div>
+
+              {/* Botones */}
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={limpiarCantidades}
+                  disabled={state.loading}
+                  className="flex-1 h-12 text-lg"
+                >
+                  <X className="w-5 h-5 mr-2" />
+                  Limpiar
+                </Button>
+                
+                <Button
+                  onClick={confirmarMovimientos}
+                  disabled={state.loading}
+                  className={`flex-1 h-12 text-lg ${buttonColor}`}
+                >
+                  <Check className="w-5 h-5 mr-2" />
+                  {state.loading ? "Procesando..." : `Confirmar ${isIngreso ? "ingreso" : "egreso"}`}
+                </Button>
+              </div>
+
+              {/* Error */}
+              {state.error && (
+                <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-sm text-red-600">{state.error}</p>
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </DashboardLayout>
