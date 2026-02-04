@@ -180,47 +180,40 @@ export default function StockConsolePage() {
 
         {/* Botón de confirmación sticky */}
         {totalProductos > 0 && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4 z-50">
-            <div className="max-w-md mx-auto">
-              {/* Resumen */}
-              <div className="text-center mb-3">
-                <div className="text-sm text-gray-600">
-                  {totalProductos} producto{totalProductos !== 1 ? "s" : ""}
-                </div>
-                <div className={`text-2xl font-bold ${isIngreso ? "text-green-600" : "text-red-600"}`}>
-                  {isIngreso ? "+" : "-"}{totalCantidad}
-                </div>
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-3 z-50">
+            <div className="max-w-md mx-auto flex items-center justify-between">
+              <Button
+                variant="outline"
+                onClick={limpiarCantidades}
+                disabled={state.loading}
+                className="h-10 px-4"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Limpiar
+              </Button>
+              
+              <div className={`text-2xl font-bold ${isIngreso ? "text-green-600" : "text-red-600"}`}>
+                {isIngreso ? "+" : "-"}{totalCantidad}
               </div>
+              
+              <Button
+                onClick={confirmarMovimientos}
+                disabled={state.loading}
+                className={`h-10 px-4 ${buttonColor}`}
+              >
+                <Check className="w-4 h-4 mr-2" />
+                {state.loading ? "Procesando..." : `Confirmar ${isIngreso ? "ingreso" : "egreso"}`}
+              </Button>
+            </div>
 
-              {/* Botones */}
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  onClick={limpiarCantidades}
-                  disabled={state.loading}
-                  className="flex-1 h-12 text-lg"
-                >
-                  <X className="w-5 h-5 mr-2" />
-                  Limpiar
-                </Button>
-                
-                <Button
-                  onClick={confirmarMovimientos}
-                  disabled={state.loading}
-                  className={`flex-1 h-12 text-lg ${buttonColor}`}
-                >
-                  <Check className="w-5 h-5 mr-2" />
-                  {state.loading ? "Procesando..." : `Confirmar ${isIngreso ? "ingreso" : "egreso"}`}
-                </Button>
-              </div>
-
-              {/* Error */}
-              {state.error && (
-                <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3">
+            {/* Error */}
+            {state.error && (
+              <div className="mt-2 max-w-md mx-auto">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-2">
                   <p className="text-sm text-red-600">{state.error}</p>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
       </div>
