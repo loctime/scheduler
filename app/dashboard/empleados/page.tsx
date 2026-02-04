@@ -40,6 +40,7 @@ import { format, parseISO, addDays } from "date-fns"
 import { es } from "date-fns/locale"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import { Skeleton } from "@/components/ui/skeleton"
 import { logger } from "@/lib/logger"
 import {
@@ -66,8 +67,9 @@ const PRESET_COLORS = [
 ]
 
 export default function EmpleadosPage() {
-  const { employees, shifts, loading: dataLoading, refreshEmployees, refreshShifts, user } = useData()
+  const { employees, shifts, loading: dataLoading, refreshEmployees, refreshShifts, user, userData } = useData()
   const { toast } = useToast()
+  const ownerId = getOwnerIdForActor(user, userData)
   
   // Estados para empleados
   const [employeeDialogOpen, setEmployeeDialogOpen] = useState(false)
@@ -104,6 +106,14 @@ export default function EmpleadosPage() {
       toast({
         title: "Error",
         description: "Firebase no está configurado",
+        variant: "destructive",
+      })
+      return
+    }
+    if (!ownerId) {
+      toast({
+        title: "Error",
+        description: "Owner no válido",
         variant: "destructive",
       })
       return
@@ -183,9 +193,19 @@ export default function EmpleadosPage() {
         return
       }
 
+      if (!ownerId) {
+        toast({
+          title: "Error",
+          description: "Owner no válido",
+          variant: "destructive",
+        })
+        return
+      }
+
       const promises = namesToAdd.map((name: string) =>
         addDoc(collection(db!, COLLECTIONS.EMPLOYEES), {
           name,
+          ownerId,
           userId: user!.uid,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -218,9 +238,12 @@ export default function EmpleadosPage() {
     
     if (db) {
       try {
+        if (!ownerId) {
+          throw new Error("Owner no válido")
+        }
         const completedQuery = query(
           collection(db, COLLECTIONS.SCHEDULES),
-          where("createdBy", "==", user.uid),
+          where("ownerId", "==", ownerId),
           where("completada", "==", true),
         )
         const schedulesSnapshot = await getDocs(completedQuery)
@@ -265,9 +288,12 @@ export default function EmpleadosPage() {
 
     setIsDeleting(true)
     try {
+      if (!ownerId) {
+        throw new Error("Owner no válido")
+      }
       const completedQuery = query(
         collection(db, COLLECTIONS.SCHEDULES),
-        where("createdBy", "==", user.uid),
+        where("ownerId", "==", ownerId),
         where("completada", "==", true),
       )
       const completedSnapshot = await getDocs(completedQuery)
@@ -295,7 +321,7 @@ export default function EmpleadosPage() {
       
       const schedulesQuery = query(
         collection(db, COLLECTIONS.SCHEDULES),
-        where("createdBy", "==", user.uid)
+        where("ownerId", "==", ownerId)
       )
       const schedulesSnapshot = await getDocs(schedulesQuery)
       
@@ -470,6 +496,7 @@ export default function EmpleadosPage() {
           color: shiftFormData.color,
           startTime: shiftFormData.startTime,
           endTime: shiftFormData.endTime,
+          ownerId,
           updatedAt: serverTimestamp(),
         }
         
@@ -498,6 +525,7 @@ export default function EmpleadosPage() {
           color: shiftFormData.color,
           startTime: shiftFormData.startTime,
           endTime: shiftFormData.endTime,
+          ownerId,
           userId: user.uid,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),

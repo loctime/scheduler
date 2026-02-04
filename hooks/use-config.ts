@@ -4,19 +4,23 @@ import { useState, useEffect } from "react"
 import { doc, onSnapshot } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { Configuracion } from "@/lib/types"
+import { useData } from "@/contexts/data-context"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
 export function useConfig(user?: { uid: string } | null) {
   const [config, setConfig] = useState<Configuracion | null>(null)
   const [loading, setLoading] = useState(true)
+  const { userData } = useData()
+  const ownerId = getOwnerIdForActor(user, userData)
 
   useEffect(() => {
-    if (!db || !user?.uid) {
+    if (!db || !ownerId) {
       setLoading(false)
       return
     }
 
-    // Usar userId como ID del documento de configuración
-    const configRef = doc(db, COLLECTIONS.CONFIG, user.uid)
+    // Usar ownerId como ID del documento de configuración
+    const configRef = doc(db, COLLECTIONS.CONFIG, ownerId)
     
     // Configuración por defecto
     const defaultConfig: Configuracion = {
@@ -54,8 +58,7 @@ export function useConfig(user?: { uid: string } | null) {
     return () => {
       unsubscribe()
     }
-  }, [user?.uid])
+  }, [ownerId])
 
   return { config, loading }
 }
-

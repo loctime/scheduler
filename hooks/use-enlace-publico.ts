@@ -104,7 +104,7 @@ export function useEnlacePublico(user: any) {
               logger.error("No se pudo actualizar estado del pedido activo:", err)
             }
 
-            // Intentar desactivar enlaces asociados a ese pedido (no bloquear si falla)
+            // Intentar desactivar enlace asociado a ese pedido (no bloquear si falla)
             try {
               const enlacesQueryPrev = query(
                 collection(db, COLLECTIONS.ENLACES_PUBLICOS),

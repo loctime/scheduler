@@ -19,6 +19,7 @@ import { format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 import { ScheduleGrid } from "@/components/schedule-grid"
 import { useData } from "@/contexts/data-context"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import { HistorialItem, Horario } from "@/lib/types"
 import { logger } from "@/lib/logger"
 
@@ -28,7 +29,8 @@ export default function HistorialPage() {
   const [historial, setHistorial] = useState<HistorialItem[]>([])
   const [schedules, setSchedules] = useState<Horario[]>([])
   const [currentPage, setCurrentPage] = useState(1)
-  const { employees, shifts, user } = useData()
+  const { employees, shifts, user, userData } = useData()
+  const ownerId = getOwnerIdForActor(user, userData)
   const [selectedVersion, setSelectedVersion] = useState<any>(null)
   const [compareVersions, setCompareVersions] = useState<{ v1: any | null; v2: any | null }>({
     v1: null,
@@ -54,9 +56,11 @@ export default function HistorialPage() {
     })
 
     // Obtener horarios actuales (solo los necesarios para el historial), filtrados por usuario
+    if (!ownerId) return
+
     const schedulesQuery = query(
       collection(db, COLLECTIONS.SCHEDULES),
-      where("createdBy", "==", user.uid),
+      where("ownerId", "==", ownerId),
       orderBy("weekStart", "desc")
     )
     const unsubscribeSchedules = onSnapshot(schedulesQuery, (snapshot) => {
@@ -69,7 +73,7 @@ export default function HistorialPage() {
       unsubscribeHistorial()
       unsubscribeSchedules()
     }
-  }, [user])
+  }, [user, ownerId])
 
   const getAssignmentsCount = (item: any) => {
     if (!item.assignments) return 0

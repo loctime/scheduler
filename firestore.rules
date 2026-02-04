@@ -227,51 +227,58 @@ service cloud.firestore {
         // ====================== EMPLOYEES ========================
         // =========================================================
         match /apps/horarios/employees/{empleadoId} {
-          allow read: if true;
-    
+          allow read: if isAuth()
+            && canActFor(resource.data.ownerId);
+
           allow create: if isAuth()
+            && request.resource.data.ownerId == actorOwnerId()
             && request.resource.data.userId == uid();
-    
+
           allow update: if isAuth()
-            && canActFor(resource.data.userId)
-            && protectUserId(resource.data.userId);
-    
+            && canActFor(resource.data.ownerId)
+            && protectFieldUnchanged("ownerId");
+
           allow delete: if isAuth()
-            && (resource.data.userId == uid() || isAdmin());
+            && (resource.data.ownerId == uid() || isAdmin());
         }
     
         // =========================================================
         // ======================= SHIFTS ==========================
         // =========================================================
         match /apps/horarios/shifts/{turnoId} {
-          allow read: if true;
-    
+          allow read: if isAuth()
+            && canActFor(resource.data.ownerId);
+
           allow create: if isAuth()
+            && request.resource.data.ownerId == actorOwnerId()
             && request.resource.data.userId == uid();
-    
+
           allow update: if isAuth()
-            && canActFor(resource.data.userId)
-            && protectUserId(resource.data.userId);
-    
+            && canActFor(resource.data.ownerId)
+            && protectFieldUnchanged("ownerId");
+
           allow delete: if isAuth()
-            && (resource.data.userId == uid() || isAdmin());
+            && (resource.data.ownerId == uid() || isAdmin());
         }
     
         // =========================================================
         // ====================== SCHEDULES ========================
         // =========================================================
         match /apps/horarios/schedules/{horarioId} {
-          allow read: if true;
-    
+          allow read: if isAuth()
+            && canActFor(resource.data.ownerId);
+
           allow create: if isAuth()
+            && request.resource.data.ownerId == actorOwnerId()
             && request.resource.data.createdBy == uid();
-    
+
           allow update: if isAuth()
-            && (resource.data.createdBy == uid() || isAdmin())
+            && canActFor(resource.data.ownerId)
+            && protectFieldUnchanged("ownerId")
             && protectCreatedBy();
-    
+
           allow delete: if isAuth()
-            && (resource.data.createdBy == uid() || isAdmin());
+            && (resource.data.ownerId == uid() || isAdmin());
         }
     
         // =========================================================
@@ -288,8 +295,12 @@ service cloud.firestore {
         // ======================== CONFIG =========================
         // =========================================================
         match /apps/horarios/config/{configId} {
-          allow read: if true;
-          allow create, update: if isAuth() && configId == uid();
+          allow read: if isAuth()
+            && configId == actorOwnerId();
+          allow create, update: if isAuth()
+            && request.resource.data.ownerId == actorOwnerId()
+            && protectFieldUnchanged("ownerId")
+            && configId == request.resource.data.ownerId;
           allow delete: if false;
         }
     
@@ -297,13 +308,15 @@ service cloud.firestore {
         // ===================== INVITACIONES ======================
         // =========================================================
         match /apps/horarios/invitaciones/{invitacionId} {
-          allow read: if true;
-    
+          allow read: if isAuth()
+            && canActFor(resource.data.ownerId);
+
           allow create: if isAuth()
-            && request.resource.data.ownerId == uid();
-    
+            && request.resource.data.ownerId == actorOwnerId();
+
           allow update, delete: if isAuth()
-            && (resource.data.ownerId == uid() || isAdmin());
+            && canActFor(resource.data.ownerId)
+            && protectFieldUnchanged("ownerId");
         }
     
         // =========================================================
@@ -422,19 +435,19 @@ service cloud.firestore {
         // ==================== ENLACES PUBLICOS ===================
         // =========================================================
         match /apps/horarios/enlaces_publicos/{enlaceId} {
-          allow read: if true;
-    
+          allow get: if resource.data.activo == true;
+          allow list: if false;
+
           allow create: if isAuth()
-            && (request.resource.data.userId == uid()
-                || invitedActingFor(request.resource.data.userId)
-                || isAdmin());
-    
+            && request.resource.data.ownerId == actorOwnerId()
+            && request.resource.data.userId == uid();
+
           allow update: if isAuth()
-            && (canActFor(resource.data.userId) || isFactory())
-            && protectUserId(resource.data.userId);
-    
+            && canActFor(resource.data.ownerId)
+            && protectFieldUnchanged("ownerId");
+
           allow delete: if isAuth()
-            && (resource.data.userId == uid() || isAdmin());
+            && canActFor(resource.data.ownerId);
         }
     
         // =========================================================

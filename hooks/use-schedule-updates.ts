@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react"
+import { useCallback, useState, useMemo } from "react"
 import { collection, addDoc, doc, serverTimestamp, getDoc } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { format, startOfWeek, addDays } from "date-fns"
@@ -11,6 +11,8 @@ import { updateAssignmentInAssignments, normalizeAssignments, hydrateAssignments
 import { logger } from "@/lib/logger"
 import { isAssignmentIncomplete, getIncompletenessReason } from "@/lib/assignment-utils"
 import { validateBeforePersist, validateCellAssignments } from "@/lib/assignment-validators"
+import { useData } from "@/contexts/data-context"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
 interface UseScheduleUpdatesProps {
   user: any
@@ -32,6 +34,8 @@ export function useScheduleUpdates({
   const DEBUG = false
   const { toast } = useToast()
   const { config } = useConfig(user)
+  const { userData } = useData()
+  const ownerId = useMemo(() => getOwnerIdForActor(user, userData), [user, userData])
   const [pendingEdit, setPendingEdit] = useState<{
     date: string
     employeeId: string
@@ -307,12 +311,21 @@ export function useScheduleUpdates({
               })
               return
             }
+            if (!ownerId) {
+              toast({
+                title: "Error",
+                description: "Owner no válido",
+                variant: "destructive",
+              })
+              return
+            }
 
             const newScheduleData = {
               nombre: `Semana del ${weekStartStr}`,
               weekStart: weekStartStr,
               semanaInicio: weekStartStr,
               semanaFin: weekEndStr,
+              ownerId,
               assignments: assignment.type === "medio_franco" && medioFrancoAssignment
                 ? {
                     [date]: {
@@ -480,11 +493,21 @@ export function useScheduleUpdates({
           currentAssignments[date][employeeId] = cleanedAssignments
           finalAssignments = cleanedAssignments
 
+          if (!ownerId) {
+            toast({
+              title: "Error",
+              description: "Owner no válido",
+              variant: "destructive",
+            })
+            return
+          }
+
           const newScheduleData = {
             nombre: scheduleNombre,
             weekStart: weekStartStr,
             semanaInicio: weekStartStr,
             semanaFin: weekEndStr,
+            ownerId,
             assignments: currentAssignments,
             dayStatus: assignments.length > 0 ? {
               [date]: {

@@ -59,7 +59,7 @@ const defaultConfig: Configuracion = {
 
 function HorariosMensualesContent() {
   const searchParams = useSearchParams()
-  const userId = searchParams.get("userId")
+  const ownerId = searchParams.get("ownerId")
   
   const [schedules, setSchedules] = useState<Horario[]>([])
   const [employees, setEmployees] = useState<Empleado[]>([])
@@ -71,9 +71,9 @@ function HorariosMensualesContent() {
 
   // Cargar configuración del usuario
   useEffect(() => {
-    if (!db || !userId) return
+    if (!db || !ownerId) return
 
-    const configRef = doc(db, COLLECTIONS.CONFIG, userId)
+    const configRef = doc(db, COLLECTIONS.CONFIG, ownerId)
     const unsubscribeConfig = onSnapshot(
       configRef,
       (snapshot) => {
@@ -90,15 +90,15 @@ function HorariosMensualesContent() {
     )
 
     return () => unsubscribeConfig()
-  }, [userId])
+  }, [ownerId])
 
   const weekStartsOn = (config?.semanaInicioDia || 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
   const monthStartDay = config?.mesInicioDia || 1
 
   // Cargar empleados filtrados por userId
   useEffect(() => {
-    if (!db || !userId) {
-      if (!userId) {
+    if (!db || !ownerId) {
+      if (!ownerId) {
         setLoading(false)
       }
       return
@@ -106,7 +106,7 @@ function HorariosMensualesContent() {
 
     const employeesQuery = query(
       collection(db, COLLECTIONS.EMPLOYEES),
-      where("userId", "==", userId),
+      where("ownerId", "==", ownerId),
       orderBy("name")
     )
     const unsubscribeEmployees = onSnapshot(
@@ -129,15 +129,15 @@ function HorariosMensualesContent() {
     )
 
     return () => unsubscribeEmployees()
-  }, [userId, toast])
+  }, [ownerId, toast])
 
   // Cargar turnos filtrados por userId
   useEffect(() => {
-    if (!db || !userId) return
+    if (!db || !ownerId) return
 
     const shiftsQuery = query(
       collection(db, COLLECTIONS.SHIFTS),
-      where("userId", "==", userId),
+      where("ownerId", "==", ownerId),
       orderBy("name")
     )
     const unsubscribeShifts = onSnapshot(
@@ -160,15 +160,15 @@ function HorariosMensualesContent() {
     )
 
     return () => unsubscribeShifts()
-  }, [userId, toast])
+  }, [ownerId, toast])
 
   // Cargar horarios filtrados por userId
   useEffect(() => {
-    if (!db || !userId) return
+    if (!db || !ownerId) return
 
     const schedulesQuery = query(
       collection(db, COLLECTIONS.SCHEDULES),
-      where("createdBy", "==", userId),
+      where("ownerId", "==", ownerId),
       orderBy("weekStart", "desc")
     )
     const unsubscribeSchedules = onSnapshot(
@@ -193,10 +193,10 @@ function HorariosMensualesContent() {
     )
 
     return () => unsubscribeSchedules()
-  }, [userId, toast])
+  }, [ownerId, toast])
 
   // Mostrar mensaje si no hay userId
-  if (!userId) {
+  if (!ownerId) {
     return (
       <div className="min-h-screen bg-background">
         <div className="container mx-auto py-8 px-4">

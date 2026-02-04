@@ -5,6 +5,7 @@ import { doc, setDoc, serverTimestamp, getDoc, Timestamp } from "firebase/firest
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { DataContext } from "@/contexts/data-context"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import { Separador } from "@/lib/types"
 
 // Helper para eliminar campos undefined de un objeto (Firebase no acepta undefined)
@@ -22,17 +23,19 @@ export function useEmployeeOrder() {
   // Usar useContext directamente para evitar el error si no hay DataProvider
   const dataContext = useContext(DataContext)
   const user = dataContext?.user || null
+  const userData = dataContext?.userData || null
   const { toast } = useToast()
+  const ownerId = getOwnerIdForActor(user, userData)
 
   const updateEmployeeOrder = useCallback(
     async (orderedItemIds: string[]) => {
-      if (!user || !db) {
+      if (!user || !db || !ownerId) {
         console.warn("No se puede actualizar el orden: usuario o Firebase no disponible")
         return
       }
 
       try {
-        const configRef = doc(db, COLLECTIONS.CONFIG, user.uid)
+        const configRef = doc(db, COLLECTIONS.CONFIG, ownerId)
         
         // Obtener la configuración actual para preservar otros campos
         const configSnap = await getDoc(configRef)
@@ -46,6 +49,7 @@ export function useEmployeeOrder() {
             updatedAt: serverTimestamp(),
             updatedBy: user.uid,
             updatedByName: user.displayName || user.email || "",
+            ownerId,
           },
           { merge: true }
         )
@@ -58,18 +62,18 @@ export function useEmployeeOrder() {
         })
       }
     },
-    [user, toast]
+    [user, ownerId, toast]
   )
 
   const addSeparator = useCallback(
     async (nombre: string, _puestoId?: string, color?: string): Promise<Separador | null> => {
-      if (!user || !db) {
+      if (!user || !db || !ownerId) {
         console.warn("No se puede agregar separador: usuario o Firebase no disponible")
         return null
       }
 
       try {
-        const configRef = doc(db, COLLECTIONS.CONFIG, user.uid)
+        const configRef = doc(db, COLLECTIONS.CONFIG, ownerId)
         const configSnap = await getDoc(configRef)
         const currentConfig = configSnap.exists() ? configSnap.data() : {}
         const currentSeparadores: Separador[] = currentConfig.separadores || []
@@ -98,6 +102,7 @@ export function useEmployeeOrder() {
             updatedAt: serverTimestamp(),
             updatedBy: user.uid,
             updatedByName: user.displayName || user.email || "",
+            ownerId,
           },
           { merge: true }
         )
@@ -113,18 +118,18 @@ export function useEmployeeOrder() {
         return null
       }
     },
-    [user, toast]
+    [user, ownerId, toast]
   )
 
   const updateSeparator = useCallback(
     async (separatorId: string, updatedSeparator: Separador): Promise<boolean> => {
-      if (!user || !db) {
+      if (!user || !db || !ownerId) {
         console.warn("No se puede actualizar separador: usuario o Firebase no disponible")
         return false
       }
 
       try {
-        const configRef = doc(db, COLLECTIONS.CONFIG, user.uid)
+        const configRef = doc(db, COLLECTIONS.CONFIG, ownerId)
         const configSnap = await getDoc(configRef)
         const currentConfig = configSnap.exists() ? configSnap.data() : {}
         const currentSeparadores: Separador[] = currentConfig.separadores || []
@@ -148,6 +153,7 @@ export function useEmployeeOrder() {
             updatedAt: serverTimestamp(),
             updatedBy: user.uid,
             updatedByName: user.displayName || user.email || "",
+            ownerId,
           },
           { merge: true }
         )
@@ -163,18 +169,18 @@ export function useEmployeeOrder() {
         return false
       }
     },
-    [user, toast]
+    [user, ownerId, toast]
   )
 
   const deleteSeparator = useCallback(
     async (separatorId: string): Promise<boolean> => {
-      if (!user || !db) {
+      if (!user || !db || !ownerId) {
         console.warn("No se puede eliminar separador: usuario o Firebase no disponible")
         return false
       }
 
       try {
-        const configRef = doc(db, COLLECTIONS.CONFIG, user.uid)
+        const configRef = doc(db, COLLECTIONS.CONFIG, ownerId)
         const configSnap = await getDoc(configRef)
         const currentConfig = configSnap.exists() ? configSnap.data() : {}
         const currentSeparadores: Separador[] = currentConfig.separadores || []
@@ -189,6 +195,7 @@ export function useEmployeeOrder() {
             updatedAt: serverTimestamp(),
             updatedBy: user.uid,
             updatedByName: user.displayName || user.email || "",
+            ownerId,
           },
           { merge: true }
         )
@@ -204,7 +211,7 @@ export function useEmployeeOrder() {
         return false
       }
     },
-    [user, toast]
+    [user, ownerId, toast]
   )
 
   return { 
@@ -214,6 +221,3 @@ export function useEmployeeOrder() {
     deleteSeparator,
   }
 }
-
-
-

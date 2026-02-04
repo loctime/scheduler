@@ -156,6 +156,7 @@ export interface Empleado {
   name: string
   email?: string
   phone?: string
+  ownerId: string
   userId: string
   createdAt?: any
   updatedAt?: any
@@ -171,6 +172,7 @@ export interface Turno {
   color: string
   colorPrimeraFranja?: string
   colorSegundaFranja?: string
+  ownerId: string
   userId: string
   createdAt?: any
   updatedAt?: any
@@ -202,6 +204,7 @@ export interface Horario {
   weekStart: string
   semanaInicio: string
   semanaFin: string
+  ownerId: string
   assignments: {
     [date: string]: {
       [empleadoId: string]: ShiftAssignment[]

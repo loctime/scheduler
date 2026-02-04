@@ -6,6 +6,7 @@ import { signOut } from "firebase/auth"
 import { db, COLLECTIONS, auth } from "@/lib/firebase"
 import { Empleado, Turno } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
 interface UserData {
   uid: string
@@ -145,10 +146,8 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
     if (!user || !db) return
 
     try {
-      // Determinar el userId a usar: si es invitado, usar ownerId, sino usar su propio uid
-      const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
-        ? userData.ownerId 
-        : user.uid
+      const ownerId = getOwnerIdForActor(user, userData)
+      if (!ownerId) return
 
       // Intentar cargar desde cache primero
       const cached = loadFromCache(CACHE_KEY_EMPLOYEES)
@@ -159,7 +158,7 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
       // Cargar desde Firestore
       const employeesQuery = query(
         collection(db, COLLECTIONS.EMPLOYEES),
-        where("userId", "==", userIdToQuery),
+        where("ownerId", "==", ownerId),
         orderBy("name")
       )
       const snapshot = await getDocs(employeesQuery)
@@ -186,10 +185,8 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
     if (!user || !db) return
 
     try {
-      // Determinar el userId a usar: si es invitado, usar ownerId, sino usar su propio uid
-      const userIdToQuery = userData?.role === "invited" && userData?.ownerId 
-        ? userData.ownerId 
-        : user.uid
+      const ownerId = getOwnerIdForActor(user, userData)
+      if (!ownerId) return
 
       // Intentar cargar desde cache primero
       const cached = loadFromCache(CACHE_KEY_SHIFTS)
@@ -200,7 +197,7 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
       // Cargar desde Firestore
       const shiftsQuery = query(
         collection(db, COLLECTIONS.SHIFTS),
-        where("userId", "==", userIdToQuery),
+        where("ownerId", "==", ownerId),
         orderBy("name")
       )
       const snapshot = await getDocs(shiftsQuery)
@@ -272,10 +269,13 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
 
     setLoading(true)
 
-    // Determinar el userId a usar para las queries
-    const userIdToQuery = userData.role === "invited" && userData.ownerId 
-      ? userData.ownerId 
-      : user.uid
+    const ownerId = getOwnerIdForActor(user, userData)
+    if (!ownerId) {
+      setEmployees([])
+      setShifts([])
+      setLoading(false)
+      return
+    }
 
     // Cargar datos iniciales
     Promise.all([refreshEmployees(), refreshShifts()]).finally(() => {
@@ -286,12 +286,12 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
     // Solo para cambios críticos, no para cada actualización
     const employeesQuery = query(
       collection(db, COLLECTIONS.EMPLOYEES),
-      where("userId", "==", userIdToQuery),
+      where("ownerId", "==", ownerId),
       orderBy("name")
     )
     const shiftsQuery = query(
       collection(db, COLLECTIONS.SHIFTS),
-      where("userId", "==", userIdToQuery),
+      where("ownerId", "==", ownerId),
       orderBy("name")
     )
 
@@ -346,4 +346,3 @@ export function useData() {
   }
   return context
 }
-

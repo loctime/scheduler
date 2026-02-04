@@ -494,25 +494,16 @@ export default function PedidosPage() {
       where("ownerId", "==", ownerId)
     )
 
+    const enlaceRef = doc(db, COLLECTIONS.ENLACES_PUBLICOS, selectedPedido.enlacePublicoId)
     const unsubscribe = onSnapshot(
-      enlacesQuery,
+      enlaceRef,
       (snapshot) => {
-        const enlacesActivos = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
-        
-        if (enlacesActivos.length > 0) {
-          // Usar el enlace más reciente
-          const enlaceMasReciente = enlacesActivos.sort((a: any, b: any) => {
-            const aTime = a.createdAt?.toMillis?.() || 0
-            const bTime = b.createdAt?.toMillis?.() || 0
-            return bTime - aTime
-          })[0]
-          setEnlaceActivo({ id: enlaceMasReciente.id })
-        } else {
+        if (!snapshot.exists()) {
           setEnlaceActivo(null)
+          return
         }
+        const data = snapshot.data() as any
+        setEnlaceActivo(data.activo ? { id: snapshot.id } : null)
       },
       (error) => {
         console.error("Error en listener de enlaces:", error)
@@ -520,7 +511,7 @@ export default function PedidosPage() {
     )
 
     return () => unsubscribe()
-  }, [selectedPedido?.id, db, user, userData])
+  }, [selectedPedido?.id, selectedPedido?.enlacePublicoId, db, user])
 
   // Handlers
   const handleOpenCreate = () => {
