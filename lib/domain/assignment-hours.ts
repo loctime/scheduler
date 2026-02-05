@@ -71,13 +71,13 @@ export function calculateAssignmentImpact(
     case "shift":
       // REGLA: Turno normal suma horas normales, horas extra separadas, NO suma francos
       // Usar UNA sola fuente de verdad para cálculo de horas
-      const { horasComputables, horasExtra } = calculateTotalDailyHours([assignment], workingConfig)
+      const { horasNormales, horasExtra } = calculateTotalDailyHours([assignment], workingConfig)
       
       impact.sumaFrancos = 0
-      impact.horasNormales = horasComputables // ✅ CORRECTO: Solo horas normales
+      impact.horasNormales = horasNormales // ✅ CORRECTO: Solo horas normales (sin extras)
       impact.horasExtras = horasExtra // ✅ CORRECTO: Horas extra separadas
       impact.horasMedioFranco = 0
-      impact.aportaTrabajo = horasComputables > 0 || horasExtra > 0
+      impact.aportaTrabajo = horasNormales > 0 || horasExtra > 0
       impact.aportaLicencia = false
       break
 
