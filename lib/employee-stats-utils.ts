@@ -4,13 +4,10 @@ import {
   EmployeeStatsView,
   createEmployeeStatsView,
   migrateLegacyStats,
-  convertToLegacyStats,
-  BUSINESS_RULES,
-  type EmployeeMonthlyStats
+  convertToLegacyStats
 } from "@/types/employee-stats"
 import { ShiftAssignment, Turno, MedioTurno, Configuracion } from "@/lib/types"
-import { calculateHoursBreakdown } from "@/lib/validations"
-import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
+import { calculateAssignmentImpact as calculateAssignmentImpactCore } from "@/lib/domain/assignment-hours"
 
 /**
  * Utilidad centralizada para combinar estadísticas mensuales y semanales.
@@ -76,54 +73,10 @@ export function initializeEmployeeWeekStats(): EmployeeWeekStats {
 }
 
 /**
- * Valida que las reglas de negocio se apliquen correctamente.
- * 
- * Esta función es útil para debugging y testing.
- */
-export function validateBusinessRules(
-  assignment: ShiftAssignment,
-  expectedMonthDelta: Partial<EmployeeMonthStats>,
-  expectedWeekDelta: Partial<EmployeeWeekStats>
-): { valid: boolean; errors: string[] } {
-  const errors: string[] = []
-  
-  // Validar reglas según el tipo de assignment
-  switch (assignment.type) {
-    case "franco":
-      if (expectedMonthDelta.francosMes !== BUSINESS_RULES.franco.sumaFrancos) {
-        errors.push(`Franco: se esperaba +${BUSINESS_RULES.franco.sumaFrancos} francos, se recibió ${expectedMonthDelta.francosMes}`)
-      }
-      if ((expectedMonthDelta.horasNormalesMes || 0) !== BUSINESS_RULES.franco.sumaHoras) {
-        errors.push(`Franco: se esperaba ${BUSINESS_RULES.franco.sumaHoras} horas, se recibió ${expectedMonthDelta.horasNormalesMes}`)
-      }
-      break
-      
-    case "medio_franco":
-      if (expectedMonthDelta.francosMes !== BUSINESS_RULES.medioFranco.sumaFrancos) {
-        errors.push(`Medio franco: se esperaba +${BUSINESS_RULES.medioFranco.sumaFrancos} francos, se recibió ${expectedMonthDelta.francosMes}`)
-      }
-      if (expectedMonthDelta.horasExtrasMes !== BUSINESS_RULES.medioFranco.sumaHorasExtras) {
-        errors.push(`Medio franco: se esperaba ${BUSINESS_RULES.medioFranco.sumaHorasExtras} horas extra, se recibió ${expectedMonthDelta.horasExtrasMes}`)
-      }
-      break
-      
-    case "shift":
-      if ((expectedMonthDelta.francosMes || 0) !== BUSINESS_RULES.turnoNormal.sumaFrancos) {
-        errors.push(`Turno: se esperaba ${BUSINESS_RULES.turnoNormal.sumaFrancos} francos, se recibió ${expectedMonthDelta.francosMes}`)
-      }
-      break
-  }
-  
-  return {
-    valid: errors.length === 0,
-    errors
-  }
-}
-
-/**
  * Calcula el impacto de una asignación individual en las estadísticas.
  * 
- * Útil para debugging y para cálculos incrementales.
+ * Esta función ahora usa el módulo centralizado assignment-hours.ts
+ * para evitar duplicación de lógica de negocio.
  */
 export function calculateAssignmentImpact(
   assignment: ShiftAssignment,
@@ -134,66 +87,38 @@ export function calculateAssignmentImpact(
   monthDelta: EmployeeMonthStats
   weekDelta: EmployeeWeekStats
 } {
-  const minutosDescanso = config?.minutosDescanso ?? 30
-  const horasMinimasParaDescanso = config?.horasMinimasParaDescanso ?? 6
-  const workingConfig = toWorkingHoursConfig(config)
+  // Usar el módulo centralizado para calcular impacto
+  const impact = calculateAssignmentImpactCore(assignment, shifts, mediosTurnos, config)
   
   const monthDelta = initializeEmployeeMonthStats()
   const weekDelta = initializeEmployeeWeekStats()
   
-  switch (assignment.type) {
-    case "franco":
-      monthDelta.francosMes = BUSINESS_RULES.franco.sumaFrancos
-      weekDelta.francosSemana = BUSINESS_RULES.franco.sumaFrancos
-      break
-      
-    case "medio_franco":
-      monthDelta.francosMes = BUSINESS_RULES.medioFranco.sumaFrancos
-      weekDelta.francosSemana = BUSINESS_RULES.medioFranco.sumaFrancos
-      
-      // Calcular horas del medio turno
-      const medioFrancoHours = calculateMedioFrancoHours(assignment, mediosTurnos)
-      monthDelta.horasMedioFrancoMes = medioFrancoHours
-      weekDelta.horasMedioFrancoSemana = medioFrancoHours
-      break
-      
-    case "shift":
-      const shiftHours = calculateShiftHours(
-        assignment,
-        shifts,
-        minutosDescanso,
-        horasMinimasParaDescanso,
-        workingConfig
-      )
-      
-      monthDelta.horasNormalesMes = shiftHours.normales
-      weekDelta.horasNormalesSemana = shiftHours.normales
-      
-      if (shiftHours.extras > 0) {
-        monthDelta.horasExtrasMes = shiftHours.extras
-        weekDelta.horasExtrasSemana = shiftHours.extras
-      }
-      
-      if (shiftHours.normales > 0 || shiftHours.extras > 0) {
-        monthDelta.diasTrabajadosMes = 1
-        weekDelta.diasTrabajadosSemana = 1
-      }
-      break
-      
-    case "licencia":
-      const licenciaHours = calculateLicenciaHours(
-        assignment,
-        shifts,
-        minutosDescanso,
-        horasMinimasParaDescanso
-      )
-      
-      monthDelta.horasLicenciaEmbarazoMes = licenciaHours
-      weekDelta.horasLicenciaEmbarazoSemana = licenciaHours
-      
-      monthDelta.diasLicenciaMes = 1
-      weekDelta.diasLicenciaSemana = 1
-      break
+  // Mapear impacto a deltas mensuales
+  monthDelta.francosMes = impact.sumaFrancos
+  monthDelta.horasNormalesMes = impact.horasNormales
+  monthDelta.horasExtrasMes = impact.horasExtras
+  monthDelta.horasLicenciaEmbarazoMes = impact.horasLicencia
+  monthDelta.horasMedioFrancoMes = impact.horasMedioFranco
+  
+  if (impact.aportaTrabajo) {
+    monthDelta.diasTrabajadosMes = 1
+  }
+  if (impact.aportaLicencia) {
+    monthDelta.diasLicenciaMes = 1
+  }
+  
+  // Mapear impacto a deltas semanales
+  weekDelta.francosSemana = impact.sumaFrancos
+  weekDelta.horasNormalesSemana = impact.horasNormales
+  weekDelta.horasExtrasSemana = impact.horasExtras
+  weekDelta.horasLicenciaEmbarazoSemana = impact.horasLicencia
+  weekDelta.horasMedioFrancoSemana = impact.horasMedioFranco
+  
+  if (impact.aportaTrabajo) {
+    weekDelta.diasTrabajadosSemana = 1
+  }
+  if (impact.aportaLicencia) {
+    weekDelta.diasLicenciaSemana = 1
   }
   
   return { monthDelta, weekDelta }
@@ -201,55 +126,3 @@ export function calculateAssignmentImpact(
 
 // Re-exportar funciones desde types para conveniencia
 export { convertToLegacyStats } from "@/types/employee-stats"
-
-// Funciones auxiliares re-exportadas para conveniencia
-export function calculateMedioFrancoHours(
-  assignment: ShiftAssignment,
-  mediosTurnos: MedioTurno[]
-): number {
-  if (assignment.startTime && assignment.endTime) {
-    const start = new Date(`2000-01-01T${assignment.startTime}`)
-    const end = new Date(`2000-01-01T${assignment.endTime}`)
-    const diffMs = end.getTime() - start.getTime()
-    return Math.max(0, diffMs / (1000 * 60 * 60))
-  }
-  return 0
-}
-
-export function calculateShiftHours(
-  assignment: ShiftAssignment,
-  shifts: Turno[],
-  minutosDescanso: number,
-  horasMinimasParaDescanso: number,
-  workingConfig: any
-): { normales: number; extras: number } {
-  const hoursBreakdown = calculateHoursBreakdown(
-    [assignment],
-    shifts,
-    minutosDescanso,
-    horasMinimasParaDescanso
-  )
-  
-  const { horasComputables, horasExtra } = calculateTotalDailyHours([assignment], workingConfig)
-  
-  return {
-    normales: horasComputables,
-    extras: horasExtra,
-  }
-}
-
-export function calculateLicenciaHours(
-  assignment: ShiftAssignment,
-  shifts: Turno[],
-  minutosDescanso: number,
-  horasMinimasParaDescanso: number
-): number {
-  const hoursBreakdown = calculateHoursBreakdown(
-    [assignment],
-    shifts,
-    minutosDescanso,
-    horasMinimasParaDescanso
-  )
-  
-  return hoursBreakdown.licencia || 0
-}
