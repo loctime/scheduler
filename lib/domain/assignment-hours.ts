@@ -50,9 +50,10 @@ export function calculateAssignmentImpact(
   switch (assignment.type) {
     case "franco":
       // REGLA: Franco suma +1 franco, NO suma horas, NO aporta trabajo
-      impact.sumaFrancos = 1
+      impact.sumaFrancos = 1 // ✅ CORRECTO: Franco siempre suma +1
       impact.horasNormales = 0
       impact.horasExtras = 0
+      impact.horasMedioFranco = 0
       impact.aportaTrabajo = false
       impact.aportaLicencia = false
       break
@@ -61,7 +62,7 @@ export function calculateAssignmentImpact(
       // REGLA: Medio franco suma +0.5 franco Y horas del medio turno, NO suma horas extra
       impact.sumaFrancos = 0.5
       impact.horasMedioFranco = calculateMedioFrancoHours(assignment, mediosTurnos)
-      impact.horasNormales = 0
+      impact.horasNormales = impact.horasMedioFranco // CORRECCIÓN: Sumar horas del medio turno a normales
       impact.horasExtras = 0
       impact.aportaTrabajo = impact.horasMedioFranco > 0
       impact.aportaLicencia = false
@@ -73,8 +74,8 @@ export function calculateAssignmentImpact(
       const { horasComputables, horasExtra } = calculateTotalDailyHours([assignment], workingConfig)
       
       impact.sumaFrancos = 0
-      impact.horasNormales = horasComputables
-      impact.horasExtras = horasExtra
+      impact.horasNormales = horasComputables // ✅ CORRECTO: Solo horas normales
+      impact.horasExtras = horasExtra // ✅ CORRECTO: Horas extra separadas
       impact.horasMedioFranco = 0
       impact.aportaTrabajo = horasComputables > 0 || horasExtra > 0
       impact.aportaLicencia = false
