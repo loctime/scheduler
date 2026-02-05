@@ -58,22 +58,32 @@ export function useEmployeeMonthStats({
         if (day < monthRange.startDate || day > monthRange.endDate) return
 
         const dateStr = format(day, "yyyy-MM-dd")
-        const dateAssignments = weekSchedule.assignments[dateStr]
-        if (!dateAssignments) return
+        const dateAssignments = weekSchedule.assignments?.[dateStr] || {}
+        const dayStatuses = weekSchedule.dayStatus?.[dateStr] || {}
+        const employeeIds = new Set([
+          ...Object.keys(dateAssignments),
+          ...Object.keys(dayStatuses),
+        ])
+        if (employeeIds.size === 0) return
 
         // Procesar asignaciones de cada empleado en este día
-        Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
+        employeeIds.forEach((employeeId) => {
           if (!stats[employeeId]) {
             stats[employeeId] = initializeEmployeeMonthStats()
           }
 
           // Normalizar asignaciones
+          const assignmentValue = dateAssignments[employeeId]
           const normalizedAssignments = normalizeAssignments(assignmentValue)
-          if (normalizedAssignments.length === 0) return
+          const dayStatus = dayStatuses[employeeId] || "normal"
+          if (normalizedAssignments.length === 0 && dayStatus === "normal") {
+            return
+          }
 
           // Inicializar flags diarios para contar días UNA SOLA VEZ
           let trabajoHoy = false
           let licenciaHoy = false
+          let francosDelDia = 0
 
           // Procesar cada asignación del empleado en este día
           normalizedAssignments.forEach((assignment) => {
@@ -91,11 +101,20 @@ export function useEmployeeMonthStats({
             stats[employeeId].horasExtrasMes += impact.horasExtras
             stats[employeeId].horasLicenciaEmbarazoMes += impact.horasLicencia
             stats[employeeId].horasMedioFrancoMes += impact.horasMedioFranco
+            francosDelDia += impact.sumaFrancos
 
             // Actualizar flags diarios (fuera del loop de assignments)
             if (impact.aportaTrabajo) trabajoHoy = true
             if (impact.aportaLicencia) licenciaHoy = true
           })
+
+          if (francosDelDia === 0) {
+            if (dayStatus === "franco") {
+              stats[employeeId].francosMes += 1
+            } else if (dayStatus === "medio_franco") {
+              stats[employeeId].francosMes += 0.5
+            }
+          }
 
           // Contar días UNA SOLA VEZ al finalizar todos los assignments del día
           if (trabajoHoy) {
