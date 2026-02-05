@@ -11,6 +11,30 @@ import { Check, X, Package } from "lucide-react"
 
 export default function StockConsolePage() {
   const { user, userData } = useData()
+  
+  // Validar permisos antes de renderizar la página
+  const tienePermisoPedidos = userData?.permisos?.paginas?.includes("pedidos")
+  
+  // Si no tiene permisos, mostrar mensaje de acceso denegado
+  if (!tienePermisoPedidos) {
+    return (
+      <DashboardLayout user={user}>
+        <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+          <div className="text-center p-8">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+              <h2 className="text-xl font-semibold text-red-800 mb-2">Acceso Denegado</h2>
+              <p className="text-red-600">
+                No tienes permisos para acceder a Stock Console.
+                <br />
+                Esta función requiere el permiso "pedidos".
+              </p>
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+  
   const stockConsole = useStockConsole(user)
   const [isPWA, setIsPWA] = useState(false)
 

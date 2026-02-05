@@ -21,7 +21,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Factory, Shield, UserCog, MessageSquare, AlertTriangle } from "lucide-react"
+import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Factory, Shield, UserCog, MessageSquare, AlertTriangle, Package } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -38,6 +38,7 @@ const navItems = [
   { href: "/dashboard/horarios-mensuales", label: "Vista Mensual", icon: CalendarDays },
   { href: "/dashboard/empleados", label: "Empleados", icon: Users },
   { href: "/dashboard/pedidos", label: "Pedidos", icon: ShoppingCart },
+  { href: "/dashboard/stock-console", label: "Stock Rápido", icon: Package, permission: "pedidos" },
   { href: "/mensajeria", label: "Mensajería", icon: MessageSquare },
   { href: "/dashboard/dias-especiales", label: "Días Especiales", icon: AlertTriangle, role: "admin" },
   { href: "/dashboard/fabrica", label: "Fábrica", icon: Factory, role: "factory" },
@@ -73,6 +74,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     "/dashboard/horarios": "horarios",
     "/dashboard/horarios-mensuales": "horarios",
     "/dashboard/pedidos": "pedidos",
+    "/dashboard/stock-console": "pedidos",
     "/dashboard/fabrica": "fabrica",
     "/dashboard/fabrica/historial": "fabrica",
     "/dashboard/empleados": "empleados",
@@ -130,6 +132,14 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     // Si el usuario es invitado y NO tiene permisos definidos, solo mostrar Pedidos
     if (userData?.role === "invited" && (!userData?.permisos?.paginas || !Array.isArray(userData.permisos.paginas) || userData.permisos.paginas.length === 0)) {
       return item.href === "/dashboard/pedidos"
+    }
+    
+    // Si el item requiere un permiso específico, verificar que el usuario lo tenga
+    if ((item as any).permission) {
+      const tienePermiso = userData?.permisos?.paginas?.includes((item as any).permission)
+      if (!tienePermiso) {
+        return false
+      }
     }
     
     // Si el item requiere un rol específico, verificar que el usuario lo tenga

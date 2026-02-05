@@ -28,6 +28,9 @@ export function useStockConsole(user: any) {
   const { toast } = useToast()
   const { userData } = useData()
   
+  // Validar permisos: si no tiene "pedidos", no permitir acceso
+  const tienePermisoPedidos = userData?.permisos?.paginas?.includes("pedidos")
+  
   // Estado local aislado
   const [state, setState] = useState<StockConsoleState>({
     selectedPedidoId: null,
@@ -48,6 +51,16 @@ export function useStockConsole(user: any) {
   // Cargar pedidos
   const loadPedidos = useCallback(async () => {
     if (!user || !db) return
+    
+    // Validar permisos antes de cargar datos
+    if (!tienePermisoPedidos) {
+      toast({
+        title: "Acceso denegado",
+        description: "No tienes permisos para acceder a Stock Console",
+        variant: "destructive",
+      })
+      return
+    }
     
     try {
       if (!ownerId) return
@@ -72,13 +85,18 @@ export function useStockConsole(user: any) {
         variant: "destructive",
       })
     }
-  }, [user, ownerId, toast])
+  }, [user, ownerId, toast, tienePermisoPedidos])
 
   // Cargar productos del pedido seleccionado
   const loadProductos = useCallback(async () => {
     if (!user || !db || !state.selectedPedidoId) {
       setProductos([])
       setStockActual({})
+      return
+    }
+    
+    // Validar permisos antes de cargar datos
+    if (!tienePermisoPedidos) {
       return
     }
     
@@ -124,13 +142,18 @@ export function useStockConsole(user: any) {
         variant: "destructive",
       })
     }
-  }, [user, state.selectedPedidoId, ownerId, toast])
+  }, [user, state.selectedPedidoId, ownerId, toast, tienePermisoPedidos])
 
   // Listener para stock en tiempo real
   useEffect(() => {
     if (!state.selectedPedidoId || !db || !user) return
 
     if (!ownerId) return
+    
+    // Validar permisos antes de configurar listener
+    if (!tienePermisoPedidos) {
+      return
+    }
 
     const productsQuery = query(
       collection(db, "apps/horarios/products"),
@@ -154,7 +177,7 @@ export function useStockConsole(user: any) {
     )
 
     return () => unsubscribe()
-  }, [state.selectedPedidoId, user, ownerId])
+  }, [state.selectedPedidoId, user, ownerId, tienePermisoPedidos])
 
   // Inicialización
   useEffect(() => {
@@ -272,6 +295,16 @@ export function useStockConsole(user: any) {
 
   // Confirmar movimientos
   const confirmarMovimientos = useCallback(async (): Promise<boolean> => {
+    // Validar permisos antes de ejecutar cualquier operación
+    if (!tienePermisoPedidos) {
+      toast({
+        title: "Acceso denegado",
+        description: "No tienes permisos para ejecutar movimientos de stock",
+        variant: "destructive",
+      })
+      return false
+    }
+    
     if (movimientosPendientes.length === 0) {
       toast({
         title: "Error",
@@ -335,7 +368,7 @@ export function useStockConsole(user: any) {
       
       return false
     }
-  }, [movimientosPendientes, ownerId, user, toast, totalProductos])
+  }, [movimientosPendientes, ownerId, user, toast, totalProductos, tienePermisoPedidos])
 
   return {
     // Estado
