@@ -6,6 +6,7 @@ import {
 } from "@/types/employee-stats"
 import { ShiftAssignment, Turno, MedioTurno, Configuracion } from "@/lib/types"
 import { calculateAssignmentImpact } from "@/lib/domain/assignment-hours"
+import { normalizeAssignments } from "@/lib/domain/normalize-assignments"
 
 interface UseEmployeeMonthStatsProps {
   employees: Array<{ id: string; name: string }>
@@ -118,16 +119,4 @@ export function useEmployeeMonthStats({
     config,
     mediosTurnos,
   ])
-}
-
-/**
- * Normaliza asignaciones desde diferentes formatos.
- */
-function normalizeAssignments(value: any): ShiftAssignment[] {
-  if (!value || !Array.isArray(value) || value.length === 0) return []
-  
-  return (value as ShiftAssignment[]).map((assignment) => ({
-    ...assignment,
-    type: assignment.type || "shift",
-  }))
 }

@@ -1,5 +1,4 @@
 import { ShiftAssignment, Turno, MedioTurno, Configuracion } from "@/lib/types"
-import { calculateHoursBreakdown } from "@/lib/validations"
 import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
 
 /**
@@ -70,36 +69,29 @@ export function calculateAssignmentImpact(
 
     case "shift":
       // REGLA: Turno normal suma horas normales, horas extra separadas, NO suma francos
-      const shiftHours = calculateShiftHours(
-        assignment,
-        shifts,
-        minutosDescanso,
-        horasMinimasParaDescanso,
-        workingConfig
-      )
+      // Usar UNA sola fuente de verdad para cálculo de horas
+      const { horasComputables, horasExtra } = calculateTotalDailyHours([assignment], workingConfig)
+      
       impact.sumaFrancos = 0
-      impact.horasNormales = shiftHours.normales
-      impact.horasExtras = shiftHours.extras
+      impact.horasNormales = horasComputables
+      impact.horasExtras = horasExtra
       impact.horasMedioFranco = 0
-      impact.aportaTrabajo = shiftHours.normales > 0 || shiftHours.extras > 0
+      impact.aportaTrabajo = horasComputables > 0 || horasExtra > 0
       impact.aportaLicencia = false
       break
 
     case "licencia":
       // REGLA: Licencia suma horas de licencia, NO suma francos ni horas normales
-      const licenciaHours = calculateLicenciaHours(
-        assignment,
-        shifts,
-        minutosDescanso,
-        horasMinimasParaDescanso
-      )
+      // Usar UNA sola fuente de verdad para cálculo de horas
+      const { horasComputables: licenciaHoras } = calculateTotalDailyHours([assignment], workingConfig)
+      
       impact.sumaFrancos = 0
       impact.horasNormales = 0
       impact.horasExtras = 0
-      impact.horasLicencia = licenciaHours
+      impact.horasLicencia = licenciaHoras
       impact.horasMedioFranco = 0
       impact.aportaTrabajo = false
-      impact.aportaLicencia = licenciaHours > 0
+      impact.aportaLicencia = licenciaHoras > 0
       break
 
     case "nota":
@@ -139,51 +131,11 @@ function calculateMedioFrancoHours(
   // Si no hay horas específicas, buscar en medios turnos configurados
   // (lógica adicional si es necesario)
   return 0
-}
-
-/**
- * Calcula horas para un turno normal.
- */
-function calculateShiftHours(
-  assignment: ShiftAssignment,
-  shifts: Turno[],
-  minutosDescanso: number,
-  horasMinimasParaDescanso: number,
-  workingConfig: any
-): { normales: number; extras: number } {
-  // Usar calculateHoursBreakdown para obtener desglose
-  const hoursBreakdown = calculateHoursBreakdown(
-    [assignment],
-    shifts,
-    minutosDescanso,
-    horasMinimasParaDescanso
-  )
   
-  // Usar calculateTotalDailyHours para separar normales de extras
-  const { horasComputables, horasExtra } = calculateTotalDailyHours([assignment], workingConfig)
-  
-  return {
-    normales: horasComputables,
-    extras: horasExtra,
-  }
-}
-
-/**
- * Calcula horas para licencia.
- */
-function calculateLicenciaHours(
-  assignment: ShiftAssignment,
-  shifts: Turno[],
-  minutosDescanso: number,
-  horasMinimasParaDescanso: number
-): number {
-  // Usar calculateHoursBreakdown para obtener horas de licencia
-  const hoursBreakdown = calculateHoursBreakdown(
-    [assignment],
-    shifts,
-    minutosDescanso,
-    horasMinimasParaDescanso
-  )
-  
-  return hoursBreakdown.licencia || 0
+  // NOTA: Comportamiento actual - si no hay horas explícitas:
+  // - suma +0.5 franco (se maneja en el case principal)
+  // - no suma horas (retorna 0 aquí)
+  // - no aporta trabajo (impact.aportaTrabajo = false)
+  // Esto es consistente con las reglas de negocio actuales.
+  // NO implementar lógica nueva automáticamente para mantener compatibilidad.
 }
