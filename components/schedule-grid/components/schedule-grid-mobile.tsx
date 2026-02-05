@@ -19,7 +19,7 @@ import { CellAssignments } from "./cell-assignments"
 import { InlineShiftSelector } from "./inline-shift-selector"
 import { GripVertical, Plus, RotateCcw, Lock, Download, FileText } from "lucide-react"
 import { getDay, parseISO } from "date-fns"
-import type { EmployeeMonthlyStats } from "../index"
+import type { EmployeeMonthlyStats } from "@/types/employee-stats"
 import { formatStatValue } from "../utils/schedule-grid-utils"
 
 interface ScheduleGridMobileProps {

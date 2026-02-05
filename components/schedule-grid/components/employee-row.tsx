@@ -3,7 +3,7 @@
 import React, { useMemo } from "react"
 import { format, getDay, parseISO } from "date-fns"
 import { Empleado, ShiftAssignment, MedioTurno, Turno, Configuracion } from "@/lib/types"
-import type { EmployeeMonthlyStats } from "../index"
+import type { EmployeeMonthlyStats } from "@/types/employee-stats"
 import { Button } from "@/components/ui/button"
 import { GripVertical, Plus } from "lucide-react"
 import { hexToRgba, formatStatValue } from "../utils/schedule-grid-utils"

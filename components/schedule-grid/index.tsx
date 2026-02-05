@@ -19,8 +19,9 @@ import { GridHeader } from "./components/grid-header"
 import { SeparatorRow } from "./components/separator-row"
 import { EmployeeRow } from "./components/employee-row"
 import { ScheduleGridMobile } from "./components/schedule-grid-mobile"
-import { hexToRgba } from "./utils/schedule-grid-utils"
-import type { GridItem } from "./hooks/use-schedule-grid-data"
+import { hexToRgba, formatStatValue } from "./utils/schedule-grid-utils"
+import { ScheduleCell } from "./components/schedule-cell"
+import type { EmployeeMonthlyStats } from "@/types/employee-stats"
 import { usePatternSuggestions } from "@/hooks/use-pattern-suggestions"
 import { useEmployeeFixedRules } from "@/hooks/use-employee-fixed-rules"
 import { FixedRuleModal } from "./components/fixed-rule-modal"
@@ -31,17 +32,6 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import { isAssignmentIncomplete } from "@/lib/assignment-utils"
 import { Grid, User } from "lucide-react"
 import { forwardRef, useRef, useEffect } from "react"
-
-export interface EmployeeMonthlyStats {
-  francos: number
-  francosSemana: number
-  horasExtrasSemana: number
-  horasExtrasMes: number
-  horasComputablesMes: number
-  horasSemana: number
-  horasLicenciaEmbarazo?: number
-  horasMedioFranco?: number
-}
 
 interface ScheduleGridProps {
   weekDays: Date[]

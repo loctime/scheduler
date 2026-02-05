@@ -20,6 +20,10 @@ import { toPng } from "html-to-image"
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
+import type { EmployeeMonthStats, EmployeeWeekStats, EmployeeStatsView } from "@/types/employee-stats"
+import { useEmployeeMonthStats } from "@/hooks/use-employee-month-stats"
+import { useEmployeeWeekStats } from "@/hooks/use-employee-week-stats"
+import { createEmployeeStatsViewForUI, convertToLegacyStats } from "@/lib/employee-stats-utils"
 import { GeneralView } from "@/components/schedule-calendar/general-view"
 import { ExportOverlay } from "@/components/export-overlay"
 import { ScheduleGridCapture } from "@/components/schedule-grid-capture"
@@ -607,117 +611,43 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
     return sorted.length > 0 ? sorted[0].weekStart : null
   }, [schedules])
 
-  const employeeMonthlyStats = useMemo<Record<string, EmployeeMonthlyStats>>(() => {
-    const stats: Record<string, EmployeeMonthlyStats> = {}
-    employees.forEach((employee) => {
-      stats[employee.id] = { francos: 0, francosSemana: 0, horasExtrasSemana: 0, horasExtrasMes: 0, horasComputablesMes: 0, horasSemana: 0, horasLicenciaEmbarazo: 0, horasMedioFranco: 0 }
-    })
-
-    if (employees.length === 0 || shiftsToUse.length === 0) {
-      return stats
-    }
-
-    const minutosDescanso = config?.minutosDescanso ?? 30
-    const horasMinimasParaDescanso = config?.horasMinimasParaDescanso ?? 6
-
-    // Mapa para rastrear horas extras por semana
-    const weeklyExtras: Record<string, Record<string, number>> = {}
-
-    monthWeeks.forEach((weekDays) => {
-      const weekSchedule = getWeekSchedule(weekDays[0])
-      if (!weekSchedule?.assignments) return
-
-      const weekStartStr = format(weekDays[0], "yyyy-MM-dd")
-      // Inicializar el registro de horas extras para esta semana
-      if (!weeklyExtras[weekStartStr]) {
-        weeklyExtras[weekStartStr] = {}
-        employees.forEach((employee) => {
-          weeklyExtras[weekStartStr][employee.id] = 0
-        })
-      }
-
-      weekDays.forEach((day) => {
-        if (day < monthRange.startDate || day > monthRange.endDate) return
-
-        const dateStr = format(day, "yyyy-MM-dd")
-        const dateAssignments = weekSchedule.assignments[dateStr]
-        if (!dateAssignments) return
-
-        Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
-          if (!stats[employeeId]) {
-            stats[employeeId] = { francos: 0, francosSemana: 0, horasExtrasSemana: 0, horasExtrasMes: 0, horasComputablesMes: 0, horasSemana: 0, horasLicenciaEmbarazo: 0, horasMedioFranco: 0 }
-          }
-
-          const normalizedAssignments = normalizeAssignments(assignmentValue)
-          if (normalizedAssignments.length === 0) {
-            return
-          }
-
-          let francosCount = 0
-          normalizedAssignments.forEach((assignment) => {
-            if (assignment.type === "franco") {
-              francosCount += 1
-            } else if (assignment.type === "medio_franco") {
-              francosCount += 0.5
-            }
-          })
-
-          if (francosCount > 0) {
-            stats[employeeId].francos += francosCount
-          }
-
-          // Calcular horas por tipo usando calculateHoursBreakdown
-          const hoursBreakdown = calculateHoursBreakdown(
-            normalizedAssignments,
-            shiftsToUse,
-            minutosDescanso,
-            horasMinimasParaDescanso
-          )
-          if (hoursBreakdown.licencia > 0) {
-            stats[employeeId].horasLicenciaEmbarazo = (stats[employeeId].horasLicenciaEmbarazo || 0) + hoursBreakdown.licencia
-          }
-          if (hoursBreakdown.medio_franco > 0) {
-            stats[employeeId].horasMedioFranco = (stats[employeeId].horasMedioFranco || 0) + hoursBreakdown.medio_franco
-          }
-
-          // Calcular horas normales y extra usando el nuevo servicio de dominio
-          const workingConfig = toWorkingHoursConfig(config)
-          const { horasComputables, horasExtra } = calculateTotalDailyHours(normalizedAssignments, workingConfig)
-          
-          // Acumular horas computables del mes
-          stats[employeeId].horasComputablesMes += horasComputables
-          
-          if (horasExtra > 0) {
-            // Acumular en el total del mes
-            stats[employeeId].horasExtrasMes += horasExtra
-            // Acumular en la semana actual
-            weeklyExtras[weekStartStr][employeeId] = (weeklyExtras[weekStartStr][employeeId] || 0) + horasExtra
-          }
-        })
-      })
-    })
-
-    // Almacenar el mapa de horas extras por semana en el objeto stats
-    // Esto permitirá que cada semana use sus propias horas extras
-    Object.keys(stats).forEach((employeeId) => {
-      // Inicializar horasExtrasSemana con 0, se actualizará por semana cuando se muestre
-      stats[employeeId].horasExtrasSemana = 0
-    })
-
-    // Agregar el mapa de weeklyExtras a stats para que pueda ser usado por semana
-    ;(stats as any).__weeklyExtras = weeklyExtras
-
-    return stats
-  }, [
+  // Usar nuevo sistema de estadísticas refactorizado
+  const employeeMonthStats = useEmployeeMonthStats({
     employees,
-    shiftsToUse,
+    shifts: shiftsToUse,
     monthWeeks,
-    monthRange.startDate,
-    monthRange.endDate,
+    monthRange,
     getWeekSchedule,
-    config?.minutosDescanso,
-    config?.horasMinimasParaDescanso,
-  ])
+    config,
+    mediosTurnos: config?.mediosTurnos,
+  })
+
+  // Convertir a formato legado para compatibilidad con componentes existentes
+  const employeeMonthlyStats = useMemo<Record<string, EmployeeMonthlyStats>>(() => {
+    const legacyStats: Record<string, EmployeeMonthlyStats> = {}
+    
+    Object.entries(employeeMonthStats).forEach(([employeeId, monthStats]) => {
+      // Crear stats semanales vacías por ahora (se calcularán por semana)
+      const weekStats: EmployeeWeekStats = {
+        francosSemana: 0,
+        horasNormalesSemana: 0,
+        horasExtrasSemana: 0,
+        horasLicenciaEmbarazoSemana: 0,
+        horasMedioFrancoSemana: 0,
+        diasTrabajadosSemana: 0,
+        diasLicenciaSemana: 0,
+      }
+      
+      const statsView: EmployeeStatsView = {
+        month: monthStats,
+        week: weekStats,
+      }
+      
+      legacyStats[employeeId] = convertToLegacyStats(statsView)
+    })
+    
+    return legacyStats
+  }, [employeeMonthStats])
 
   const handleExportMonthPDF = useCallback(async () => {
     await exportMonthPDF(
