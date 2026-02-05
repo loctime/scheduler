@@ -260,14 +260,35 @@ export function GeneralView({
                   }
                 }
 
+                // Procesar dayStatus primero (francos y medios francos)
+                const dayStatus = weekSchedule?.dayStatus?.[dateStr]?.[employeeId] || "normal"
+                if (dayStatus === "franco") {
+                  weekStats[employeeId].francosSemana += 1
+                  return // Si es franco completo, no procesar assignments
+                }
+                if (dayStatus === "medio_franco") {
+                  weekStats[employeeId].francosSemana += 0.5
+                  // Continuar procesando assignments para sumar horas del medio turno
+                }
+
                 const normalizedAssignments = normalizeAssignments(assignmentValue)
                 if (normalizedAssignments.length === 0) {
                   return
                 }
 
+                // Filtrar assignments de tipo franco para evitar doble conteo
+                // Pero mantener medio_franco para procesar sus horas
+                const filteredAssignments = normalizedAssignments.filter(
+                  (assignment) => assignment.type !== "franco"
+                )
+
+                if (filteredAssignments.length === 0) {
+                  return
+                }
+
                 // Usar el sistema centralizado para calcular impacto de cada assignment
                 const workingConfig = toWorkingHoursConfig(config)
-                normalizedAssignments.forEach((assignment) => {
+                filteredAssignments.forEach((assignment) => {
                   const impact = calculateAssignmentImpact(
                     assignment,
                     shifts,
@@ -275,8 +296,9 @@ export function GeneralView({
                     config
                   )
 
-                  // Acumular valores usando el impacto calculado
-                  weekStats[employeeId].francosSemana += impact.sumaFrancos
+                  // No sumar francos desde assignments si ya viene de dayStatus
+                  const shouldAddFrancos = dayStatus === "normal"
+                  weekStats[employeeId].francosSemana += shouldAddFrancos ? impact.sumaFrancos : 0
                   weekStats[employeeId].horasSemana += impact.horasNormales
                   weekStats[employeeId].horasExtrasSemana += impact.horasExtras
                 })
