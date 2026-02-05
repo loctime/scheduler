@@ -15,6 +15,7 @@ const ROUTE_TO_PAGE_ID: Record<string, string> = {
   "/dashboard/horarios": "horarios",
   "/dashboard/horarios-mensuales": "horarios", // Vista mensual también mapea a "horarios"
   "/dashboard/pedidos": "pedidos",
+  "/dashboard/stock-console": "pedidos",
   "/dashboard/fabrica": "fabrica",
   "/dashboard/fabrica/historial": "fabrica",
   "/dashboard/empleados": "empleados",
@@ -187,4 +188,3 @@ function ProtectedRoute({
 
   return <>{children}</>
 }
-

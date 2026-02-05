@@ -10,6 +10,7 @@ import {
   getHorarioOwnerId, 
   OWNER_ID_MISSING_ERROR, 
   getImageUrlWithCache, 
+  getPwaHorarioUrls,
   loadPublishedHorario, 
   formatWeekHeader
 } from "@/lib/pwa-horario"
@@ -63,16 +64,6 @@ function HorarioContent() {
       // Iniciar flujo CACHE-FIRST
       loadFromCacheFirst(resolvedOwnerId)
       
-      // Agregar manifest dinámico con ownerId
-      const manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement
-      if (manifestLink) {
-        manifestLink.href = `/api/manifest-horario?ownerId=${encodeURIComponent(resolvedOwnerId)}`
-      } else {
-        const link = document.createElement('link')
-        link.rel = 'manifest'
-        link.href = `/api/manifest-horario?ownerId=${encodeURIComponent(resolvedOwnerId)}`
-        document.head.appendChild(link)
-      }
     } else {
       setError(OWNER_ID_MISSING_ERROR)
       setLoading(false)
@@ -121,6 +112,19 @@ function HorarioContent() {
 
       setImageSrc(blobUrl)
       setLoading(false)
+
+      try {
+        const { cacheKey, imageUrl } = getPwaHorarioUrls(ownerId)
+        const cache = await caches.open(cacheKey)
+        await cache.put(
+          imageUrl,
+          new Response(imageBlob, {
+            headers: { "Content-Type": imageBlob.type || "image/png" },
+          })
+        )
+      } catch (cacheError) {
+        console.warn("No se pudo guardar en cache:", cacheError)
+      }
     } catch {
       setError('IMAGE_LOAD_ERROR')
       setLoading(false)
@@ -398,7 +402,7 @@ function HorarioContent() {
 
       {/* Componentes PWA */}
       <PWAInstallPrompt />
-      <PWAUpdateNotification swPath="/pwa/horario/sw.js" />
+      <PWAUpdateNotification swPath="/sw-pwa.js" />
     </div>
   )
 }
