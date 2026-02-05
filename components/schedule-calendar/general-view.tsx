@@ -8,6 +8,8 @@ import type { Horario, Empleado, Turno, MedioTurno, ShiftAssignment, ShiftAssign
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { format } from "date-fns"
 import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
+import { calculateAssignmentImpact } from "@/lib/domain/assignment-hours"
+import { normalizeAssignments } from "@/lib/domain/normalize-assignments"
 
 type AssignmentUpdateHandler = (
   date: string,
@@ -258,31 +260,26 @@ export function GeneralView({
                   }
                 }
 
-                const dayStatus = weekSchedule?.dayStatus?.[dateStr]?.[employeeId] || "normal"
-                if (dayStatus === "franco") {
-                  weekStats[employeeId].francosSemana += 1
-                  return
-                }
-                if (dayStatus === "medio_franco") {
-                  weekStats[employeeId].francosSemana += 0.5
-                }
-
                 const normalizedAssignments = normalizeAssignments(assignmentValue)
                 if (normalizedAssignments.length === 0) {
                   return
                 }
 
-                // Calcular horas extras y horas totales para este día usando el nuevo servicio de dominio
+                // Usar el sistema centralizado para calcular impacto de cada assignment
                 const workingConfig = toWorkingHoursConfig(config)
-                const { horasExtra, horasNormales } = calculateTotalDailyHours(normalizedAssignments, workingConfig)
-                
-                if (horasExtra > 0) {
-                  weekStats[employeeId].horasExtrasSemana += horasExtra
-                }
-                
-                if (horasNormales > 0) {
-                  weekStats[employeeId].horasSemana += horasNormales
-                }
+                normalizedAssignments.forEach((assignment) => {
+                  const impact = calculateAssignmentImpact(
+                    assignment,
+                    shifts,
+                    mediosTurnos || [],
+                    config
+                  )
+
+                  // Acumular valores usando el impacto calculado
+                  weekStats[employeeId].francosSemana += impact.sumaFrancos
+                  weekStats[employeeId].horasSemana += impact.horasNormales
+                  weekStats[employeeId].horasExtrasSemana += impact.horasExtras
+                })
               })
             })
           }
