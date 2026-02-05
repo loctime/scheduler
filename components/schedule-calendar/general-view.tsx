@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react"
 import { MonthHeader } from "@/components/schedule-calendar/month-header"
-import { WeekSchedule } from "@/components/schedule-calendar/week-schedule"
+import { WeekView } from "@/components/schedule-calendar/week-view"
 import { EmptyStateCard, LoadingStateCard } from "@/components/schedule-calendar/state-card"
 import type { Horario, Empleado, Turno, MedioTurno, ShiftAssignment, ShiftAssignmentValue, Configuracion } from "@/lib/types"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
@@ -198,9 +198,6 @@ export function GeneralView({
           const weekKey = format(weekStartDate, "yyyy-MM-dd")
           const isExpanded = expandedWeeks.has(weekKey)
 
-          // Calcular horas extras para esta semana específica
-          const weekStats: Record<string, EmployeeMonthlyStats> = {}
-          
           // Si la semana está completada y tiene snapshot, usar empleados del snapshot
           // Si no hay empleados activos pero hay snapshot, usar el snapshot
           const employeesForWeek = (() => {
@@ -226,90 +223,10 @@ export function GeneralView({
             }
             return employees
           })()
-          
-          employeesForWeek.forEach((employee) => {
-            weekStats[employee.id] = {
-              ...employeeMonthlyStats[employee.id] || { francos: 0, francosSemana: 0, horasExtrasSemana: 0, horasExtrasMes: 0, horasComputablesMes: 0, horasSemana: 0 },
-              francosSemana: 0,
-              horasExtrasSemana: 0,
-              horasSemana: 0,
-            }
-          })
-
-          if (weekSchedule?.assignments) {
-            const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAssignment[] => {
-              if (!value || !Array.isArray(value) || value.length === 0) return []
-              return (value as ShiftAssignment[]).map((assignment) => ({
-                ...assignment,
-                type: assignment.type || "shift",
-              }))
-            }
-
-            weekDays.forEach((day) => {
-              const dateStr = format(day, "yyyy-MM-dd")
-              const dateAssignments = weekSchedule.assignments[dateStr]
-              if (!dateAssignments) return
-
-              Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
-                if (!weekStats[employeeId]) {
-                  weekStats[employeeId] = {
-                    ...employeeMonthlyStats[employeeId],
-                    francosSemana: 0,
-                    horasExtrasSemana: 0,
-                    horasSemana: 0,
-                  }
-                }
-
-                // Procesar dayStatus primero (francos y medios francos)
-                const dayStatus = weekSchedule?.dayStatus?.[dateStr]?.[employeeId] || "normal"
-                if (dayStatus === "franco") {
-                  weekStats[employeeId].francosSemana += 1
-                  return // Si es franco completo, no procesar assignments
-                }
-                if (dayStatus === "medio_franco") {
-                  weekStats[employeeId].francosSemana += 0.5
-                  // Continuar procesando assignments para sumar horas del medio turno
-                }
-
-                const normalizedAssignments = normalizeAssignments(assignmentValue)
-                if (normalizedAssignments.length === 0) {
-                  return
-                }
-
-                // Filtrar assignments de tipo franco para evitar doble conteo
-                // Pero mantener medio_franco para procesar sus horas
-                const filteredAssignments = normalizedAssignments.filter(
-                  (assignment) => assignment.type !== "franco"
-                )
-
-                if (filteredAssignments.length === 0) {
-                  return
-                }
-
-                // Usar el sistema centralizado para calcular impacto de cada assignment
-                const workingConfig = toWorkingHoursConfig(config)
-                filteredAssignments.forEach((assignment) => {
-                  const impact = calculateAssignmentImpact(
-                    assignment,
-                    shifts,
-                    mediosTurnos || [],
-                    config
-                  )
-
-                  // No sumar francos desde assignments si ya viene de dayStatus
-                  const shouldAddFrancos = dayStatus === "normal"
-                  weekStats[employeeId].francosSemana += shouldAddFrancos ? impact.sumaFrancos : 0
-                  weekStats[employeeId].horasSemana += impact.horasNormales
-                  weekStats[employeeId].horasExtrasSemana += impact.horasExtras
-                })
-              })
-            })
-          }
 
           return (
-            <WeekSchedule
+            <WeekView
               key={weekIndex}
-              ref={(element) => handleWeekScheduleRef(weekStartDate, element)}
               weekDays={weekDays}
               weekIndex={weekIndex}
               weekSchedule={weekSchedule}
@@ -317,27 +234,21 @@ export function GeneralView({
               allEmployees={employees}
               shifts={shifts}
               monthRange={{ start: monthRange.startDate, end: monthRange.endDate }}
-              onAssignmentUpdate={onAssignmentUpdate ? (date, employeeId, assignments, options) => {
-                onAssignmentUpdate(date, employeeId, assignments, { scheduleId: weekSchedule?.id })
+              mediosTurnos={mediosTurnos}
+              employeeMonthlyStats={employeeMonthlyStats}
+              config={config}
+              onAssignmentUpdate={onAssignmentUpdate ? async (date: string, employeeId: string, assignments: ShiftAssignment[], options?: { scheduleId?: string }) => {
+                await onAssignmentUpdate(date, employeeId, assignments, { scheduleId: weekSchedule?.id })
               } : undefined}
               onExportImage={onExportWeekImage}
               onExportPDF={onExportWeekPDF}
-              onExportExcel={() => onExportWeekExcel(weekStartDate, weekDays, weekSchedule)}
+              onExportExcel={onExportWeekExcel}
               exporting={exporting}
-              mediosTurnos={mediosTurnos}
-              employeeStats={Object.values(weekStats)}
               open={isExpanded}
-              onOpenChange={(open) => handleWeekToggle(weekStartDate, open)}
-              onMarkComplete={undefined}
-              lastCompletedWeekStart={undefined}
+              onOpenChange={(open: boolean) => handleWeekToggle(weekStartDate, open)}
+              onWeekScheduleRef={handleWeekScheduleRef}
               getWeekSchedule={getWeekSchedule}
               allSchedules={allSchedules}
-              onPublishSchedule={onPublishSchedule}
-              isPublishingSchedule={isPublishingSchedule}
-              copiedWeekData={copiedWeekData}
-              onCopyCurrentWeek={onCopyCurrentWeek}
-              onPasteCopiedWeek={onPasteCopiedWeek}
-              isPastingWeek={isPastingWeek}
             />
           )
         })}
