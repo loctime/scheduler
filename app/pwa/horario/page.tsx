@@ -1,24 +1,26 @@
 "use client"
 
 import { useEffect, useState, Suspense, useRef } from "react"
-import { useSearchParams } from "next/navigation"
+import { useOwnerId } from "@/hooks/use-owner-id"
+import { useRouter } from "next/navigation"
+import { useData } from "@/contexts/data-context"
 import { Loader2, AlertCircle } from "lucide-react"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { PWAUpdateNotification } from "@/components/pwa-update-notification"
 import { 
   setHorarioOwnerId, 
-  getHorarioOwnerId, 
   OWNER_ID_MISSING_ERROR, 
   getImageUrlWithCache, 
+  getPwaHorarioUrls,
   loadPublishedHorario, 
   formatWeekHeader
 } from "@/lib/pwa-horario"
 
 function HorarioContent() {
-  const searchParams = useSearchParams()
-  const urlOwnerId = searchParams.get("ownerId")
+  const ownerId = useOwnerId()
+  const router = useRouter()
+  const { loading: userLoading, user } = useData()
   const [loading, setLoading] = useState(true)
-  const [ownerId, setOwnerId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [imageSrc, setImageSrc] = useState<string | null>(null)
   const [weekHeader, setWeekHeader] = useState<string | null>(null)
@@ -47,37 +49,22 @@ function HorarioContent() {
   })
 
   useEffect(() => {
-    // Prioridad: 1) URL parameter, 2) localStorage, 3) error
-    let resolvedOwnerId: string | null = urlOwnerId
-    
-    if (!resolvedOwnerId) {
-      resolvedOwnerId = getHorarioOwnerId()
+    if (userLoading) return
+
+    if (!user) {
+      router.replace("/pwa")
+      return
     }
-    
-    if (resolvedOwnerId) {
-      // Si tenemos ownerId (ya sea de URL o localStorage), guardarlo en localStorage
-      setHorarioOwnerId(resolvedOwnerId)
-      setOwnerId(resolvedOwnerId)
+
+    if (ownerId) {
+      setHorarioOwnerId(ownerId)
       setError(null)
-      
-      // Iniciar flujo CACHE-FIRST
-      loadFromCacheFirst(resolvedOwnerId)
-      
-      // Agregar manifest dinámico con ownerId
-      const manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement
-      if (manifestLink) {
-        manifestLink.href = `/api/manifest-horario?ownerId=${encodeURIComponent(resolvedOwnerId)}`
-      } else {
-        const link = document.createElement('link')
-        link.rel = 'manifest'
-        link.href = `/api/manifest-horario?ownerId=${encodeURIComponent(resolvedOwnerId)}`
-        document.head.appendChild(link)
-      }
+      loadFromCacheFirst(ownerId)
     } else {
       setError(OWNER_ID_MISSING_ERROR)
       setLoading(false)
     }
-  }, [urlOwnerId])
+  }, [ownerId, router, user, userLoading])
 
   const loadFromCacheFirst = async (ownerId: string) => {
     try {
@@ -121,6 +108,19 @@ function HorarioContent() {
 
       setImageSrc(blobUrl)
       setLoading(false)
+
+      try {
+        const { cacheKey, imageUrl } = getPwaHorarioUrls(ownerId)
+        const cache = await caches.open(cacheKey)
+        await cache.put(
+          imageUrl,
+          new Response(imageBlob, {
+            headers: { "Content-Type": imageBlob.type || "image/png" },
+          })
+        )
+      } catch (cacheError) {
+        console.warn("No se pudo guardar en cache:", cacheError)
+      }
     } catch {
       setError('IMAGE_LOAD_ERROR')
       setLoading(false)
@@ -398,7 +398,7 @@ function HorarioContent() {
 
       {/* Componentes PWA */}
       <PWAInstallPrompt />
-      <PWAUpdateNotification swPath="/pwa/horario/sw.js" />
+      <PWAUpdateNotification swPath="/sw-pwa.js" />
     </div>
   )
 }
