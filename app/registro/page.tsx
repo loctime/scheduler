@@ -3,8 +3,6 @@
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth"
-import { doc, setDoc, serverTimestamp, query, where, getDocs, updateDoc, collection, getDoc } from "firebase/firestore"
-import { signOut } from "firebase/auth"
 import { auth, db, COLLECTIONS } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,11 +10,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2, Eye, EyeOff } from "lucide-react"
+import { procesarRegistroInvitacion, validarTokenInvitacion } from "@/lib/invitacion-utils"
 
 function RegistroContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get("token")
+  const redirectTo = searchParams.get("redirect")
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [validating, setValidating] = useState(true)
@@ -29,46 +29,24 @@ function RegistroContent() {
   // Validar token
   useEffect(() => {
     const validarToken = async () => {
-      if (!token || !db) {
-        setValidating(false)
-        return
-      }
-
       try {
-        const q = query(
-          collection(db, COLLECTIONS.INVITACIONES),
-          where("token", "==", token),
-          where("activo", "==", true),
-          where("usado", "==", false)
-        )
-        const snapshot = await getDocs(q)
-        
-        if (snapshot.empty) {
-          console.warn("⚠️ Invitación no encontrada o no disponible para token:", token)
-          setTokenValid(false)
+        const result = await validarTokenInvitacion(token)
+        setTokenValid(result.tokenValid)
+        setOwnerId(result.ownerId)
+        if (!result.tokenValid) {
           toast({
             title: "Link inválido",
             description: "Este link de invitación no es válido o ya fue usado",
             variant: "destructive",
           })
-        } else {
-          setTokenValid(true)
-          const linkData = snapshot.docs[0].data()
-          setOwnerId(linkData.ownerId)
         }
       } catch (error: any) {
-        console.error("❌ Error validating token:", error)
-        if (error?.code === "permission-denied") {
-          console.warn("🔒 Validación de invitación pendiente por permisos. Se validará luego de autenticar.")
-          setTokenValid(true)
-        } else {
-          setTokenValid(false)
-          toast({
-            title: "Error al validar",
-            description: "No se pudo validar el link de invitación. Intenta nuevamente.",
-            variant: "destructive",
-          })
-        }
+        setTokenValid(false)
+        toast({
+          title: "Error al validar",
+          description: "No se pudo validar el link de invitación. Intenta nuevamente.",
+          variant: "destructive",
+        })
       } finally {
         setValidating(false)
       }
@@ -82,155 +60,7 @@ function RegistroContent() {
     if (!token || !tokenValid || !db) {
       throw new Error("Token de invitación inválido")
     }
-
-    // Buscar el link de invitación nuevamente para asegurarnos de que sigue válido
-    let snapshot
-    try {
-      const q = query(
-        collection(db, COLLECTIONS.INVITACIONES),
-        where("token", "==", token),
-        where("activo", "==", true),
-        where("usado", "==", false)
-      )
-      snapshot = await getDocs(q)
-    } catch (error: any) {
-      console.error("❌ Error leyendo invitación:", error)
-      if (error?.code === "permission-denied") {
-        throw new Error("No tienes permisos para validar esta invitación. Verifica tu sesión e intenta nuevamente.")
-      }
-      throw new Error("No se pudo validar la invitación. Intenta nuevamente.")
-    }
-
-    if (snapshot.empty) {
-      let statusMessage = "Token de invitación inválido"
-      try {
-        const statusQuery = query(
-          collection(db, COLLECTIONS.INVITACIONES),
-          where("token", "==", token)
-        )
-        const statusSnapshot = await getDocs(statusQuery)
-        if (statusSnapshot.empty) {
-          console.warn("❌ Invitación no encontrada para token:", token)
-          statusMessage = "Token de invitación inválido"
-        } else {
-          const statusData = statusSnapshot.docs[0].data()
-          if (statusData.activo === false) {
-            console.warn("⚠️ Invitación encontrada pero inactiva:", statusSnapshot.docs[0].id)
-            statusMessage = "Este link de invitación fue desactivado."
-          } else if (statusData.usado) {
-            console.warn("⚠️ Invitación ya usada:", statusSnapshot.docs[0].id)
-            statusMessage = "Este link de invitación ya fue usado por otro usuario. Solicita un nuevo link."
-          } else {
-            console.warn("⚠️ Invitación encontrada pero no disponible (estado inesperado):", statusSnapshot.docs[0].id)
-            statusMessage = "Este link de invitación no está disponible en este momento."
-          }
-        }
-      } catch (error) {
-        console.error("❌ Error verificando estado de invitación:", error)
-        statusMessage = "No se pudo validar la invitación. Intenta nuevamente."
-      }
-      throw new Error(statusMessage)
-    }
-
-    const linkDoc = snapshot.docs[0]
-    const linkData = linkDoc.data()
-    const roleDelLink = "invited"
-    const permisosDelLink = linkData.permisos
-    const emailInvitacion = typeof linkData.email === "string" ? linkData.email.toLowerCase() : null
-    const emailUsuario = typeof user.email === "string" ? user.email.toLowerCase() : null
-
-    if (emailInvitacion) {
-      if (!emailUsuario) {
-        console.warn("❌ Invitación requiere email, pero el usuario no tiene email:", user.uid)
-        throw new Error("No se pudo validar tu email con esta invitación. Usa un método de acceso con email.")
-      }
-      if (emailInvitacion !== emailUsuario) {
-        console.warn("❌ Email no coincide con la invitación:", { emailInvitacion, emailUsuario })
-        throw new Error("El email de la invitación no coincide con el de tu cuenta.")
-      }
-    }
-
-    // Verificar si el usuario ya existe en Firestore
-    const userRef = doc(db, COLLECTIONS.USERS, user.uid)
-    const userDoc = await getDoc(userRef)
-
-    if (userDoc.exists()) {
-      const userData = userDoc.data()
-      // Si el usuario ya existe pero no es invitado, o es invitado de otro owner, mostrar error
-      if (userData.role !== "invited" || (userData.ownerId && userData.ownerId !== ownerId)) {
-        if (auth) {
-          await signOut(auth)
-        }
-        throw new Error("Esta cuenta ya está registrada. Por favor inicia sesión normalmente.")
-      } else {
-        // Si ya es invitado del mismo owner, actualizar información
-        console.log("🔄 Actualizando usuario existente...")
-        const updateData: any = {
-          email: user.email,
-          displayName: user.displayName || user.email?.split("@")[0] || "Usuario",
-          photoURL: user.photoURL || null,
-          role: roleDelLink,
-          ownerId: ownerId || null,
-          updatedAt: serverTimestamp(),
-        }
-        if (permisosDelLink) {
-          updateData.permisos = permisosDelLink
-        }
-        await updateDoc(userRef, updateData)
-        console.log("✅ Usuario actualizado exitosamente")
-      }
-
-      // Marcar link como usado si no estaba ya usado
-      if (!linkData.usado) {
-        console.log("🔗 Marcando invitación como usada (usuario existente), linkDoc.id:", linkDoc.id)
-        await updateDoc(doc(db, COLLECTIONS.INVITACIONES, linkDoc.id), {
-          usado: true,
-          usadoPor: user.uid,
-          usadoEn: serverTimestamp(),
-        })
-        console.log("✅ Invitación marcada como usada")
-      }
-    } else {
-      // Determinar el rol a asignar
-      const rolAAsignar = "invited"
-      
-      // Crear nuevo documento de usuario
-      console.log("➕ Creando nuevo usuario con role:", rolAAsignar, "y ownerId:", ownerId || "ninguno")
-      
-      const userData: any = {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName || user.email?.split("@")[0] || "Usuario",
-        photoURL: user.photoURL || null,
-        role: rolAAsignar,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }
-      
-      // Solo agregar ownerId si el rol es "invited"
-      if (rolAAsignar === "invited" && ownerId) {
-        userData.ownerId = ownerId
-      }
-      
-      // Aplicar permisos del link si existen
-      if (permisosDelLink) {
-        userData.permisos = permisosDelLink
-        console.log("🔐 Permisos aplicados:", permisosDelLink)
-      }
-      
-      // PRIMERO crear el usuario para que las reglas de Firestore puedan leer su rol
-      await setDoc(userRef, userData)
-      console.log("✅ Usuario creado exitosamente")
-
-      // Marcar link como usado
-      console.log("🔗 Marcando invitación como usada, linkDoc.id:", linkDoc.id)
-      await updateDoc(doc(db, COLLECTIONS.INVITACIONES, linkDoc.id), {
-        usado: true,
-        usadoPor: user.uid,
-        usadoEn: serverTimestamp(),
-      })
-      console.log("✅ Invitación marcada como usada")
-    }
+    await procesarRegistroInvitacion(user, token)
   }
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
@@ -288,7 +118,7 @@ function RegistroContent() {
 
       // Redirigir al dashboard
       setTimeout(() => {
-        router.push("/dashboard/pedidos")
+        router.push(redirectTo || "/dashboard/pedidos")
       }, 1000)
     } catch (error: any) {
       console.error("❌ Error en registro:", error)
@@ -308,7 +138,7 @@ function RegistroContent() {
           })
 
           setTimeout(() => {
-            router.push("/dashboard/pedidos")
+            router.push(redirectTo || "/dashboard/pedidos")
           }, 1000)
         } catch (signInError: any) {
           let errorMessage = "Este email ya está registrado"
@@ -385,7 +215,7 @@ function RegistroContent() {
 
       // Redirigir al dashboard
       setTimeout(() => {
-        router.push("/dashboard/pedidos")
+        router.push(redirectTo || "/dashboard/pedidos")
       }, 1000)
     } catch (error: any) {
       console.error("❌ Error en registro:", error)

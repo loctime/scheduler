@@ -1,13 +1,14 @@
 "use client"
 
 import { useEffect, useState, Suspense, useRef } from "react"
-import { useSearchParams } from "next/navigation"
+import { useOwnerId } from "@/hooks/use-owner-id"
+import { useRouter } from "next/navigation"
+import { useData } from "@/contexts/data-context"
 import { Loader2, AlertCircle } from "lucide-react"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { PWAUpdateNotification } from "@/components/pwa-update-notification"
 import { 
   setHorarioOwnerId, 
-  getHorarioOwnerId, 
   OWNER_ID_MISSING_ERROR, 
   getImageUrlWithCache, 
   getPwaHorarioUrls,
@@ -16,10 +17,10 @@ import {
 } from "@/lib/pwa-horario"
 
 function HorarioContent() {
-  const searchParams = useSearchParams()
-  const urlOwnerId = searchParams.get("ownerId")
+  const ownerId = useOwnerId()
+  const router = useRouter()
+  const { loading: userLoading, user } = useData()
   const [loading, setLoading] = useState(true)
-  const [ownerId, setOwnerId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [imageSrc, setImageSrc] = useState<string | null>(null)
   const [weekHeader, setWeekHeader] = useState<string | null>(null)
@@ -48,17 +49,15 @@ function HorarioContent() {
   })
 
   useEffect(() => {
-    // Prioridad: 1) URL parameter, 2) localStorage, 3) error
-    let resolvedOwnerId: string | null = urlOwnerId
-    
-    if (!resolvedOwnerId) {
-      resolvedOwnerId = getHorarioOwnerId()
+    if (userLoading) return
+
+    if (!user) {
+      router.replace("/pwa")
+      return
     }
-    
-    if (resolvedOwnerId) {
-      // Si tenemos ownerId (ya sea de URL o localStorage), guardarlo en localStorage
-      setHorarioOwnerId(resolvedOwnerId)
-      setOwnerId(resolvedOwnerId)
+
+    if (ownerId) {
+      setHorarioOwnerId(ownerId)
       setError(null)
       
       // Iniciar flujo CACHE-FIRST
@@ -68,7 +67,7 @@ function HorarioContent() {
       setError(OWNER_ID_MISSING_ERROR)
       setLoading(false)
     }
-  }, [urlOwnerId])
+  }, [ownerId, router, user, userLoading])
 
   const loadFromCacheFirst = async (ownerId: string) => {
     try {
