@@ -57,13 +57,9 @@ const defaultConfig: Configuracion = {
   mediosTurnos: [],
 }
 
-interface HorariosMensualesContentProps {
-  ownerIdOverride?: string | null
-}
-
-export function HorariosMensualesContent({ ownerIdOverride = null }: HorariosMensualesContentProps) {
+export function HorariosMensualesContent() {
   const searchParams = useSearchParams()
-  const ownerId = ownerIdOverride ?? searchParams.get("ownerId")
+  const ownerId = searchParams.get("ownerId")
 
   const [schedules, setSchedules] = useState<Horario[]>([])
   const [employees, setEmployees] = useState<Empleado[]>([])
