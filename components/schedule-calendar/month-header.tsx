@@ -5,6 +5,7 @@ import { Download, ChevronLeft, ChevronRight, Loader2, ExternalLink } from "luci
 import { format, addDays } from "date-fns"
 import { es } from "date-fns/locale"
 import { useMemo } from "react"
+import { useCompanySlug } from "@/hooks/use-company-slug"
 
 interface MonthHeaderProps {
   monthRange: { startDate: Date; endDate: Date }
@@ -71,14 +72,22 @@ export function MonthHeader({
   exporting,
   user,
 }: MonthHeaderProps) {
+  const { companySlug, isLoading: slugLoading } = useCompanySlug()
   const mainMonth = useMemo(() => {
     return getMainMonth(monthRange.startDate, monthRange.endDate)
   }, [monthRange.startDate, monthRange.endDate])
 
   const handleOpenPwa = () => {
     if (!user?.uid) return
-    const pwaUrl = `/pwa/horario/${user.uid}`
-    window.open(pwaUrl, '_blank')
+    
+    // Usar companySlug si está disponible, sino mostrar mensaje de que debe publicar primero
+    if (!slugLoading && companySlug) {
+      const pwaUrl = `/pwa/horario/${companySlug}`
+      window.open(pwaUrl, '_blank')
+    } else {
+      // Mostrar mensaje informativo si no hay companySlug
+      alert('Para ver la versión PWA, primero publica el horario usando el botón "Publicar Horario"')
+    }
   }
 
   return (

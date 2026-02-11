@@ -3,6 +3,7 @@ import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useOwnerId } from "./use-owner-id"
 import { useData } from "@/contexts/data-context"
+import { normalizeCompanySlug } from "@/lib/public-company"
 
 export interface PublishPublicScheduleOptions {
   companyName?: string
@@ -59,7 +60,19 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
     setError(null)
 
     try {
-      console.log("🔧 [usePublicPublisher] Publishing schedule for ownerId:", ownerId)
+      // Generar companySlug a partir del companyName
+      const companySlug = normalizeCompanySlug(options.companyName || "")
+      console.log("🔧 [usePublicPublisher] CompanySlug generado:", companySlug)
+      
+      // Guardar companySlug en la configuración de la empresa
+      const configRef = doc(db, "settings", "main")
+      await setDoc(configRef, {
+        publicSlug: companySlug,
+        companyName: options.companyName,
+        updatedAt: serverTimestamp()
+      }, { merge: true })
+      
+      console.log("🔧 [usePublicPublisher] CompanySlug guardado en configuración:", companySlug)
       console.log("🔧 [usePublicPublisher] WeekId:", options.weekId)
       console.log("🔧 [usePublicPublisher] Has publicImageUrl:", !!options.publicImageUrl)
       
@@ -147,7 +160,7 @@ export function usePublicPublisher(): UsePublicPublisherReturn {
       console.log("🔧 [usePublicPublisher] PublicImageUrl prefix:", publicScheduleData.weeks[options.weekId].publicImageUrl?.substring(0, 50) + "...")
       console.log("🔧 [usePublicPublisher] PublicImageUrl saved successfully:", !!options.publicImageUrl)
       
-      return ownerId // Retornar el ownerId para generar URL pública
+      return companySlug // Retornar el companySlug para generar URL pública
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Error al publicar"
       setError(errorMessage)

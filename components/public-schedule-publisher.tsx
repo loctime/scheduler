@@ -48,22 +48,36 @@ export function PublicSchedulePublisher({ weekId, weekData }: PublicSchedulePubl
 
     try {
       console.log("🔧 [PublicSchedulePublisher] Llamando a publishToPublic...")
-      const publicScheduleId = await publishToPublic({
+      const companySlug = await publishToPublic({
         companyName: companyName.trim(),
         weekId,
         weekData
       })
 
-      console.log("🔧 [PublicSchedulePublisher] publishToPublic retornó:", publicScheduleId)
+      console.log("🔧 [PublicSchedulePublisher] publishToPublic retornó companySlug:", companySlug)
       
-      const url = `${window.location.origin}/horario/${publicScheduleId}`
+      // Generar URL con nueva arquitectura PWA
+      const url = `${window.location.origin}/pwa/horario/${companySlug}`
       console.log("🔧 [PublicSchedulePublisher] URL pública generada:", url)
       setPublishedUrl(url)
 
-      toast({
-        title: "Horario publicado",
-        description: "El horario ahora está disponible públicamente",
-      })
+      // Copiar automáticamente al portapapeles
+      try {
+        await navigator.clipboard.writeText(url)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 3000)
+        
+        toast({
+          title: "✅ Horario publicado y enlace copiado",
+          description: "El enlace ya está en el portapapeles para compartir",
+        })
+      } catch (clipboardError) {
+        console.warn("🔧 [PublicSchedulePublisher] No se pudo copiar automáticamente:", clipboardError)
+        toast({
+          title: "Horario publicado",
+          description: "El horario ahora está disponible públicamente",
+        })
+      }
 
       setIsDialogOpen(false)
     } catch (error) {
@@ -135,8 +149,8 @@ export function PublicSchedulePublisher({ weekId, weekData }: PublicSchedulePubl
 
               <div className="bg-blue-50 p-3 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  <strong>Importante:</strong> Al publicar, el horario será visible para cualquier persona que tenga el enlace. 
-                  Los datos serán de solo lectura.
+                  <strong>Importante:</strong> Al publicar, se generará un enlace único basado en el nombre de la empresa. 
+                  El enlace se copiará automáticamente al portapapeles para compartir.
                 </p>
               </div>
 
@@ -199,7 +213,9 @@ export function PublicSchedulePublisher({ weekId, weekData }: PublicSchedulePubl
 
               <div className="bg-green-50 p-3 rounded-lg">
                 <p className="text-sm text-green-800">
+                  <strong>✅ Enlace copiado automáticamente</strong><br/>
                   Comparte este enlace con los empleados para que puedan ver el horario sin necesidad de registrarse.
+                  La URL usa el nuevo formato PWA: <code className="bg-green-100 px-1 rounded">/pwa/horario/{companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}</code>
                 </p>
               </div>
 

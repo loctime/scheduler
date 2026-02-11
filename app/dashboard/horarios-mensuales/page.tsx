@@ -18,6 +18,7 @@ import { WeekSchedule } from "@/components/schedule-calendar/week-schedule"
 import { getCustomMonthRange, getMonthWeeks } from "@/lib/utils"
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { ExportOverlay } from "@/components/export-overlay"
+import { useCompanySlug } from "@/hooks/use-company-slug"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { calculateDailyHours, calculateHoursBreakdown } from "@/lib/validations"
 import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
@@ -27,15 +28,17 @@ import { Share2 } from "lucide-react"
 
 const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAssignment[] => {
   if (!value || !Array.isArray(value) || value.length === 0) return []
-  return (value as ShiftAssignment[]).map((assignment) => ({
-    ...assignment,
-    type: assignment.type || "shift",
+  return (value as any[]).map((assignment) => ({
+    type: assignment.type,
+    shiftId: assignment.shiftId || "",
+    startTime: assignment.startTime || "",
+    endTime: assignment.endTime || "",
   }))
 }
 
 interface MonthGroup {
-  monthKey: string // "YYYY-MM" para ordenar
-  monthName: string // "Noviembre 2025"
+  monthKey: string // YYYY-MM
+  monthName: string // "Enero 2024"
   monthDate: Date // Fecha del mes
   weeks: WeekGroup[]
 }
@@ -54,11 +57,11 @@ export default function HorariosMensualesPage() {
   const ownerId = useMemo(() => getOwnerIdForActor(user, userData), [user, userData])
   const { config } = useConfig(user)
   const { toast } = useToast()
+  const { companySlug, isLoading: slugLoading } = useCompanySlug()
   const { exporting, exportImage, exportPDF, exportExcel } = useExportSchedule()
   const [publishingWeekId, setPublishingWeekId] = useState<string | null>(null)
   const weekStartsOn = (config?.semanaInicioDia || 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
   const monthStartDay = config?.mesInicioDia || 1
-
 
   useEffect(() => {
     if (!user || !db || !ownerId) return
@@ -68,6 +71,7 @@ export default function HorariosMensualesPage() {
       where("ownerId", "==", ownerId),
       orderBy("weekStart", "desc")
     )
+
     const unsubscribeSchedules = onSnapshot(
       schedulesQuery,
       (snapshot) => {
@@ -78,13 +82,13 @@ export default function HorariosMensualesPage() {
         setSchedules(schedulesData)
       },
       (error) => {
-        console.error("Error en listener de horarios:", error)
+        console.error("Error loading schedules:", error)
         toast({
           title: "Error",
-          description: "No se pudieron cargar los horarios. Verifica tus permisos.",
+          description: "No se pudieron cargar los horarios",
           variant: "destructive",
         })
-      },
+      }
     )
 
     return () => {
@@ -108,7 +112,7 @@ export default function HorariosMensualesPage() {
       const weekEndDate = weekDays[weekDays.length - 1]
       
       // Determinar a qué mes pertenece esta semana
-      // El mes es el que contiene el weekStartDate en su rango personalizado
+      // El mes es el que contiene el weekStart en su rango personalizado
       const monthRange = getCustomMonthRange(weekStartDate, monthStartDay)
       let targetMonthDate = monthRange.startDate
       
@@ -178,24 +182,10 @@ export default function HorariosMensualesPage() {
     const minutosDescanso = config?.minutosDescanso ?? 30
     const horasMinimasParaDescanso = config?.horasMinimasParaDescanso ?? 6
 
-    // Mapa para rastrear horas extras por semana (para obtener la última semana)
-    const weeklyExtras: Record<string, Record<string, number>> = {}
-    let lastWeekStartStr: string | null = null
-
     monthWeeks.forEach((weekDays) => {
       const weekStartStr = format(weekDays[0], "yyyy-MM-dd")
       const weekSchedule = schedules.find((s) => s.weekStart === weekStartStr) || null
       if (!weekSchedule?.assignments) return
-
-      // Inicializar el registro de horas extras para esta semana
-      if (!weeklyExtras[weekStartStr]) {
-        weeklyExtras[weekStartStr] = {}
-        employees.forEach((employee) => {
-          weeklyExtras[weekStartStr][employee.id] = 0
-        })
-      }
-      // Actualizar la última semana procesada
-      lastWeekStartStr = weekStartStr
 
       weekDays.forEach((day) => {
         if (day < monthRange.startDate || day > monthRange.endDate) return
@@ -251,8 +241,6 @@ export default function HorariosMensualesPage() {
           if (horasExtra > 0) {
             // Acumular en el total del mes
             stats[employeeId].horasExtrasMes += horasExtra
-            // Acumular en la semana actual
-            weeklyExtras[weekStartStr][employeeId] = (weeklyExtras[weekStartStr][employeeId] || 0) + horasExtra
           }
         })
       })
@@ -296,153 +284,162 @@ export default function HorariosMensualesPage() {
   const handleShareLink = useCallback(async () => {
     if (!user) return
     
-    const shareUrl = `${window.location.origin}/pwa/horario/${user.uid}`
-    
-    try {
-      await navigator.clipboard.writeText(shareUrl)
+    // Usar companySlug si está disponible, sino mostrar mensaje informativo
+    if (!slugLoading && companySlug) {
+      const shareUrl = `${window.location.origin}/pwa/horario/${companySlug}`
+      
+      try {
+        await navigator.clipboard.writeText(shareUrl)
+        toast({
+          title: "Enlace copiado",
+          description: "El enlace PWA se ha copiado al portapapeles. Compártelo con tu equipo.",
+        })
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "No se pudo copiar el enlace",
+          variant: "destructive"
+        })
+      }
+    } else {
       toast({
-        title: "Enlace copiado",
-        description: "El enlace PWA se ha copiado al portapapeles. Compártelo con tu equipo.",
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo copiar el enlace. Cópialo manualmente.",
-        variant: "destructive",
+        title: "Publicación requerida",
+        description: "Para compartir el horario, primero publica usando el botón 'Publicar Horario'",
+        variant: "destructive"
       })
     }
-  }, [user, toast])
+  }, [user, companySlug, slugLoading, toast])
 
   return (
     <>
       <ExportOverlay isExporting={exporting} message="Exportando horario..." />
       <DashboardLayout user={user}>
         <div className="space-y-4 sm:space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-          <div>
-            {config?.nombreEmpresa && (
-              <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground mb-1">
-                {config.nombreEmpresa}
-              </h1>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+            <div>
+              {config?.nombreEmpresa && (
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground mb-1">
+                  {config.nombreEmpresa}
+                </h1>
+              )}
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">Horarios Mensuales</h2>
+              <p className="text-sm sm:text-base text-muted-foreground">
+                Vista jerárquica de todos los horarios organizados por mes y semana
+              </p>
+            </div>
+            {user && (
+              <Button onClick={handleShareLink} variant="outline" size="default" className="shrink-0">
+                <Share2 className="mr-2 h-4 w-4" />
+                Compartir enlace
+              </Button>
             )}
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">Horarios Mensuales</h2>
-            <p className="text-sm sm:text-base text-muted-foreground">
-              Vista jerárquica de todos los horarios organizados por mes y semana
-            </p>
           </div>
-          {user && (
-            <Button onClick={handleShareLink} variant="outline" size="default" className="shrink-0">
-              <Share2 className="mr-2 h-4 w-4" />
-              Compartir enlace
-            </Button>
-          )}
-        </div>
 
-        {dataLoading ? (
-          <Card className="p-6 sm:p-8 md:p-12 text-center">
-            <Loader2 className="mx-auto h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary" />
-            <p className="mt-4 text-sm sm:text-base text-muted-foreground">Cargando datos...</p>
-          </Card>
-        ) : employees.length === 0 ? (
-          <Card className="p-6 sm:p-8 md:p-12 text-center">
-            <p className="text-sm sm:text-base text-muted-foreground">No hay empleados registrados. Agrega empleados para crear horarios.</p>
-          </Card>
-        ) : shifts.length === 0 ? (
-          <Card className="p-6 sm:p-8 md:p-12 text-center">
-            <p className="text-sm sm:text-base text-muted-foreground">No hay turnos configurados. Agrega turnos para crear horarios.</p>
-          </Card>
-        ) : monthGroups.length === 0 ? (
-          <Card className="p-6 sm:p-8 md:p-12 text-center">
-            <p className="text-sm sm:text-base text-muted-foreground">No hay horarios disponibles. Crea horarios para verlos aquí.</p>
-          </Card>
-        ) : (
-          <Accordion type="multiple" className="space-y-3 sm:space-y-4">
-            {monthGroups.map((month) => {
-              const monthRange = getCustomMonthRange(month.monthDate, monthStartDay)
-              const employeeStats = calculateMonthlyStats(month.monthDate)
+          {dataLoading ? (
+            <Card className="p-6 sm:p-8 md:p-12 text-center">
+              <Loader2 className="mx-auto h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary" />
+              <p className="mt-4 text-sm sm:text-base text-muted-foreground">Cargando datos...</p>
+            </Card>
+          ) : employees.length === 0 ? (
+            <Card className="p-6 sm:p-8 md:p-12 text-center">
+              <p className="text-sm sm:text-base text-muted-foreground">No hay empleados registrados. Agrega empleados para crear horarios.</p>
+            </Card>
+          ) : shifts.length === 0 ? (
+            <Card className="p-6 sm:p-8 md:p-12 text-center">
+              <p className="text-sm sm:text-base text-muted-foreground">No hay turnos configurados. Agrega turnos para crear horarios.</p>
+            </Card>
+          ) : monthGroups.length === 0 ? (
+            <Card className="p-6 sm:p-8 md:p-12 text-center">
+              <p className="text-sm sm:text-base text-muted-foreground">No hay horarios disponibles. Crea horarios para verlos aquí.</p>
+            </Card>
+          ) : (
+            <Accordion type="multiple" className="space-y-3 sm:space-y-4">
+              {monthGroups.map((month) => {
+                const monthRange = getCustomMonthRange(month.monthDate, monthStartDay)
+                const employeeStats = calculateMonthlyStats(month.monthDate)
 
-              return (
-                <AccordionItem
-                  key={month.monthKey}
-                  value={month.monthKey}
-                  className="border rounded-lg px-3 sm:px-4 bg-card"
-                >
-                  <AccordionTrigger className="text-base sm:text-lg md:text-xl font-semibold hover:no-underline py-3 sm:py-4">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between w-full pr-2 sm:pr-4 gap-1 sm:gap-0">
-                      <span className="truncate">{month.monthName}</span>
-                      <span className="text-xs sm:text-sm font-normal text-muted-foreground shrink-0">
-                        {month.weeks.length} {month.weeks.length === 1 ? "semana" : "semanas"}
-                      </span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="space-y-2 sm:space-y-3 mt-2">
-                      {month.weeks.map((week) => {
-                        // Calcular horas extras para esta semana específica
-                        const weekStats: Record<string, EmployeeMonthlyStats> = {}
-                        employees.forEach((employee) => {
-                          weekStats[employee.id] = {
-                            ...employeeStats[employee.id],
-                            horasExtrasSemana: 0,
-                          }
-                        })
-
-                        if (week.schedule?.assignments) {
-                          week.weekDays.forEach((day) => {
-                            const dateStr = format(day, "yyyy-MM-dd")
-                            const dateAssignments = week.schedule?.assignments[dateStr]
-                            if (!dateAssignments) return
-
-                            Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
-                              if (!weekStats[employeeId]) {
-                                weekStats[employeeId] = {
-                                  ...employeeStats[employeeId],
-                                  horasExtrasSemana: 0,
-                                }
-                              }
-
-                              const normalizedAssignments = normalizeAssignments(assignmentValue)
-                              if (normalizedAssignments.length === 0) {
-                                return
-                              }
-
-                              // Calcular horas extras para este día usando el nuevo servicio de dominio
-                              const workingConfig = toWorkingHoursConfig(config)
-                              const { horasExtra } = calculateTotalDailyHours(normalizedAssignments, workingConfig)
-                              if (horasExtra > 0) {
-                                weekStats[employeeId].horasExtrasSemana += horasExtra
-                              }
-                            })
+                return (
+                  <AccordionItem
+                    key={month.monthKey}
+                    value={month.monthKey}
+                    className="border rounded-lg px-3 sm:px-4 bg-card"
+                  >
+                    <AccordionTrigger className="text-base sm:text-lg md:text-xl font-semibold hover:no-underline py-3 sm:py-4">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between w-full pr-2 sm:pr-4 gap-1 sm:gap-0">
+                        <span className="truncate">{month.monthName}</span>
+                        <span className="text-xs sm:text-sm font-normal text-muted-foreground shrink-0">
+                          {month.weeks.length} {month.weeks.length === 1 ? "semana" : "semanas"}
+                        </span>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-2 sm:space-y-3 mt-2">
+                        {month.weeks.map((week) => {
+                          // Calcular horas extras para esta semana específica
+                          const weekStats: Record<string, EmployeeMonthlyStats> = {}
+                          employees.forEach((employee) => {
+                            weekStats[employee.id] = {
+                              ...employeeStats[employee.id],
+                              horasExtrasSemana: 0,
+                            }
                           })
-                        }
 
-                        return (
-                          <WeekSchedule
-                            key={week.weekStartStr}
-                            weekDays={week.weekDays}
-                            weekIndex={0}
-                            weekSchedule={week.schedule}
-                            employees={employees}
-                            allEmployees={employees}
-                            shifts={shifts}
-                            monthRange={{ start: monthRange.startDate, end: monthRange.endDate }}
-                            onExportImage={handleExportWeekImage}
-                            onExportPDF={handleExportWeekPDF}
-                            onExportExcel={() => handleExportWeekExcel(week.weekStartDate, week.weekDays, week.schedule)}
-                            exporting={exporting}
-                            mediosTurnos={config?.mediosTurnos}
-                            employeeStats={Object.values(weekStats)}
-                            readonly={true}
-                          />
-                        )
-                      })}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              )
-            })}
-          </Accordion>
-        )}
+                          if (week.schedule?.assignments) {
+                            week.weekDays.forEach((day) => {
+                              const dateStr = format(day, "yyyy-MM-dd")
+                              const dateAssignments = week.schedule?.assignments[dateStr]
+                              if (!dateAssignments) return
+
+                              Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
+                                if (!weekStats[employeeId]) {
+                                  weekStats[employeeId] = {
+                                    ...employeeStats[employeeId],
+                                    horasExtrasSemana: 0,
+                                  }
+                                }
+
+                                const normalizedAssignments = normalizeAssignments(assignmentValue)
+                                if (normalizedAssignments.length === 0) {
+                                  return
+                                }
+
+                                // Calcular horas extras para este día usando el nuevo servicio de dominio
+                                const workingConfig = toWorkingHoursConfig(config)
+                                const { horasExtra } = calculateTotalDailyHours(normalizedAssignments, workingConfig)
+                                if (horasExtra > 0) {
+                                  weekStats[employeeId].horasExtrasSemana += horasExtra
+                                }
+                              })
+                            })
+                          }
+
+                          return (
+                            <WeekSchedule
+                              key={week.weekStartStr}
+                              weekDays={week.weekDays}
+                              weekIndex={0}
+                              weekSchedule={week.schedule}
+                              employees={employees}
+                              allEmployees={employees}
+                              shifts={shifts}
+                              monthRange={{ start: monthRange.startDate, end: monthRange.endDate }}
+                              onExportImage={handleExportWeekImage}
+                              onExportPDF={handleExportWeekPDF}
+                              onExportExcel={() => handleExportWeekExcel(week.weekStartDate, week.weekDays, week.schedule)}
+                              exporting={exporting}
+                              mediosTurnos={config?.mediosTurnos}
+                              employeeStats={Object.values(weekStats)}
+                              readonly={true}
+                            />
+                          )
+                        })}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                )
+              })}
+            </Accordion>
+          )}
         </div>
       </DashboardLayout>
     </>
