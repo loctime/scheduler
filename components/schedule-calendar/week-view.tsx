@@ -27,6 +27,20 @@ interface WeekViewProps {
   onWeekScheduleRef?: (weekStartDate: Date, element: HTMLDivElement | null) => void
   getWeekSchedule?: (weekStartDate: Date) => Horario | null
   allSchedules?: Horario[]
+  user?: any
+  onMarkComplete?: (weekId: string) => void
+  lastCompletedWeekStart?: Date | null
+  onPublishSchedule?: (weekStartDate: Date, weekEndDate: Date) => Promise<void> | void
+  isPublishingSchedule?: boolean
+  copiedWeekData?: {
+    assignments: Horario["assignments"]
+    dayStatus: Horario["dayStatus"]
+    weekStartDate: string
+    copiedAt: string
+  } | null
+  onCopyCurrentWeek?: (weekStartDate: Date) => void
+  onPasteCopiedWeek?: (targetWeekStartDate: Date) => Promise<void>
+  isPastingWeek?: boolean
 }
 
 export function WeekView({
@@ -50,6 +64,15 @@ export function WeekView({
   onWeekScheduleRef,
   getWeekSchedule,
   allSchedules,
+  user,
+  onMarkComplete,
+  lastCompletedWeekStart,
+  onPublishSchedule,
+  isPublishingSchedule,
+  copiedWeekData,
+  onCopyCurrentWeek,
+  onPasteCopiedWeek,
+  isPastingWeek,
 }: WeekViewProps) {
   const weekStartDate = weekDays[0]
 
@@ -119,16 +142,17 @@ export function WeekView({
       employeeStats={Object.values(weekStats)}
       open={open}
       onOpenChange={onOpenChange}
-      onMarkComplete={undefined}
-      lastCompletedWeekStart={undefined}
+      user={user}
+      onMarkComplete={onMarkComplete}
+      lastCompletedWeekStart={lastCompletedWeekStart}
       getWeekSchedule={getWeekSchedule}
       allSchedules={allSchedules}
-      isPublishingSchedule={false}
-      onPublishSchedule={undefined}
-      onCopyCurrentWeek={undefined}
-      onPasteCopiedWeek={undefined}
-      isPastingWeek={false}
-      copiedWeekData={null}
+      onPublishSchedule={onPublishSchedule}
+      isPublishingSchedule={isPublishingSchedule}
+      copiedWeekData={copiedWeekData}
+      onCopyCurrentWeek={onCopyCurrentWeek}
+      onPasteCopiedWeek={onPasteCopiedWeek}
+      isPastingWeek={isPastingWeek}
     />
   )
 }

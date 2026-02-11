@@ -249,6 +249,18 @@ export function GeneralView({
               onWeekScheduleRef={handleWeekScheduleRef}
               getWeekSchedule={getWeekSchedule}
               allSchedules={allSchedules}
+              user={user}
+              onMarkComplete={onMarkWeekComplete ? (weekId: string) => {
+                const weekDate = new Date(weekId.replace('schedule-week-', ''))
+                onMarkWeekComplete(weekDate, !weekSchedule?.completada)
+              } : undefined}
+              lastCompletedWeekStart={lastCompletedWeekStart ? new Date(lastCompletedWeekStart) : undefined}
+              onPublishSchedule={onPublishSchedule}
+              isPublishingSchedule={isPublishingSchedule}
+              copiedWeekData={copiedWeekData}
+              onCopyCurrentWeek={onCopyCurrentWeek}
+              onPasteCopiedWeek={onPasteCopiedWeek}
+              isPastingWeek={isPastingWeek}
             />
           )
         })}
