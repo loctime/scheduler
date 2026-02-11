@@ -52,12 +52,11 @@ const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAss
 
 export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarProps) {
   const { toast } = useToast()
-  const { publishToPublic } = usePublicPublisher()
   const { employees, shifts, loading: dataLoading, user: contextUser } = useData() 
   const { config } = useConfig(contextUser || userProp)
   const { exporting, exportImage, exportPDF, exportExcel, exportMonthPDF } = useExportSchedule()
-  const { publishToPublic: publishPublic, isPublishing, error: publishError } = usePublicPublisher()
-  
+  const { publishToPublic, isPublishing, error: publishError } = usePublicPublisher(contextUser || userProp)
+
   // Para compatibilidad con el código existente
   const userData = contextUser || userProp
 
