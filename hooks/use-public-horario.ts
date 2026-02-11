@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { resolveOwnerIdFromCompanySlug } from "@/lib/public-company"
 
 export interface PublicHorarioData {
   ownerId: string
@@ -25,27 +26,26 @@ export interface UsePublicHorarioReturn {
 }
 
 /**
- * Hook para leer horarios públicos SIN autenticación
- * Lee desde: apps/horarios/enlaces_publicos/{ownerId}
+ * Public data contract:
+ * - route param is companySlug
+ * - slug resolves to ownerId
+ * - reads only from public collection apps/horarios/enlaces_publicos/{ownerId}
  */
-export function usePublicHorario(ownerId: string): UsePublicHorarioReturn {
+export function usePublicHorario(companySlug: string): UsePublicHorarioReturn {
   const [horario, setHorario] = useState<PublicHorarioData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const loadPublicHorario = async () => {
-    console.log("🔧 [usePublicHorario] Iniciando carga para ownerId:", ownerId?.substring(0, 10) + '...')
-
     try {
       if (!db) {
-        console.warn("🔧 [usePublicHorario] Firestore no disponible")
+        setError("Firestore no disponible")
         setIsLoading(false)
         return
       }
 
-      if (!ownerId || ownerId.trim() === '') {
-        console.warn("🔧 [usePublicHorario] ownerId no proporcionado")
-        setError("Se requiere ownerId para acceder al horario")
+      if (!companySlug || companySlug.trim() === "") {
+        setError("Se requiere companySlug para acceder al horario")
         setIsLoading(false)
         return
       }
@@ -53,56 +53,35 @@ export function usePublicHorario(ownerId: string): UsePublicHorarioReturn {
       setIsLoading(true)
       setError(null)
 
-      console.log("🔧 [usePublicHorario] Loading public horario for ownerId:", ownerId)
-      
-      // Path válido: apps/horarios/enlaces_publicos/{ownerId}
-      const fullPath = "apps/horarios/enlaces_publicos/" + ownerId
-      console.log("🔧 [usePublicHorario] Reading from:", fullPath)
-      
-      const horarioRef = doc(db, "apps", "horarios", "enlaces_publicos", ownerId)
-      console.log("🔧 [usePublicHorario] Document reference created for apps/horarios/enlaces_publicos/" + ownerId)
-      
-      const horarioDoc = await getDoc(horarioRef)
-      console.log("🔧 [usePublicHorario] Document fetched, exists:", horarioDoc.exists())
-
-      if (!horarioDoc.exists()) {
-        console.log("🔧 [usePublicHorario] No published horario found")
+      const ownerId = await resolveOwnerIdFromCompanySlug(companySlug)
+      if (!ownerId) {
+        setError("Empresa no encontrada")
         setHorario(null)
         return
       }
 
+      const horarioRef = doc(db, "apps", "horarios", "enlaces_publicos", ownerId)
+      const horarioDoc = await getDoc(horarioRef)
+
+      if (!horarioDoc.exists()) {
+        setHorario(null)
+        setError("Horario público no disponible")
+        return
+      }
+
       const horarioData = horarioDoc.data() as PublicHorarioData
-      const currentWeek = horarioData.weeks[horarioData.publishedWeekId]
-      
-      console.log("🔧 [usePublicHorario] Public horario found:", {
+      // Defensive public filter: expose only strictly public fields
+      setHorario({
         ownerId: horarioData.ownerId,
         publishedWeekId: horarioData.publishedWeekId,
-        currentWeekId: currentWeek?.weekId,
-        currentWeekLabel: currentWeek?.weekLabel,
-        hasPublishedAt: !!currentWeek?.publishedAt,
-        hasPublicImageUrl: !!currentWeek?.publicImageUrl,
-        publicImageUrlLength: currentWeek?.publicImageUrl?.length || 0,
-        publicImageUrlPrefix: currentWeek?.publicImageUrl?.substring(0, 50) + "...",
-        daysCount: Object.keys(currentWeek?.days || {}).length,
-        employeesCount: currentWeek?.employees?.length || 0,
+        weeks: horarioData.weeks || {},
+        userId: horarioData.userId,
         isPublic: horarioData.isPublic,
-        weeksCount: Object.keys(horarioData.weeks).length,
-        allWeeksIds: Object.keys(horarioData.weeks)
+        companyName: horarioData.companyName,
       })
-      
-      console.log("🔧 [usePublicHorario] Setting horario state:", !!horarioData)
-      setHorario(horarioData)
-      console.log("🔧 [usePublicHorario] Horario state set successfully")
-
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Error al cargar horario"
       setError(errorMessage)
-      console.error("🔧 [usePublicHorario] Error loading public horario:", err)
-      console.error("🔧 [usePublicHorario] Error details:", {
-        message: errorMessage,
-        stack: err instanceof Error ? err.stack : undefined,
-        ownerId: ownerId?.substring(0, 10) + '...'
-      })
     } finally {
       setIsLoading(false)
     }
@@ -110,11 +89,11 @@ export function usePublicHorario(ownerId: string): UsePublicHorarioReturn {
 
   useEffect(() => {
     loadPublicHorario()
-  }, [ownerId])
+  }, [companySlug])
 
   return {
     horario,
     isLoading,
-    error
+    error,
   }
 }

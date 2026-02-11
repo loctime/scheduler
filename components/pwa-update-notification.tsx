@@ -18,7 +18,7 @@ interface PWAUpdateNotificationProps {
   swPath?: string
 }
 
-export function PWAUpdateNotification({ swPath = "/sw.js" }: PWAUpdateNotificationProps) {
+export function PWAUpdateNotification({ swPath = "/sw-pwa.js" }: PWAUpdateNotificationProps) {
   const { updateAvailable, updateServiceWorker } = usePWAUpdate(swPath)
 
   if (!updateAvailable) return null

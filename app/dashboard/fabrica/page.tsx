@@ -576,7 +576,7 @@ export default function FabricaPage() {
         />
       )}
       <PWAInstallPrompt />
-      <PWAUpdateNotification swPath="/sw-fabrica.js" />
+      <PWAUpdateNotification swPath="/sw-pwa.js" />
     </DashboardLayout>
   )
 }

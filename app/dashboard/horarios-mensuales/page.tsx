@@ -296,7 +296,7 @@ export default function HorariosMensualesPage() {
   const handleShareLink = useCallback(async () => {
     if (!user) return
     
-    const shareUrl = `${window.location.origin}/pwa/horario?ownerId=${user.uid}`
+    const shareUrl = `${window.location.origin}/pwa/horario/${user.uid}`
     
     try {
       await navigator.clipboard.writeText(shareUrl)

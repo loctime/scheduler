@@ -111,7 +111,7 @@ export function usePublishedSchedule(): UsePublishedScheduleReturn {
 
   // Generar URL de compartir
   const shareUrl = publishedSchedule 
-    ? `${window.location.origin}/pwa/horario/${publishedSchedule.id}`
+    ? `${window.location.origin}/pwa/horario/${publishedSchedule.ownerId}`
     : null
 
   return {

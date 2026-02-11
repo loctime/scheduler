@@ -1,11 +1,6 @@
-"use client"
+import { redirect } from "next/navigation"
 
-import { useParams } from "next/navigation"
-import PublicHorarioPage from "@/components/public-horario-page"
-
-export default function HorarioPublicPage() {
-  const params = useParams()
-  const ownerId = params.ownerId as string
-
-  return <PublicHorarioPage scheduleId={ownerId} />
+export default async function LegacyHorarioOwnerPage({ params }: { params: Promise<{ ownerId: string }> }) {
+  const { ownerId } = await params
+  redirect(`/pwa/horario/${ownerId}`)
 }

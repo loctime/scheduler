@@ -8,15 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Check, X, Package } from "lucide-react"
 
-interface StockConsoleContentProps {
-  showPwaMeta?: boolean
-  registerLegacyServiceWorker?: boolean
-}
-
-export function StockConsoleContent({
-  showPwaMeta = false,
-  registerLegacyServiceWorker = false,
-}: StockConsoleContentProps) {
+export function StockConsoleContent() {
   const { user, userData } = useData()
 
   // Validar permisos antes de renderizar la página
@@ -33,23 +25,6 @@ export function StockConsoleContent({
       )
     }
   }, [])
-
-  useEffect(() => {
-    if (!registerLegacyServiceWorker) return
-
-    if (typeof window !== "undefined" && window.location.pathname === "/dashboard/stock-console") {
-      if ("serviceWorker" in navigator) {
-        navigator.serviceWorker
-          .register("/sw-stock-console.js")
-          .then((registration) => {
-            console.log("Stock Console SW registrado:", registration)
-          })
-          .catch((error) => {
-            console.error("Stock Console SW error:", error)
-          })
-      }
-    }
-  }, [registerLegacyServiceWorker])
 
   // Si no tiene permisos, mostrar mensaje de acceso denegado
   if (!tienePermisoPedidos) {
@@ -89,13 +64,6 @@ export function StockConsoleContent({
 
   return (
     <>
-      {showPwaMeta && !isPWA && (
-        <>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-          <meta name="theme-color" content="#3b82f6" />
-          <link rel="manifest" href="/manifest-stock-console.json" />
-        </>
-      )}
 
       <div className={`min-h-screen bg-gray-100 ${isPWA ? "pb-20" : "pb-24"}`}>
         {/* Header simple */}

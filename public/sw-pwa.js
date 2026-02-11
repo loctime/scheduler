@@ -1,10 +1,9 @@
-// Service Worker para PWA unificada bajo /pwa
-const APP_VERSION = "2025-02-05-pwa"
+// Service Worker único para el sistema PWA unificado
+const APP_VERSION = "2026-02-11-unified"
 const CACHE_NAME = `pwa-shell-${APP_VERSION}`
 
 const SHELL_URLS = [
-  "/pwa/horario",
-  "/pwa/mensual",
+  "/pwa",
   "/pwa/stock-console",
   "/manifest-pwa.json",
   "/icon-light-32x32.png",
@@ -15,9 +14,7 @@ const SHELL_URLS = [
 
 self.addEventListener("install", (event) => {
   self.skipWaiting()
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS))
-  )
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS)))
 })
 
 self.addEventListener("activate", (event) => {
@@ -39,17 +36,13 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return
 
-  if (event.request.mode === "navigate") {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match("/pwa/horario"))
-    )
+  if (event.request.mode === "navigate" && event.request.url.includes("/pwa/")) {
+    event.respondWith(fetch(event.request).catch(() => caches.match("/pwa")))
     return
   }
 
   if (SHELL_URLS.some((url) => event.request.url.includes(url))) {
-    event.respondWith(
-      caches.match(event.request).then((cached) => cached || fetch(event.request))
-    )
+    event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request)))
   }
 })
 

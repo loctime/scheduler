@@ -77,7 +77,7 @@ export function MonthHeader({
 
   const handleOpenPwa = () => {
     if (!user?.uid) return
-    const pwaUrl = `/pwa/horario?ownerId=${user.uid}`
+    const pwaUrl = `/pwa/horario/${user.uid}`
     window.open(pwaUrl, '_blank')
   }
 

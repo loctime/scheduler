@@ -1763,7 +1763,7 @@ export default function PedidosPage() {
         }}
       />
       <PWAInstallPrompt />
-      <PWAUpdateNotification swPath="/sw-pedidos.js" />
+      <PWAUpdateNotification swPath="/sw-pwa.js" />
     </DashboardLayout>
   )
 }
