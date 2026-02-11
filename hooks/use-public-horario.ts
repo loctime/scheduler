@@ -1,87 +1,95 @@
 import { useState, useEffect } from "react"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { resolveOwnerIdFromCompanySlug } from "@/lib/public-company"
-
-export interface PublicHorarioData {
-  ownerId: string
-  publishedWeekId: string
-  weeks: Record<string, {
-    weekId: string
-    weekLabel: string
-    publishedAt: any
-    publicImageUrl?: string | null
-    days: Record<string, any[]>
-    employees: any[]
-  }>
-  userId: string
-  isPublic?: boolean
-  companyName?: string
-}
+import { resolvePublicCompany } from "@/lib/public-companies"
+import { sanitizePublicHorarioData, isValidPublicHorarioData, createGenericPublicError, logPublicAccess } from "@/lib/public-data-sanitizer"
 
 export interface UsePublicHorarioReturn {
-  horario: PublicHorarioData | null
+  horario: any // SanitizedPublicHorarioData pero sin tipado estricto para compatibilidad
   isLoading: boolean
   error: string | null
 }
 
 /**
- * Public data contract:
- * - route param is companySlug
- * - slug resolves to ownerId
- * - reads only from public collection apps/horarios/enlaces_publicos/{ownerId}
+ * Hook para cargar horario público usando el nuevo sistema de companySlug
+ * 
+ * Características:
+ * - Resolución O(1) desde publicCompanies/{slug}
+ * - Sanitización estricta de datos sensibles
+ * - Logging de accesos para seguridad
+ * - 404 controlado sin revelar información
  */
 export function usePublicHorario(companySlug: string): UsePublicHorarioReturn {
-  const [horario, setHorario] = useState<PublicHorarioData | null>(null)
+  const [horario, setHorario] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const loadPublicHorario = async () => {
     try {
+      // Resetear estado
+      setIsLoading(true)
+      setError(null)
+      setHorario(null)
+
+      // Validaciones básicas
       if (!db) {
-        setError("Firestore no disponible")
-        setIsLoading(false)
+        setError("Servicio no disponible")
         return
       }
 
       if (!companySlug || companySlug.trim() === "") {
-        setError("Se requiere companySlug para acceder al horario")
-        setIsLoading(false)
+        setError("Enlace inválido")
         return
       }
 
-      setIsLoading(true)
-      setError(null)
+      // Log de intento de acceso (para seguridad)
+      logPublicAccess(companySlug)
 
-      const ownerId = await resolveOwnerIdFromCompanySlug(companySlug)
-      if (!ownerId) {
-        setError("Empresa no encontrada")
-        setHorario(null)
+      // Resolver companySlug a ownerId usando O(1) lookup
+      const publicCompany = await resolvePublicCompany(companySlug)
+      if (!publicCompany) {
+        // 404 controlado - no revelar si existió o no
+        const errorResponse = createGenericPublicError()
+        setError(errorResponse.error)
         return
       }
 
-      const horarioRef = doc(db, "apps", "horarios", "enlaces_publicos", ownerId)
+      // Obtener datos públicos desde la colección dedicada
+      const horarioRef = doc(db, "apps", "horarios", "enlaces_publicos", publicCompany.ownerId)
       const horarioDoc = await getDoc(horarioRef)
 
       if (!horarioDoc.exists()) {
-        setHorario(null)
-        setError("Horario público no disponible")
+        const errorResponse = createGenericPublicError()
+        setError(errorResponse.error)
         return
       }
 
-      const horarioData = horarioDoc.data() as PublicHorarioData
-      // Defensive public filter: expose only strictly public fields
-      setHorario({
-        ownerId: horarioData.ownerId,
-        publishedWeekId: horarioData.publishedWeekId,
-        weeks: horarioData.weeks || {},
-        userId: horarioData.userId,
-        isPublic: horarioData.isPublic,
-        companyName: horarioData.companyName,
-      })
+      const rawData = horarioDoc.data() as any
+      
+      // Sanitizar datos para remover información sensible
+      const sanitizedData = sanitizePublicHorarioData(rawData)
+      
+      if (!isValidPublicHorarioData(sanitizedData)) {
+        setError("Horario no disponible")
+        return
+      }
+
+      // Actualizar log de acceso exitoso
+      logPublicAccess(companySlug, navigator.userAgent, 'success')
+
+      setHorario(sanitizedData)
     } catch (err) {
+      console.error('❌ [usePublicHorario] Error cargando horario público:', err)
+      
+      // Error genérico para no revelar información sensible
       const errorMessage = err instanceof Error ? err.message : "Error al cargar horario"
-      setError(errorMessage)
+      
+      // Si es error de red/conexión, mostrarlo
+      if (errorMessage.includes('network') || errorMessage.includes('connection') || errorMessage.includes('timeout')) {
+        setError("Error de conexión. Intenta nuevamente.")
+      } else {
+        setError("Error al cargar horario")
+      }
     } finally {
       setIsLoading(false)
     }

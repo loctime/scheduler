@@ -289,7 +289,7 @@ export default function PublicHorarioPage({ companySlug }: PublicHorarioPageProp
     if (!horario) return {}
     
     const stats: Record<string, EmployeeMonthlyStats> = {}
-    employees.forEach((employee) => {
+    employees.forEach((employee: any) => {
       stats[employee.id] = {
         francos: 0,
         francosSemana: 0,
@@ -817,7 +817,7 @@ export default function PublicHorarioPage({ companySlug }: PublicHorarioPageProp
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {employees.map((employee) => (
+                {employees.map((employee: any) => (
                   <Button
                     key={employee.id}
                     variant="outline"

@@ -43,7 +43,7 @@ export function PublicMensualPage({ companySlug }: { companySlug: string }) {
             <CardContent className="py-6 text-sm text-muted-foreground">No hay semanas publicadas.</CardContent>
           </Card>
         ) : (
-          weeks.map((week) => (
+          weeks.map((week: any) => (
             <Card key={week.weekId}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">

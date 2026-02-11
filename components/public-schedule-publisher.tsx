@@ -19,8 +19,8 @@ export function PublicSchedulePublisher({ weekId, weekData }: PublicSchedulePubl
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   
-  const { userData } = useData()
-  const { publishToPublic, isPublishing, error } = usePublicPublisher()
+  const { userData, user } = useData()
+  const { publishToPublic, isPublishing, error } = usePublicPublisher(user)
   const { toast } = useToast()
 
   // Solo los admins pueden publicar
