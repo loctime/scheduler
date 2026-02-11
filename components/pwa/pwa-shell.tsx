@@ -4,16 +4,21 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { onAuthStateChanged } from "firebase/auth"
-import { Calendar, CalendarDays, Package, Loader2 } from "lucide-react"
+import { Package, Loader2 } from "lucide-react"
 import { auth, isFirebaseConfigured } from "@/lib/firebase"
 import { DataProvider } from "@/contexts/data-context"
 import { cn } from "@/lib/utils"
 
-const navItems = [
-  { href: "/pwa/horario", label: "Horario", icon: Calendar },
-  { href: "/pwa/mensual", label: "Mensual", icon: CalendarDays },
-  { href: "/pwa/stock-console", label: "Stock", icon: Package },
-]
+const navItems = [{ href: "/pwa/stock-console", label: "Stock", icon: Package }]
+
+function setAuthCookie(token?: string) {
+  if (typeof document === "undefined") return
+  if (!token) {
+    document.cookie = "firebase_id_token=; Path=/; Max-Age=0; SameSite=Lax"
+    return
+  }
+  document.cookie = `firebase_id_token=${token}; Path=/; Max-Age=3600; SameSite=Lax; Secure`
+}
 
 export function PwaShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -26,8 +31,14 @@ export function PwaShell({ children }: { children: React.ReactNode }) {
       return
     }
 
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser)
+      if (currentUser) {
+        const token = await currentUser.getIdToken()
+        setAuthCookie(token)
+      } else {
+        setAuthCookie()
+      }
       setLoading(false)
     })
 
@@ -44,14 +55,7 @@ export function PwaShell({ children }: { children: React.ReactNode }) {
     }
 
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/sw-pwa.js", { scope: "/pwa/" })
-        .then((registration) => {
-          console.log("PWA SW registrado:", registration)
-        })
-        .catch((error) => {
-          console.error("PWA SW error:", error)
-        })
+      navigator.serviceWorker.register("/sw-pwa.js", { scope: "/pwa/" }).catch(() => {})
     }
   }, [])
 
@@ -82,8 +86,8 @@ export function PwaShell({ children }: { children: React.ReactNode }) {
                     <span>{item.label}</span>
                   </div>
                 </Link>
-              )}
-            )}
+              )
+            })}
           </div>
         </nav>
       </div>

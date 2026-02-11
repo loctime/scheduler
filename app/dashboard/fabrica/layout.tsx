@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from "next"
 export const metadata: Metadata = {
   title: "Panel de Fábrica - Stock",
   description: "Panel de gestión de pedidos para fábrica",
-  manifest: "/manifest-fabrica.json",
+  manifest: "/manifest-pwa.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

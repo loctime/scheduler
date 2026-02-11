@@ -13,7 +13,7 @@ interface PWAUpdateHook {
  * Detecta cuando hay una nueva versión del service worker disponible
  * y permite actualizarlo automáticamente
  */
-export function usePWAUpdate(swPath: string = "/sw.js"): PWAUpdateHook {
+export function usePWAUpdate(swPath: string = "/sw-pwa.js"): PWAUpdateHook {
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null)
   const [updateAvailable, setUpdateAvailable] = useState(false)
 

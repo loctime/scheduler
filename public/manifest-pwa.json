@@ -1,8 +1,8 @@
 {
-  "name": "PWA Horarios",
-  "short_name": "Horarios",
-  "description": "Horario publicado, vista mensual y stock console",
-  "start_url": "/pwa/horario",
+  "name": "PWA Operaciones",
+  "short_name": "Operaciones",
+  "description": "PWA unificada para módulos públicos y privados",
+  "start_url": "/pwa",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
@@ -37,33 +37,9 @@
   "categories": ["productivity", "business"],
   "shortcuts": [
     {
-      "name": "Horario",
-      "short_name": "Horario",
-      "description": "Ver horario publicado",
-      "url": "/pwa/horario",
-      "icons": [
-        {
-          "src": "/icon-light-32x32.png",
-          "sizes": "32x32"
-        }
-      ]
-    },
-    {
-      "name": "Mensual",
-      "short_name": "Mensual",
-      "description": "Ver vista mensual",
-      "url": "/pwa/mensual",
-      "icons": [
-        {
-          "src": "/icon-light-32x32.png",
-          "sizes": "32x32"
-        }
-      ]
-    },
-    {
-      "name": "Stock",
+      "name": "Stock Console",
       "short_name": "Stock",
-      "description": "Abrir stock console",
+      "description": "Abrir módulo privado de stock",
       "url": "/pwa/stock-console",
       "icons": [
         {

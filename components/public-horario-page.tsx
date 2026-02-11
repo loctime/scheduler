@@ -40,7 +40,7 @@ function getMainMonth(startDate: Date, endDate: Date): Date {
 }
 
 interface PublicHorarioPageProps {
-  scheduleId: string
+  companySlug: string
 }
 
 const buildFallbackEmployees = (ownerId: string, days?: Record<string, any>) => {
@@ -111,8 +111,8 @@ const getWeekStartDate = (weekId?: string, days?: Record<string, any>) => {
   return null
 }
 
-export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps) {
-  const { horario, isLoading, error } = usePublicHorario(scheduleId)
+export default function PublicHorarioPage({ companySlug }: PublicHorarioPageProps) {
+  const { horario, isLoading, error } = usePublicHorario(companySlug)
   const { config } = useConfig()
   const [copied, setCopied] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
@@ -154,48 +154,17 @@ export default function PublicHorarioPage({ scheduleId }: PublicHorarioPageProps
     }
   }, [])
 
-  // PWA: Registrar service worker y manejar instalación
+  // PWA: usar manifest/scope unificados y solo capturar prompt de instalación
   useEffect(() => {
-    // Limpiar cualquier manifest existente
-    const existingManifest = document.querySelector('link[rel="manifest"]')
-    if (existingManifest) {
-      existingManifest.remove()
-    }
-    
-    // Agregar manifest exclusivo para horario
-    const link = document.createElement('link')
-    link.rel = 'manifest'
-    link.href = '/manifest-horario.json'
-    document.head.appendChild(link)
-
-    // Registrar service worker exclusivo para horario
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw-horario.js', { scope: '/horario/' })
-        .then((registration) => {
-          console.log('SW Horario registrado:', registration)
-        })
-        .catch((error) => {
-          console.error('Error al registrar SW Horario:', error)
-        })
-    }
-
-    // Manejar beforeinstallprompt
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault()
       setDeferredPrompt(e)
       setShowInstallButton(true)
-      console.log('beforeinstallprompt capturado para horario')
     }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-      // Limpiar manifest
-      const manifestLink = document.querySelector('link[rel="manifest"][href="/manifest-horario.json"]')
-      if (manifestLink) {
-        document.head.removeChild(manifestLink)
-      }
     }
   }, [])
 

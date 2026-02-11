@@ -151,7 +151,7 @@ export default function ChatPage() {
       <StockChatProvider user={user}>
         <ChatContent />
         <PWAInstallPrompt />
-        <PWAUpdateNotification swPath="/sw.js" />
+        <PWAUpdateNotification swPath="/sw-pwa.js" />
       </StockChatProvider>
     </DataProvider>
   )
