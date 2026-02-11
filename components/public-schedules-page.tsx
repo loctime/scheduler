@@ -135,24 +135,43 @@ export function PublicSchedulesPage({ ownerId }: PublicSchedulesPageProps) {
     return addDays(selectedWeek, i)
   }) : []
 
+  // Soportar tanto el contrato nuevo (weeks[publishedWeekId]) como el legado
+  const currentWeekData = weekData?.weeks?.[weekData?.publishedWeekId] || null
+  const normalizedDays = currentWeekData?.days || weekData?.days || weekData?.assignments || {}
+  const normalizedDayStatus = currentWeekData?.dayStatus || weekData?.dayStatus || {}
+  const currentWeekImageUrl = currentWeekData?.publicImageUrl || weekData?.publicImageUrl || null
+
+  const hasWeekContent = useMemo(() => {
+    const hasAssignments = normalizedDays && typeof normalizedDays === 'object' && Object.keys(normalizedDays).length > 0
+    const hasDayStatus = normalizedDayStatus && typeof normalizedDayStatus === 'object' && Object.keys(normalizedDayStatus).length > 0
+    return Boolean(hasAssignments || hasDayStatus)
+  }, [normalizedDays, normalizedDayStatus])
+
+  const isPublished = Boolean(
+    weekData?.isPublished ||
+    weekData?.publishedWeekId ||
+    currentWeekData ||
+    hasWeekContent
+  )
+
   // Construir datos para los componentes
-  const employees = weekData?.employees || buildFallbackEmployees(ownerId, weekData?.days)
-  const shifts = weekData?.shifts || buildShiftsFromAssignments(ownerId, weekData?.days)
+  const employees = currentWeekData?.employees || weekData?.employees || buildFallbackEmployees(ownerId, normalizedDays)
+  const shifts = weekData?.shifts || buildShiftsFromAssignments(ownerId, normalizedDays)
   
   // Transformar assignments al formato esperado
   const transformedAssignments = useMemo(() => {
-    if (!weekData?.days) return {}
+    if (!normalizedDays || typeof normalizedDays !== 'object') return {}
     
     const assignments: { [date: string]: { [empleadoId: string]: ShiftAssignment[] | string[] } } = {}
     
-    Object.entries(weekData.days).forEach(([date, dayAssignments]) => {
+    Object.entries(normalizedDays).forEach(([date, dayAssignments]) => {
       if (!Array.isArray(dayAssignments)) {
         assignments[date] = dayAssignments as { [empleadoId: string]: ShiftAssignment[] | string[] }
       }
     })
     
     return assignments
-  }, [weekData?.days])
+  }, [normalizedDays])
 
   // Crear employeeStats vacío para mantener layout
   const employeeStats = useMemo(() => {
@@ -231,7 +250,7 @@ export function PublicSchedulesPage({ ownerId }: PublicSchedulesPageProps) {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {weekData.isPublished && (
+            {isPublished && (
               <Badge variant="secondary" className="bg-green-100 text-green-800">
                 Publicado
               </Badge>
@@ -265,31 +284,31 @@ export function PublicSchedulesPage({ ownerId }: PublicSchedulesPageProps) {
 
       {/* Contenido principal */}
       <div className="w-full px-6 pb-6">
-        {weekData.publicImageUrl && (weekType === "past" || weekType === "current") ? (
+        {currentWeekImageUrl && (weekType === "past" || weekType === "current") ? (
           // Mostrar imagen publicada para semanas pasadas y actual
           <div className="w-full overflow-x-auto">
             <img
-              src={weekData.publicImageUrl}
+              src={currentWeekImageUrl}
               alt={`Horario ${weekLabel}`}
               className="w-full h-auto"
               style={{ maxWidth: '100%' }}
             />
           </div>
-        ) : weekType === "future" ? (
-          // Vista simplificada para semanas futuras
+        ) : weekType === "future" || hasWeekContent ? (
+          // Si hay datos reales (aunque no haya imagen), mostrar la vista simplificada
           <SimplifiedScheduleView
             weekStartDate={selectedWeek.toISOString().split('T')[0]}
             employees={employees}
             assignments={transformedAssignments}
           />
         ) : (
-          // Mensaje para semanas pasadas sin imagen publicada
+          // Solo mostrar estado no publicado cuando realmente no hay datos de semana
           <Card>
             <CardContent className="pt-6 text-center">
               <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Horario no publicado</h3>
+              <h3 className="text-lg font-semibold mb-2">Horario aún no publicado</h3>
               <p className="text-gray-600">
-                Este horario no ha sido publicado aún.
+                Este horario todavía no tiene datos públicos disponibles.
               </p>
             </CardContent>
           </Card>
