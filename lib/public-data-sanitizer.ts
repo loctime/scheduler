@@ -10,6 +10,7 @@ export interface SanitizedPublicHorarioData {
     publishedAt: any // Firestore Timestamp
     publicImageUrl?: string | null
     days: Record<string, any[]>
+    dayStatus?: Record<string, any>
     employees: Array<{
       id: string
       name: string
@@ -66,6 +67,7 @@ function sanitizeWeeks(weeks: Record<string, any>): Record<string, any> {
       publishedAt: weekData.publishedAt || null,
       publicImageUrl: weekData.publicImageUrl || null,
       days: weekData.days || {},
+      dayStatus: weekData.dayStatus || {},
       employees: sanitizeEmployees(weekData.employees || [])
     }
   })

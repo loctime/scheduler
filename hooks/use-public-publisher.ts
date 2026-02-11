@@ -56,8 +56,9 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
     setError(null)
 
     try {
-      // Obtener ownerId del usuario actual
-      const ownerId = getOwnerIdForActor(user, user.userData || {})
+      // Obtener ownerId del usuario actual.
+      // Fallback a user.uid para sesiones donde userData no viene embebido en `user`.
+      const ownerId = getOwnerIdForActor(user, user?.userData) || user?.uid || null
       
       if (!ownerId) {
         setError("No se puede determinar el propietario")
