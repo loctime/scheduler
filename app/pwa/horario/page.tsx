@@ -61,7 +61,7 @@ function HorarioContent() {
       setError(null)
       
       // Iniciar flujo CACHE-FIRST
-      loadFromCacheFirst(resolvedOwnerId)
+      loadFromCacheFirst(ownerId)
       
     } else {
       setError(OWNER_ID_MISSING_ERROR)
