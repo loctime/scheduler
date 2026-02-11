@@ -500,6 +500,7 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
       console.log("🔧 [ScheduleCalendar] employeesToPublish:", employeesToPublish)
       
       const publishedOwnerId = await publishToPublic({
+        companyName: config?.nombreEmpresa || 'Mi Empresa',
         weekId,
         weekData: {
           ...weekSchedule,
