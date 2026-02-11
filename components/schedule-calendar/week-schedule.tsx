@@ -111,7 +111,11 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
   const [isMarkingComplete, setIsMarkingComplete] = useState(false)
   const [confirmClearRowDialogOpen, setConfirmClearRowDialogOpen] = useState(false)
   const [pendingClearRowEmployeeId, setPendingClearRowEmployeeId] = useState<string | null>(null)
-  const [showSchedulingWarnings, setShowSchedulingWarnings] = useState(false)
+  const [confirmEditDialogOpen, setConfirmEditDialogOpen] = useState(false)
+  const [pendingEditAction, setPendingEditAction] = useState<{
+    type: 'assignment' | 'clear'
+    data?: any
+  } | null>(null)
 
   // Si no se proporciona open/onOpenChange, usar estado interno
   const [internalOpen, setInternalOpen] = useState(false)
@@ -132,14 +136,7 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
   const handleMarkComplete = useCallback(async () => {
     if (!onMarkComplete) return
     
-    // Mostrar advertencias de días especiales primero
-    setShowSchedulingWarnings(true)
-  }, [onMarkComplete, weekStartDate, isCompleted])
-
-  const handleConfirmMarkComplete = useCallback(async () => {
-    if (!onMarkComplete) return
-    
-    setShowSchedulingWarnings(false)
+    // Marcar directamente como completada sin mostrar advertencias
     setIsMarkingComplete(true)
     try {
       await onMarkComplete(weekId)
@@ -149,6 +146,44 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
       setIsMarkingComplete(false)
     }
   }, [onMarkComplete, weekId])
+
+  // Handler para cuando se intenta editar una semana completada
+  const handleEditAttempt = useCallback((action: { type: 'assignment' | 'clear', data?: any }) => {
+    if (isCompleted) {
+      setPendingEditAction(action)
+      setConfirmEditDialogOpen(true)
+      return false // Bloquear la acción
+    }
+    return true // Permitir la acción
+  }, [isCompleted])
+
+  // Handler para confirmar edición de semana completada
+  const handleConfirmEdit = useCallback(async () => {
+    if (!pendingEditAction || !onMarkComplete) return
+    
+    setConfirmEditDialogOpen(false)
+    
+    try {
+      // Primero desmarcar como completada
+      await onMarkComplete(weekId)
+      
+      // Luego ejecutar la acción pendiente si existe
+      if (pendingEditAction.type === 'clear' && pendingEditAction.data?.employeeId) {
+        await weekActions.executeClearEmployeeRow(pendingEditAction.data.employeeId)
+      }
+      // Las acciones de assignment se manejarán en el componente correspondiente
+    } catch (error) {
+      logger.error("Error al desmarcar semana como completada:", error)
+    } finally {
+      setPendingEditAction(null)
+    }
+  }, [pendingEditAction, onMarkComplete, weekId, weekActions])
+
+  // Handler para cancelar edición
+  const handleCancelEdit = useCallback(() => {
+    setConfirmEditDialogOpen(false)
+    setPendingEditAction(null)
+  }, [])
 
   // Handler para exportar que abre la semana si está cerrada
   const handleExportImage = useCallback(async () => {
@@ -184,6 +219,12 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
   // Handler para limpiar fila de empleado que maneja confirmaciones
   const handleClearEmployeeRow = useCallback(
     async (employeeId: string): Promise<boolean> => {
+      // Verificar si es una semana completada
+      if (!handleEditAttempt({ type: 'clear', data: { employeeId } })) {
+        return false
+      }
+      
+      // Si no está completada, proceder con la lógica normal
       if (shouldRequestConfirmation(weekSchedule, "clear")) {
         setPendingClearRowEmployeeId(employeeId)
         setConfirmClearRowDialogOpen(true)
@@ -191,7 +232,7 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
       }
       return await weekActions.executeClearEmployeeRow(employeeId)
     },
-    [weekSchedule, weekActions]
+    [weekSchedule, weekActions, handleEditAttempt]
   )
 
   const handleConfirmClearRow = useCallback(async () => {
@@ -256,26 +297,6 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
         </div>
       </CollapsibleContent>
 
-      {/* Diálogo de advertencias de días especiales */}
-      <AlertDialog open={showSchedulingWarnings} onOpenChange={setShowSchedulingWarnings}>
-        <AlertDialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Advertencias de Días Especiales</AlertDialogTitle>
-          </AlertDialogHeader>
-          
-          <SchedulingWarnings
-            startDate={format(weekStartDate, 'yyyy-MM-dd')}
-            endDate={format(weekEndDate, 'yyyy-MM-dd')}
-            city="viedma" // TODO: obtener de configuración
-            province="río negro"
-            country="argentina"
-            onContinue={handleConfirmMarkComplete}
-            onCancel={() => setShowSchedulingWarnings(false)}
-            showContinueButton={true}
-          />
-        </AlertDialogContent>
-      </AlertDialog>
-
       {/* Diálogo de confirmación para limpiar fila de empleado */}
       <AlertDialog open={confirmClearRowDialogOpen} onOpenChange={setConfirmClearRowDialogOpen}>
         <AlertDialogContent>
@@ -289,6 +310,23 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setPendingClearRowEmployeeId(null)}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmClearRow}>Confirmar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Diálogo de confirmación para edición de semana completada */}
+      <AlertDialog open={confirmEditDialogOpen} onOpenChange={setConfirmEditDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Editar semana completada?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta semana está marcada como lista. Si la editas, dejará de estar completada.
+              ¿Deseas continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelEdit}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmEdit}>Continuar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

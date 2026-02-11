@@ -446,7 +446,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     [orderedItems]
   )
 
-  const isClickable = !readonly && !!onAssignmentUpdate
+  const isClickable = !readonly && !isScheduleCompleted && !!onAssignmentUpdate
 
   // Funciones para manejar horarios fijos manuales
   const isManuallyFixed = useCallback(

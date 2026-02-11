@@ -28,7 +28,7 @@ export function WeekScheduleHeader({ title, isOpen, isCompleted }: WeekScheduleH
           {isCompleted && (
             <Badge variant="default" className="ml-2 bg-green-600 hover:bg-green-700">
               <CheckCircle2 className="h-3 w-3 mr-1" />
-              Completada
+              Lista
             </Badge>
           )}
         </div>
