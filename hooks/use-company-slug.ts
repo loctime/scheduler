@@ -1,15 +1,14 @@
 import { useState, useEffect } from "react"
 import { doc, getDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
-import { useAuth } from "@/contexts/auth-context"
+import { auth, db } from "@/lib/firebase"
 
 export function useCompanySlug() {
-  const { user } = useAuth()
   const [companySlug, setCompanySlug] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const load = async () => {
+      const user = auth?.currentUser
       if (!user || !db) {
         setIsLoading(false)
         return
@@ -34,7 +33,7 @@ export function useCompanySlug() {
     }
 
     load()
-  }, [user])
+  }, [auth])
 
   return { companySlug, isLoading }
 }
