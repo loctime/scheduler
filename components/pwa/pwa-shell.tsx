@@ -4,12 +4,16 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { onAuthStateChanged } from "firebase/auth"
-import { Package, Loader2 } from "lucide-react"
+import { Package, Loader2, Calendar, CalendarDays } from "lucide-react"
 import { auth, isFirebaseConfigured } from "@/lib/firebase"
 import { DataProvider } from "@/contexts/data-context"
 import { cn } from "@/lib/utils"
 
-const navItems = [{ href: "/pwa/stock-console", label: "Stock", icon: Package }]
+const navItems = [
+  { href: "/pwa/horario", label: "Horario", icon: Calendar },
+  { href: "/pwa/mensual", label: "Mensual", icon: CalendarDays },
+  { href: "/pwa/stock-console", label: "Stock", icon: Package }
+]
 
 function setAuthCookie(token?: string) {
   if (typeof document === "undefined") return
