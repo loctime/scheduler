@@ -12,6 +12,22 @@ import { resolvePublicCompany } from "@/lib/public-companies"
 
 interface PublicScheduleData {
   id: string
+  ownerId: string
+  publishedWeekId: string
+  weeks: Record<string, {
+    weekId: string
+    weekLabel: string
+    publishedAt: any
+    publicImageUrl?: string | null
+    employees?: any[]
+  }>
+  userId: string
+  isPublic: boolean
+  companyName?: string
+}
+
+interface FullScheduleData {
+  id: string
   weekStart: string
   weekEnd: string
   assignments: Record<string, any>
@@ -114,18 +130,18 @@ export function usePublicMonthlySchedulesV2({
           companyName: publicCompany.companyName
         })
 
-        // Leer desde publicSchedules (el nuevo modelo con weekStart/weekEnd)
+        // Leer desde enlaces_publicos (único lugar con reglas públicas)
         if (!db) {
           setError("Base de datos no disponible")
           setIsLoading(false)
           return
         }
         
-        const publicSchedulesRef = collection(db, "apps", "horarios", "publicSchedules", companySlug, "weeks")
-        const publicSchedulesSnapshot = await getDocs(publicSchedulesRef)
+        const publicDocRef = doc(db, "apps", "horarios", "enlaces_publicos", publicCompany.ownerId)
+        const publicDoc = await getDoc(publicDocRef)
 
-        if (publicSchedulesSnapshot.empty) {
-          console.log("🔧 [usePublicMonthlySchedulesV2] No hay schedules públicos para companySlug:", companySlug)
+        if (!publicDoc.exists()) {
+          console.log("🔧 [usePublicMonthlySchedulesV2] No existe documento enlaces_publicos para ownerId:", publicCompany.ownerId)
           setSchedules([])
           setCompanyName(publicCompany.companyName)
           setError(null)
@@ -133,25 +149,62 @@ export function usePublicMonthlySchedulesV2({
           return
         }
 
-        const schedulesData = publicSchedulesSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as PublicScheduleData[]
-
-        console.log("🔧 [usePublicMonthlySchedulesV2] Datos cargados desde publicSchedules:", {
-          companySlug,
-          schedulesCount: schedulesData.length,
-          schedules: schedulesData.map(s => ({
-            id: s.id,
-            weekStart: s.weekStart,
-            weekEnd: s.weekEnd,
-            hasAssignments: !!s.assignments,
-            employeesCount: s.employeesSnapshot?.length || 0
-          }))
+        const data = publicDoc.data() as PublicScheduleData
+        console.log("🔧 [usePublicMonthlySchedulesV2] Datos cargados desde enlaces_publicos:", {
+          ownerId: publicCompany.ownerId,
+          hasWeeks: !!data.weeks,
+          weeksCount: Object.keys(data.weeks || {}).length,
+          companyName: data.companyName
         })
 
-        setSchedules(schedulesData)
-        setCompanyName(publicCompany.companyName)
+        // Para cada week en enlaces_publicos, obtener el schedule original desde schedules/{weekId}
+        const schedulesWithFullData: FullScheduleData[] = []
+        const weeks = data.weeks || {}
+        
+        for (const [weekKey, weekData] of Object.entries(weeks)) {
+          try {
+            // Obtener el schedule original desde schedules/{weekId}
+            const scheduleRef = doc(db, "apps", "horarios", "schedules", weekData.weekId)
+            const scheduleDoc = await getDoc(scheduleRef)
+            
+            if (!scheduleDoc.exists()) {
+              console.warn("🔧 [usePublicMonthlySchedulesV2] No existe schedule original para weekId:", weekData.weekId)
+              continue
+            }
+            
+            const originalSchedule = scheduleDoc.data() as any
+            console.log("🔧 [usePublicMonthlySchedulesV2] Schedule original encontrado:", {
+              weekId: weekData.weekId,
+              hasWeekStart: !!originalSchedule.weekStart,
+              hasWeekEnd: !!originalSchedule.weekEnd,
+              weekStart: originalSchedule.weekStart,
+              weekEnd: originalSchedule.weekEnd
+            })
+            
+            // Crear un schedule con los datos del original pero compatible con la interfaz
+            const fullScheduleData = {
+              id: weekData.weekId,
+              weekStart: originalSchedule.weekStart,
+              weekEnd: originalSchedule.weekEnd,
+              assignments: originalSchedule.assignments || {},
+              employeesSnapshot: originalSchedule.employeesSnapshot || weekData.employees || [],
+              ordenEmpleadosSnapshot: originalSchedule.ordenEmpleadosSnapshot || [],
+              publishedAt: weekData.publishedAt,
+              publishedBy: publicCompany.ownerId,
+              companyName: data.companyName || publicCompany.companyName
+            }
+            
+            schedulesWithFullData.push(fullScheduleData)
+          } catch (error) {
+            console.error("🔧 [usePublicMonthlySchedulesV2] Error obteniendo schedule original:", {
+              weekId: weekData.weekId,
+              error: error
+            })
+          }
+        }
+
+        setSchedules(schedulesWithFullData as any[])
+        setCompanyName(data.companyName || publicCompany.companyName)
         setError(null)
 
       } catch (err) {
@@ -165,14 +218,14 @@ export function usePublicMonthlySchedulesV2({
     loadPublicData()
   }, [companySlug, refetchTrigger])
 
-  // Agrupar horarios por mes y semana (usando directamente weekStart/weekEnd)
+  // Agrupar horarios por mes y semana (usando directamente weekStart/weekEnd de schedules originales)
   const monthGroups = useMemo<MonthGroup[]>(() => {
     if (schedules.length === 0) return []
 
     const monthMap = new Map<string, MonthGroup>()
 
     schedules.forEach((schedule) => {
-      // Usar directamente weekStart y weekEnd del schedule
+      // Usar directamente weekStart y weekEnd del schedule original
       if (!schedule.weekStart || !schedule.weekEnd) {
         console.warn("🔧 [usePublicMonthlySchedulesV2] Schedule sin weekStart/weekEnd, ignorando:", schedule.id)
         return // Ignorar este schedule
