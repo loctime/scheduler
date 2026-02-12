@@ -71,14 +71,14 @@ export function PwaShell({ children }: { children: React.ReactNode }) {
         {companySlug ? [
           { href: `/pwa/horario/${companySlug}`, label: "Horario", icon: Calendar },
           { href: `/pwa/mensual/${companySlug}`, label: "Mensual", icon: CalendarDays },
-          { href: "/pwa/stock-console", label: "Stock", icon: Package }
+          { href: user ? `/pwa/stock-console/${companySlug}` : "/pwa/stock-console", label: "Stock", icon: Package }
         ].map((item) => {
           const Icon = item.icon
           const isActive = pathname === item.href
           
           // Para Stock, verificar si requiere login
           const handleClick = async (e: React.MouseEvent) => {
-            if (!user && item.href === "/pwa/stock-console") {
+            if (!user && (item.href === "/pwa/stock-console" || item.href.includes("/pwa/stock-console/"))) {
               e.preventDefault()
               // Redirigir a login
               window.location.href = "/pwa"

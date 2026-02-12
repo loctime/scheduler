@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Check, X, Package } from "lucide-react"
 
-export function StockConsoleContent() {
+interface StockConsoleContentProps {
+  companySlug?: string
+}
+
+export function StockConsoleContent({ companySlug }: StockConsoleContentProps = {}) {
   const { user, userData } = useData()
 
   // Validar permisos antes de renderizar la página
