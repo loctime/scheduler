@@ -7,9 +7,11 @@ export function PublicMensualPage({ companySlug }: { companySlug: string }) {
   const router = useRouter()
 
   useEffect(() => {
+    console.log("🔧 [PublicMensualPage] Redirigiendo a:", `/dashboard/horarios-mensuales/${companySlug}`)
+    
     // Redirigir a la nueva ruta del dashboard que es pública
-    router.replace(`/dashboard/horarios-mensuales/${companySlug}`)
-  }, [router, companySlug])
+    window.location.href = `/dashboard/horarios-mensuales/${companySlug}`
+  }, [companySlug])
 
   // Mostrar loader mientras redirige
   return (

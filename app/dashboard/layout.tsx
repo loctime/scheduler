@@ -28,6 +28,11 @@ const ROUTE_TO_PAGE_ID: Record<string, string> = {
 // Páginas permitidas para usuarios invitados (por defecto)
 const ALLOWED_PAGES_FOR_INVITED = ["/dashboard/pedidos"]
 
+// Páginas públicas (no requieren autenticación)
+const PUBLIC_PAGES = [
+  "/dashboard/horarios-mensuales", // Ruta base para acceso público
+]
+
 // Páginas que requieren rol específico
 const FACTORY_PAGES = ["/dashboard/fabrica", "/dashboard/fabrica/historial"]
 const MANAGER_PAGES = ["/dashboard/gerente"]
@@ -40,6 +45,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
+    // Verificar si es una página pública
+    const isPublicPage = PUBLIC_PAGES.some(page => pathname.startsWith(page))
+    
+    if (isPublicPage) {
+      setLoading(false)
+      return
+    }
+    
     if (!isFirebaseConfigured() || !auth) {
       router.push("/")
       return
@@ -55,7 +68,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     })
 
     return () => unsubscribe()
-  }, [router])
+  }, [router, pathname])
 
   if (loading) {
     return (
@@ -63,6 +76,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
+  }
+
+  // Verificar si es una página pública
+  const isPublicPage = PUBLIC_PAGES.some(page => pathname.startsWith(page))
+  
+  if (isPublicPage) {
+    // Para páginas públicas, renderizar sin DataProvider ni StockChatProvider
+    return <>{children}</>
   }
 
   if (!user) {
