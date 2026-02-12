@@ -2,29 +2,14 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { LoginForm } from "@/components/login-form"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useData } from "@/contexts/data-context"
 import { useCompanySlug } from "@/hooks/use-company-slug"
 import { Button } from "@/components/ui/button"
 import { Calendar, FileText, Users } from "lucide-react"
 
 export default function PwaHomePage() {
-  const { user } = useData()
   const router = useRouter()
   const { companySlug } = useCompanySlug()
-
-  if (!user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <LoginForm />
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen bg-background">

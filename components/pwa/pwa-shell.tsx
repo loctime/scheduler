@@ -108,8 +108,8 @@ export function PwaShell({ children }: { children: React.ReactNode }) {
     </nav>
   )
 
-  // Estado de carga
-  if (loading || (!user && !urlSlug)) {
+  // Estado de carga (solo mientras se resuelve auth; no bloquear por falta de usuario)
+  if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
