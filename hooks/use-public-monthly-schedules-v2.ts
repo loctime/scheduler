@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react"
-import { collection, query, orderBy, onSnapshot, where, doc, getDoc } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, where, doc, getDoc, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { format, parseISO, addDays } from "date-fns"
 import { es } from "date-fns/locale"
@@ -12,17 +12,13 @@ import { resolvePublicCompany } from "@/lib/public-companies"
 
 interface PublicScheduleData {
   id: string
-  ownerId: string
-  publishedWeekId: string
-  weeks: Record<string, {
-    weekId: string
-    weekLabel: string
-    publishedAt: any
-    publicImageUrl?: string | null
-    employees?: any[]
-  }>
-  userId: string
-  isPublic: boolean
+  weekStart: string
+  weekEnd: string
+  assignments: Record<string, any>
+  employeesSnapshot: any[]
+  ordenEmpleadosSnapshot: string[]
+  publishedAt: any
+  publishedBy: string
   companyName?: string
 }
 
@@ -118,18 +114,18 @@ export function usePublicMonthlySchedulesV2({
           companyName: publicCompany.companyName
         })
 
-        // Ahora leer desde enlaces_publicos usando el ownerId correcto
+        // Leer desde publicSchedules (el nuevo modelo con weekStart/weekEnd)
         if (!db) {
           setError("Base de datos no disponible")
           setIsLoading(false)
           return
         }
         
-        const publicDocRef = doc(db, "apps", "horarios", "enlaces_publicos", publicCompany.ownerId)
-        const publicDoc = await getDoc(publicDocRef)
+        const publicSchedulesRef = collection(db, "apps", "horarios", "publicSchedules", companySlug, "weeks")
+        const publicSchedulesSnapshot = await getDocs(publicSchedulesRef)
 
-        if (!publicDoc.exists()) {
-          console.log("🔧 [usePublicMonthlySchedulesV2] No existe documento enlaces_publicos para ownerId:", publicCompany.ownerId)
+        if (publicSchedulesSnapshot.empty) {
+          console.log("🔧 [usePublicMonthlySchedulesV2] No hay schedules públicos para companySlug:", companySlug)
           setSchedules([])
           setCompanyName(publicCompany.companyName)
           setError(null)
@@ -137,16 +133,25 @@ export function usePublicMonthlySchedulesV2({
           return
         }
 
-        const data = publicDoc.data() as PublicScheduleData
-        console.log("🔧 [usePublicMonthlySchedulesV2] Datos cargados:", {
-          ownerId: publicCompany.ownerId,
-          hasWeeks: !!data.weeks,
-          weeksCount: Object.keys(data.weeks || {}).length,
-          companyName: data.companyName
+        const schedulesData = publicSchedulesSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as PublicScheduleData[]
+
+        console.log("🔧 [usePublicMonthlySchedulesV2] Datos cargados desde publicSchedules:", {
+          companySlug,
+          schedulesCount: schedulesData.length,
+          schedules: schedulesData.map(s => ({
+            id: s.id,
+            weekStart: s.weekStart,
+            weekEnd: s.weekEnd,
+            hasAssignments: !!s.assignments,
+            employeesCount: s.employeesSnapshot?.length || 0
+          }))
         })
 
-        setSchedules([data])
-        setCompanyName(data.companyName || publicCompany.companyName)
+        setSchedules(schedulesData)
+        setCompanyName(publicCompany.companyName)
         setError(null)
 
       } catch (err) {
@@ -160,106 +165,83 @@ export function usePublicMonthlySchedulesV2({
     loadPublicData()
   }, [companySlug, refetchTrigger])
 
-  // Agrupar horarios por mes y semana (adaptado a estructura enlaces_publicos)
+  // Agrupar horarios por mes y semana (usando directamente weekStart/weekEnd)
   const monthGroups = useMemo<MonthGroup[]>(() => {
     if (schedules.length === 0) return []
 
     const monthMap = new Map<string, MonthGroup>()
 
-    schedules.forEach((publicDoc) => {
-      // Extraer weeks del documento enlaces_publicos
-      const weeks = publicDoc.weeks || {}
+    schedules.forEach((schedule) => {
+      // Usar directamente weekStart y weekEnd del schedule
+      if (!schedule.weekStart || !schedule.weekEnd) {
+        console.warn("🔧 [usePublicMonthlySchedulesV2] Schedule sin weekStart/weekEnd, ignorando:", schedule.id)
+        return // Ignorar este schedule
+      }
+
+      let weekStart: Date
+      let weekEnd: Date
       
-      Object.values(weeks).forEach((weekData) => {
-        // Extraer fechas del weekLabel o usar valores por defecto
-        let weekStart: Date
-        let weekEnd: Date
+      try {
+        weekStart = parseISO(schedule.weekStart)
+        weekEnd = parseISO(schedule.weekEnd)
         
-        console.log("🔧 [usePublicMonthlySchedulesV2] Procesando weekData:", {
-          weekId: weekData.weekId,
-          weekLabel: weekData.weekLabel,
-          publishedAt: weekData.publishedAt
-        })
-        
-        if (weekData.weekLabel && weekData.weekLabel.includes(' - ')) {
-          try {
-            const [startStr, endStr] = weekData.weekLabel.split(' - ')
-            const parsedStart = parseISO(startStr.trim())
-            const parsedEnd = parseISO(endStr.trim())
-            
-            // Validar que las fechas sean válidas
-            if (isNaN(parsedStart.getTime()) || isNaN(parsedEnd.getTime())) {
-              console.warn("🔧 [usePublicMonthlySchedulesV2] Fechas inválidas en weekLabel, usando fallback")
-              throw new Error("Fechas inválidas")
-            }
-            
-            weekStart = parsedStart
-            weekEnd = parsedEnd
-          } catch (error) {
-            console.warn("🔧 [usePublicMonthlySchedulesV2] Error parseando weekLabel:", error)
-            // Fallback: usar fecha de publicación como referencia
-            weekStart = weekData.publishedAt?.toDate() || new Date()
-            weekEnd = addDays(weekStart, 6)
-          }
-        } else {
-          // Fallback: usar fecha de publicación como referencia
-          weekStart = weekData.publishedAt?.toDate() || new Date()
-          weekEnd = addDays(weekStart, 6)
-        }
-        
-        console.log("🔧 [usePublicMonthlySchedulesV2] Fechas procesadas:", {
-          weekStart: weekStart.toISOString(),
-          weekEnd: weekEnd.toISOString(),
-          weekStartValid: !isNaN(weekStart.getTime()),
-          weekEndValid: !isNaN(weekEnd.getTime())
-        })
-        
-        const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
-        
-        const monthRange = getCustomMonthRange(weekStart, monthStartDay)
-        let targetMonthDate = monthRange.startDate
-        
-        if (weekStart < monthRange.startDate) {
-          const prevMonth = new Date(monthRange.startDate)
-          prevMonth.setMonth(prevMonth.getMonth() - 1)
-          targetMonthDate = getCustomMonthRange(prevMonth, monthStartDay).startDate
-        }
-        
-        const monthKey = format(targetMonthDate, "yyyy-MM")
-        const monthName = format(targetMonthDate, "MMMM yyyy", { locale: es })
-        
-        if (!monthMap.has(monthKey)) {
-          monthMap.set(monthKey, {
-            monthKey,
-            monthName: monthName.charAt(0).toUpperCase() + monthName.slice(1),
-            monthDate: targetMonthDate,
-            weeks: [],
+        // Validar que las fechas sean válidas
+        if (isNaN(weekStart.getTime()) || isNaN(weekEnd.getTime())) {
+          console.warn("🔧 [usePublicMonthlySchedulesV2] Fechas inválidas en weekStart/weekEnd, ignorando schedule:", {
+            id: schedule.id,
+            weekStart: schedule.weekStart,
+            weekEnd: schedule.weekEnd
           })
+          return // Ignorar este schedule
         }
-        
-        const monthGroup = monthMap.get(monthKey)!
-        const weekStartStr = format(weekStart, "yyyy-MM-dd")
-        
-        const existingWeek = monthGroup.weeks.find((w) => w.weekStartStr === weekStartStr)
-        
-        if (!existingWeek) {
-          monthGroup.weeks.push({
-            weekStartDate: weekStart,
-            weekEndDate: weekEnd,
-            weekStartStr,
-            schedule: {
-              id: weekData.weekId,
-              weekStart: format(weekStart, "yyyy-MM-dd"),
-              weekEnd: format(weekEnd, "yyyy-MM-dd"),
-              assignments: {}, // Los assignments no están disponibles en enlaces_publicos
-              employeesSnapshot: weekData.employees || [],
-              ordenEmpleadosSnapshot: [],
-              ...weekData
-            },
-            weekDays,
-          })
-        }
+      } catch (error) {
+        console.warn("🔧 [usePublicMonthlySchedulesV2] Error parseando weekStart/weekEnd:", error)
+        return // Ignorar este schedule
+      }
+      
+      console.log("🔧 [usePublicMonthlySchedulesV2] Schedule procesado:", {
+        id: schedule.id,
+        weekStart: weekStart.toISOString(),
+        weekEnd: weekEnd.toISOString()
       })
+      
+      const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+      
+      const monthRange = getCustomMonthRange(weekStart, monthStartDay)
+      let targetMonthDate = monthRange.startDate
+      
+      if (weekStart < monthRange.startDate) {
+        const prevMonth = new Date(monthRange.startDate)
+        prevMonth.setMonth(prevMonth.getMonth() - 1)
+        targetMonthDate = getCustomMonthRange(prevMonth, monthStartDay).startDate
+      }
+      
+      const monthKey = format(targetMonthDate, "yyyy-MM")
+      const monthName = format(targetMonthDate, "MMMM yyyy", { locale: es })
+      
+      if (!monthMap.has(monthKey)) {
+        monthMap.set(monthKey, {
+          monthKey,
+          monthName: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+          monthDate: targetMonthDate,
+          weeks: [],
+        })
+      }
+      
+      const monthGroup = monthMap.get(monthKey)!
+      const weekStartStr = format(weekStart, "yyyy-MM-dd")
+      
+      const existingWeek = monthGroup.weeks.find((w) => w.weekStartStr === weekStartStr)
+      
+      if (!existingWeek) {
+        monthGroup.weeks.push({
+          weekStartDate: weekStart,
+          weekEndDate: weekEnd,
+          weekStartStr,
+          schedule: schedule,
+          weekDays,
+        })
+      }
     })
 
     monthMap.forEach((month) => {
