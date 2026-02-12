@@ -1,14 +1,18 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { LoginForm } from "@/components/login-form"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useData } from "@/contexts/data-context"
+import { useCompanySlug } from "@/hooks/use-company-slug"
 import { Button } from "@/components/ui/button"
-import { Calendar, FileText, Users, Settings, Share2 } from "lucide-react"
+import { Calendar, FileText, Users } from "lucide-react"
 
 export default function PwaEntryPage() {
   const { user } = useData()
+  const router = useRouter()
+  const { companySlug } = useCompanySlug()
 
   if (!user) {
     return (
@@ -46,9 +50,15 @@ export default function PwaEntryPage() {
                     <p className="text-sm text-muted-foreground">Vista y edición semanal</p>
                   </div>
                 </div>
-                <Link href="/pwa/horario" className="mt-4 block">
-                  <Button className="w-full">Ir a Horario</Button>
-                </Link>
+                <div className="mt-4">
+                  <Button
+                    className="w-full"
+                    disabled={!companySlug}
+                    onClick={() => companySlug && router.push(`/pwa/horario/${companySlug}`)}
+                  >
+                    Ir a Horario
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
@@ -62,9 +72,15 @@ export default function PwaEntryPage() {
                     <p className="text-sm text-muted-foreground">Vista mensual completa</p>
                   </div>
                 </div>
-                <Link href="/pwa/horarios-mensuales" className="mt-4 block">
-                  <Button className="w-full">Ir a Mensual</Button>
-                </Link>
+                <div className="mt-4">
+                  <Button
+                    className="w-full"
+                    disabled={!companySlug}
+                    onClick={() => companySlug && router.push(`/pwa/mensual/${companySlug}`)}
+                  >
+                    Ir a Mensual
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
@@ -83,38 +99,6 @@ export default function PwaEntryPage() {
                 </Link>
               </CardContent>
             </Card>
-
-            {/* Dashboard Principal */}
-            <Card className="hover:shadow-lg transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-4">
-                  <Settings className="h-8 w-8 text-primary" />
-                  <div className="flex-1">
-                    <h3 className="font-semibold">Dashboard</h3>
-                    <p className="text-sm text-muted-foreground">Panel de administración</p>
-                  </div>
-                </div>
-                <Link href="/dashboard" className="mt-4 block">
-                  <Button className="w-full" variant="outline">Ir a Dashboard</Button>
-                </Link>
-              </CardContent>
-            </Card>
-
-            {/* Publicación */}
-            <Card className="hover:shadow-lg transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-4">
-                  <Share2 className="h-8 w-8 text-primary" />
-                  <div className="flex-1">
-                    <h3 className="font-semibold">Publicar Horario</h3>
-                    <p className="text-sm text-muted-foreground">Compartir enlace público</p>
-                  </div>
-                </div>
-                <Link href="/dashboard" className="mt-4 block">
-                  <Button className="w-full" variant="outline">Configurar</Button>
-                </Link>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Info Section */}
@@ -127,10 +111,9 @@ export default function PwaEntryPage() {
                 <div>
                   <h4 className="font-medium mb-2">Rutas Privadas (requieren login):</h4>
                   <ul className="space-y-1 text-muted-foreground">
-                    <li>• /pwa/horario - Horario semanal privado</li>
-                    <li>• /pwa/horarios-mensuales - Vista mensual</li>
+                    <li>• /pwa/horario/[companySlug] - Horario semanal</li>
+                    <li>• /pwa/mensual/[companySlug] - Vista mensual</li>
                     <li>• /pwa/stock-console - Gestión de stock</li>
-                    <li>• /dashboard - Panel completo</li>
                   </ul>
                 </div>
                 <div>
