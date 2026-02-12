@@ -4,10 +4,9 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname, useParams } from "next/navigation"
 import { onAuthStateChanged } from "firebase/auth"
-import { Package, Loader2, Calendar, CalendarDays } from "lucide-react"
+import { Package, Loader2, Calendar, CalendarDays, Home } from "lucide-react"
 import { auth, isFirebaseConfigured } from "@/lib/firebase"
 import { DataProvider } from "@/contexts/data-context"
-import { useCompanySlug } from "@/hooks/use-company-slug"
 import { cn } from "@/lib/utils"
 
 function setAuthCookie(token?: string) {
@@ -24,11 +23,8 @@ export function PwaShell({ children }: { children: React.ReactNode }) {
   const params = useParams()
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const { companySlug: userSlug, isLoading: slugLoading } = useCompanySlug()
-  
-  // Obtener companySlug de la URL para páginas públicas
-  const urlSlug = params?.companySlug as string
-  const companySlug = userSlug || urlSlug
+  // Slug solo desde la URL (multi-tenant público); no depende de autenticación
+  const companySlug = params?.companySlug as string
 
   useEffect(() => {
     if (!isFirebaseConfigured() || !auth) {
@@ -64,30 +60,21 @@ export function PwaShell({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Componente para renderizar los tabs
+  // Tabs de navegación: slug siempre desde la URL
   const renderTabs = () => (
     <nav className="fixed bottom-0 left-0 right-0 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="mx-auto flex max-w-lg items-center justify-around px-3 py-2">
         {companySlug ? [
-          { href: `/pwa/horario/${companySlug}`, label: "Horario", icon: Calendar },
-          { href: `/pwa/mensual/${companySlug}`, label: "Mensual", icon: CalendarDays },
-          { href: user ? `/pwa/stock-console/${companySlug}` : "/pwa/stock-console", label: "Stock", icon: Package }
+          { href: `/pwa/${companySlug}/horario`, label: "Horario", icon: Calendar },
+          { href: `/pwa/${companySlug}/mensual`, label: "Mensual", icon: CalendarDays },
+          { href: `/pwa/${companySlug}/home`, label: "Panel", icon: Home },
+          { href: `/pwa/${companySlug}/stock-console`, label: "Stock", icon: Package }
         ].map((item) => {
           const Icon = item.icon
           const isActive = pathname === item.href
-          
-          // Para Stock, verificar si requiere login
-          const handleClick = async (e: React.MouseEvent) => {
-            if (!user && (item.href === "/pwa/stock-console" || item.href.includes("/pwa/stock-console/"))) {
-              e.preventDefault()
-              // Redirigir a login
-              window.location.href = "/pwa"
-              return
-            }
-          }
 
           return (
-            <Link key={item.href} href={item.href} className="flex-1" onClick={handleClick}>
+            <Link key={item.href} href={item.href} className="flex-1">
               <div
                 className={cn(
                   "flex flex-col items-center justify-center gap-1 rounded-md py-2 text-xs font-medium transition",
@@ -99,11 +86,7 @@ export function PwaShell({ children }: { children: React.ReactNode }) {
               </div>
             </Link>
           )
-        }) : (
-          <div className="flex-1 text-center text-sm text-muted-foreground">
-            Publica un horario para acceder a todas las secciones
-          </div>
-        )}
+        }) : null}
       </div>
     </nav>
   )

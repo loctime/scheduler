@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
 
-const PRIVATE_PWA_PATHS = ["/pwa/stock-console"]
-const PUBLIC_PWA_PREFIXES = ["/pwa/horario/", "/pwa/mensual/"]
+// Rutas privadas PWA (requieren login): /pwa/stock-console o /pwa/[slug]/stock-console
+function isPrivatePwaPath(pathname: string): boolean {
+  if (pathname === "/pwa/stock-console" || pathname.startsWith("/pwa/stock-console/")) return true
+  if (/^\/pwa\/[^/]+\/stock-console\/?$/.test(pathname)) return true
+  return false
+}
+
+// Rutas públicas PWA: /pwa/[slug], /pwa/[slug]/horario, /pwa/[slug]/mensual, /pwa/[slug]/home; y legacy /pwa/horario/, /pwa/mensual/
+function isPublicPwaPath(pathname: string): boolean {
+  if (pathname.startsWith("/pwa/horario/") || pathname.startsWith("/pwa/mensual/")) return true
+  const match = pathname.match(/^\/pwa\/([^/]+)(?:\/(horario|mensual|home))?\/?$/)
+  return !!match
+}
 
 function decodeJwtPayload(token: string): any | null {
   try {
@@ -38,10 +49,10 @@ function hasValidFirebaseToken(request: NextRequest): boolean {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  const isPrivatePwaPath = PRIVATE_PWA_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
-  const isPublicPwaPath = PUBLIC_PWA_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  const isPrivate = isPrivatePwaPath(pathname)
+  const isPublic = isPublicPwaPath(pathname)
 
-  if (isPrivatePwaPath && !hasValidFirebaseToken(request)) {
+  if (isPrivate && !hasValidFirebaseToken(request)) {
     const loginUrl = new URL("/pwa", request.url)
     loginUrl.searchParams.set("next", pathname)
     return NextResponse.redirect(loginUrl)
@@ -51,7 +62,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/pwa", request.url))
   }
 
-  if (pathname.startsWith("/pwa/") && !isPrivatePwaPath && !isPublicPwaPath && pathname !== "/pwa" && !pathname.startsWith("/pwa/invite/")) {
+  if (pathname.startsWith("/pwa/") && !isPrivate && !isPublic && pathname !== "/pwa" && !pathname.startsWith("/pwa/invite/")) {
     return NextResponse.redirect(new URL("/pwa", request.url))
   }
 

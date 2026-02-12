@@ -1,16 +1,13 @@
-"use client"
+import { redirect } from "next/navigation"
 
-import { useParams } from "next/navigation"
-import { PwaShell } from "@/components/pwa/pwa-shell"
-import PublicHorarioPage from "@/components/public-horario-page"
-
-export default function PwaHorarioPublicPage() {
-  const params = useParams()
-  const companySlug = params.companySlug as string
-
-  return (
-    <PwaShell>
-      <PublicHorarioPage companySlug={companySlug} />
-    </PwaShell>
-  )
+/**
+ * Redirección: /pwa/horario/[companySlug] → /pwa/[companySlug]/horario
+ * Mantiene enlaces antiguos funcionando.
+ */
+export default function PwaHorarioRedirectPage({
+  params,
+}: {
+  params: { companySlug: string }
+}) {
+  redirect(`/pwa/${params.companySlug}/horario`)
 }
