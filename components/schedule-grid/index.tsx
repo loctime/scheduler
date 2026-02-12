@@ -512,6 +512,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
             <GridHeader 
               weekDays={weekDays} 
               user={user} 
+              readonly={readonly}
               onCloseSelector={() => setSelectedCell(null)} 
             />
             <tbody>
@@ -709,7 +710,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
       >
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
-            <GridHeader weekDays={weekDays} user={user} onCloseSelector={() => setSelectedCell(null)} />
+            <GridHeader weekDays={weekDays} user={user} readonly={readonly} onCloseSelector={() => setSelectedCell(null)} />
             <tbody>
               {(orderedItems || []).map((item, itemIndex) => {
                 const showAddButton = !readonly && item.type === "employee"

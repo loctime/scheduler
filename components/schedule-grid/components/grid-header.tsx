@@ -13,9 +13,10 @@ interface GridHeaderProps {
   weekDays: Date[]
   user?: any // .Usuario opcional (para páginas públicas sin DataProvider)
   onCloseSelector?: () => void
+  readonly?: boolean // Nueva prop para deshabilitar consultas en modo readonly
 }
 
-export function GridHeader({ weekDays, user: userProp, onCloseSelector }: GridHeaderProps) {
+export function GridHeader({ weekDays, user: userProp, onCloseSelector, readonly }: GridHeaderProps) {
   // Usar useContext directamente para evitar el error si no hay DataProvider
   const dataContext = useContext(DataContext)
   const contextUser = dataContext?.user || null
@@ -24,9 +25,9 @@ export function GridHeader({ weekDays, user: userProp, onCloseSelector }: GridHe
   const nombreEmpresa = config?.nombreEmpresa || "Empleado"
   const colorEmpresa = config?.colorEmpresa
 
-  // Hook para días especiales
+  // Hook para días especiales - SOLO si no es readonly
   const { isSpecialDay } = useCalendarSpecialDays({
-    autoSubscribe: true,
+    autoSubscribe: !readonly, // Deshabilitar consulta si es readonly
     initialFilter: {
       city: 'viedma', // TODO: obtener de configuración
       province: 'río negro',
