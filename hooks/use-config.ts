@@ -1,16 +1,19 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useContext } from "react"
 import { doc, onSnapshot } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { Configuracion } from "@/lib/types"
-import { useData } from "@/contexts/data-context"
+import { DataContext } from "@/contexts/data-context"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
 export function useConfig(user?: { uid: string } | null) {
   const [config, setConfig] = useState<Configuracion | null>(null)
   const [loading, setLoading] = useState(true)
-  const { userData } = useData()
+  
+  // Usar useContext directamente para evitar el error si no hay DataProvider
+  const dataContext = useContext(DataContext)
+  const userData = dataContext?.userData || null
   const ownerId = getOwnerIdForActor(user, userData)
 
   useEffect(() => {
