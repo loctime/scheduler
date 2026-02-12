@@ -30,6 +30,9 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
     }
   }, [])
 
+  // Hook siempre llamado antes de cualquier return (regla de hooks de React)
+  const stockConsole = useStockConsole(user)
+
   // Si no tiene permisos, mostrar mensaje de acceso denegado
   if (!tienePermisoPedidos) {
     return (
@@ -47,8 +50,6 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
       </div>
     )
   }
-
-  const stockConsole = useStockConsole(user)
 
   const {
     state,
