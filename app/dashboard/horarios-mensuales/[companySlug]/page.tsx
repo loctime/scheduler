@@ -10,7 +10,7 @@ import { useConfig } from "@/hooks/use-config"
 import { format, parseISO, startOfWeek, addDays } from "date-fns"
 import { es } from "date-fns/locale"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { WeekSchedule } from "@/components/schedule-calendar/week-schedule"
+import { ScheduleGrid } from "@/components/schedule-grid"
 import { getCustomMonthRange, getMonthWeeks } from "@/lib/utils"
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { ExportOverlay } from "@/components/export-overlay"
@@ -261,21 +261,19 @@ export default function PublicMensualPage({ params }: PageProps) {
                         <AccordionContent>
                           <div className="pt-4">
                             {weekGroup.schedule && (
-                              <WeekSchedule
+                              <ScheduleGrid
                                 weekDays={weekGroup.weekDays}
-                                weekIndex={0}
-                                weekSchedule={weekGroup.schedule}
+                                schedule={weekGroup.schedule}
                                 employees={weekGroup.schedule.employeesSnapshot || []}
                                 allEmployees={weekGroup.schedule.employeesSnapshot || []}
                                 shifts={[]}
                                 monthRange={{
-                                  start: getCustomMonthRange(weekGroup.weekStartDate, 1).startDate,
-                                  end: getCustomMonthRange(weekGroup.weekStartDate, 1).endDate
+                                  startDate: getCustomMonthRange(weekGroup.weekStartDate, 1).startDate,
+                                  endDate: getCustomMonthRange(weekGroup.weekStartDate, 1).endDate
                                 }}
-                                employeeStats={[]}
+                                employeeStats={{}}
                                 readonly={true}
-                                showActions={false}
-                                title={`Semana del ${format(weekGroup.weekStartDate, "dd 'de' MMMM", { locale: es })}`}
+                                user={null}
                               />
                             )}
                           </div>
