@@ -1,4 +1,4 @@
-import { doc, getDoc, runTransaction, serverTimestamp, Firestore } from "firebase/firestore"
+import { doc, getDoc, runTransaction, serverTimestamp, Firestore, collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 /**
@@ -117,14 +117,6 @@ export async function createPublicCompanySlug(
         
         transaction.set(publicCompanyRef, publicCompanyData)
         
-        // Actualizar referencia en settings/main
-        const settingsRef = doc(db!, "settings", "main")
-        transaction.set(settingsRef, {
-          publicSlug: finalSlug,
-          companyName: companyName.trim(),
-          publicSlugUpdatedAt: serverTimestamp()
-        }, { merge: true })
-        
         console.log(`✅ [createPublicCompanySlug] Slug único creado: ${finalSlug}`)
         return finalSlug
       }
@@ -173,26 +165,37 @@ export async function resolvePublicCompany(companySlug: string): Promise<PublicC
 }
 
 /**
- * Obtener slug actual del propietario
+ * @deprecated Esta función depende de settings/main que ya no se usa
+ * Usar resolvePublicCompany() directamente para buscar por slug
+ */
+export async function getCurrentSlugForOwner(ownerId: string): Promise<string | null> {
+  console.warn(`⚠️  [getCurrentSlugForOwner] Función deprecada que depende de settings/main`)
+  return null
+}
+
+/**
+ * Buscar slug actual de un owner en publicCompanies
  * 
  * @param ownerId ID del propietario
  * @returns Slug actual o null si no tiene
  */
-export async function getCurrentSlugForOwner(ownerId: string): Promise<string | null> {
+async function findCurrentSlugForOwner(ownerId: string): Promise<string | null> {
   if (!db || !ownerId) return null
   
   try {
-    const settingsRef = doc(db!, "settings", "main")
-    const settingsDoc = await getDoc(settingsRef)
+    // Buscar por ownerId en la colección publicCompanies
+    const publicCompaniesRef = collection(db!, PUBLIC_COMPANIES_COLLECTION)
+    const q = query(publicCompaniesRef, where("ownerId", "==", ownerId), where("active", "==", true))
+    const querySnapshot = await getDocs(q)
     
-    if (!settingsDoc.exists()) {
+    if (querySnapshot.empty) {
       return null
     }
     
-    const data = settingsDoc.data()
-    return data?.publicSlug || null
+    // Retornar el primer slug encontrado (debería haber solo uno activo)
+    return querySnapshot.docs[0].id
   } catch (error) {
-    console.error(`❌ [getCurrentSlugForOwner] Error:`, error)
+    console.error(`❌ [findCurrentSlugForOwner] Error:`, error)
     return null
   }
 }
@@ -230,7 +233,7 @@ export async function changePublicCompanySlug(
     }
     
     // Obtener slug actual
-    const currentSlug = await getCurrentSlugForOwner(ownerId)
+    const currentSlug = await findCurrentSlugForOwner(ownerId)
     
     if (currentSlug) {
       // Desactivar slug anterior
@@ -247,14 +250,6 @@ export async function changePublicCompanySlug(
     }
     
     transaction.set(newPublicCompanyRef, newPublicCompanyData)
-    
-    // Actualizar settings
-    const settingsRef = doc(db!, "settings", "main")
-    transaction.set(settingsRef, {
-      publicSlug: normalizedSlug,
-      companyName: companyName.trim(),
-      publicSlugUpdatedAt: serverTimestamp()
-    }, { merge: true })
     
     console.log(`✅ [changePublicCompanySlug] Slug cambiado: ${currentSlug} → ${normalizedSlug}`)
   })
