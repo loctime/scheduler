@@ -105,7 +105,7 @@ export function usePublicMonthlySchedulesV2({
 
   useEffect(() => {
     if (!companySlug || !db) {
-      setError("No se pudo inicializar la carga de horarios públicos")
+      setError("No se pudo inicializar la carga de horarios públicos: companySlug o base de datos no disponible")
       setIsLoading(false)
       return
     }
