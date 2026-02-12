@@ -24,6 +24,11 @@ export function generateSpecialDayId(city: string, date: string): string {
  * Parsea una fecha de API (día, mes, año) a formato ISO
  */
 export function parseAPIDate(day: number, month: number, year: number): string {
+  // Validate inputs before calling toString()
+  if (day == null || month == null || year == null) {
+    throw new Error("Invalid date parameters: day, month, and year are required")
+  }
+  
   const monthStr = month.toString().padStart(2, '0')
   const dayStr = day.toString().padStart(2, '0')
   return `${year}-${monthStr}-${dayStr}`

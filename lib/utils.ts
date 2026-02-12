@@ -17,7 +17,7 @@ export function adjustTime(timeStr: string | undefined, minutes: number): string
   if (!timeStr) return ""
   
   const [hours, mins] = timeStr.split(":").map(Number)
-  const totalMinutes = hours * 60 + mins + minutes
+  const totalMinutes = hours * 60 + mins + (minutes ?? 0)
   
   // Normalizar a 24 horas
   const normalizedMinutes = ((totalMinutes % 1440) + 1440) % 1440

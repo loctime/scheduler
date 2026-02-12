@@ -158,7 +158,9 @@ export function calculateShiftDurationMinutes(
 /**
  * Convierte minutos a formato "HH:MM"
  */
-export function minutesToTime(minutes: number): string {
+export function minutesToTime(minutes: number | null | undefined): string {
+  if (minutes == null || isNaN(minutes)) return "00:00"
+  
   const normalizedMinutes = ((minutes % 1440) + 1440) % 1440
   const hours = Math.floor(normalizedMinutes / 60)
   const mins = normalizedMinutes % 60

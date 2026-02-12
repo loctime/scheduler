@@ -126,6 +126,12 @@ export function useMonthlySchedules({
     const monthMap = new Map<string, MonthGroup>()
 
     schedules.forEach((schedule) => {
+      // Validate weekStart exists before parsing
+      if (!schedule.weekStart) {
+        console.warn("🔧 [useMonthlySchedules] Schedule sin weekStart, ignorando:", schedule.id)
+        return // Ignorar este schedule
+      }
+      
       const weekStartDate = parseISO(schedule.weekStart)
       
       // Generar días de la semana (usando el weekStart del schedule que ya está correcto)

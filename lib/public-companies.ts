@@ -65,7 +65,7 @@ export function normalizeCompanySlug(input: string): string {
  * Generar sufijo único para slug duplicado
  */
 function generateUniqueSlug(baseSlug: string, suffix: number): string {
-  const maxBaseLength = 40 - suffix.toString().length - 1 // -1 por el guión
+  const maxBaseLength = 40 - (suffix?.toString()?.length || 0) - 1 // -1 por el guión
   const truncatedBase = baseSlug.substring(0, maxBaseLength)
   return `${truncatedBase}-${suffix}`
 }
