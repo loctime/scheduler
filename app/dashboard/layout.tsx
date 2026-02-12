@@ -29,9 +29,8 @@ const ROUTE_TO_PAGE_ID: Record<string, string> = {
 const ALLOWED_PAGES_FOR_INVITED = ["/dashboard/pedidos"]
 
 // Páginas públicas (no requieren autenticación)
-const PUBLIC_PAGES = [
-  "/dashboard/horarios-mensuales", // Ruta base para acceso público
-]
+// Solo la vista con companySlug es pública; la ruta base requiere auth
+const isPublicMensualPage = (path: string) => path.match(/^\/dashboard\/horarios-mensuales\/[^/]+$/)
 
 // Páginas que requieren rol específico
 const FACTORY_PAGES = ["/dashboard/fabrica", "/dashboard/fabrica/historial"]
@@ -46,7 +45,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     // Verificar si es una página pública
-    const isPublicPage = PUBLIC_PAGES.some(page => pathname.startsWith(page))
+    const isPublicPage = isPublicMensualPage(pathname)
     
     if (isPublicPage) {
       setLoading(false)
@@ -79,7 +78,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   // Verificar si es una página pública
-  const isPublicPage = PUBLIC_PAGES.some(page => pathname.startsWith(page))
+  const isPublicPage = isPublicMensualPage(pathname)
   
   if (isPublicPage) {
     // Para páginas públicas, renderizar sin DataProvider ni StockChatProvider
