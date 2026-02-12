@@ -77,7 +77,7 @@ export default function PwaHomePage() {
                     <p className="text-sm text-muted-foreground">Gestión de stock</p>
                   </div>
                 </div>
-                <Link href={`/pwa/${companySlug}/stock-console`} className="mt-4 block">
+                <Link href={`/pwa/stock-console/${companySlug}`} className="mt-4 block">
                   <Button className="w-full" variant="outline">Ir a Stock</Button>
                 </Link>
               </CardContent>

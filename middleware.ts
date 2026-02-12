@@ -50,10 +50,9 @@ export function middleware(request: NextRequest) {
   const isPrivate = isPrivatePwaPath(pathname)
   const isPublic = isPublicPwaPath(pathname)
 
+  // No redirigir a /pwa (da 404). La página stock-console muestra LoginForm cuando no hay auth.
   if (isPrivate && !hasValidFirebaseToken(request)) {
-    const loginUrl = new URL("/pwa", request.url)
-    loginUrl.searchParams.set("next", pathname)
-    return NextResponse.redirect(loginUrl)
+    return NextResponse.next()
   }
 
   if (pathname === "/pwa/horario" || pathname === "/pwa/mensual") {
