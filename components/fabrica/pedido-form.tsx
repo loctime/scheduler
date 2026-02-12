@@ -400,7 +400,7 @@ export function FabricaPedidoForm({
                         const valor = e.target.value === "" ? 0 : parseInt(e.target.value) || 0
                         updateCantidad(producto.id, valor)
                       }}
-                      placeholder={cantidadPedida.toString()}
+                      placeholder={(cantidadPedida ?? 0).toString()}
                       className="text-lg font-semibold text-center h-12 border-2 flex-1"
                     />
                     <Button

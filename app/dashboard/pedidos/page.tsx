@@ -563,7 +563,7 @@ export default function PedidosPage() {
       const cantidad = calcularPedidoConAjuste(p.stockMinimo, stockActual[p.id], p.id)
       let texto = selectedPedido.formatoSalida
       texto = texto.replace(/{nombre}/g, p.nombre)
-      texto = texto.replace(/{cantidad}/g, cantidad.toString())
+      texto = texto.replace(/{cantidad}/g, (cantidad ?? 0).toString())
       texto = texto.replace(/{unidad}/g, p.unidad || "")
       return texto.trim()
     })
@@ -607,7 +607,7 @@ export default function PedidosPage() {
       // Copiar solo la columna "Pedir" (una línea por producto, respetando el orden actual)
       const cantidadesPedir = products.map(p => {
         const cantidad = calcularPedidoConAjuste(p.stockMinimo, stockActual[p.id], p.id)
-        return cantidad.toString()
+        return (cantidad ?? 0).toString()
       })
       
       const textoACopiar = cantidadesPedir.join("\n")

@@ -351,7 +351,7 @@ export default function ConfiguracionPage() {
             <div className="space-y-2">
               <Label htmlFor="mesInicioDia">Día de inicio del mes</Label>
               <Select
-                value={config.mesInicioDia.toString()}
+                value={(config.mesInicioDia ?? 1).toString()}
                 onValueChange={(value) => setConfig({ ...config, mesInicioDia: parseInt(value) })}
               >
                 <SelectTrigger id="mesInicioDia">
@@ -375,7 +375,7 @@ export default function ConfiguracionPage() {
             <div className="space-y-2">
               <Label htmlFor="semanaInicioDia">Día de inicio de la semana</Label>
               <Select
-                value={config.semanaInicioDia.toString()}
+                value={(config.semanaInicioDia ?? 1).toString()}
                 onValueChange={(value) => setConfig({ ...config, semanaInicioDia: parseInt(value) })}
               >
                 <SelectTrigger id="semanaInicioDia">

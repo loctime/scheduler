@@ -119,7 +119,7 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
 
   const [isCreatingProduct, setIsCreatingProduct] = useState(false)
   const [newProductNombre, setNewProductNombre] = useState("")
-  const [newProductStockMinimo, setNewProductStockMinimo] = useState(stockMinimoDefault.toString())
+  const [newProductStockMinimo, setNewProductStockMinimo] = useState((stockMinimoDefault ?? 0).toString())
   const [newProductUnidad, setNewProductUnidad] = useState("U")
   const newProductInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -209,7 +209,7 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
     const productId = await onCreateProduct(newProductNombre.trim(), stockMinimo, unidad)
     if (productId) {
       setNewProductNombre("")
-      setNewProductStockMinimo(stockMinimoDefault.toString())
+      setNewProductStockMinimo((stockMinimoDefault ?? 0).toString())
       setNewProductUnidad("U")
       setIsCreatingProduct(false)
     }
@@ -445,7 +445,7 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
             onCancel={() => {
               setIsCreatingProduct(false)
               setNewProductNombre("")
-              setNewProductStockMinimo(stockMinimoDefault.toString())
+              setNewProductStockMinimo((stockMinimoDefault ?? 0).toString())
               setNewProductUnidad("U")
             }}
           />
