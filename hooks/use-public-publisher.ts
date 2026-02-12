@@ -130,10 +130,17 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
       const publicSchedulePath = `apps/horarios/publicSchedules/${companySlug}/weeks/${options.weekId}`
       const publicScheduleRef = doc(db, publicSchedulePath)
       
-      // Estructura pública con solo los campos necesarios para visualización
+      // Firestore no acepta undefined: usar null o derivar weekEnd desde weekStart si falta
+      const weekStart = originalSchedule.weekStart ?? null
+      let weekEnd = originalSchedule.weekEnd ?? null
+      if (weekStart && !weekEnd) {
+        const start = new Date(weekStart + "T12:00:00")
+        start.setDate(start.getDate() + 6)
+        weekEnd = start.toISOString().slice(0, 10)
+      }
       const publicScheduleData = {
-        weekStart: originalSchedule.weekStart,
-        weekEnd: originalSchedule.weekEnd,
+        weekStart,
+        weekEnd,
         assignments: originalSchedule.assignments || {},
         employeesSnapshot: originalSchedule.employeesSnapshot || [],
         ordenEmpleadosSnapshot: originalSchedule.ordenEmpleadosSnapshot || [],

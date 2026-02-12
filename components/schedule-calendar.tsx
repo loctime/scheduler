@@ -408,8 +408,8 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
       return
     }
 
-    const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
-    setPublishingWeekId(weekId)
+    const weekIdForUi = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
+    setPublishingWeekId(weekIdForUi)
     
     try {
       console.log("🔧 [ScheduleCalendar] Capturando WeekSchedule visible...")
@@ -501,7 +501,7 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
       
       const publishedOwnerId = await publishToPublic({
         companyName: config?.nombreEmpresa || 'Mi Empresa',
-        weekId,
+        weekId: weekSchedule.id,
         weekData: {
           ...weekSchedule,
           startDate: format(weekStartDate, "dd/MM/yyyy"),
