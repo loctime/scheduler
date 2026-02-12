@@ -179,10 +179,10 @@ export function useStockConsole(user: any) {
     return () => unsubscribe()
   }, [state.selectedPedidoId, user, ownerId, tienePermisoPedidos])
 
-  // Inicialización
+  // Inicialización: re-ejecutar cuando ownerId esté disponible (p. ej. userData del colaborador cargada)
   useEffect(() => {
     loadPedidos()
-  }, [user])
+  }, [user, ownerId])
 
   useEffect(() => {
     loadProductos()
