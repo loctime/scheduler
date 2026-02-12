@@ -224,7 +224,7 @@ export function usePublicMonthlySchedulesV2({
 
     const monthMap = new Map<string, MonthGroup>()
 
-    schedules.forEach((schedule) => {
+    schedules.forEach((schedule: any) => {
       // Usar directamente weekStart y weekEnd del schedule original
       if (!schedule.weekStart || !schedule.weekEnd) {
         console.warn("🔧 [usePublicMonthlySchedulesV2] Schedule sin weekStart/weekEnd, ignorando:", schedule.id)
