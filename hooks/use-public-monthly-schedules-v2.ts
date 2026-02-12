@@ -175,15 +175,44 @@ export function usePublicMonthlySchedulesV2({
         let weekStart: Date
         let weekEnd: Date
         
+        console.log("🔧 [usePublicMonthlySchedulesV2] Procesando weekData:", {
+          weekId: weekData.weekId,
+          weekLabel: weekData.weekLabel,
+          publishedAt: weekData.publishedAt
+        })
+        
         if (weekData.weekLabel && weekData.weekLabel.includes(' - ')) {
-          const [startStr, endStr] = weekData.weekLabel.split(' - ')
-          weekStart = parseISO(startStr.trim())
-          weekEnd = parseISO(endStr.trim())
+          try {
+            const [startStr, endStr] = weekData.weekLabel.split(' - ')
+            const parsedStart = parseISO(startStr.trim())
+            const parsedEnd = parseISO(endStr.trim())
+            
+            // Validar que las fechas sean válidas
+            if (isNaN(parsedStart.getTime()) || isNaN(parsedEnd.getTime())) {
+              console.warn("🔧 [usePublicMonthlySchedulesV2] Fechas inválidas en weekLabel, usando fallback")
+              throw new Error("Fechas inválidas")
+            }
+            
+            weekStart = parsedStart
+            weekEnd = parsedEnd
+          } catch (error) {
+            console.warn("🔧 [usePublicMonthlySchedulesV2] Error parseando weekLabel:", error)
+            // Fallback: usar fecha de publicación como referencia
+            weekStart = weekData.publishedAt?.toDate() || new Date()
+            weekEnd = addDays(weekStart, 6)
+          }
         } else {
           // Fallback: usar fecha de publicación como referencia
           weekStart = weekData.publishedAt?.toDate() || new Date()
           weekEnd = addDays(weekStart, 6)
         }
+        
+        console.log("🔧 [usePublicMonthlySchedulesV2] Fechas procesadas:", {
+          weekStart: weekStart.toISOString(),
+          weekEnd: weekEnd.toISOString(),
+          weekStartValid: !isNaN(weekStart.getTime()),
+          weekEndValid: !isNaN(weekEnd.getTime())
+        })
         
         const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
         
