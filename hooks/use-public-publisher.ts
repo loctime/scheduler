@@ -1,6 +1,6 @@
 import { useState } from "react"
-import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { doc, setDoc, serverTimestamp, getDoc, updateDoc, collection, query, where, getDocs, limit } from "firebase/firestore"
+import { db, COLLECTIONS } from "@/lib/firebase"
 import { createPublicCompanySlug } from "@/lib/public-companies"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
@@ -80,6 +80,35 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
       console.log("🔧 [usePublicPublisher] CompanySlug único creado:", companySlug)
       console.log("🔧 [usePublicPublisher] WeekId:", options.weekId)
       console.log("🔧 [usePublicPublisher] Has publicImageUrl:", !!options.publicImageUrl)
+
+      // Guardar el companySlug en la configuración del usuario para que useCompanySlug lo encuentre
+      try {
+        const configQuery = query(
+          collection(db, COLLECTIONS.CONFIG),
+          where("userId", "==", user?.uid),
+          limit(1)
+        )
+        const configSnapshot = await getDocs(configQuery)
+        
+        if (!configSnapshot.empty) {
+          const configDoc = configSnapshot.docs[0]
+          await updateDoc(configDoc.ref, { publicSlug: companySlug })
+          console.log("🔧 [usePublicPublisher] CompanySlug guardado en config:", companySlug)
+        } else {
+          // Crear config si no existe
+          const configRef = doc(db, COLLECTIONS.CONFIG, user?.uid)
+          await setDoc(configRef, {
+            userId: user?.uid,
+            ownerId: ownerId,
+            publicSlug: companySlug,
+            createdAt: serverTimestamp()
+          })
+          console.log("🔧 [usePublicPublisher] Config creado con companySlug:", companySlug)
+        }
+      } catch (configError) {
+        console.warn("🔧 [usePublicPublisher] No se pudo guardar companySlug en config:", configError)
+        // No fallar la publicación si no se puede guardar en config
+      }
 
       // Path EXACTO: apps/horarios/enlaces_publicos/{ownerId}
       const fullPath = "apps/horarios/enlaces_publicos/" + ownerId

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
-import { doc, getDoc } from "firebase/firestore"
-import { auth, db } from "@/lib/firebase"
+import { doc, getDoc, collection, query, where, getDocs, limit } from "firebase/firestore"
+import { auth, db, COLLECTIONS } from "@/lib/firebase"
 
 export function useCompanySlug() {
   const [companySlug, setCompanySlug] = useState<string | null>(null)
@@ -15,11 +15,18 @@ export function useCompanySlug() {
       }
 
       try {
-        const userRef = doc(db, "apps/horarios/users", user.uid)
-        const snap = await getDoc(userRef)
-
-        if (snap.exists()) {
-          const data = snap.data()
+        // Buscar en la colección config donde se guarda el publicSlug
+        const configQuery = query(
+          collection(db, COLLECTIONS.CONFIG),
+          where("publicSlug", "!=", null),
+          where("userId", "==", user.uid),
+          limit(1)
+        )
+        const querySnapshot = await getDocs(configQuery)
+        
+        if (!querySnapshot.empty) {
+          const configDoc = querySnapshot.docs[0]
+          const data = configDoc.data()
           if (data.publicSlug) {
             setCompanySlug(data.publicSlug)
           }
