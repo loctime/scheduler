@@ -3,7 +3,6 @@ import type { Metadata, Viewport } from "next"
 export const metadata: Metadata = {
   title: "Chat de Stock - Asistente IA",
   description: "Asistente de chat para gestión de stock con IA",
-  manifest: "/manifest-pwa.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

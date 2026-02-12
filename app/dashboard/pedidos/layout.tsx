@@ -3,7 +3,6 @@ import type { Metadata, Viewport } from "next"
 export const metadata: Metadata = {
   title: "Gestión de Pedidos - Stock",
   description: "Sistema de gestión de pedidos y stock",
-  manifest: "/manifest-pwa.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

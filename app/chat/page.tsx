@@ -10,7 +10,6 @@ import { ChatInterface } from "@/components/stock/chat-interface"
 import { useStockChatContext } from "@/contexts/stock-chat-context"
 import { Loader2, MessageCircle, RefreshCw, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { PWAUpdateNotification } from "@/components/pwa-update-notification"
 
 function ChatContent() {
@@ -150,7 +149,6 @@ export default function ChatPage() {
     <DataProvider user={user}>
       <StockChatProvider user={user}>
         <ChatContent />
-        <PWAInstallPrompt />
         <PWAUpdateNotification swPath="/sw-pwa.js" />
       </StockChatProvider>
     </DataProvider>

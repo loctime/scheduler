@@ -115,8 +115,6 @@ export default function PublicHorarioPage({ companySlug }: PublicHorarioPageProp
   const { horario, isLoading, error } = usePublicHorario(companySlug)
   const { config } = useConfig()
   const [copied, setCopied] = useState(false)
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
-  const [showInstallButton, setShowInstallButton] = useState(false)
   const [showIndividualView, setShowIndividualView] = useState(false)
   const [showEmployeeSelector, setShowEmployeeSelector] = useState(false)
   const [currentViewer, setCurrentViewer] = useState<{employeeId: string, employeeName: string} | null>(null)
@@ -151,20 +149,6 @@ export default function PublicHorarioPage({ companySlug }: PublicHorarioPageProp
         console.error('Error al cargar identificación:', error)
         setShowEmployeeSelector(true)
       }
-    }
-  }, [])
-
-  // PWA: usar manifest/scope unificados y solo capturar prompt de instalación
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault()
-      setDeferredPrompt(e)
-      setShowInstallButton(true)
-    }
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
     }
   }, [])
 
@@ -323,40 +307,6 @@ export default function PublicHorarioPage({ companySlug }: PublicHorarioPageProp
       toast({
         title: "Error",
         description: "No se pudo copiar el enlace",
-        variant: "destructive",
-      })
-    }
-  }
-
-  // PWA: Manejar instalación
-  const handleInstallApp = async () => {
-    if (!deferredPrompt) return
-
-    try {
-      console.log('Iniciando instalación PWA horario...')
-      deferredPrompt.prompt()
-      const { outcome } = await deferredPrompt.userChoice
-      console.log('Resultado instalación:', outcome)
-      
-      if (outcome === 'accepted') {
-        toast({
-          title: "Horario instalado",
-          description: "La app del horario se ha instalado correctamente",
-        })
-      } else {
-        toast({
-          title: "Instalación cancelada",
-          description: "La instalación fue cancelada",
-        })
-      }
-      
-      setDeferredPrompt(null)
-      setShowInstallButton(false)
-    } catch (error) {
-      console.error('Error en instalación:', error)
-      toast({
-        title: "Error",
-        description: "No se pudo instalar la app del horario",
         variant: "destructive",
       })
     }
@@ -540,21 +490,6 @@ export default function PublicHorarioPage({ companySlug }: PublicHorarioPageProp
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {/* Botón de instalación PWA */}
-            {showInstallButton && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleInstallApp}
-                className="text-xs bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
-              >
-                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"/>
-                </svg>
-                Instalar Horario
-              </Button>
-            )}
-            
             {/* Botón Vista Individual */}
             <Button
               variant="outline"

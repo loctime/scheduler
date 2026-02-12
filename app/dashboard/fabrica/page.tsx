@@ -21,7 +21,6 @@ import { generarNumeroRemito, crearRemitoEnvioDesdeDisponibles } from "@/lib/rem
 import { useRemitos } from "@/hooks/use-remitos"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { logger } from "@/lib/logger"
-import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { PWAUpdateNotification } from "@/components/pwa-update-notification"
 
 type FiltroEstado = "todos" | "pendientes" | "en-proceso"
@@ -575,7 +574,6 @@ export default function FabricaPage() {
           productosDisponibles={productosDisponiblesPendientes}
         />
       )}
-      <PWAInstallPrompt />
       <PWAUpdateNotification swPath="/sw-pwa.js" />
     </DashboardLayout>
   )

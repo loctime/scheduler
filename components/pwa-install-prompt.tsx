@@ -10,35 +10,18 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>
 }
 
+/**
+ * Botón de instalación PWA. Solo se muestra bajo /pwa.
+ * Usa beforeinstallprompt, event.prompt(), y se oculta si ya está instalada (standalone).
+ */
 export function PWAInstallPrompt() {
   const pathname = usePathname()
-  
-  // Determinar el nombre de la app según la ruta
-  const getAppName = () => {
-    if (pathname?.startsWith('/pwa/horario')) {
-      return 'Horario'
-    }
-    if (pathname?.startsWith('/dashboard/pedidos')) {
-      return 'Pedidos'
-    }
-    if (pathname?.startsWith('/dashboard/fabrica')) {
-      return 'Fábrica'
-    }
-    if (pathname?.startsWith('/chat')) {
-      return 'Chat'
-    }
-    return 'app'
-  }
-  
-  const appName = getAppName()
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [showPrompt, setShowPrompt] = useState(false)
 
   useEffect(() => {
-    // Verificar si ya está instalado
-    if (window.matchMedia("(display-mode: standalone)").matches) {
-      return
-    }
+    if (typeof window === "undefined") return
+    if (window.matchMedia("(display-mode: standalone)").matches) return
 
     const handler = (e: Event) => {
       e.preventDefault()
@@ -47,47 +30,42 @@ export function PWAInstallPrompt() {
     }
 
     window.addEventListener("beforeinstallprompt", handler)
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handler)
-    }
+    return () => window.removeEventListener("beforeinstallprompt", handler)
   }, [])
 
   const handleInstall = async () => {
     if (!deferredPrompt) return
-
     deferredPrompt.prompt()
-    const { outcome } = await deferredPrompt.userChoice
-
-    if (outcome === "accepted") {
-      console.log("PWA instalada")
-    }
-
+    await deferredPrompt.userChoice
     setDeferredPrompt(null)
     setShowPrompt(false)
   }
 
   const handleDismiss = () => {
     setShowPrompt(false)
-    // Guardar en localStorage para no mostrar de nuevo por un tiempo
-    localStorage.setItem("pwa-install-dismissed", Date.now().toString())
+    try {
+      localStorage.setItem("pwa-install-dismissed", Date.now().toString())
+    } catch {
+      // ignore
+    }
   }
 
-  // No mostrar si fue descartado recientemente (últimas 24 horas)
   useEffect(() => {
-    const dismissed = localStorage.getItem("pwa-install-dismissed")
-    if (dismissed) {
-      const dismissedTime = parseInt(dismissed, 10)
-      const hoursSinceDismissed = (Date.now() - dismissedTime) / (1000 * 60 * 60)
-      if (hoursSinceDismissed < 24) {
-        setShowPrompt(false)
+    try {
+      const dismissed = localStorage.getItem("pwa-install-dismissed")
+      if (dismissed) {
+        const dismissedTime = parseInt(dismissed, 10)
+        const hoursSinceDismissed = (Date.now() - dismissedTime) / (1000 * 60 * 60)
+        if (hoursSinceDismissed < 24) setShowPrompt(false)
       }
+    } catch {
+      // ignore
     }
   }, [])
 
-  if (!showPrompt || !deferredPrompt) {
-    return null
-  }
+  // Solo mostrar bajo /pwa
+  if (typeof pathname !== "string" || !pathname.startsWith("/pwa")) return null
+  if (!showPrompt || !deferredPrompt) return null
 
   return (
     <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 z-50 animate-in slide-in-from-bottom-5">
@@ -95,7 +73,7 @@ export function PWAInstallPrompt() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium">Instalar como app</p>
           <p className="text-xs text-muted-foreground">
-            Instalá {appName} para acceder rápido desde tu pantalla de inicio
+            Instalá la app para acceder rápido desde tu pantalla de inicio
           </p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">

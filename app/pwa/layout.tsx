@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next"
 import { PwaShell } from "@/components/pwa/pwa-shell"
+import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 
 export const metadata: Metadata = {
   title: "PWA Horarios",
@@ -39,5 +40,10 @@ export const viewport: Viewport = {
 }
 
 export default function PwaLayout({ children }: { children: React.ReactNode }) {
-  return <PwaShell>{children}</PwaShell>
+  return (
+    <PwaShell>
+      {children}
+      <PWAInstallPrompt />
+    </PwaShell>
+  )
 }

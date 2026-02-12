@@ -42,7 +42,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { PWAUpdateNotification } from "@/components/pwa-update-notification"
 
 const FORMAT_EXAMPLES = [
@@ -1762,7 +1761,6 @@ export default function PedidosPage() {
           await ejecutarGenerarEnlace()
         }}
       />
-      <PWAInstallPrompt />
       <PWAUpdateNotification swPath="/sw-pwa.js" />
     </DashboardLayout>
   )
