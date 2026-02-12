@@ -68,7 +68,7 @@ export function PwaShell({ children }: { children: React.ReactNode }) {
           { href: `/pwa/${companySlug}/horario`, label: "Horario", icon: Calendar },
           { href: `/pwa/${companySlug}/mensual`, label: "Mensual", icon: CalendarDays },
           { href: `/pwa/${companySlug}/home`, label: "Panel", icon: Home },
-          { href: `/pwa/${companySlug}/stock-console`, label: "Stock", icon: Package }
+          { href: `/pwa/stock-console/${companySlug}`, label: "Stock", icon: Package }
         ].map((item) => {
           const Icon = item.icon
           const isActive = pathname === item.href

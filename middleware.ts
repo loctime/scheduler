@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 
-// Rutas privadas PWA (requieren login): /pwa/stock-console o /pwa/[slug]/stock-console
+// Rutas privadas PWA (requieren login): app/pwa/stock-console/[companySlug] → /pwa/stock-console/xxx
 function isPrivatePwaPath(pathname: string): boolean {
-  if (pathname === "/pwa/stock-console" || pathname.startsWith("/pwa/stock-console/")) return true
-  if (/^\/pwa\/[^/]+\/stock-console\/?$/.test(pathname)) return true
-  return false
+  return pathname === "/pwa/stock-console" || pathname.startsWith("/pwa/stock-console/")
 }
 
 // Rutas públicas PWA: /pwa/[slug], /pwa/[slug]/horario, /pwa/[slug]/mensual, /pwa/[slug]/home; y legacy /pwa/horario/, /pwa/mensual/
