@@ -110,76 +110,72 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
         // No fallar la publicación si no se puede guardar en config
       }
 
-      // Path EXACTO: apps/horarios/enlaces_publicos/{ownerId}
-      const fullPath = "apps/horarios/enlaces_publicos/" + ownerId
-      console.log("🔧 [usePublicPublisher] Writing to:", fullPath)
-
-      console.log("🔧 [usePublicPublisher] Datos a guardar:", {
+      // Primero leer el schedule original desde la colección privada
+      const originalScheduleRef = doc(db, COLLECTIONS.SCHEDULES, options.weekId)
+      const originalScheduleDoc = await getDoc(originalScheduleRef)
+      
+      if (!originalScheduleDoc.exists()) {
+        setError("Horario no encontrado")
+        throw new Error("Horario no encontrado")
+      }
+      
+      const originalSchedule = originalScheduleDoc.data()
+      console.log("🔧 [usePublicPublisher] Schedule original leído:", {
         weekId: options.weekId,
-        hasEmployees: !!(options.employees),
-        employeesCount: options.employees?.length || 0,
-        employees: options.employees,
-        hasWeekDataEmployees: !!(options.weekData.employees),
-        weekDataEmployeesCount: options.weekData.employees?.length || 0,
-        weekDataEmployees: options.weekData.employees
+        hasAssignments: !!originalSchedule.assignments,
+        assignmentsCount: Object.keys(originalSchedule.assignments || {}).length
       })
 
-      // Estructura con weeks y publicImageUrl
-      const weekData = {
-        weekId: options.weekId,
-        weekLabel: options.weekData.startDate && options.weekData.endDate 
-          ? `${options.weekData.startDate} - ${options.weekData.endDate}`
-          : `Semana ${options.weekId}`,
-        publishedAt: serverTimestamp(),
-        publicImageUrl: options.publicImageUrl || null,
-        days: options.weekData.scheduleData?.assignments || options.weekData.assignments || {},
-        dayStatus: options.weekData.scheduleData?.dayStatus || options.weekData.dayStatus || {},
-        employees: options.employees || options.weekData.employees || []
-      }
-
-      console.log("🔧 [usePublicPublisher] weekData.employees final:", weekData.employees)
-
+      // Crear documento público en la nueva estructura
+      const publicSchedulePath = `apps/horarios/publicSchedules/${companySlug}/weeks/${options.weekId}`
+      const publicScheduleRef = doc(db, publicSchedulePath)
+      
+      // Estructura pública con solo los campos necesarios para visualización
       const publicScheduleData = {
+        weekStart: originalSchedule.weekStart,
+        weekEnd: originalSchedule.weekEnd,
+        assignments: originalSchedule.assignments || {},
+        employeesSnapshot: originalSchedule.employeesSnapshot || [],
+        ordenEmpleadosSnapshot: originalSchedule.ordenEmpleadosSnapshot || [],
+        publishedAt: serverTimestamp(),
+        publishedBy: user?.uid,
+        companyName: options.companyName.trim()
+      }
+      
+      console.log("🔧 [usePublicPublisher] Escribiendo schedule público en:", publicSchedulePath)
+      console.log("🔧 [usePublicPublisher] Datos públicos:", {
+        weekStart: publicScheduleData.weekStart,
+        weekEnd: publicScheduleData.weekEnd,
+        hasAssignments: !!publicScheduleData.assignments,
+        assignmentsCount: Object.keys(publicScheduleData.assignments || {}).length,
+        employeesCount: publicScheduleData.employeesSnapshot.length
+      })
+
+      await setDoc(publicScheduleRef, publicScheduleData)
+
+      // Mantener el documento existente en enlaces_publicos para compatibilidad
+      // pero sin los datos del schedule (solo metadata)
+      const legacyPublicData = {
         ownerId: ownerId,
         publishedWeekId: options.weekId,
         weeks: {
-          [options.weekId]: weekData
+          [options.weekId]: {
+            weekId: options.weekId,
+            weekLabel: options.weekData.startDate && options.weekData.endDate 
+              ? `${options.weekData.startDate} - ${options.weekData.endDate}`
+              : `Semana ${options.weekId}`,
+            publishedAt: serverTimestamp(),
+            publicImageUrl: options.publicImageUrl || null,
+            employees: options.employees || options.weekData.employees || []
+          }
         },
-        userId: user?.uid, // Requerido por las reglas de Firestore
-        isPublic: true, // Flag para identificar como horario público
+        userId: user?.uid,
+        isPublic: true,
         companyName: options.companyName.trim()
       }
 
-      console.log("🔧 [usePublicPublisher] Datos a publicar:", {
-        ...publicScheduleData,
-        publishedAt: "[Timestamp]",
-        weeksCount: Object.keys(publicScheduleData.weeks).length,
-        currentWeekId: publicScheduleData.publishedWeekId,
-        hasPublicImageUrl: !!weekData.publicImageUrl,
-        daysCount: Object.keys(weekData.days).length,
-        employeesCount: weekData.employees.length
-      })
-
-      // Usar setDoc con overwrite completo en apps/horarios/enlaces_publicos/{ownerId}
-      const publicRef = doc(db, "apps", "horarios", "enlaces_publicos", ownerId)
-      console.log("🔧 [usePublicPublisher] Document reference created for apps/horarios/enlaces_publicos/" + ownerId)
-
-      await setDoc(publicRef, publicScheduleData, { merge: true })
-
-      // Verificar inmediatamente si el documento se guardó
-      const savedDoc = await getDoc(publicRef)
-      console.log("🔧 [usePublicPublisher] Document exists after save:", savedDoc.exists())
-      if (savedDoc.exists()) {
-        const savedData = savedDoc.data()
-        console.log("🔧 [usePublicPublisher] Saved data verification:", {
-          hasOwnerId: !!savedData.ownerId,
-          hasPublishedWeekId: !!savedData.publishedWeekId,
-          weeksCount: Object.keys(savedData.weeks || {}).length,
-          isPublic: savedData.isPublic
-        })
-      } else {
-        throw new Error("No se pudo verificar el guardado del documento")
-      }
+      const legacyRef = doc(db, "apps", "horarios", "enlaces_publicos", ownerId)
+      await setDoc(legacyRef, legacyPublicData, { merge: true })
 
       console.log("✅ [usePublicPublisher] Publicación completada exitosamente")
       return companySlug

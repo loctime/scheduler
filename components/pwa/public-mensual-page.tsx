@@ -4,7 +4,7 @@ import { useMemo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Loader2 } from "lucide-react"
-import { usePublicMonthlySchedules } from "@/hooks/use-public-monthly-schedules"
+import { usePublicMonthlySchedulesV2 } from "@/hooks/use-public-monthly-schedules-v2"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { WeekSchedule } from "@/components/schedule-calendar/week-schedule"
 import { getCustomMonthRange } from "@/lib/utils"
@@ -20,7 +20,7 @@ export function PublicMensualPage({ companySlug }: { companySlug: string }) {
     isLoading,
     error,
     calculateMonthlyStats
-  } = usePublicMonthlySchedules({
+  } = usePublicMonthlySchedulesV2({
     companySlug,
     employees: [], // Se extraerán dinámicamente de los schedules
     shifts: [], // Se extraerán dinámicamente de los schedules
