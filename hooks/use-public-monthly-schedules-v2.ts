@@ -1,13 +1,13 @@
 import { useEffect, useState, useMemo, useCallback } from "react"
-import { collection, query, orderBy, onSnapshot, where, doc, getDoc, getDocs } from "firebase/firestore"
+import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { format, parseISO, addDays } from "date-fns"
-import { es } from "date-fns/locale"
-import { getCustomMonthRange, getMonthWeeks } from "@/lib/utils"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
-import { calculateHoursBreakdown } from "@/lib/validations"
-import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
-import { ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
+import {
+  buildMonthGroupsFromSchedules,
+  createCalculateMonthlyStats,
+  type MonthGroup,
+  type WeekGroup,
+} from "@/lib/monthly-utils"
 import { resolvePublicCompany } from "@/lib/public-companies"
 
 interface PublicScheduleData {
@@ -38,30 +38,7 @@ interface FullScheduleData {
   companyName?: string
 }
 
-const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAssignment[] => {
-  if (!value || !Array.isArray(value) || value.length === 0) return []
-  return (value as any[]).map((assignment) => ({
-    type: assignment.type,
-    shiftId: assignment.shiftId || "",
-    startTime: assignment.startTime || "",
-    endTime: assignment.endTime || "",
-  }))
-}
-
-export interface MonthGroup {
-  monthKey: string // YYYY-MM
-  monthName: string // "Enero 2024"
-  monthDate: Date // Fecha del mes
-  weeks: WeekGroup[]
-}
-
-export interface WeekGroup {
-  weekStartDate: Date
-  weekEndDate: Date
-  weekStartStr: string
-  schedule: any // PublicScheduleData
-  weekDays: Date[]
-}
+export type { MonthGroup, WeekGroup }
 
 export interface UsePublicMonthlySchedulesV2Options {
   companySlug: string
@@ -218,109 +195,28 @@ export function usePublicMonthlySchedulesV2({
     loadPublicData()
   }, [companySlug, refetchTrigger])
 
-  // Agrupar horarios por mes y semana (usando directamente weekStart/weekEnd de schedules originales)
-  const monthGroups = useMemo<MonthGroup[]>(() => {
-    if (schedules.length === 0) return []
+  const monthGroups = useMemo(
+    () =>
+      buildMonthGroupsFromSchedules(
+        schedules as any,
+        monthStartDay,
+        weekStartsOn
+      ),
+    [schedules, monthStartDay, weekStartsOn]
+  )
 
-    const monthMap = new Map<string, MonthGroup>()
-
-    schedules.forEach((schedule: any) => {
-      // Usar directamente weekStart y weekEnd del schedule original
-      if (!schedule.weekStart || !schedule.weekEnd) {
-        console.warn("🔧 [usePublicMonthlySchedulesV2] Schedule sin weekStart/weekEnd, ignorando:", schedule.id)
-        return // Ignorar este schedule
-      }
-
-      let weekStart: Date
-      let weekEnd: Date
-      
-      try {
-        weekStart = parseISO(schedule.weekStart)
-        weekEnd = parseISO(schedule.weekEnd)
-        
-        // Validar que las fechas sean válidas
-        if (isNaN(weekStart.getTime()) || isNaN(weekEnd.getTime())) {
-          console.warn("🔧 [usePublicMonthlySchedulesV2] Fechas inválidas en weekStart/weekEnd, ignorando schedule:", {
-            id: schedule.id,
-            weekStart: schedule.weekStart,
-            weekEnd: schedule.weekEnd
-          })
-          return // Ignorar este schedule
-        }
-      } catch (error) {
-        console.warn("🔧 [usePublicMonthlySchedulesV2] Error parseando weekStart/weekEnd:", error)
-        return // Ignorar este schedule
-      }
-      
-      console.log("🔧 [usePublicMonthlySchedulesV2] Schedule procesado:", {
-        id: schedule.id,
-        weekStart: weekStart.toISOString(),
-        weekEnd: weekEnd.toISOString()
-      })
-      
-      const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
-      
-      const monthRange = getCustomMonthRange(weekStart, monthStartDay)
-      let targetMonthDate = monthRange.startDate
-      
-      if (weekStart < monthRange.startDate) {
-        const prevMonth = new Date(monthRange.startDate)
-        prevMonth.setMonth(prevMonth.getMonth() - 1)
-        targetMonthDate = getCustomMonthRange(prevMonth, monthStartDay).startDate
-      }
-      
-      const monthKey = format(targetMonthDate, "yyyy-MM")
-      const monthName = format(targetMonthDate, "MMMM yyyy", { locale: es })
-      
-      if (!monthMap.has(monthKey)) {
-        monthMap.set(monthKey, {
-          monthKey,
-          monthName: monthName.charAt(0).toUpperCase() + monthName.slice(1),
-          monthDate: targetMonthDate,
-          weeks: [],
-        })
-      }
-      
-      const monthGroup = monthMap.get(monthKey)!
-      const weekStartStr = format(weekStart, "yyyy-MM-dd")
-      
-      const existingWeek = monthGroup.weeks.find((w) => w.weekStartStr === weekStartStr)
-      
-      if (!existingWeek) {
-        monthGroup.weeks.push({
-          weekStartDate: weekStart,
-          weekEndDate: weekEnd,
-          weekStartStr,
-          schedule: schedule,
-          weekDays,
-        })
-      }
-    })
-
-    monthMap.forEach((month) => {
-      month.weeks.sort((a, b) => a.weekStartDate.getTime() - b.weekStartDate.getTime())
-    })
-
-    return Array.from(monthMap.values()).sort((a, b) => b.monthKey.localeCompare(a.monthKey))
-  }, [schedules, monthStartDay, weekStartsOn])
-
-  // Calcular estadísticas mensuales para empleados (adaptado para enlaces_publicos)
-  const calculateMonthlyStats = useCallback((monthDate: Date): Record<string, EmployeeMonthlyStats> => {
-    const stats: Record<string, EmployeeMonthlyStats> = {}
-    employees.forEach((employee) => {
-      stats[employee.id] = { francos: 0, francosSemana: 0, horasExtrasSemana: 0, horasExtrasMes: 0, horasComputablesMes: 0, horasSemana: 0, horasLicenciaEmbarazo: 0, horasMedioFranco: 0 }
-    })
-
-    if (employees.length === 0 || shifts.length === 0) {
-      return stats
-    }
-
-    // Nota: Con enlaces_publicos no tenemos acceso a los assignments detallados
-    // Solo podemos mostrar información básica de empleados
-    // Las estadísticas de horas no se pueden calcular sin assignments
-    
-    return stats
-  }, [employees, shifts])
+  const calculateMonthlyStats = useMemo(
+    () =>
+      createCalculateMonthlyStats({
+        employees,
+        shifts,
+        config,
+        schedules: schedules as any,
+        monthStartDay,
+        weekStartsOn,
+      }),
+    [employees, shifts, config, schedules, monthStartDay, weekStartsOn]
+  )
 
   return {
     monthGroups,

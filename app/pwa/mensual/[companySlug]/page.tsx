@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button"
 import { Share2, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
-import { useMonthlySchedule } from "@/hooks/use-monthly-schedule"
+import { usePublicMonthlySchedulesApi } from "@/hooks/use-public-monthly-schedules-api"
 import { MonthlyScheduleView } from "@/components/monthly-schedule-view"
 
 /**
  * Página PWA de horarios mensuales públicos.
- * No usa AuthContext ni DataProvider.
- * Renderiza directamente con useMonthlySchedule(companySlug).
+ * No usa AuthContext, DataProvider ni Firestore.
+ * Obtiene datos vía fetch al endpoint público del backend.
  */
 export default function PwaMensualPublicPage() {
   const params = useParams()
@@ -27,17 +27,16 @@ export default function PwaMensualPublicPage() {
   const {
     monthGroups,
     companyName,
+    employees,
+    shifts,
+    config,
     isLoading,
     error,
     calculateMonthlyStats,
-  } = useMonthlySchedule({
+  } = usePublicMonthlySchedulesApi({
     companySlug,
     year: Number.isFinite(year) ? year : undefined,
     month: Number.isFinite(month) && month! >= 1 && month! <= 12 ? month : undefined,
-    employees: [],
-    shifts: [],
-    monthStartDay: 1,
-    weekStartsOn: 1,
   })
 
   const handleShare = async () => {
@@ -139,9 +138,10 @@ export default function PwaMensualPublicPage() {
         <MonthlyScheduleView
           monthGroups={monthGroups}
           companyName={companyName}
-          employees={[]}
-          shifts={[]}
-          monthStartDay={1}
+          employees={employees}
+          shifts={shifts}
+          config={config ?? undefined}
+          monthStartDay={config?.mesInicioDia ?? 1}
           isLoading={false}
           calculateMonthlyStats={calculateMonthlyStats}
           readonly
