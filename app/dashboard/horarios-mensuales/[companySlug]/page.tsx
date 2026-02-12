@@ -1,18 +1,54 @@
 "use client"
 
-import { usePublicMonthlySchedulesV2 } from "@/hooks/use-public-monthly-schedules-v2"
+import { useEffect, useState, useMemo, useCallback } from "react"
+import { collection, query, orderBy, onSnapshot, where } from "firebase/firestore"
+import { db, COLLECTIONS } from "@/lib/firebase"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, Calendar, Users, Clock } from "lucide-react"
+import { Horario } from "@/lib/types"
+import { useConfig } from "@/hooks/use-config"
+import { format, parseISO, startOfWeek, addDays } from "date-fns"
+import { es } from "date-fns/locale"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { WeekSchedule } from "@/components/schedule-calendar/week-schedule"
-import { getCustomMonthRange } from "@/lib/utils"
-import { format } from "date-fns"
-import { es } from "date-fns/locale"
-import { useToast } from "@/hooks/use-toast"
+import { getCustomMonthRange, getMonthWeeks } from "@/lib/utils"
+import { useExportSchedule } from "@/hooks/use-export-schedule"
+import { ExportOverlay } from "@/components/export-overlay"
+import { useCompanySlug } from "@/hooks/use-company-slug"
+import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
+import { calculateDailyHours, calculateHoursBreakdown } from "@/lib/validations"
+import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
+import { ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Share2, ArrowLeft } from "lucide-react"
 import Link from "next/link"
-import { useConfig } from "@/hooks/use-config"
+import { useToast } from "@/hooks/use-toast"
+import { usePublicMonthlySchedulesV2 } from "@/hooks/use-public-monthly-schedules-v2"
+
+const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAssignment[] => {
+  if (!value || !Array.isArray(value) || value.length === 0) return []
+  return (value as any[]).map((assignment) => ({
+    type: assignment.type,
+    shiftId: assignment.shiftId || "",
+    startTime: assignment.startTime || "",
+    endTime: assignment.endTime || "",
+  }))
+}
+
+interface MonthGroup {
+  monthKey: string // YYYY-MM
+  monthName: string // "Enero 2024"
+  monthDate: Date // Fecha del mes
+  weeks: WeekGroup[]
+}
+
+interface WeekGroup {
+  weekStartDate: Date
+  weekEndDate: Date
+  weekStartStr: string
+  schedule: Horario | null
+  weekDays: Date[]
+}
 
 interface PageProps {
   params: {
