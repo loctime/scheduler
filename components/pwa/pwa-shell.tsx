@@ -119,20 +119,11 @@ export function PwaShell({ children }: { children: React.ReactNode }) {
 
   // Renderizado principal
   return (
-    <>
-      {user ? (
-        <DataProvider user={user}>
-          <div className="min-h-screen bg-background pb-20">
-            {children}
-            {renderTabs()}
-          </div>
-        </DataProvider>
-      ) : (
-        <div className="min-h-screen bg-background pb-20">
-          {children}
-          {renderTabs()}
-        </div>
-      )}
-    </>
+    <DataProvider user={user}>
+      <div className="min-h-screen bg-background pb-20">
+        {children}
+        {renderTabs()}
+      </div>
+    </DataProvider>
   )
 }
