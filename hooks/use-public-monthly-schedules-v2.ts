@@ -11,13 +11,17 @@ import { ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
 
 interface PublicScheduleData {
   id: string
-  weekStart: string
-  weekEnd: string
-  assignments: Record<string, any>
-  employeesSnapshot: any[]
-  ordenEmpleadosSnapshot: string[]
-  publishedAt: any
-  publishedBy: string
+  ownerId: string
+  publishedWeekId: string
+  weeks: Record<string, {
+    weekId: string
+    weekLabel: string
+    publishedAt: any
+    publicImageUrl?: string | null
+    employees?: any[]
+  }>
+  userId: string
+  isPublic: boolean
   companyName?: string
 }
 
@@ -96,10 +100,10 @@ export function usePublicMonthlySchedulesV2({
     setIsLoading(true)
     setError(null)
 
-    // Leer desde publicSchedules en lugar de schedules privado
+    // Leer desde enlaces_publicos (la única colección pública con reglas definidas)
     const publicSchedulesQuery = query(
-      collection(db, "apps", "horarios", "publicSchedules", companySlug, "weeks"),
-      orderBy("weekStart", "desc")
+      collection(db, "apps", "horarios", "enlaces_publicos", companySlug),
+      orderBy("publishedAt", "desc")
     )
 
     const unsubscribeSchedules = onSnapshot(
@@ -138,56 +142,77 @@ export function usePublicMonthlySchedulesV2({
     }
   }, [companySlug, refetchTrigger])
 
-  // Agrupar horarios por mes y semana (misma lógica que el dashboard)
+  // Agrupar horarios por mes y semana (adaptado a estructura enlaces_publicos)
   const monthGroups = useMemo<MonthGroup[]>(() => {
     if (schedules.length === 0) return []
 
     const monthMap = new Map<string, MonthGroup>()
 
-    schedules.forEach((schedule) => {
-      const weekStartDate = parseISO(schedule.weekStart)
+    schedules.forEach((publicDoc) => {
+      // Extraer weeks del documento enlaces_publicos
+      const weeks = publicDoc.weeks || {}
       
-      const weekStart = weekStartDate
-      const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
-      const weekEndDate = weekDays[weekDays.length - 1]
-      
-      const monthRange = getCustomMonthRange(weekStartDate, monthStartDay)
-      let targetMonthDate = monthRange.startDate
-      
-      if (weekStartDate < monthRange.startDate) {
-        const prevMonth = new Date(monthRange.startDate)
-        prevMonth.setMonth(prevMonth.getMonth() - 1)
-        targetMonthDate = getCustomMonthRange(prevMonth, monthStartDay).startDate
-      }
-      
-      const monthKey = format(targetMonthDate, "yyyy-MM")
-      const monthName = format(targetMonthDate, "MMMM yyyy", { locale: es })
-      
-      if (!monthMap.has(monthKey)) {
-        monthMap.set(monthKey, {
-          monthKey,
-          monthName: monthName.charAt(0).toUpperCase() + monthName.slice(1),
-          monthDate: targetMonthDate,
-          weeks: [],
-        })
-      }
-      
-      const monthGroup = monthMap.get(monthKey)!
-      
-      const weekStartStr = format(weekStart, "yyyy-MM-dd")
-      const existingWeek = monthGroup.weeks.find((w) => w.weekStartStr === weekStartStr)
-      
-      if (!existingWeek) {
-        monthGroup.weeks.push({
-          weekStartDate: weekStart,
-          weekEndDate,
-          weekStartStr,
-          schedule,
-          weekDays,
-        })
-      } else {
-        existingWeek.schedule = schedule
-      }
+      Object.values(weeks).forEach((weekData) => {
+        // Extraer fechas del weekLabel o usar valores por defecto
+        let weekStart: Date
+        let weekEnd: Date
+        
+        if (weekData.weekLabel && weekData.weekLabel.includes(' - ')) {
+          const [startStr, endStr] = weekData.weekLabel.split(' - ')
+          weekStart = parseISO(startStr.trim())
+          weekEnd = parseISO(endStr.trim())
+        } else {
+          // Fallback: usar fecha de publicación como referencia
+          weekStart = weekData.publishedAt?.toDate() || new Date()
+          weekEnd = addDays(weekStart, 6)
+        }
+        
+        const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+        
+        const monthRange = getCustomMonthRange(weekStart, monthStartDay)
+        let targetMonthDate = monthRange.startDate
+        
+        if (weekStart < monthRange.startDate) {
+          const prevMonth = new Date(monthRange.startDate)
+          prevMonth.setMonth(prevMonth.getMonth() - 1)
+          targetMonthDate = getCustomMonthRange(prevMonth, monthStartDay).startDate
+        }
+        
+        const monthKey = format(targetMonthDate, "yyyy-MM")
+        const monthName = format(targetMonthDate, "MMMM yyyy", { locale: es })
+        
+        if (!monthMap.has(monthKey)) {
+          monthMap.set(monthKey, {
+            monthKey,
+            monthName: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+            monthDate: targetMonthDate,
+            weeks: [],
+          })
+        }
+        
+        const monthGroup = monthMap.get(monthKey)!
+        const weekStartStr = format(weekStart, "yyyy-MM-dd")
+        
+        const existingWeek = monthGroup.weeks.find((w) => w.weekStartStr === weekStartStr)
+        
+        if (!existingWeek) {
+          monthGroup.weeks.push({
+            weekStartDate: weekStart,
+            weekEndDate: weekEnd,
+            weekStartStr,
+            schedule: {
+              id: weekData.weekId,
+              weekStart: format(weekStart, "yyyy-MM-dd"),
+              weekEnd: format(weekEnd, "yyyy-MM-dd"),
+              assignments: {}, // Los assignments no están disponibles en enlaces_publicos
+              employeesSnapshot: weekData.employees || [],
+              ordenEmpleadosSnapshot: [],
+              ...weekData
+            },
+            weekDays,
+          })
+        }
+      })
     })
 
     monthMap.forEach((month) => {
@@ -197,7 +222,7 @@ export function usePublicMonthlySchedulesV2({
     return Array.from(monthMap.values()).sort((a, b) => b.monthKey.localeCompare(a.monthKey))
   }, [schedules, monthStartDay, weekStartsOn])
 
-  // Calcular estadísticas mensuales para empleados
+  // Calcular estadísticas mensuales para empleados (adaptado para enlaces_publicos)
   const calculateMonthlyStats = useCallback((monthDate: Date): Record<string, EmployeeMonthlyStats> => {
     const stats: Record<string, EmployeeMonthlyStats> = {}
     employees.forEach((employee) => {
@@ -208,77 +233,12 @@ export function usePublicMonthlySchedulesV2({
       return stats
     }
 
-    const monthRange = getCustomMonthRange(monthDate, monthStartDay)
-    const monthWeeks = getMonthWeeks(monthDate, monthStartDay, weekStartsOn)
-    const minutosDescanso = config?.minutosDescanso ?? 30
-    const horasMinimasParaDescanso = config?.horasMinimasParaDescanso ?? 6
-
-    monthWeeks.forEach((weekDays) => {
-      const weekStartStr = format(weekDays[0], "yyyy-MM-dd")
-      const weekSchedule = schedules.find((s) => s.weekStart === weekStartStr) || null
-      if (!weekSchedule?.assignments) return
-
-      weekDays.forEach((day) => {
-        if (day < monthRange.startDate || day > monthRange.endDate) return
-
-        const dateStr = format(day, "yyyy-MM-dd")
-        const dateAssignments = weekSchedule.assignments[dateStr]
-        if (!dateAssignments) return
-
-        Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
-          if (!stats[employeeId]) {
-            stats[employeeId] = { francos: 0, francosSemana: 0, horasExtrasSemana: 0, horasExtrasMes: 0, horasComputablesMes: 0, horasSemana: 0, horasLicenciaEmbarazo: 0, horasMedioFranco: 0 }
-          }
-
-          const normalizedAssignments = normalizeAssignments(assignmentValue as ShiftAssignmentValue | undefined)
-          if (normalizedAssignments.length === 0) {
-            return
-          }
-
-          let francosCount = 0
-          normalizedAssignments.forEach((assignment) => {
-            if (assignment.type === "franco") {
-              francosCount += 1
-            } else if (assignment.type === "medio_franco") {
-              francosCount += 0.5
-            }
-          })
-
-          if (francosCount > 0) {
-            stats[employeeId].francos += francosCount
-          }
-
-          const hoursBreakdown = calculateHoursBreakdown(
-            normalizedAssignments,
-            shifts,
-            minutosDescanso,
-            horasMinimasParaDescanso
-          )
-          if (hoursBreakdown.licencia > 0) {
-            stats[employeeId].horasLicenciaEmbarazo = (stats[employeeId].horasLicenciaEmbarazo || 0) + hoursBreakdown.licencia
-          }
-          if (hoursBreakdown.medio_franco > 0) {
-            stats[employeeId].horasMedioFranco = (stats[employeeId].horasMedioFranco || 0) + hoursBreakdown.medio_franco
-          }
-
-          const workingConfig = toWorkingHoursConfig(config)
-          const { horasComputables, horasExtra } = calculateTotalDailyHours(normalizedAssignments, workingConfig)
-          
-          stats[employeeId].horasComputablesMes += horasComputables
-          
-          if (horasExtra > 0) {
-            stats[employeeId].horasExtrasMes += horasExtra
-          }
-        })
-      })
-    })
-
-    Object.keys(stats).forEach((employeeId) => {
-      stats[employeeId].horasExtrasSemana = 0
-    })
-
+    // Nota: Con enlaces_publicos no tenemos acceso a los assignments detallados
+    // Solo podemos mostrar información básica de empleados
+    // Las estadísticas de horas no se pueden calcular sin assignments
+    
     return stats
-  }, [employees, shifts, config, monthStartDay, weekStartsOn, schedules])
+  }, [employees, shifts])
 
   return {
     monthGroups,

@@ -152,6 +152,19 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
       })
 
       await setDoc(publicScheduleRef, publicScheduleData)
+      
+      // Verificar inmediatamente si el documento se guardó
+      const savedDoc = await getDoc(publicScheduleRef)
+      console.log("🔧 [usePublicPublisher] Verificación de escritura en publicSchedules:", {
+        path: publicSchedulePath,
+        exists: savedDoc.exists(),
+        hasData: savedDoc.exists() ? Object.keys(savedDoc.data() || {}).length : 0
+      })
+      
+      if (!savedDoc.exists()) {
+        console.error("❌ [usePublicPublisher] ERROR: No se pudo guardar el documento en publicSchedules")
+        throw new Error("No se pudo guardar el documento en publicSchedules")
+      }
 
       // Mantener el documento existente en enlaces_publicos para compatibilidad
       // pero sin los datos del schedule (solo metadata)
@@ -176,6 +189,15 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
 
       const legacyRef = doc(db, "apps", "horarios", "enlaces_publicos", ownerId)
       await setDoc(legacyRef, legacyPublicData, { merge: true })
+      
+      // Verificar el documento legacy también
+      const legacySavedDoc = await getDoc(legacyRef)
+      console.log("🔧 [usePublicPublisher] Verificación de escritura en enlaces_publicos:", {
+        path: `apps/horarios/enlaces_publicos/${ownerId}`,
+        exists: legacySavedDoc.exists(),
+        hasData: legacySavedDoc.exists() ? Object.keys(legacySavedDoc.data() || {}).length : 0,
+        hasWeeks: legacySavedDoc.exists() ? Object.keys(legacySavedDoc.data()?.weeks || {}).length : 0
+      })
 
       console.log("✅ [usePublicPublisher] Publicación completada exitosamente")
       return companySlug
