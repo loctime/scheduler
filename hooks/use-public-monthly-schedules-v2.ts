@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react"
-import { collection, query, orderBy, onSnapshot, where } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, where, doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { format, parseISO, addDays } from "date-fns"
 import { es } from "date-fns/locale"
@@ -8,6 +8,7 @@ import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { calculateHoursBreakdown } from "@/lib/validations"
 import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
 import { ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
+import { resolvePublicCompany } from "@/lib/public-companies"
 
 interface PublicScheduleData {
   id: string
@@ -100,46 +101,63 @@ export function usePublicMonthlySchedulesV2({
     setIsLoading(true)
     setError(null)
 
-    // Leer desde enlaces_publicos (la única colección pública con reglas definidas)
-    const publicSchedulesQuery = query(
-      collection(db, "apps", "horarios", "enlaces_publicos", companySlug),
-      orderBy("publishedAt", "desc")
-    )
-
-    const unsubscribeSchedules = onSnapshot(
-      publicSchedulesQuery,
-      (snapshot) => {
-        try {
-          const schedulesData = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          })) as PublicScheduleData[]
-          setSchedules(schedulesData)
-          
-          // Extraer companyName del primer schedule que lo tenga
-          const firstScheduleWithCompanyName = schedulesData.find(schedule => schedule.companyName)
-          if (firstScheduleWithCompanyName) {
-            setCompanyName(firstScheduleWithCompanyName.companyName)
-          }
-          
-          setError(null)
-        } catch (err) {
-          console.error("Error processing public schedules data:", err)
-          setError("Error al procesar los datos de horarios públicos")
-        } finally {
+    // Primero resolver companySlug a ownerId
+    const loadPublicData = async () => {
+      try {
+        // Resolver companySlug a ownerId usando el mismo sistema que usePublicHorario
+        const publicCompany = await resolvePublicCompany(companySlug)
+        if (!publicCompany) {
+          setError("Empresa no encontrada")
           setIsLoading(false)
+          return
         }
-      },
-      (error) => {
-        console.error("Error loading public schedules:", error)
-        setError("No se pudieron cargar los horarios públicos")
+
+        console.log("🔧 [usePublicMonthlySchedulesV2] CompanySlug resuelto:", {
+          companySlug,
+          ownerId: publicCompany.ownerId,
+          companyName: publicCompany.companyName
+        })
+
+        // Ahora leer desde enlaces_publicos usando el ownerId correcto
+        if (!db) {
+          setError("Base de datos no disponible")
+          setIsLoading(false)
+          return
+        }
+        
+        const publicDocRef = doc(db, "apps", "horarios", "enlaces_publicos", publicCompany.ownerId)
+        const publicDoc = await getDoc(publicDocRef)
+
+        if (!publicDoc.exists()) {
+          console.log("🔧 [usePublicMonthlySchedulesV2] No existe documento enlaces_publicos para ownerId:", publicCompany.ownerId)
+          setSchedules([])
+          setCompanyName(publicCompany.companyName)
+          setError(null)
+          setIsLoading(false)
+          return
+        }
+
+        const data = publicDoc.data() as PublicScheduleData
+        console.log("🔧 [usePublicMonthlySchedulesV2] Datos cargados:", {
+          ownerId: publicCompany.ownerId,
+          hasWeeks: !!data.weeks,
+          weeksCount: Object.keys(data.weeks || {}).length,
+          companyName: data.companyName
+        })
+
+        setSchedules([data])
+        setCompanyName(data.companyName || publicCompany.companyName)
+        setError(null)
+
+      } catch (err) {
+        console.error("❌ [usePublicMonthlySchedulesV2] Error cargando datos públicos:", err)
+        setError("Error al cargar los horarios públicos")
+      } finally {
         setIsLoading(false)
       }
-    )
-
-    return () => {
-      unsubscribeSchedules()
     }
+
+    loadPublicData()
   }, [companySlug, refetchTrigger])
 
   // Agrupar horarios por mes y semana (adaptado a estructura enlaces_publicos)
