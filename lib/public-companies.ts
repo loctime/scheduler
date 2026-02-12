@@ -13,9 +13,9 @@ export interface PublicCompany {
 
 /**
  * Colección dedicada para lookup O(1) de empresas públicas
- * Path: publicCompanies/{slug}
+ * Path: apps/horarios/publicCompanies/{slug}
  */
-const PUBLIC_COMPANIES_COLLECTION = "publicCompanies"
+const PUBLIC_COMPANIES_COLLECTION = "apps/horarios/publicCompanies"
 
 /**
  * Validación estricta de formato de slug

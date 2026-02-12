@@ -18,7 +18,7 @@ El sistema de companySlug ha sido completamente refactorizado para ser **profesi
 ### **1. Colección Dedicada**
 
 ```
-publicCompanies/{slug}
+apps/horarios/publicCompanies/{slug}
 ├── ownerId: string           // ID del propietario
 ├── companyName: string       // Nombre original de la empresa
 ├── createdAt: timestamp     // Fecha de creación
@@ -26,7 +26,7 @@ publicCompanies/{slug}
 ```
 
 **Ventajas:**
-- 🚀 **Lookup O(1)**: `doc(db, "publicCompanies", slug)`
+- 🚀 **Lookup O(1)**: `doc(db, "apps/horarios/publicCompanies", slug)`
 - 🔒 **Sin escaneos**: No usa `where()` ni índices complejos
 - 📈 **Escalable**: Funciona igual con 1M+ de empresas
 
@@ -35,9 +35,9 @@ publicCompanies/{slug}
 ```
 1. normalizeCompanySlug() → slug base
 2. runTransaction() → operación atómica
-3. Verificar existencia en publicCompanies
+3. Verificar existencia en apps/horarios/publicCompanies
 4. Si existe → generar sufijo (-2, -3...)
-5. Crear documento publicCompanies/{slug}
+5. Crear documento apps/horarios/publicCompanies/{slug}
 6. Actualizar settings/main.publicSlug
 7. Retornar slug único
 ```
@@ -54,7 +54,7 @@ publicCompanies/{slug}
 query(collection(db, "settings"), where("publicSlug", "==", slug))
 
 // AHORA: Directo O(1)
-doc(db, "publicCompanies", slug)
+doc(db, "apps/horarios/publicCompanies", slug)
 ```
 
 **Performance:**
@@ -89,7 +89,7 @@ export function logPublicAccess(slug, userAgent, ip)            // Logging segur
 ```typescript
 // Hook actualizado con nuevo sistema
 export function usePublicHorario(companySlug) {
-  // Resuelve O(1) desde publicCompanies
+  // Resuelve O(1) desde apps/horarios/publicCompanies
   // Sanitiza datos automáticamente
   // Maneja 404 controlado
   // Log de accesos para seguridad
@@ -176,7 +176,7 @@ node scripts/migrate-to-new-slug-system.js rollback
 1. **Backup**: Crear snapshot de datos actuales
 2. **Detección**: Buscar slugs en settings/main
 3. **Validación**: Verificar formato y duplicados
-4. **Creación**: Generar documentos en publicCompanies
+4. **Creación**: Generar documentos en apps/horarios/publicCompanies
 5. **Actualización**: Marcar como migrado en settings
 6. **Verificación**: Confirmar consistencia
 7. **Limpieza**: Opcional: eliminar datos legacy
@@ -246,7 +246,7 @@ test('ataques de inyección, force bruta')
 {
   "indexes": [
     {
-      "collectionGroup": "publicCompanies",
+      "collectionGroup": "apps/horarios/publicCompanies",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "active", "order": "ASCENDING" }
@@ -255,7 +255,7 @@ test('ataques de inyección, force bruta')
   ],
   "fieldOverrides": [
     {
-      "collectionGroup": "publicCompanies",
+      "collectionGroup": "apps/horarios/publicCompanies",
       "fieldPath": "active",
       "indexes": [
         { "order": "ASCENDING", "queryScope": "COLLECTION" }
@@ -351,7 +351,7 @@ console.log('✅ [createPublicCompanySlug] Slug creado:', slug)
 
 ### **✅ Checklist de Producción**
 
-- [x] Colección dedicada publicCompanies implementada
+- [x] Colección dedicada apps/horarios/publicCompanies implementada
 - [x] Creación atómica sin race conditions
 - [x] Resolución O(1) directa por ID
 - [x] Validación estricta de formato

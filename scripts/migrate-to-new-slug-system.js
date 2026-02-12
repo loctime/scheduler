@@ -96,7 +96,7 @@ async function migrateSettingsDocument(settingsDoc) {
 
       // Verificar si ya existe en publicCompanies
       while (suffix <= 100) {
-        const publicCompanyRef = db.collection('publicCompanies').doc(finalSlug);
+        const publicCompanyRef = db.collection('apps/horarios/publicCompanies').doc(finalSlug);
         const publicCompanyDoc = await transaction.get(publicCompanyRef);
 
         if (!publicCompanyDoc.exists()) {
@@ -206,7 +206,7 @@ async function migrateToNewSlugSystem() {
 
     // 4. Verificación post-migración
     console.log('\n🔍 [MIGRATION] Verificando migración...');
-    const publicCompaniesSnapshot = await db.collection('publicCompanies').get();
+    const publicCompaniesSnapshot = await db.collection('apps/horarios/publicCompanies').get();
     console.log(`📋 [MIGRATION] Total documentos en publicCompanies: ${publicCompaniesSnapshot.size}`);
 
     // 5. Mostrar detalles de migración
@@ -244,7 +244,7 @@ async function rollbackMigration() {
 
   try {
     // Eliminar todos los documentos migrados
-    const publicCompaniesSnapshot = await db.collection('publicCompanies')
+    const publicCompaniesSnapshot = await db.collection('apps/horarios/publicCompanies')
       .where('migratedFrom', '==', 'settings_main')
       .get();
 

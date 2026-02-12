@@ -45,7 +45,7 @@
   ],
   "fieldOverrides": [
     {
-      "collectionGroup": "publicCompanies",
+      "collectionGroup": "apps/horarios/publicCompanies",
       "fieldPath": "active",
       "indexes": [
         {
