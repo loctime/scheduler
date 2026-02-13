@@ -138,7 +138,9 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
         start.setDate(start.getDate() + 6)
         weekEnd = start.toISOString().slice(0, 10)
       }
+      // Las reglas exigen request.resource.data.ownerId == request.auth.uid
       const publicScheduleData = {
+        ownerId: user?.uid,
         weekStart,
         weekEnd,
         assignments: originalSchedule.assignments || {},
