@@ -185,38 +185,38 @@ export default function ConfiguracionPage() {
       setSaving(true)
       const configRef = doc(db, COLLECTIONS.CONFIG, ownerId)
       
-      // Preparar datos asegurándonos de que todos los campos estén presentes
-      // Eliminar campos undefined ya que Firestore no los acepta
+      // Preparar datos con valores por defecto: Firestore no acepta undefined
+      const reglas = config.reglasHorarias
       const dataToSave: any = {
-        nombreEmpresa: config.nombreEmpresa || "Empleado",
-        mesInicioDia: config.mesInicioDia,
-        horasMaximasPorDia: config.horasMaximasPorDia,
-        semanaInicioDia: config.semanaInicioDia,
-        mostrarFinesDeSemana: config.mostrarFinesDeSemana,
-        formatoHora24: config.formatoHora24,
-        minutosDescanso: config.minutosDescanso,
-        horasMinimasParaDescanso: config.horasMinimasParaDescanso,
-        mediosTurnos: config.mediosTurnos || [],
-        reglasHorarias: config.reglasHorarias,
+        nombreEmpresa: config.nombreEmpresa ?? "Empleado",
+        mesInicioDia: config.mesInicioDia ?? 1,
+        horasMaximasPorDia: config.horasMaximasPorDia ?? 8,
+        semanaInicioDia: config.semanaInicioDia ?? 1,
+        mostrarFinesDeSemana: config.mostrarFinesDeSemana ?? true,
+        formatoHora24: config.formatoHora24 ?? true,
+        minutosDescanso: config.minutosDescanso ?? 30,
+        horasMinimasParaDescanso: config.horasMinimasParaDescanso ?? 6,
+        mediosTurnos: Array.isArray(config.mediosTurnos) ? config.mediosTurnos : [],
+        reglasHorarias: {
+          horasNormalesPorDia: reglas?.horasNormalesPorDia ?? 8,
+          horasNormalesPorSemana: reglas?.horasNormalesPorSemana ?? 48,
+          inicioHorarioNocturno: reglas?.inicioHorarioNocturno ?? "21:00",
+          limiteDiarioRecomendado: reglas?.limiteDiarioRecomendado ?? 10,
+        },
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
         updatedByName: user.displayName || user.email || "",
       }
-      
-      // Solo agregar colorEmpresa si tiene un valor (no undefined)
-      if (config.colorEmpresa !== undefined && config.colorEmpresa !== null) {
+      if (config.colorEmpresa != null && config.colorEmpresa !== "") {
         dataToSave.colorEmpresa = config.colorEmpresa
       }
-      
-      // Agregar firma digital si existe
       if (config.nombreFirma !== undefined) {
-        dataToSave.nombreFirma = config.nombreFirma
+        dataToSave.nombreFirma = config.nombreFirma ?? ""
       }
       if (config.firmaDigital !== undefined) {
-        dataToSave.firmaDigital = config.firmaDigital || null
+        dataToSave.firmaDigital = config.firmaDigital ?? null
       }
 
-      // Si el documento no existe, agregar createdAt
       const configSnap = await getDoc(configRef)
       if (!configSnap.exists()) {
         dataToSave.createdAt = serverTimestamp()

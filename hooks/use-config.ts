@@ -44,7 +44,13 @@ export function useConfig(user?: { uid: string } | null) {
       configRef,
       (snapshot) => {
         if (snapshot.exists()) {
-          setConfig(snapshot.data() as Configuracion)
+          const data = snapshot.data() as Configuracion
+          // Asegurar que mediosTurnos siempre sea un array (por si el documento es antiguo)
+          setConfig({
+            ...defaultConfig,
+            ...data,
+            mediosTurnos: Array.isArray(data.mediosTurnos) ? data.mediosTurnos : (defaultConfig.mediosTurnos ?? []),
+          })
         } else {
           setConfig(defaultConfig)
         }

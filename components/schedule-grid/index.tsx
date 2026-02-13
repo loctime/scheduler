@@ -103,6 +103,8 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
   const user = userProp || contextUser
   
   const { config } = useConfig(user)
+  // Usar mediosTurnos de config cuando esté disponible (evita que llegue vacío por timing o prop no pasada)
+  const effectiveMediosTurnos = (config?.mediosTurnos ?? mediosTurnos) ?? []
   const { toast } = useToast()
   const isMobile = useIsMobile()
   const { updateEmployeeOrder, addSeparator, updateSeparator, deleteSeparator } = useEmployeeOrder()
@@ -208,7 +210,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     getEmployeeDayStatus,
     getShiftInfo,
     shifts,
-    mediosTurnos,
+    mediosTurnos: effectiveMediosTurnos,
   })
 
   // Hook para drag and drop
@@ -561,7 +563,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
                         onAssignmentUpdate={onAssignmentUpdate}
                         scheduleId={schedule?.id}
                         shifts={shifts}
-                        mediosTurnos={mediosTurnos}
+                        mediosTurnos={effectiveMediosTurnos}
                         onQuickAssignments={handleQuickAssignments}
                         cellUndoHistory={cellUndoHistory}
                         handleCellUndo={handleCellUndo}
@@ -618,7 +620,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
             readonly={readonly}
             employeeStats={employeeStats}
             shifts={shifts}
-            mediosTurnos={mediosTurnos}
+            mediosTurnos={effectiveMediosTurnos}
             cellUndoHistory={cellUndoHistory}
             handleCellUndo={handleCellUndo}
             getSuggestion={getSuggestion}
@@ -765,7 +767,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
                         onAssignmentUpdate={onAssignmentUpdate}
                         scheduleId={schedule?.id}
                         shifts={shifts}
-                        mediosTurnos={mediosTurnos}
+                        mediosTurnos={effectiveMediosTurnos}
                         onQuickAssignments={handleQuickAssignments}
                         cellUndoHistory={cellUndoHistory}
                         handleCellUndo={handleCellUndo}
