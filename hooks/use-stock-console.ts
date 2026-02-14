@@ -20,6 +20,7 @@ import type {
   ConfirmarMovimientoResult 
 } from "@/src/domain/stock/types"
 import type { Pedido, Producto } from "@/lib/types"
+import { getPedidoUsage, recordPedidoUsage } from "@/lib/stock-console-pedido-uso"
 
 // Renombrar la función para evitar conflicto
 const confirmarMovimientosService = confirmarMovimientos
@@ -75,7 +76,19 @@ export function useStockConsole(user: any) {
         ...doc.data(),
       })) as Pedido[]
       
-      pedidosData.sort((a, b) => a.nombre.localeCompare(b.nombre))
+      // Ordenar por uso del usuario: más utilizado primero, luego alfabético
+      const usage = getPedidoUsage(ownerId)
+      pedidosData.sort((a, b) => {
+        const ua = usage[a.id]
+        const ub = usage[b.id]
+        if (ua && ub) {
+          if (ua.count !== ub.count) return ub.count - ua.count
+          if (ua.lastUsed !== ub.lastUsed) return ub.lastUsed - ua.lastUsed
+        }
+        if (ua && !ub) return -1
+        if (!ua && ub) return 1
+        return a.nombre.localeCompare(b.nombre)
+      })
       setPedidos(pedidosData)
     } catch (error: any) {
       console.error("Error al cargar pedidos:", error)
@@ -190,8 +203,9 @@ export function useStockConsole(user: any) {
 
   // Acciones
   const setSelectedPedidoId = useCallback((pedidoId: string | null) => {
+    if (pedidoId && ownerId) recordPedidoUsage(ownerId, pedidoId)
     setState(prev => ({ ...prev, selectedPedidoId: pedidoId }))
-  }, [])
+  }, [ownerId])
 
   const incrementarCantidad = useCallback((productoId: string) => {
     setState(prev => ({
