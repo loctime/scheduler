@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2 } from "lucide-react"
@@ -25,6 +25,20 @@ export default function PwaMensualPage() {
   const year = searchParams.get("year") ? parseInt(searchParams.get("year")!, 10) : undefined
   const month = searchParams.get("month") ? parseInt(searchParams.get("month")!, 10) : undefined
   const { toast } = useToast()
+  const [preferredEmployeeId, setPreferredEmployeeId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const saved = localStorage.getItem("horario.viewer")
+      if (saved) {
+        const viewer = JSON.parse(saved) as { employeeId?: string; employeeName?: string }
+        if (viewer?.employeeId) setPreferredEmployeeId(viewer.employeeId)
+      }
+    } catch {
+      // Ignorar errores de parse
+    }
+  }, [])
 
   const { ownerId } = useOwnerIdFromSlug(companySlug)
   const { employees, loading: employeesLoading } = useEmployeesByOwnerId(ownerId)
@@ -192,6 +206,7 @@ export default function PwaMensualPage() {
           calculateMonthlyStats={calculateMonthlyStats}
           readonly
           mobileIndividualOnly
+          preferredEmployeeId={preferredEmployeeId}
         />
       </div>
     </div>

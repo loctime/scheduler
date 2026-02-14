@@ -42,6 +42,8 @@ export interface MonthlyScheduleViewProps {
   readonly?: boolean
   /** En móvil mostrar solo vista individual (sin Grilla completa). */
   mobileIndividualOnly?: boolean
+  /** ID del empleado a mostrar primero en vista individual (p. ej. "¿Quién sos?"). */
+  preferredEmployeeId?: string | null
 }
 
 /**
@@ -63,6 +65,7 @@ export function MonthlyScheduleView({
   exporting = false,
   readonly = true,
   mobileIndividualOnly = false,
+  preferredEmployeeId = null,
 }: MonthlyScheduleViewProps) {
   if (isLoading) {
     return (
@@ -170,6 +173,7 @@ export function MonthlyScheduleView({
                       employeeStats={Object.values(weekStats)}
                       readonly={readonly}
                       mobileIndividualOnly={mobileIndividualOnly}
+                      preferredEmployeeId={preferredEmployeeId}
                     />
                   )
                 })}

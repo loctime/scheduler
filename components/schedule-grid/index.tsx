@@ -58,6 +58,8 @@ interface ScheduleGridProps {
   onExportEmployeeImage?: (employeeId: string, employeeName: string, weekStartDate: Date) => void // Función para exportar imagen de un empleado
   /** En móvil mostrar solo vista individual (sin toggle Grilla completa). Usado en vista mensual. */
   mobileIndividualOnly?: boolean
+  /** ID del empleado a mostrar primero en vista individual (p. ej. el de "¿Quién sos?"). */
+  preferredEmployeeId?: string | null
 }
 
 export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
@@ -79,6 +81,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
   user: userProp,
   onExportEmployeeImage,
   mobileIndividualOnly = false,
+  preferredEmployeeId = null,
 }, ref) => {
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
   const [cellUndoHistory, setCellUndoHistory] = useState<Map<string, ShiftAssignment[]>>(new Map())
@@ -472,12 +475,18 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     }))
   }, [weekDays])
 
-  // Filtrar solo empleados (sin separadores) para vista móvil
+  // Filtrar solo empleados (sin separadores) para vista móvil; si hay preferredEmployeeId, ponerlo primero
   const employeesForMobile = useMemo(() => {
-    return (orderedItems || [])
+    const list = (orderedItems || [])
       .filter((item) => item.type === "employee")
       .map((item) => item.data as Empleado)
-  }, [orderedItems])
+    if (preferredEmployeeId && list.some((e) => e.id === preferredEmployeeId)) {
+      const preferred = list.find((e) => e.id === preferredEmployeeId)!
+      const rest = list.filter((e) => e.id !== preferredEmployeeId)
+      return [preferred, ...rest]
+    }
+    return list
+  }, [orderedItems, preferredEmployeeId])
 
   // Función para renderizar la grilla desktop (reutilizable)
   const renderDesktopGrid = ({ 
