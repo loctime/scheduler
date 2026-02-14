@@ -3,8 +3,7 @@
 import { useMemo, useState, useEffect } from "react"
 import { addDays, format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
-import { Calendar, Check, Copy, X } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { Calendar, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -15,30 +14,6 @@ import { useConfig } from "@/hooks/use-config"
 import { useToast } from "@/hooks/use-toast"
 import type { Empleado, Horario, Turno, ShiftAssignment } from "@/lib/types"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
-
-// Importar getMainMonth desde month-header
-function getMainMonth(startDate: Date, endDate: Date): Date {
-  const monthDays: Map<string, number> = new Map()
-  
-  let currentDate = new Date(startDate)
-  while (currentDate <= endDate) {
-    const monthKey = format(currentDate, "yyyy-MM")
-    monthDays.set(monthKey, (monthDays.get(monthKey) || 0) + 1)
-    currentDate = addDays(currentDate, 1)
-  }
-  
-  let maxDays = 0
-  let mainMonthKey = ""
-  
-  monthDays.forEach((days, monthKey) => {
-    if (days > maxDays) {
-      maxDays = days
-      mainMonthKey = monthKey
-    }
-  })
-  
-  return parseISO(mainMonthKey + "-01")
-}
 
 interface PublicHorarioPageProps {
   companySlug: string
@@ -115,7 +90,6 @@ const getWeekStartDate = (weekId?: string, days?: Record<string, any>) => {
 export default function PublicHorarioPage({ companySlug }: PublicHorarioPageProps) {
   const { horario, isLoading, error } = usePublicHorario(companySlug)
   const { config } = useConfig()
-  const [copied, setCopied] = useState(false)
   const [showIndividualView, setShowIndividualView] = useState(false)
   const [showEmployeeSelector, setShowEmployeeSelector] = useState(false)
   const [currentViewer, setCurrentViewer] = useState<{employeeId: string, employeeName: string} | null>(null)
@@ -208,18 +182,6 @@ export default function PublicHorarioPage({ companySlug }: PublicHorarioPageProp
   // Estado de carga unificado - SOLO depende de isLoading
   const isDataLoading = isLoading
 
-  // Calcular el mes principal usando getMainMonth
-  const mainMonth = useMemo(() => {
-    if (!weekStartDate) return null
-    const weekEndDate = addDays(weekStartDate, 6)
-    return getMainMonth(weekStartDate, weekEndDate)
-  }, [weekStartDate])
-
-  const monthLabel = useMemo(() => {
-    if (!mainMonth) return ""
-    return format(mainMonth, "MMMM", { locale: es }).toUpperCase()
-  }, [mainMonth])
-
   const employees = useMemo(() => {
     // MODELO A: Usar empleados de la semana publicada si existen, sino fallback
     const currentWeek = horario?.weeks?.[horario.publishedWeekId]
@@ -293,25 +255,6 @@ export default function PublicHorarioPage({ companySlug }: PublicHorarioPageProp
     if (!horario?.ownerId) return null
     return { uid: horario.ownerId }
   }, [horario?.ownerId])
-
-  const handleCopyUrl = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-
-      toast({
-        title: "Enlace copiado",
-        description: "El enlace del horario ha sido copiado al portapapeles",
-      })
-    } catch (copyError) {
-      toast({
-        title: "Error",
-        description: "No se pudo copiar el enlace",
-        variant: "destructive",
-      })
-    }
-  }
 
   // Toggle vista individual
   const handleToggleIndividualView = () => {
@@ -439,99 +382,43 @@ export default function PublicHorarioPage({ companySlug }: PublicHorarioPageProp
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header único unificado */}
+      {/* Header Horario Semanal (mobile-first) */}
       <div className="border-b bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex-1">
-            {/* Nombre de la empresa */}
-            {config?.nombreEmpresa && (
-              <div className="text-sm font-semibold text-gray-700 mb-2 sm:mb-1">
-                {config.nombreEmpresa}
-              </div>
-            )}
-            
-            {/* Saludo personalizado */}
-            {currentViewer && (
-              <div className="text-sm text-gray-600 mb-1">
-                Hola, <span className="font-medium">{currentViewer.employeeName}</span>
-              </div>
-            )}
-            
-            <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-              <Calendar className="h-6 w-6" />
-              Horario Semanal
-            </h1>
-            <div className="mt-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0">
-              {/* Mobile: rango corto + mes en misma línea */}
-              <div className="flex items-center gap-2 sm:hidden">
-                <span className="text-sm text-gray-500">
-                  {format(weekStartDate, "dd/MM")} – {format(addDays(weekStartDate, 6), "dd/MM")}
-                </span>
-                {monthLabel && (
-                  <>
-                    <span className="text-sm text-gray-400">-</span>
-                    <span className="text-sm font-medium text-gray-700">
-                      {monthLabel}
-                    </span>
-                  </>
-                )}
-              </div>
-              
-              {/* Desktop: rango completo + mes separados */}
-              <div className="hidden sm:flex sm:items-center sm:justify-between w-full">
-                <div className="text-sm text-gray-500">
-                  {format(weekStartDate, "dd/MM/yyyy")} – {format(addDays(weekStartDate, 6), "dd/MM/yyyy")}
-                </div>
-                {monthLabel && (
-                  <div className="text-sm font-medium text-gray-700">
-                    {monthLabel}
-                  </div>
-                )}
-              </div>
+        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-3">
+          {/* Fila 1: HORARIO — nombre — fecha */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs font-semibold tracking-wide text-muted-foreground shrink-0">
+                HORARIO
+              </span>
+              <span className="text-sm font-medium truncate">
+                {currentViewer?.employeeName ?? "—"}
+              </span>
             </div>
+            <span className="text-xs text-muted-foreground shrink-0">
+              {format(weekStartDate, "dd/MM")} – {format(addDays(weekStartDate, 6), "dd/MM")}
+              <span className="hidden sm:inline"> {format(weekStartDate, "yyyy")}</span>
+            </span>
           </div>
-          <div className="flex items-center gap-3">
-            {/* Botón Vista Individual */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleToggleIndividualView}
-              className="text-xs"
-            >
-              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM13 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2h-2z"/>
-              </svg>
-              Vista individual
-            </Button>
-            
-            {/* Botón Cambiar Persona */}
-            {currentViewer && (
+          {/* Fila 2: SEMANAL + acciones */}
+          <div className="flex items-center justify-between gap-2 mt-1 flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+              SEMANAL
+            </h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleToggleIndividualView}
+              >
+                Vista individual
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleChangePerson}
-                className="text-xs"
               >
-                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/>
-                </svg>
                 Cambiar persona
-              </Button>
-            )}
-            
-            {/* Ocultar chip "Publicado" y botón "Copiar enlace" en móvil */}
-            <div className="hidden sm:flex sm:items-center sm:gap-3">
-              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                Publicado
-              </Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCopyUrl}
-                className="text-xs"
-              >
-                <Copy className="mr-2 h-3 w-3" />
-                Copiar enlace
               </Button>
             </div>
           </div>
