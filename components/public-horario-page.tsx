@@ -15,9 +15,12 @@ import { useConfig } from "@/hooks/use-config"
 import { useToast } from "@/hooks/use-toast"
 import type { Empleado, Horario, Turno, ShiftAssignment } from "@/lib/types"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
+import type { ZoomableImageProps } from "@/components/ZoomableImage"
 
 interface PublicHorarioPageProps {
   companySlug: string
+  /** Componente para envolver la imagen (ej. ZoomableImage). Si no se pasa, se usa <img>. */
+  ImageWrapper?: React.ComponentType<ZoomableImageProps>
 }
 
 const buildFallbackEmployees = (ownerId: string, days?: Record<string, any>) => {
@@ -88,7 +91,7 @@ const getWeekStartDate = (weekId?: string, days?: Record<string, any>) => {
   return null
 }
 
-export default function PublicHorarioPage({ companySlug }: PublicHorarioPageProps) {
+export default function PublicHorarioPage({ companySlug, ImageWrapper }: PublicHorarioPageProps) {
   const { horario, isLoading, error } = usePublicHorario(companySlug)
   const { config } = useConfig()
   const [showIndividualView, setShowIndividualView] = useState(false)
@@ -480,30 +483,39 @@ export default function PublicHorarioPage({ companySlug }: PublicHorarioPageProp
             )
           }
           
-          // Vista por defecto: Imagen publicada
+          // Vista por defecto: Imagen publicada (con zoom si se pasa ImageWrapper)
           console.log("🔧 [PublicHorarioPage] Rendering published image")
+          const imageSrc = currentWeek.publicImageUrl
+          const imageAlt = `Horario ${currentWeek.weekLabel || 'semanal'}`
+          const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+            console.error("🔧 [PublicHorarioPage] Image load error:", e)
+            console.log("🔧 [PublicHorarioPage] Image failed, using ScheduleGrid fallback")
+          }
           return (
             <div className="w-full overflow-x-auto overflow-y-auto bg-white border rounded-lg p-4 sm:p-6"
                  style={{ touchAction: 'pan-x pan-y pinch-zoom' }}>
-              
-              <img 
-                src={currentWeek.publicImageUrl} 
-                alt={`Horario ${currentWeek.weekLabel || 'semanal'}`}
-                style={{ 
-                  width: '100%', 
-                  maxWidth: '100%', 
-                  height: 'auto', 
-                  display: 'block',
-                  maxHeight: '80vh',
-                  objectFit: 'contain',
-                  touchAction: 'pan-x pan-y pinch-zoom'
-                }}
-                onError={(e) => {
-                  console.error("🔧 [PublicHorarioPage] Image load error:", e)
-                  // Si falla la carga, mostrar ScheduleGrid como fallback
-                  console.log("🔧 [PublicHorarioPage] Image failed, using ScheduleGrid fallback")
-                }}
-              />
+              {ImageWrapper ? (
+                <ImageWrapper
+                  src={imageSrc}
+                  alt={imageAlt}
+                  onError={handleImageError}
+                />
+              ) : (
+                <img
+                  src={imageSrc}
+                  alt={imageAlt}
+                  style={{
+                    width: '100%',
+                    maxWidth: '100%',
+                    height: 'auto',
+                    display: 'block',
+                    maxHeight: '80vh',
+                    objectFit: 'contain',
+                    touchAction: 'pan-x pan-y pinch-zoom'
+                  }}
+                  onError={handleImageError}
+                />
+              )}
             </div>
           )
         })()}

@@ -398,3 +398,21 @@
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/* ZoomableImage: fondo negro cuando está ampliada y bloqueo de scroll del body */
+.zoomable-image-wrapper {
+  width: 100%;
+  min-height: 200px;
+  background: transparent;
+  overflow: hidden;
+}
+
+.zoomable-image-wrapper--zoomed {
+  background: #000;
+  position: relative;
+}
+
+body.zoomable-image-body-lock {
+  overflow: hidden;
+  touch-action: none;
+}
