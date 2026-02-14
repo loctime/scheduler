@@ -4,52 +4,61 @@ const path = require('path');
 const firestoreRulesDir = path.join(__dirname);
 const outputFile = path.join(__dirname, '..', 'firestore.rules');
 
-// Orden de los archivos a concatenar - CONTROLFILE (repositorio maestro)
-// Incluye todas las apps que comparten el Firestore
+// ORDEN DE CARGA DE REGLAS (IMPORTANTE)
+// - helpers/base primero
+// - apps específicas después
+// - default deny se agrega SOLO AL FINAL
 const files = [
   'base.rules',
+
+  // Apps core
   'controlFile.rules',
-  'controlbio.rules',
-  'controlciclo.rules',
-  'controlRemito.rules',
   'controlgastos.rules',
-  'controllaudit.rules',
-  'controlstore.rules',
-  'horarios.rules'
+  'audit.rules',
+  'repo.rules',
+  'emails.rules',
+  'valentin.rules',
+  'controlrepo.rules',
+
+  // Horarios / Scheduler
+  'horarios.rules',
+
+  // Mapping (NUEVO)
+  'mapping.rules'
 ];
 
-// Encabezado del archivo
+// Header Firestore
 let content = `rules_version = '2';\n\n`;
 content += `service cloud.firestore {\n`;
 content += `  match /databases/{db}/documents {\n\n`;
 
-// Leer y concatenar cada archivo
+// Concatenar reglas
 files.forEach((file) => {
   const filePath = path.join(firestoreRulesDir, file);
-  if (fs.existsSync(filePath)) {
-    const fileContent = fs.readFileSync(filePath, 'utf8');
-    
-    // Agregar comentario de sección
-    const sectionName = file.replace('.rules', '').toUpperCase().replace('-', '');
-    content += `    /* ========= ${sectionName} ========= */\n`;
-    content += `    \n`;
-    
-    // Agregar indentación a cada línea del contenido (4 espacios base)
-    const indentedContent = fileContent
-      .split('\n')
-      .map(line => {
-        if (line.trim() === '') return '    '; // Mantener líneas vacías con indentación
-        return `    ${line}`;
-      })
-      .join('\n');
-    
-    content += indentedContent + '\n\n';
-  } else {
-    console.warn(`⚠️  Archivo no encontrado: ${filePath}`);
+
+  if (!fs.existsSync(filePath)) {
+    console.warn(`⚠️  Archivo no encontrado: ${file}`);
+    return;
   }
+
+  const fileContent = fs.readFileSync(filePath, 'utf8');
+
+  const sectionName = file
+    .replace('.rules', '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9_]/g, '');
+
+  content += `    /* ========= ${sectionName} ========= */\n\n`;
+
+  const indentedContent = fileContent
+    .split('\n')
+    .map(line => (line.trim() === '' ? '    ' : `    ${line}`))
+    .join('\n');
+
+  content += indentedContent + '\n\n';
 });
 
-// Footer con deny por defecto
+// Default deny (ÚNICO Y AL FINAL)
 content += `    /* ========= DENY POR DEFECTO ========= */\n\n`;
 content += `    match /{document=**} {\n`;
 content += `      allow read, write: if false;\n`;
@@ -57,9 +66,8 @@ content += `    }\n`;
 content += `  }\n`;
 content += `}\n`;
 
-// Escribir el archivo concatenado
+// Escribir archivo final
 fs.writeFileSync(outputFile, content, 'utf8');
 
 console.log('✅ Reglas de Firestore concatenadas exitosamente en firestore.rules');
 console.log(`📝 Total de líneas: ${content.split('\n').length}`);
-

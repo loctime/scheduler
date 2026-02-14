@@ -205,6 +205,7 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
         },
         userId: user?.uid,
         isPublic: true,
+        activo: true, // Requerido por reglas Firestore para lectura pública (PWA mensual)
         companyName: options.companyName.trim()
       }
 

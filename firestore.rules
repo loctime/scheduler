@@ -162,6 +162,13 @@ service cloud.firestore {
         function actorOwnerId() {
           return isInvited() ? myOwnerId() : uid();
         }
+
+        // PWA pública: permite lectura sin auth si el owner tiene enlace público activo
+        function isPublicOwner(ownerId) {
+          return ownerId != null && ownerId != ''
+            && exists(/databases/$(db)/documents/apps/horarios/enlaces_publicos/$(ownerId))
+            && get(/databases/$(db)/documents/apps/horarios/enlaces_publicos/$(ownerId)).data.activo == true;
+        }
     
         function protectFieldUnchanged(field) {
           return !(field in request.resource.data)
@@ -227,8 +234,9 @@ service cloud.firestore {
         // ====================== EMPLOYEES ========================
         // =========================================================
         match /apps/horarios/employees/{empleadoId} {
-          allow read: if isAuth()
-            && canActFor(resource.data.ownerId);
+          allow read: if (isAuth()
+            && canActFor(resource.data.ownerId))
+            || isPublicOwner(resource.data.ownerId);
 
           allow create: if isAuth()
             && request.resource.data.ownerId == actorOwnerId()
@@ -246,8 +254,9 @@ service cloud.firestore {
         // ======================= SHIFTS ==========================
         // =========================================================
         match /apps/horarios/shifts/{turnoId} {
-          allow read: if isAuth()
-            && canActFor(resource.data.ownerId);
+          allow read: if (isAuth()
+            && canActFor(resource.data.ownerId))
+            || isPublicOwner(resource.data.ownerId);
 
           allow create: if isAuth()
             && request.resource.data.ownerId == actorOwnerId()
@@ -265,8 +274,9 @@ service cloud.firestore {
         // ====================== SCHEDULES ========================
         // =========================================================
         match /apps/horarios/schedules/{horarioId} {
-          allow read: if isAuth()
-            && canActFor(resource.data.ownerId);
+          allow read: if (isAuth()
+            && canActFor(resource.data.ownerId))
+            || isPublicOwner(resource.data.ownerId);
 
           allow create: if isAuth()
             && request.resource.data.ownerId == actorOwnerId()
@@ -295,8 +305,9 @@ service cloud.firestore {
         // ======================== CONFIG =========================
         // =========================================================
         match /apps/horarios/config/{configId} {
-          allow read: if isAuth()
-            && configId == actorOwnerId();
+          allow read: if (isAuth()
+            && configId == actorOwnerId())
+            || isPublicOwner(configId);
           allow create, update: if isAuth()
             && request.resource.data.ownerId == actorOwnerId()
             && protectFieldUnchanged("ownerId")
@@ -431,6 +442,16 @@ service cloud.firestore {
             && (resource.data.ownerId == uid() || isAdmin());
         }
     
+        // =========================================================
+        // ================== PUBLIC COMPANIES (PWA) =================
+        // =========================================================
+        // Resolver companySlug -> ownerId sin auth para PWA
+        match /apps/horarios/publicCompanies/{slug} {
+          allow get: if resource.data.active == true;
+          allow list: if false;
+          allow create, update, delete: if isAuth();
+        }
+
         // =========================================================
         // ==================== ENLACES PUBLICOS ===================
         // =========================================================
