@@ -1,12 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { useData } from "@/contexts/data-context"
 import { useStockConsole } from "@/hooks/use-stock-console"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Check, X, Package } from "lucide-react"
+import { Check, X, Package, ArrowLeft } from "lucide-react"
 
 interface StockConsoleContentProps {
   companySlug?: string
@@ -72,38 +73,49 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
       <div className={`min-h-screen bg-gray-100 ${isPWA ? "pb-20" : "pb-24"}`}>
         {/* Header simple */}
-        <div className="bg-blue-500 text-white p-4 shadow-lg">
-          <h1 className="text-xl font-bold">Stock Rápido</h1>
+        <div className="bg-blue-500 text-white p-4 shadow-lg flex items-center gap-3">
+          {companySlug ? (
+            <Link
+              href={`/pwa/${companySlug}/home`}
+              className="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-white/20 active:bg-white/30 transition-colors shrink-0"
+              aria-label="Volver al home"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </Link>
+          ) : null}
+          <h1 className="text-xl font-bold flex-1">Stock Rápido</h1>
         </div>
 
-        {/* Selector de Pedido (compacto) */}
+        {/* Selector de Pedido (compacto) — máx. 2 filas + scroll horizontal */}
         <div className="bg-white border-b">
           <div className="p-4">
             <div className="text-sm text-gray-600 mb-2">Pedido (opcional)</div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setSelectedPedidoId(null)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  !state.selectedPedidoId
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 text-gray-700"
-                }`}
-              >
-                Sin pedido
-              </button>
-              {pedidos.map((pedido) => (
+            <div className="overflow-x-auto overflow-y-hidden max-h-[4.75rem]">
+              <div className="flex flex-wrap gap-2 w-max min-w-full max-h-[4.75rem]">
                 <button
-                  key={pedido.id}
-                  onClick={() => setSelectedPedidoId(pedido.id)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    state.selectedPedidoId === pedido.id
+                  onClick={() => setSelectedPedidoId(null)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors shrink-0 ${
+                    !state.selectedPedidoId
                       ? "bg-blue-600 text-white"
                       : "bg-gray-200 text-gray-700"
                   }`}
                 >
-                  {pedido.nombre}
+                  Sin pedido
                 </button>
-              ))}
+                {pedidos.map((pedido) => (
+                  <button
+                    key={pedido.id}
+                    onClick={() => setSelectedPedidoId(pedido.id)}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors shrink-0 ${
+                      state.selectedPedidoId === pedido.id
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-200 text-gray-700"
+                    }`}
+                  >
+                    {pedido.nombre}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
