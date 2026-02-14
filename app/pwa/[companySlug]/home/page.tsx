@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Calendar, FileText, Users } from "lucide-react"
+import { PwaTodayScheduleCard } from "@/components/pwa-today-schedule-card"
 
 export default function PwaHomePage() {
   const router = useRouter()
@@ -81,30 +82,8 @@ export default function PwaHomePage() {
             </Card>
           </div>
 
-          {/* Info Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Información de Acceso</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <h4 className="font-medium mb-2">Rutas públicas (acceso libre):</h4>
-                  <ul className="space-y-1 text-muted-foreground">
-                    <li>• /pwa/[slug]/horario - Horario semanal</li>
-                    <li>• /pwa/[slug]/mensual - Vista mensual</li>
-                    <li>• /pwa/[slug]/home - Panel</li>
-                  </ul>
-                </div>
-                <div>
-                  <h4 className="font-medium mb-2">Ruta privada (requiere login):</h4>
-                  <ul className="space-y-1 text-muted-foreground">
-                    <li>• /pwa/[slug]/stock-console - Gestión de stock</li>
-                  </ul>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Horario de Hoy */}
+          <PwaTodayScheduleCard companySlug={companySlug} />
         </div>
       </div>
     </div>

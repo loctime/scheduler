@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ScheduleGrid } from "@/components/schedule-grid"
+import { PwaTodayScheduleCard } from "@/components/pwa-today-schedule-card"
 import { usePublicHorario } from "@/hooks/use-public-horario"
 import { useConfig } from "@/hooks/use-config"
 import { useToast } from "@/hooks/use-toast"
@@ -621,99 +622,7 @@ export default function PublicHorarioPage({ companySlug }: PublicHorarioPageProp
       {/* Banner "HORARIO DE HOY" - solo si hay empleado identificado */}
       {currentViewer && (
         <div className="w-full px-2 py-4">
-          <Card className="bg-blue-50 border-blue-200">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg text-blue-900">HORARIO DE HOY</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center">
-                <p className="text-sm text-blue-700 mb-2">
-                  {currentViewer.employeeName}
-                </p>
-                <p className="text-xs text-blue-600">
-                  {(() => {
-                    const today = new Date()
-                    const todayStr = format(today, "yyyy-MM-dd")
-                    const currentWeek = horario.weeks?.[horario.publishedWeekId]
-                    const dayData = currentWeek?.days?.[todayStr] as any
-                    const todayAssignments = dayData?.[currentViewer.employeeId]
-                    
-                    if (!todayAssignments || todayAssignments.length === 0) {
-                      return "🎉 Hoy tenés franco"
-                    }
-                    
-                    // Usar la misma lógica que ScheduleGrid para renderizar
-                    if (Array.isArray(todayAssignments)) {
-                      console.log("🔧 [PublicHorarioPage] Debug assignments:", {
-                        todayAssignments,
-                        shiftsAvailable: shifts.length,
-                        shiftsData: shifts,
-                        firstAssignment: todayAssignments[0],
-                        firstAssignmentType: typeof todayAssignments[0],
-                        firstAssignmentKeys: Object.keys(todayAssignments[0] || {})
-                      })
-                      
-                      return todayAssignments.map((assignment: any) => {
-                        console.log("🔧 [PublicHorarioPage] Procesando assignment:", assignment)
-                        
-                        // Si es objeto ShiftAssignment
-                        if (assignment && typeof assignment === 'object') {
-                          console.log("🔧 [PublicHorarioPage] Assignment object keys:", Object.keys(assignment))
-                          
-                          if (assignment.type === 'franco') {
-                            return 'Franco'
-                          }
-                          if (assignment.type === 'medio-franco') {
-                            return 'Medio franco'
-                          }
-                          if (assignment.type === 'shift') {
-                            // Si tiene startTime y endTime, usarlos directamente
-                            if (assignment.startTime && assignment.endTime) {
-                              return `${assignment.startTime} a ${assignment.endTime}`
-                            }
-                            // Sino, buscar en shifts por shiftId
-                            if (assignment.shiftId) {
-                              console.log("🔧 [PublicHorarioPage] Buscando shift por ID:", assignment.shiftId)
-                              const shift = shifts.find(s => s.id === assignment.shiftId)
-                              console.log("🔧 [PublicHorarioPage] Shift encontrado:", shift)
-                              if (shift) {
-                                return `${shift.startTime} a ${shift.endTime}`
-                              }
-                            }
-                          }
-                          return assignment.shiftId || 'Turno'
-                        }
-                        
-                        // Si es string, buscar en shifts
-                        if (typeof assignment === 'string') {
-                          console.log("🔧 [PublicHorarioPage] Buscando shift:", assignment)
-                          const shift = shifts.find(s => s.id === assignment)
-                          console.log("🔧 [PublicHorarioPage] Shift encontrado:", shift)
-                          if (shift) {
-                            return `${shift.startTime} a ${shift.endTime}`
-                          }
-                          return assignment
-                        }
-                        
-                        return 'Turno'
-                      }).join(' • ')
-                    }
-                    
-                    // Si no es array, tratar como string simple
-                    if (typeof todayAssignments === 'string') {
-                      const shift = shifts.find(s => s.id === todayAssignments)
-                      if (shift) {
-                        return `${shift.startTime} a ${shift.endTime}`
-                      }
-                      return todayAssignments
-                    }
-                    
-                    return todayAssignments
-                  })()}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <PwaTodayScheduleCard companySlug={companySlug} horario={horario} shifts={shifts} />
         </div>
       )}
 
