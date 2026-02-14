@@ -3,7 +3,34 @@
 import { useState, useEffect } from "react"
 import { collection, query, where, orderBy, doc, onSnapshot } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
+import { resolvePublicCompany } from "@/lib/public-companies"
 import type { Empleado, Turno, Configuracion } from "@/lib/types"
+
+/**
+ * Resuelve companySlug a ownerId (uid) usando publicCompanies.
+ * Útil para construir enlaces a /pwa/mensual?uid=XXX desde el panel PWA.
+ */
+export function useOwnerIdFromSlug(companySlug: string | null) {
+  const [ownerId, setOwnerId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(!!companySlug)
+
+  useEffect(() => {
+    if (!companySlug) {
+      setOwnerId(null)
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    resolvePublicCompany(companySlug)
+      .then((company) => {
+        setOwnerId(company?.ownerId ?? null)
+      })
+      .catch(() => setOwnerId(null))
+      .finally(() => setLoading(false))
+  }, [companySlug])
+
+  return { ownerId, loading }
+}
 
 /**
  * Carga empleados por ownerId (misma query que DataContext).

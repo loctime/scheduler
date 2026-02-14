@@ -7,6 +7,7 @@ import { onAuthStateChanged } from "firebase/auth"
 import { Package, Loader2, Calendar, CalendarDays, Home } from "lucide-react"
 import { auth, isFirebaseConfigured } from "@/lib/firebase"
 import { DataProvider } from "@/contexts/data-context"
+import { useOwnerIdFromSlug } from "@/hooks/use-owner-data"
 import { cn } from "@/lib/utils"
 
 function setAuthCookie(token?: string) {
@@ -25,6 +26,8 @@ export function PwaShell({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   // Slug solo desde la URL (multi-tenant público); no depende de autenticación
   const companySlug = params?.companySlug as string
+  const { ownerId } = useOwnerIdFromSlug(companySlug ?? null)
+  const mensualHref = ownerId ? `/pwa/mensual?uid=${encodeURIComponent(ownerId)}` : "/pwa/mensual"
 
   useEffect(() => {
     if (!isFirebaseConfigured() || !auth) {
@@ -65,13 +68,13 @@ export function PwaShell({ children }: { children: React.ReactNode }) {
     <nav className="fixed bottom-0 left-0 right-0 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="mx-auto flex max-w-lg items-center justify-around px-3 py-2">
         {companySlug ? [
-          { href: `/pwa/${companySlug}/horario`, label: "Horario", icon: Calendar },
-          { href: "/pwa/mensual", label: "Mensual", icon: CalendarDays },
-          { href: `/pwa/${companySlug}/home`, label: "Panel", icon: Home },
-          { href: `/pwa/stock-console/${companySlug}`, label: "Stock", icon: Package }
+          { href: `/pwa/${companySlug}/horario`, label: "Horario", icon: Calendar, pathMatch: null as string | null },
+          { href: mensualHref, label: "Mensual", icon: CalendarDays, pathMatch: "/pwa/mensual" },
+          { href: `/pwa/${companySlug}/home`, label: "Panel", icon: Home, pathMatch: null as string | null },
+          { href: `/pwa/stock-console/${companySlug}`, label: "Stock", icon: Package, pathMatch: null as string | null }
         ].map((item) => {
           const Icon = item.icon
-          const isActive = pathname === item.href
+          const isActive = pathname === item.href || (item.pathMatch != null && pathname === item.pathMatch)
 
           return (
             <Link key={item.href} href={item.href} className="flex-1">

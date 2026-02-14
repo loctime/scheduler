@@ -5,11 +5,14 @@ import { useRouter, useParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Calendar, FileText, Users } from "lucide-react"
+import { useOwnerIdFromSlug } from "@/hooks/use-owner-data"
 
 export default function PwaHomePage() {
   const router = useRouter()
   const params = useParams()
   const companySlug = params.companySlug as string
+  const { ownerId } = useOwnerIdFromSlug(companySlug)
+  const mensualHref = ownerId ? `/pwa/mensual?uid=${encodeURIComponent(ownerId)}` : "/pwa/mensual"
 
   return (
     <div className="min-h-screen bg-background">
@@ -57,7 +60,7 @@ export default function PwaHomePage() {
                   </div>
                 </div>
                 <div className="mt-4">
-                  <Link href="/pwa/mensual">
+                  <Link href={mensualHref}>
                     <Button className="w-full">Ir a Mensual</Button>
                   </Link>
                 </div>
