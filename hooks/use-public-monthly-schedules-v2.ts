@@ -126,57 +126,37 @@ export function usePublicMonthlySchedulesV2({
           return
         }
 
-        const data = publicDoc.data() as PublicScheduleData
-        console.log("🔧 [usePublicMonthlySchedulesV2] Datos cargados desde enlaces_publicos:", {
+        const data = publicDoc.data() as any
+        const slug = data.companySlug || companySlug
+        const weekIds: string[] = Array.isArray(data.publishedWeekIds) && data.publishedWeekIds.length > 0
+          ? data.publishedWeekIds
+          : data.weeks ? Object.keys(data.weeks) : []
+        console.log("🔧 [usePublicMonthlySchedulesV2] Metadata desde enlaces_publicos:", {
           ownerId: publicCompany.ownerId,
-          hasWeeks: !!data.weeks,
-          weeksCount: Object.keys(data.weeks || {}).length,
+          weeksCount: weekIds.length,
           companyName: data.companyName
         })
 
-        // Para cada week en enlaces_publicos, obtener el schedule original desde schedules/{weekId}
         const schedulesWithFullData: FullScheduleData[] = []
-        const weeks = data.weeks || {}
-        
-        for (const [weekKey, weekData] of Object.entries(weeks)) {
+        for (const weekId of weekIds) {
           try {
-            // Obtener el schedule original desde schedules/{weekId}
-            const scheduleRef = doc(db, "apps", "horarios", "schedules", weekData.weekId)
-            const scheduleDoc = await getDoc(scheduleRef)
-            
-            if (!scheduleDoc.exists()) {
-              console.warn("🔧 [usePublicMonthlySchedulesV2] No existe schedule original para weekId:", weekData.weekId)
-              continue
-            }
-            
-            const originalSchedule = scheduleDoc.data() as any
-            console.log("🔧 [usePublicMonthlySchedulesV2] Schedule original encontrado:", {
-              weekId: weekData.weekId,
-              hasWeekStart: !!originalSchedule.weekStart,
-              hasWeekEnd: !!originalSchedule.weekEnd,
-              weekStart: originalSchedule.weekStart,
-              weekEnd: originalSchedule.weekEnd
-            })
-            
-            // Crear un schedule con los datos del original pero compatible con la interfaz
-            const fullScheduleData = {
-              id: weekData.weekId,
-              weekStart: originalSchedule.weekStart,
-              weekEnd: originalSchedule.weekEnd,
-              assignments: originalSchedule.assignments || {},
-              employeesSnapshot: originalSchedule.employeesSnapshot || weekData.employees || [],
-              ordenEmpleadosSnapshot: originalSchedule.ordenEmpleadosSnapshot || [],
-              publishedAt: weekData.publishedAt,
+            const weekRef = doc(db, "apps", "horarios", "publicSchedules", slug, "weeks", weekId)
+            const weekDoc = await getDoc(weekRef)
+            if (!weekDoc.exists()) continue
+            const d = weekDoc.data() as any
+            schedulesWithFullData.push({
+              id: weekId,
+              weekStart: d.weekStart || "",
+              weekEnd: d.weekEnd || "",
+              assignments: d.assignments || {},
+              employeesSnapshot: d.employeesSnapshot || [],
+              ordenEmpleadosSnapshot: d.ordenEmpleadosSnapshot || [],
+              publishedAt: d.publishedAt,
               publishedBy: publicCompany.ownerId,
               companyName: data.companyName || publicCompany.companyName
-            }
-            
-            schedulesWithFullData.push(fullScheduleData)
-          } catch (error) {
-            console.error("🔧 [usePublicMonthlySchedulesV2] Error obteniendo schedule original:", {
-              weekId: weekData.weekId,
-              error: error
             })
+          } catch (error) {
+            console.error("🔧 [usePublicMonthlySchedulesV2] Error leyendo semana pública:", { weekId, error })
           }
         }
 

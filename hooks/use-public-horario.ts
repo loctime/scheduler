@@ -54,7 +54,7 @@ export function usePublicHorario(companySlug: string): UsePublicHorarioReturn {
         return
       }
 
-      // Obtener datos públicos desde la colección dedicada
+      // Obtener metadata desde enlaces_publicos (ya no guardamos el blob "weeks" para no superar 1MB)
       const horarioRef = doc(db, "apps", "horarios", "enlaces_publicos", publicCompany.ownerId)
       const horarioDoc = await getDoc(horarioRef)
 
@@ -65,10 +65,54 @@ export function usePublicHorario(companySlug: string): UsePublicHorarioReturn {
       }
 
       const rawData = horarioDoc.data() as any
-      
-      // Sanitizar datos para remover información sensible
-      const sanitizedData = sanitizePublicHorarioData(rawData)
-      
+      let dataToSanitize: typeof rawData
+
+      // Compatibilidad: si aún existe el blob "weeks" (doc antiguo), usarlo
+      if (rawData.weeks && typeof rawData.weeks === "object" && Object.keys(rawData.weeks).length > 0) {
+        dataToSanitize = rawData
+      } else {
+        // Nuevo formato: metadata + leer cada semana desde publicSchedules
+        const slug = rawData.companySlug || companySlug
+        const publishedWeekId = rawData.publishedWeekId || ""
+        const weekIds = Array.isArray(rawData.publishedWeekIds) && rawData.publishedWeekIds.length > 0
+          ? rawData.publishedWeekIds.slice(0, 12)
+          : publishedWeekId ? [publishedWeekId] : []
+        if (weekIds.length === 0) {
+          setError("Horario no disponible")
+          return
+        }
+        const weeks: Record<string, any> = {}
+        for (const weekId of weekIds) {
+          const weekRef = doc(db, "apps", "horarios", "publicSchedules", slug, "weeks", weekId)
+          const weekSnap = await getDoc(weekRef)
+          if (!weekSnap.exists()) continue
+          const d = weekSnap.data() as any
+          const weekStart = d.weekStart || ""
+          const weekEnd = d.weekEnd || ""
+          const weekLabel = weekStart && weekEnd ? `${weekStart} - ${weekEnd}` : `Semana ${weekId}`
+          weeks[weekId] = {
+            weekId,
+            weekLabel,
+            publishedAt: d.publishedAt ?? null,
+            publicImageUrl: null,
+            days: d.assignments || {},
+            dayStatus: d.dayStatus || {},
+            employees: d.employeesSnapshot || [],
+            shifts: d.shifts || []
+          }
+        }
+        if (Object.keys(weeks).length === 0) {
+          setError("Horario no disponible")
+          return
+        }
+        dataToSanitize = {
+          ...rawData,
+          publishedWeekId: publishedWeekId || weekIds[0],
+          weeks
+        }
+      }
+
+      const sanitizedData = sanitizePublicHorarioData(dataToSanitize)
       if (!isValidPublicHorarioData(sanitizedData)) {
         setError("Horario no disponible")
         return

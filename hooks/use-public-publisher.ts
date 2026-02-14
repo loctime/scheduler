@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { doc, setDoc, serverTimestamp, getDoc, collection, query, where, getDocs } from "firebase/firestore"
+import { doc, setDoc, serverTimestamp, getDoc, deleteField, collection, query, where, getDocs } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { createPublicCompanySlug } from "@/lib/public-companies"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
@@ -161,64 +161,35 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
         throw new Error("No se pudo guardar el documento en publicSchedules")
       }
 
-      // Mantener enlaces_publicos con datos completos para que la PWA pueda leerlos
-      // La PWA (usePublicHorario) lee de aquí y espera weeks[weekId].days (asignaciones)
-      const employeesForLegacy = options.employees?.length
-        ? options.employees
-        : (originalSchedule.employeesSnapshot || []).map((e: any) => ({
-            id: e.id || e.employeeId,
-            name: e.name || e.displayName || e.id || 'Empleado'
-          })).filter((e: any) => e.id)
-
-      // Incluir turnos (id, name, color) para que la PWA muestre el color real en "Horario de Hoy"
-      let shiftsSnapshot: Array<{ id: string; name: string; color: string }> = []
-      try {
-        const shiftsQuery = query(
-          collection(db, COLLECTIONS.SHIFTS),
-          where("ownerId", "==", ownerId)
-        )
-        const shiftsSnap = await getDocs(shiftsQuery)
-        shiftsSnapshot = shiftsSnap.docs.map((d) => {
-          const data = d.data()
-          return { id: d.id, name: (data.name as string) || "", color: (data.color as string) || "#9ca3af" }
-        })
-      } catch (shiftsErr) {
-        console.warn("🔧 [usePublicPublisher] No se pudieron cargar turnos para snapshot:", shiftsErr)
-      }
+      // Enlaces públicos: solo metadata (sin weeks) para no superar 1MB por documento.
+      // La PWA lee cada semana desde publicSchedules/{companySlug}/weeks/{weekId}.
+      const legacyRef = doc(db, "apps", "horarios", "enlaces_publicos", ownerId)
+      const existingLegacy = await getDoc(legacyRef)
+      const existingData = existingLegacy.exists() ? existingLegacy.data() : {}
+      const existingWeekIds: string[] = Array.isArray(existingData.publishedWeekIds)
+        ? existingData.publishedWeekIds
+        : existingData.weeks ? Object.keys(existingData.weeks) : []
+      const publishedWeekIds = existingWeekIds.includes(options.weekId)
+        ? existingWeekIds
+        : [options.weekId, ...existingWeekIds].slice(0, 104) // máx. ~2 años de semanas
 
       const legacyPublicData = {
-        ownerId: ownerId,
+        ownerId,
+        companySlug,
         publishedWeekId: options.weekId,
-        weeks: {
-          [options.weekId]: {
-            weekId: options.weekId,
-            weekLabel: options.weekData.startDate && options.weekData.endDate
-              ? `${options.weekData.startDate} - ${options.weekData.endDate}`
-              : `Semana ${options.weekId}`,
-            publishedAt: serverTimestamp(),
-            publicImageUrl: options.publicImageUrl || null,
-            days: originalSchedule.assignments || {},
-            dayStatus: originalSchedule.dayStatus || {},
-            employees: employeesForLegacy,
-            shifts: shiftsSnapshot
-          }
-        },
+        publishedWeekIds,
         userId: user?.uid,
         isPublic: true,
-        activo: true, // Requerido por reglas Firestore para lectura pública (PWA mensual)
-        companyName: options.companyName.trim()
+        activo: true,
+        companyName: options.companyName.trim(),
+        lastPublishedAt: serverTimestamp(),
+        weeks: deleteField() // quitar blob antiguo para no superar 1MB
       }
 
-      const legacyRef = doc(db, "apps", "horarios", "enlaces_publicos", ownerId)
       await setDoc(legacyRef, legacyPublicData, { merge: true })
-      
-      // Verificar el documento legacy también
-      const legacySavedDoc = await getDoc(legacyRef)
-      console.log("🔧 [usePublicPublisher] Verificación de escritura en enlaces_publicos:", {
+      console.log("🔧 [usePublicPublisher] Metadata en enlaces_publicos actualizada (sin weeks):", {
         path: `apps/horarios/enlaces_publicos/${ownerId}`,
-        exists: legacySavedDoc.exists(),
-        hasData: legacySavedDoc.exists() ? Object.keys(legacySavedDoc.data() || {}).length : 0,
-        hasWeeks: legacySavedDoc.exists() ? Object.keys(legacySavedDoc.data()?.weeks || {}).length : 0
+        publishedWeekIds: publishedWeekIds.length
       })
 
       console.log("✅ [usePublicPublisher] Publicación completada exitosamente")

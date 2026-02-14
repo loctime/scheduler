@@ -269,7 +269,10 @@ match /apps/horarios/employee_fixed_rules/{ruleId} {
 
 match /apps/horarios/enlaces_publicos/{ownerId} {
   allow read: if true;
-  allow write: if false;
+
+  allow create, update: if isAuth() && horariosCanActFor(ownerId);
+
+  allow delete: if isAuth() && horariosCanActFor(ownerId);
 }
 
 /* ===============================
