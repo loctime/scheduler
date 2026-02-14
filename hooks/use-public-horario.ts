@@ -94,7 +94,7 @@ export function usePublicHorario(companySlug: string): UsePublicHorarioReturn {
             weekId,
             weekLabel,
             publishedAt: d.publishedAt ?? null,
-            publicImageUrl: null,
+            publicImageUrl: d.publicImageUrl ?? null,
             days: d.assignments || {},
             dayStatus: d.dayStatus || {},
             employees: d.employeesSnapshot || [],

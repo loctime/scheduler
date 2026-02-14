@@ -134,7 +134,8 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
         ordenEmpleadosSnapshot: originalSchedule.ordenEmpleadosSnapshot || [],
         publishedAt: serverTimestamp(),
         publishedBy: user?.uid,
-        companyName: options.companyName.trim()
+        companyName: options.companyName.trim(),
+        publicImageUrl: options.publicImageUrl ?? null
       }
       
       console.log("🔧 [usePublicPublisher] Escribiendo schedule público en:", publicSchedulePath)
