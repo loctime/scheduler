@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Calendar, FileText, Users } from "lucide-react"
 import { PwaTodayScheduleCard } from "@/components/pwa-today-schedule-card"
 import { UserStatusMenu } from "@/components/pwa/UserStatusMenu"
+import { PwaViewerBadge } from "@/components/pwa/PwaViewerBadge"
 
 export default function PwaHomePage() {
   const router = useRouter()
@@ -21,12 +22,15 @@ export default function PwaHomePage() {
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <h1 className="text-3xl font-bold text-foreground">Panel PWA</h1>
+                <h1 className="text-3xl font-bold text-foreground">Panel PWA {companySlug}</h1>
                 <p className="text-muted-foreground">
                   Acceso rápido a todas las funcionalidades del sistema
                 </p>
               </div>
-              <UserStatusMenu />
+              <div className="flex items-center gap-1">
+                <PwaViewerBadge companySlug={companySlug} />
+                <UserStatusMenu />
+              </div>
             </div>
             <PwaTodayScheduleCard companySlug={companySlug} variant="inline" />
           </div>

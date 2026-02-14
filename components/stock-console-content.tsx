@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Check, X, Package, ArrowLeft } from "lucide-react"
 import { UserStatusMenu } from "@/components/pwa/UserStatusMenu"
+import { PwaViewerBadge } from "@/components/pwa/PwaViewerBadge"
 
 interface StockConsoleContentProps {
   companySlug?: string
@@ -85,7 +86,8 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
             </Link>
           ) : null}
           <h1 className="text-xl font-bold flex-1">Stock Rápido</h1>
-          <div className="[&_button]:text-white [&_button]:hover:bg-white/20 [&_button]:hover:text-white [&_.bg-green-500]:border-blue-500">
+          <div className="flex items-center gap-1 [&_button]:text-white [&_button]:hover:bg-white/20 [&_button]:hover:text-white [&_.bg-green-500]:border-blue-500">
+            <PwaViewerBadge companySlug={companySlug} variant="light-on-dark" />
             <UserStatusMenu />
           </div>
         </div>

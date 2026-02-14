@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ScheduleGrid } from "@/components/schedule-grid"
 import { PwaTodayScheduleCard } from "@/components/pwa-today-schedule-card"
+import { notifyViewerChanged, notifyViewerCleared } from "@/components/pwa/PwaViewerBadge"
 import { usePublicHorario } from "@/hooks/use-public-horario"
 import { useConfig } from "@/hooks/use-config"
 import { useToast } from "@/hooks/use-toast"
@@ -270,6 +271,7 @@ export default function PublicHorarioPage({ companySlug }: PublicHorarioPageProp
     // Guardar en localStorage
     if (typeof window !== 'undefined') {
       localStorage.setItem('horario.viewer', JSON.stringify(viewer))
+      notifyViewerChanged(viewer)
     }
     
     toast({
@@ -286,6 +288,7 @@ export default function PublicHorarioPage({ companySlug }: PublicHorarioPageProp
     // Limpiar localStorage
     if (typeof window !== 'undefined') {
       localStorage.removeItem('horario.viewer')
+      notifyViewerCleared()
     }
   }
 
