@@ -1,90 +1,159 @@
 /* ===============================
-   HORARIOS – VERSION LIMPIA
+   HORARIOS – LECTURA PÚBLICA
    =============================== */
 
 /* ========= HELPERS ========= */
 
-function canActFor(ownerId) {
-  return isAuth() && (
-    request.auth.uid == ownerId ||
-    (
-      exists(/databases/$(db)/documents/apps/horarios/users/$(request.auth.uid))
-      &&
-      get(/databases/$(db)/documents/apps/horarios/users/$(request.auth.uid)).data.ownerId == ownerId
-    )
-  );
+function horariosUserOwnerId() {
+  return isAuth()
+    && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+    ? get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId
+    : null;
 }
 
-// Verifica si el owner tiene slug público activo
-function ownerHasActivePublicSlug(ownerId) {
-  return ownerId != null
-    &&
-    exists(
-      /databases/$(db)/documents/apps/horarios/publicCompanies/$(ownerId)
-    )
-    &&
-    get(
-      /databases/$(db)/documents/apps/horarios/publicCompanies/$(ownerId)
-    ).data.active == true;
+function horariosCanActFor(ownerId) {
+  return isAuth()
+    && ownerId != null
+    && (
+      uid() == ownerId
+      || (
+        exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+        &&
+        get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId == ownerId
+      )
+      || (
+        exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+        &&
+        get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role
+          in ['admin','manager','factory','maxdev']
+      )
+    );
 }
 
-/* ========= PUBLIC COMPANIES ========= */
+
+
+/* ===============================
+   PUBLIC COMPANIES
+   =============================== */
 
 match /apps/horarios/publicCompanies/{slug} {
-  allow read: if resource.data.active == true;
+  allow read: if true;
 
   allow create: if isAuth()
-    && request.resource.data.ownerId == request.auth.uid;
+    && request.resource.data.ownerId == uid();
 
   allow update, delete: if false;
 }
 
-/* ========= PUBLIC SCHEDULES ========= */
+/* ===============================
+   PUBLIC SCHEDULES
+   =============================== */
 
 match /apps/horarios/publicSchedules/{companySlug}/weeks/{weekId} {
   allow read: if true;
 
   allow create, update: if isAuth()
-    && request.resource.data.ownerId == request.auth.uid;
+    && request.resource.data.ownerId == uid();
 
   allow delete: if false;
 }
 
-/* ========= PRODUCTS ========= */
+/* ===============================
+   PUBLIC OWNERS
+   =============================== */
 
-match /apps/horarios/products/{productId} {
-  allow read: if isAuth();
-
-  allow update: if isAuth()
-    && request.resource.data.ownerId == resource.data.ownerId;
-
-  allow create, delete: if false;
+match /apps/horarios/publicOwners/{ownerId} {
+  allow read: if true;
+  allow write: if horariosCanActFor(ownerId);
 }
 
-/* ========= STOCK MOVIMIENTOS ========= */
+/* ===============================
+   PRODUCTS
+   =============================== */
 
-match /apps/horarios/stock_movimientos/{movId} {
-  allow read: if isAuth();
+match /apps/horarios/products/{docId} {
+  allow read: if true;
 
-  allow create: if isAuth()
-    && request.resource.data.userId == uid()
-    && request.resource.data.ownerId is string;
-
-  allow update, delete: if false;
+  allow create: if horariosCanActFor(request.resource.data.ownerId);
+  allow update, delete: if horariosCanActFor(
+    resource.data.ownerId != null
+      ? resource.data.ownerId
+      : request.resource.data.ownerId
+  );
 }
 
-/* ========= USERS ========= */
+/* ===============================
+   PEDIDOS
+   =============================== */
+
+match /apps/horarios/pedidos/{docId} {
+  allow read: if true;
+
+  allow create: if horariosCanActFor(request.resource.data.ownerId);
+  allow update, delete: if horariosCanActFor(
+    resource.data.ownerId != null
+      ? resource.data.ownerId
+      : request.resource.data.ownerId
+  );
+}
+
+match /apps/horarios/pedidos/{docId}/{sub=**} {
+  allow read: if true;
+
+  allow create: if horariosCanActFor(request.resource.data.ownerId);
+  allow update, delete: if horariosCanActFor(
+    resource.data.ownerId != null
+      ? resource.data.ownerId
+      : request.resource.data.ownerId
+  );
+}
+
+/* ===============================
+   STOCK ACTUAL
+   =============================== */
+
+match /apps/horarios/stock_actual/{docId} {
+  allow read: if true;
+
+  allow create: if horariosCanActFor(request.resource.data.ownerId);
+  allow update, delete: if horariosCanActFor(
+    resource.data.ownerId != null
+      ? resource.data.ownerId
+      : request.resource.data.ownerId
+  );
+}
+
+/* ===============================
+   STOCK MOVIMIENTOS
+   =============================== */
+
+match /apps/horarios/stock_movimientos/{docId} {
+  allow read: if true;
+
+  allow create: if horariosCanActFor(request.resource.data.ownerId);
+  allow update, delete: if horariosCanActFor(
+    resource.data.ownerId != null
+      ? resource.data.ownerId
+      : request.resource.data.ownerId
+  );
+}
+
+/* ===============================
+   USERS
+   =============================== */
 
 match /apps/horarios/users/{userId} {
-  allow create: if isAuth() && userId == request.auth.uid;
-  allow read, update: if isAuth() && userId == request.auth.uid;
-  allow delete: if false;
+  allow read, write: if isAuth() && userId == uid();
 }
 
-/* ========= INVITACIONES ========= */
+/* ===============================
+   INVITACIONES
+   =============================== */
 
-match /apps/horarios/invitaciones/{invitacionId} {
-  allow read: if isAuth();
+match /apps/horarios/invitaciones/{docId} {
+  allow read: if true;
+
+  allow create: if isAuth();
 
   allow update: if isAuth()
     && (
@@ -94,65 +163,127 @@ match /apps/horarios/invitaciones/{invitacionId} {
         request.resource.data.usado == true
         && request.resource.data.usadoPor == uid()
         && request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(["usado", "usadoPor", "usadoEn"])
+          .hasOnly(["usado", "usadoPor", "usadoEn"])
       )
     );
 
-  allow create: if isAuth();
   allow delete: if false;
 }
 
-/* ========= EMPLOYEES ========= */
+/* ===============================
+   EMPLOYEES
+   =============================== */
 
 match /apps/horarios/employees/{docId} {
+  allow read: if true;
 
-  allow read: if
-    canActFor(resource.data.ownerId)
-    ||
-    ownerHasActivePublicSlug(resource.data.ownerId);
+  allow create: if horariosCanActFor(request.resource.data.ownerId);
 
-  allow write: if canActFor(request.resource.data.ownerId);
+  allow update, delete: if horariosCanActFor(
+    resource.data.ownerId != null
+      ? resource.data.ownerId
+      : request.resource.data.ownerId
+  );
 }
 
-/* ========= SHIFTS ========= */
+
+/* ===============================
+   SHIFTS
+   =============================== */
 
 match /apps/horarios/shifts/{docId} {
+  allow read: if true;
 
-  allow read: if
-    canActFor(resource.data.ownerId)
-    ||
-    ownerHasActivePublicSlug(resource.data.ownerId);
-
-  allow write: if canActFor(request.resource.data.ownerId);
+  allow create: if horariosCanActFor(request.resource.data.ownerId);
+  allow update, delete: if horariosCanActFor(
+    resource.data.ownerId != null
+      ? resource.data.ownerId
+      : request.resource.data.ownerId
+  );
 }
 
-/* ========= SCHEDULES ========= */
+/* ===============================
+   SCHEDULES
+   =============================== */
 
 match /apps/horarios/schedules/{docId} {
 
-  allow read: if
-    canActFor(resource.data.ownerId)
-    ||
-    ownerHasActivePublicSlug(resource.data.ownerId);
+  allow read: if true;
 
-  allow write: if canActFor(request.resource.data.ownerId);
+  allow create: if horariosCanActFor(request.resource.data.ownerId);
+
+  allow update, delete: if isAuth();
 }
 
-/* ========= CONFIG ========= */
+/* ===============================
+   HISTORIAL (cambios de horarios)
+   =============================== */
 
-match /apps/horarios/config/{ownerId} {
+match /apps/horarios/historial/{historialId} {
+  allow read: if isAuth() && resource.data.createdBy == uid();
 
-  allow read: if
-    canActFor(ownerId)
-    ||
-    ownerHasActivePublicSlug(ownerId);
+  allow create: if isAuth() && request.resource.data.createdBy == uid();
 
-  allow write: if canActFor(ownerId);
+  allow update: if false;
+
+  allow delete: if isAuth() && resource.data.createdBy == uid();
 }
 
-/* ========= FALLBACK ========= */
+/* ===============================
+   EMPLOYEE FIXED RULES
+   =============================== */
 
-match /apps/horarios/{document=**} {
-  allow read: if false;
+match /apps/horarios/employee_fixed_rules/{ruleId} {
+
+  allow read: if isAuth() && (
+    resource.data.ownerId == uid()
+    ||
+    (
+      exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+      &&
+      get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId
+        == resource.data.ownerId
+    )
+    ||
+    (
+      exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+      &&
+      get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role
+        in ['admin', 'manager', 'factory', 'maxdev']
+    )
+  );
+
+  allow create: if horariosCanActFor(request.resource.data.ownerId);
+
+  allow update, delete: if horariosCanActFor(
+    resource.data.ownerId != null
+      ? resource.data.ownerId
+      : request.resource.data.ownerId
+  );
+}
+
+
+/* ===============================
+   ENLACES PUBLICOS
+   =============================== */
+
+match /apps/horarios/enlaces_publicos/{ownerId} {
+  allow read: if true;
   allow write: if false;
+}
+
+/* ===============================
+   CONFIG
+   =============================== */
+
+match /apps/horarios/config/{docId} {
+  allow read: if true;
+
+  allow create: if horariosCanActFor(request.resource.data.ownerId);
+
+  allow update, delete: if horariosCanActFor(
+    resource.data.ownerId != null
+      ? resource.data.ownerId
+      : request.resource.data.ownerId
+  );
 }

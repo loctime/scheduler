@@ -76,30 +76,15 @@ export const saveEmployeeRequest = async (
 };
 
 /**
- * Obtener un pedido de empleado específico
+ * Obtener un pedido de empleado específico.
+ * Desactivado: no se accede a Firestore (feature eliminada).
  */
 export const getEmployeeRequest = async (
-  scheduleId: string,
-  employeeId: string,
-  date: string
+  _scheduleId: string,
+  _employeeId: string,
+  _date: string
 ): Promise<EmployeeRequest | null> => {
-  if (!db) {
-    return null;
-  }
-
-  try {
-    const docId = `${scheduleId}_${employeeId}_${date}`;
-    const docRef = doc(db, COLLECTION_NAME, docId);
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-      return docSnap.data() as EmployeeRequest;
-    }
-    return null;
-  } catch (error) {
-    console.error('Error getting employee request:', error);
-    return null;
-  }
+  return Promise.resolve(null);
 };
 
 /**

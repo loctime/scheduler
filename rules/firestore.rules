@@ -1013,38 +1013,6 @@ service cloud.firestore {
       allow delete: if isAuth()
         && canActFor(resource.data.ownerId);
     }
-    // =========================================================
-    // ================= EMPLOYEE REQUESTS =====================
-    // =========================================================
-    match /apps/horarios/employee_requests/{requestId} {
-    
-      // Lectura:
-      // - empleado autenticado
-      // - roles con acceso (admin / manager / factory / invitado)
-      // IMPORTANTE: NO usar resource.data en read (queries)
-      allow read: if isAuth();
-    
-      // Creación:
-      // - solo el empleado autenticado
-      allow create: if isAuth()
-        && request.resource.data.userId == uid()
-        && request.resource.data.ownerId == myOwnerId();
-    
-      // Update:
-      // - owner / admin / manager
-      // - el empleado NO puede editar una vez creada
-      allow update: if isAuth()
-        && canActFor(resource.data.ownerId)
-        && protectFieldUnchanged('userId')
-        && protectFieldUnchanged('employeeId')
-        && protectFieldUnchanged('ownerId');
-    
-      // Delete:
-      // - owner o admin
-      allow delete: if isAuth()
-        && canActFor(resource.data.ownerId);
-    }
-    
         // =========================================================
         // ===================== DEFAULT DENY ======================
         // =========================================================
