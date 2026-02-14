@@ -2,10 +2,11 @@
 
 import { Button } from "@/components/ui/button"
 import { Download, ChevronLeft, ChevronRight, Loader2, ExternalLink } from "lucide-react"
-import { format, addDays } from "date-fns"
+import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { useMemo } from "react"
 import { useCompanySlug } from "@/hooks/use-company-slug"
+import { getMainMonth } from "@/lib/utils"
 
 interface MonthHeaderProps {
   monthRange: { startDate: Date; endDate: Date }
@@ -15,52 +16,6 @@ interface MonthHeaderProps {
   onExportPDF: () => void
   exporting: boolean
   user?: any
-}
-
-/**
- * Determina el mes principal basándose en qué mes tiene más días en el rango
- */
-function getMainMonth(startDate: Date, endDate: Date): Date {
-  const monthDays: Map<string, number> = new Map()
-  
-  let currentDate = new Date(startDate)
-  const end = new Date(endDate)
-  
-  // Contar días por mes
-  while (currentDate <= end) {
-    const monthKey = format(currentDate, "yyyy-MM")
-    monthDays.set(monthKey, (monthDays.get(monthKey) || 0) + 1)
-    currentDate = addDays(currentDate, 1)
-  }
-  
-  // Encontrar el mes con más días
-  let maxDays = 0
-  let mainMonthKey = ""
-  
-  monthDays.forEach((days, monthKey) => {
-    if (days > maxDays) {
-      maxDays = days
-      mainMonthKey = monthKey
-    }
-  })
-  
-  // Si hay empate (mismo número de días), preferir el mes que viene después (el segundo mes del rango)
-  if (maxDays > 0) {
-    // Obtener todas las claves de mes y encontrar los que tienen el máximo de días
-    const allMonthKeys = Array.from(monthDays.keys()).sort()
-    const candidatesWithMaxDays = allMonthKeys.filter(key => monthDays.get(key) === maxDays)
-    
-    // Si hay empate, usar el último mes (el que viene después)
-    const selectedMonthKey = candidatesWithMaxDays.length > 1 
-      ? candidatesWithMaxDays[candidatesWithMaxDays.length - 1]
-      : mainMonthKey
-    
-    const [year, month] = selectedMonthKey.split("-").map(Number)
-    return new Date(year, month - 1, 15) // Usar día 15 para evitar problemas con días de fin de mes
-  }
-  
-  // Fallback: usar el mes de la fecha de fin
-  return new Date(endDate)
 }
 
 export function MonthHeader({

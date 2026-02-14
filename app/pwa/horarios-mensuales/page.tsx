@@ -14,7 +14,7 @@ import { format, parseISO, startOfWeek, addDays } from "date-fns"
 import { es } from "date-fns/locale"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { WeekSchedule } from "@/components/schedule-calendar/week-schedule"
-import { getCustomMonthRange, getMonthWeeks } from "@/lib/utils"
+import { getCustomMonthRange, getMainMonth, getMonthWeeks } from "@/lib/utils"
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { ExportOverlay } from "@/components/export-overlay"
 import { useCompanySlug } from "@/hooks/use-company-slug"
@@ -115,7 +115,9 @@ export default function PwaHorariosMensualesPage() {
       
       // Crear key del mes (YYYY-MM basado en el mes personalizado)
       const monthKey = format(targetMonthDate, "yyyy-MM")
-      const monthName = format(targetMonthDate, "MMMM yyyy", { locale: es })
+      const periodRange = getCustomMonthRange(targetMonthDate, monthStartDay)
+      const mainMonth = getMainMonth(periodRange.startDate, periodRange.endDate)
+      const monthName = format(mainMonth, "MMMM yyyy", { locale: es })
       
       // Obtener o crear el grupo del mes
       if (!monthMap.has(monthKey)) {

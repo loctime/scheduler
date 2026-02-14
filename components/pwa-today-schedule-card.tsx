@@ -58,6 +58,8 @@ interface PwaTodayScheduleCardProps {
   companySlug: string
   horario?: any
   shifts?: Turno[]
+  /** "inline" = una línea compacta para el header; "card" = tarjeta completa (default) */
+  variant?: "card" | "inline"
 }
 
 /**
@@ -67,7 +69,7 @@ interface PwaTodayScheduleCardProps {
  * - Medio franco (warning)
  * - Franco completo (muted)
  */
-export function PwaTodayScheduleCard({ companySlug, horario: horarioProp, shifts: shiftsProp }: PwaTodayScheduleCardProps) {
+export function PwaTodayScheduleCard({ companySlug, horario: horarioProp, shifts: shiftsProp, variant = "card" }: PwaTodayScheduleCardProps) {
   const { horario: horarioFromHook, isLoading } = usePublicHorario(companySlug)
   const horario = horarioProp ?? horarioFromHook
   const [currentViewer, setCurrentViewer] = useState<{
@@ -100,7 +102,41 @@ export function PwaTodayScheduleCard({ companySlug, horario: horarioProp, shifts
 
   if (!currentViewer) return null
 
+  const today = new Date()
+  const todayStr = format(today, "yyyy-MM-dd")
+  const currentWeek = horario?.weeks?.[horario?.publishedWeekId]
+  const dayData = currentWeek?.days?.[todayStr] as Record<string, any> | undefined
+  const todayAssignments = dayData?.[currentViewer.employeeId]
+
   const isLoadingState = !horarioProp && (isLoading || !horario?.publishedWeekId)
+  const scheduleInfo = getTodayScheduleInfo(todayAssignments, shifts)
+
+  if (variant === "inline") {
+    if (isLoadingState) {
+      return (
+        <p className="text-sm text-muted-foreground">
+          Hoy: <span className="inline-block h-4 w-24 align-middle bg-muted rounded animate-pulse" />
+        </p>
+      )
+    }
+    const { status, timeBlocks } = scheduleInfo
+    const text =
+      status === "franco"
+        ? "Franco"
+        : status === "medio_franco"
+          ? timeBlocks.length > 0
+            ? timeBlocks.map((b) => `${b.startTime}–${b.endTime}`).join(", ")
+            : "Medio franco"
+          : timeBlocks.length > 0
+            ? timeBlocks.map((b) => `${b.startTime}–${b.endTime}`).join(", ")
+            : "—"
+    return (
+      <p className="text-sm text-muted-foreground">
+        Hoy: <span className="font-medium text-foreground tabular-nums">{text}</span>
+      </p>
+    )
+  }
+
   if (isLoadingState) {
     return (
       <Card className="overflow-hidden border rounded-none sm:rounded-md">
@@ -114,14 +150,6 @@ export function PwaTodayScheduleCard({ companySlug, horario: horarioProp, shifts
       </Card>
     )
   }
-
-  const today = new Date()
-  const todayStr = format(today, "yyyy-MM-dd")
-  const currentWeek = horario?.weeks?.[horario?.publishedWeekId]
-  const dayData = currentWeek?.days?.[todayStr] as Record<string, any> | undefined
-  const todayAssignments = dayData?.[currentViewer.employeeId]
-
-  const scheduleInfo = getTodayScheduleInfo(todayAssignments, shifts)
 
   return (
     <PwaTodayScheduleCardContent

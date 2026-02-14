@@ -6,6 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 import { startOfWeek, addDays, addWeeks, setDate, addMonths } from "date-fns"
+import { format } from "date-fns"
 
 /**
  * Ajusta una hora en formato HH:mm sumando o restando minutos
@@ -60,6 +61,45 @@ export function getCustomMonthRange(date: Date, monthStartDay: number) {
   const endDate = addDays(setDate(nextMonth, monthStartDay), -1)
   
   return { startDate, endDate }
+}
+
+/**
+ * Determina el mes principal basándose en qué mes tiene más días en el rango.
+ * Útil cuando un período abarca dos meses (ej. 26 ene - 25 feb): devuelve el mes con más días.
+ * Si hay empate, prefiere el mes posterior.
+ */
+export function getMainMonth(startDate: Date, endDate: Date): Date {
+  const monthDays: Map<string, number> = new Map()
+  let currentDate = new Date(startDate)
+  const end = new Date(endDate)
+
+  while (currentDate <= end) {
+    const monthKey = format(currentDate, "yyyy-MM")
+    monthDays.set(monthKey, (monthDays.get(monthKey) || 0) + 1)
+    currentDate = addDays(currentDate, 1)
+  }
+
+  let maxDays = 0
+  let mainMonthKey = ""
+  monthDays.forEach((days, monthKey) => {
+    if (days > maxDays) {
+      maxDays = days
+      mainMonthKey = monthKey
+    }
+  })
+
+  if (maxDays > 0) {
+    const allMonthKeys = Array.from(monthDays.keys()).sort()
+    const candidatesWithMaxDays = allMonthKeys.filter((key) => monthDays.get(key) === maxDays)
+    const selectedMonthKey =
+      candidatesWithMaxDays.length > 1
+        ? candidatesWithMaxDays[candidatesWithMaxDays.length - 1]
+        : mainMonthKey
+    const [year, month] = selectedMonthKey.split("-").map(Number)
+    return new Date(year, month - 1, 15)
+  }
+
+  return new Date(endDate)
 }
 
 /**

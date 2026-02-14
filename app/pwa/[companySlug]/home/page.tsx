@@ -22,6 +22,7 @@ export default function PwaHomePage() {
             <p className="text-muted-foreground">
               Acceso rápido a todas las funcionalidades del sistema
             </p>
+            <PwaTodayScheduleCard companySlug={companySlug} variant="inline" />
           </div>
 
           {/* Main Navigation Grid */}
@@ -81,9 +82,6 @@ export default function PwaHomePage() {
               </CardContent>
             </Card>
           </div>
-
-          {/* Horario de Hoy */}
-          <PwaTodayScheduleCard companySlug={companySlug} />
         </div>
       </div>
     </div>

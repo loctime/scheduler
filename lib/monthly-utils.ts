@@ -1,6 +1,6 @@
 import { format, parseISO, addDays } from "date-fns"
 import { es } from "date-fns/locale"
-import { getCustomMonthRange, getMonthWeeks } from "@/lib/utils"
+import { getCustomMonthRange, getMainMonth, getMonthWeeks } from "@/lib/utils"
 import type { Horario } from "@/lib/types"
 import type { EmployeeMonthlyStats } from "@/types/employee-stats"
 import { calculateHoursBreakdown } from "@/lib/validations"
@@ -54,7 +54,9 @@ export function buildMonthGroupsFromSchedules(
     }
 
     const monthKey = format(targetMonthDate, "yyyy-MM")
-    const monthName = format(targetMonthDate, "MMMM yyyy", { locale: es })
+    const periodRange = getCustomMonthRange(targetMonthDate, monthStartDay)
+    const mainMonth = getMainMonth(periodRange.startDate, periodRange.endDate)
+    const monthName = format(mainMonth, "MMMM yyyy", { locale: es })
 
     if (!monthMap.has(monthKey)) {
       monthMap.set(monthKey, {
