@@ -7,25 +7,26 @@ import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Share2, ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { useParams } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { useMonthlySchedules } from "@/hooks/use-monthly-schedules"
-import { useEmployeesByOwnerId, useShiftsByOwnerId, useConfigByOwnerId } from "@/hooks/use-owner-data"
+import { useOwnerIdFromSlug, useEmployeesByOwnerId, useShiftsByOwnerId, useConfigByOwnerId } from "@/hooks/use-owner-data"
 import { MonthlyScheduleView } from "@/components/monthly-schedule-view"
 import type { MonthGroup } from "@/lib/monthly-utils"
 
 /**
- * Página PWA de horarios mensuales.
- * Misma fuente que el dashboard: Firestore schedules, employees, shifts, config (ownerId == uid).
- * Query: ?uid=XXXX (obligatorio). Opcional: ?year=YYYY&month=M
+ * Página PWA de horarios mensuales bajo /pwa/[slug]/mensual.
+ * Obtiene ownerId desde slug y usa useMonthlySchedules.
  */
 export default function PwaMensualPage() {
+  const params = useParams()
+  const companySlug = params.companySlug as string
   const searchParams = useSearchParams()
-  const uid = searchParams.get("uid") ?? ""
-  const ownerId = uid || null
   const year = searchParams.get("year") ? parseInt(searchParams.get("year")!, 10) : undefined
   const month = searchParams.get("month") ? parseInt(searchParams.get("month")!, 10) : undefined
   const { toast } = useToast()
 
+  const { ownerId } = useOwnerIdFromSlug(companySlug)
   const { employees, loading: employeesLoading } = useEmployeesByOwnerId(ownerId)
   const { shifts, loading: shiftsLoading } = useShiftsByOwnerId(ownerId)
   const { config, loading: configLoading } = useConfigByOwnerId(ownerId)
@@ -39,7 +40,7 @@ export default function PwaMensualPage() {
     error,
     calculateMonthlyStats,
   } = useMonthlySchedules({
-    ownerId: uid,
+    ownerId: ownerId ?? "",
     employees,
     shifts,
     config,
@@ -75,17 +76,16 @@ export default function PwaMensualPage() {
     }
   }
 
-  if (!uid) {
+  if (!companySlug) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="max-w-md w-full mx-4">
           <CardHeader>
-            <CardTitle>Parámetro requerido</CardTitle>
+            <CardTitle>Empresa no especificada</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground mb-4">
-              Indica el usuario con <code className="bg-muted px-1 rounded">?uid=</code> en la URL.
-              Ejemplo: /pwa/mensual?uid=tu-owner-id
+              La URL debe incluir el identificador de la empresa.
             </p>
             <Link href="/pwa">
               <Button variant="outline" className="w-full">
@@ -119,7 +119,7 @@ export default function PwaMensualPage() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground mb-4">{error}</p>
-            <Link href="/pwa">
+            <Link href={`/pwa/${companySlug}/home`}>
               <Button variant="outline" className="w-full">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Volver
@@ -140,9 +140,9 @@ export default function PwaMensualPage() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground mb-4">
-              No hay horarios mensuales para este usuario.
+              No hay horarios mensuales para esta empresa.
             </p>
-            <Link href="/pwa">
+            <Link href={`/pwa/${companySlug}/home`}>
               <Button variant="outline" className="w-full">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Volver
@@ -163,14 +163,14 @@ export default function PwaMensualPage() {
               <h1 className="text-2xl font-bold text-foreground">
                 {config?.nombreEmpresa ?? "Horario mensual"}
               </h1>
-              <p className="text-sm text-muted-foreground">Vista mensual (misma fuente que el dashboard)</p>
+              <p className="text-sm text-muted-foreground">Vista mensual</p>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={handleShare} className="flex items-center gap-2">
                 <Share2 className="h-4 w-4" />
                 Compartir
               </Button>
-              <Link href="/pwa">
+              <Link href={`/pwa/${companySlug}/home`}>
                 <Button variant="outline" size="sm">
                   Volver
                 </Button>

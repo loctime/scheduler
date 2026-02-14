@@ -88,7 +88,7 @@ export default function PublicMensualPage() {
             <p className="text-muted-foreground mb-4">
               Esta empresa aún no ha publicado horarios mensuales.
             </p>
-            <Link href={`/pwa/horario/${companySlug}`}>
+            <Link href={`/pwa/${companySlug}/horario`}>
               <Button variant="outline" className="w-full">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Ver horario semanal
@@ -114,7 +114,7 @@ export default function PublicMensualPage() {
                 <Share2 className="h-4 w-4" />
                 Compartir
               </Button>
-              <Link href={`/pwa/horario/${companySlug}`}>
+              <Link href={`/pwa/${companySlug}/horario`}>
                 <Button variant="outline" size="sm">
                   Ver semanal
                 </Button>

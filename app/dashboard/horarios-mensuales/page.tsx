@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react"
 import { useData } from "@/contexts/data-context"
 import { useConfig } from "@/hooks/use-config"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
+import { getCompanySlugFromOwnerId } from "@/lib/public-companies"
 import { useToast } from "@/hooks/use-toast"
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { ExportOverlay } from "@/components/export-overlay"
@@ -78,7 +79,19 @@ export default function HorariosMensualesPage() {
     if (!user) return
 
     if (ownerId) {
-      const shareUrl = `${window.location.origin}/pwa/mensual?uid=${ownerId}`
+      const companySlug = await getCompanySlugFromOwnerId(ownerId)
+      const shareUrl = companySlug
+        ? `${window.location.origin}/pwa/${companySlug}/mensual`
+        : null
+
+      if (!shareUrl) {
+        toast({
+          title: "No disponible",
+          description: "No se encontró el enlace público. Publica tu horario primero.",
+          variant: "destructive",
+        })
+        return
+      }
 
       try {
         await navigator.clipboard.writeText(shareUrl)

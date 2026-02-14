@@ -1,10 +1,9 @@
 // Service Worker único para el sistema PWA unificado
-const APP_VERSION = "2026-02-11-unified"
+const APP_VERSION = "2026-02-14-slug-unified"
 const CACHE_NAME = `pwa-shell-${APP_VERSION}`
 
 const SHELL_URLS = [
   "/pwa",
-  "/pwa/stock-console",
   "/manifest-pwa.json",
   "/icon-light-32x32.png",
   "/icon-dark-32x32.png",

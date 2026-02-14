@@ -5,14 +5,11 @@ import { useRouter, useParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Calendar, FileText, Users } from "lucide-react"
-import { useOwnerIdFromSlug } from "@/hooks/use-owner-data"
 
 export default function PwaHomePage() {
   const router = useRouter()
   const params = useParams()
   const companySlug = params.companySlug as string
-  const { ownerId } = useOwnerIdFromSlug(companySlug)
-  const mensualHref = ownerId ? `/pwa/mensual?uid=${encodeURIComponent(ownerId)}` : "/pwa/mensual"
 
   return (
     <div className="min-h-screen bg-background">
@@ -60,7 +57,7 @@ export default function PwaHomePage() {
                   </div>
                 </div>
                 <div className="mt-4">
-                  <Link href={mensualHref}>
+                  <Link href={`/pwa/${companySlug}/mensual`}>
                     <Button className="w-full">Ir a Mensual</Button>
                   </Link>
                 </div>
@@ -77,7 +74,7 @@ export default function PwaHomePage() {
                     <p className="text-sm text-muted-foreground">Gestión de stock</p>
                   </div>
                 </div>
-                <Link href={`/pwa/stock-console/${companySlug}`} className="mt-4 block">
+                <Link href={`/pwa/${companySlug}/stock-console`} className="mt-4 block">
                   <Button className="w-full" variant="outline">Ir a Stock</Button>
                 </Link>
               </CardContent>
@@ -95,7 +92,7 @@ export default function PwaHomePage() {
                   <h4 className="font-medium mb-2">Rutas públicas (acceso libre):</h4>
                   <ul className="space-y-1 text-muted-foreground">
                     <li>• /pwa/[slug]/horario - Horario semanal</li>
-                    <li>• /pwa/mensual?uid=XXX - Vista mensual</li>
+                    <li>• /pwa/[slug]/mensual - Vista mensual</li>
                     <li>• /pwa/[slug]/home - Panel</li>
                   </ul>
                 </div>

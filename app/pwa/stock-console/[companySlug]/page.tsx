@@ -1,27 +1,13 @@
-"use client"
+import { redirect } from "next/navigation"
 
-import { useParams } from "next/navigation"
-import { useData } from "@/contexts/data-context"
-import { LoginForm } from "@/components/login-form"
-import { Card, CardContent } from "@/components/ui/card"
-import { StockConsoleContent } from "@/components/stock-console-content"
-
-export default function PwaStockConsolePage() {
-  const params = useParams()
-  const { user } = useData()
-  const companySlug = params.companySlug as string
-
-  if (!user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <LoginForm />
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  return <StockConsoleContent companySlug={companySlug} />
+/**
+ * Redirect para compatibilidad: /pwa/stock-console/[slug] → /pwa/[slug]/stock-console
+ */
+export default async function PwaStockConsoleRedirectPage({
+  params,
+}: {
+  params: Promise<{ companySlug: string }>
+}) {
+  const { companySlug } = await params
+  redirect(`/pwa/${companySlug}/stock-console`)
 }

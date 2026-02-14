@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from "next/server"
 
-// Rutas privadas PWA (requieren login): app/pwa/stock-console/[companySlug] → /pwa/stock-console/xxx
+// Rutas privadas PWA (stock-console requiere login): /pwa/[slug]/stock-console
 function isPrivatePwaPath(pathname: string): boolean {
-  return pathname === "/pwa/stock-console" || pathname.startsWith("/pwa/stock-console/")
+  return /^\/pwa\/[^/]+\/stock-console\/?$/.test(pathname)
 }
 
-// Rutas públicas PWA: /pwa/mensual (con ?uid=), /pwa/[slug]/horario, /pwa/[slug]/home; /pwa/slug/mensual sin página → 404
+// Rutas públicas PWA unificadas: /pwa, /pwa/[slug]/*, /pwa/invite/*, /pwa/stock-console/* (redirect), /pwa/horario/* (redirect)
 function isPublicPwaPath(pathname: string): boolean {
-  if (pathname === "/pwa/mensual" || pathname.startsWith("/pwa/horario/") || pathname.startsWith("/pwa/mensual/")) return true
-  const match = pathname.match(/^\/pwa\/([^/]+)(?:\/(horario|mensual|home))?\/?$/)
-  return !!match
+  if (pathname === "/pwa" || pathname === "/pwa/") return true
+  if (pathname.startsWith("/pwa/invite/")) return true
+  // /pwa/stock-console y /pwa/stock-console/xxx (redirect a arquitectura unificada)
+  if (pathname === "/pwa/stock-console" || pathname.startsWith("/pwa/stock-console/")) return true
+  // /pwa/horario/xxx (redirect a /pwa/xxx/horario)
+  if (pathname.startsWith("/pwa/horario/")) return true
+  // /pwa/[slug], /pwa/[slug]/horario, /pwa/[slug]/home, /pwa/[slug]/mensual, /pwa/[slug]/stock-console
+  return /^\/pwa\/([^/]+)(?:\/(horario|mensual|home|stock-console))?\/?$/.test(pathname)
 }
 
 function decodeJwtPayload(token: string): any | null {
@@ -55,7 +60,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // /pwa/mensual?uid=XXX es la ruta válida; solo redirigir /pwa/horario sin segmento
+  // /pwa/horario sin slug → redirect a /pwa
   if (pathname === "/pwa/horario") {
     return NextResponse.redirect(new URL("/pwa", request.url))
   }
