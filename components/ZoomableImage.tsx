@@ -51,7 +51,6 @@ export function ZoomableImage({ src, alt, onError, className, style }: ZoomableI
         onTransformed={handleTransformed}
         doubleClick={{ mode: "toggle", step: 0.7 }}
         wheel={{ step: 0.15, activationKeys: ["Control"] }}
-        pinchEnabled
         panning={{ velocityDisabled: true }}
       >
         <TransformComponent

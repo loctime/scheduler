@@ -37,6 +37,12 @@ interface RawPublicHorarioData {
   [key: string]: any
 }
 
+/** Detecta si un string parece un UID (Firebase, etc.) y no un nombre legible */
+function looksLikeUid(value: string): boolean {
+  if (!value || value.length < 12) return false
+  return /^[a-zA-Z0-9_-]+$/.test(value) && !/\s/.test(value)
+}
+
 /**
  * Sanitiza empleados removiendo información sensible
  */
@@ -45,10 +51,16 @@ function sanitizeEmployees(employees: any[]): Array<{ id: string; name: string }
   
   return employees
     .filter(emp => emp && typeof emp === 'object')
-    .map(emp => ({
-      id: emp.id || emp.employeeId || '',
-      name: emp.name || emp.displayName || emp.id || 'Empleado'
-    }))
+    .map((emp, index) => {
+      const id = emp.id || emp.employeeId || ''
+      const rawName = emp.name || emp.displayName || ''
+      const name = rawName
+        ? rawName
+        : looksLikeUid(id)
+          ? `Empleado ${index + 1}`
+          : id || 'Empleado'
+      return { id, name }
+    })
     .filter(emp => emp.id && emp.name) // Solo empleados válidos
 }
 

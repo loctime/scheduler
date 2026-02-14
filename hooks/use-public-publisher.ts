@@ -130,7 +130,7 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
         weekStart,
         weekEnd,
         assignments: originalSchedule.assignments || {},
-        employeesSnapshot: originalSchedule.employeesSnapshot || [],
+        employeesSnapshot: originalSchedule.employeesSnapshot || originalSchedule.empleadosSnapshot || [],
         ordenEmpleadosSnapshot: originalSchedule.ordenEmpleadosSnapshot || [],
         publishedAt: serverTimestamp(),
         publishedBy: user?.uid,

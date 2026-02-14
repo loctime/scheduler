@@ -218,9 +218,9 @@ export default function PublicHorarioPage({ companySlug, ImageWrapper }: PublicH
       })
     }
     
-    const builtEmployees = Array.from(allEmployeeIds).map(id => ({
+    const builtEmployees = Array.from(allEmployeeIds).map((id, index) => ({
       id,
-      name: id, // Fallback: usar ID como nombre
+      name: `Empleado ${index + 1}`, // Fallback cuando no hay snapshot con nombres
     }))
     
     console.log("🔧 [PublicHorarioPage] Built fallback employees:", builtEmployees)
