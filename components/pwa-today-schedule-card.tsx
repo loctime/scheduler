@@ -186,12 +186,9 @@ function PwaTodayScheduleCardContent({ employeeName, scheduleInfo }: PwaTodaySch
                     aria-hidden
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-base sm:text-lg font-semibold tabular-nums tracking-tight">
+                    <p className="text-2xl sm:text-3xl font-semibold tabular-nums tracking-tight">
                       {block.startTime} – {block.endTime}
                     </p>
-                    {block.label && (
-                      <p className="text-xs font-medium text-muted-foreground mt-0.5">{block.label}</p>
-                    )}
                   </div>
                 </div>
               ))
