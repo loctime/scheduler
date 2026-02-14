@@ -5,9 +5,9 @@ function isPrivatePwaPath(pathname: string): boolean {
   return pathname === "/pwa/stock-console" || pathname.startsWith("/pwa/stock-console/")
 }
 
-// Rutas públicas PWA: /pwa/[slug], /pwa/[slug]/horario, /pwa/[slug]/mensual, /pwa/[slug]/home; y legacy /pwa/horario/, /pwa/mensual/
+// Rutas públicas PWA: /pwa/mensual (con ?uid=), /pwa/[slug]/horario, /pwa/[slug]/home; /pwa/slug/mensual sin página → 404
 function isPublicPwaPath(pathname: string): boolean {
-  if (pathname.startsWith("/pwa/horario/") || pathname.startsWith("/pwa/mensual/")) return true
+  if (pathname === "/pwa/mensual" || pathname.startsWith("/pwa/horario/") || pathname.startsWith("/pwa/mensual/")) return true
   const match = pathname.match(/^\/pwa\/([^/]+)(?:\/(horario|mensual|home))?\/?$/)
   return !!match
 }
@@ -55,7 +55,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  if (pathname === "/pwa/horario" || pathname === "/pwa/mensual") {
+  // /pwa/mensual?uid=XXX es la ruta válida; solo redirigir /pwa/horario sin segmento
+  if (pathname === "/pwa/horario") {
     return NextResponse.redirect(new URL("/pwa", request.url))
   }
 

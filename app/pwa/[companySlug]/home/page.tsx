@@ -57,12 +57,9 @@ export default function PwaHomePage() {
                   </div>
                 </div>
                 <div className="mt-4">
-                  <Button
-                    className="w-full"
-                    onClick={() => router.push(`/pwa/${companySlug}/mensual`)}
-                  >
-                    Ir a Mensual
-                  </Button>
+                  <Link href="/pwa/mensual">
+                    <Button className="w-full">Ir a Mensual</Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>
@@ -95,7 +92,7 @@ export default function PwaHomePage() {
                   <h4 className="font-medium mb-2">Rutas públicas (acceso libre):</h4>
                   <ul className="space-y-1 text-muted-foreground">
                     <li>• /pwa/[slug]/horario - Horario semanal</li>
-                    <li>• /pwa/[slug]/mensual - Vista mensual</li>
+                    <li>• /pwa/mensual?uid=XXX - Vista mensual</li>
                     <li>• /pwa/[slug]/home - Panel</li>
                   </ul>
                 </div>

@@ -66,7 +66,7 @@ export function PwaShell({ children }: { children: React.ReactNode }) {
       <div className="mx-auto flex max-w-lg items-center justify-around px-3 py-2">
         {companySlug ? [
           { href: `/pwa/${companySlug}/horario`, label: "Horario", icon: Calendar },
-          { href: `/pwa/${companySlug}/mensual`, label: "Mensual", icon: CalendarDays },
+          { href: "/pwa/mensual", label: "Mensual", icon: CalendarDays },
           { href: `/pwa/${companySlug}/home`, label: "Panel", icon: Home },
           { href: `/pwa/stock-console/${companySlug}`, label: "Stock", icon: Package }
         ].map((item) => {
