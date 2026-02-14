@@ -22,9 +22,9 @@ export default function PwaHomePage() {
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <h1 className="text-3xl font-bold text-foreground">Panel PWA {companySlug}</h1>
+                <h1 className="text-3xl font-bold text-foreground">{companySlug}</h1>
                 <p className="text-muted-foreground">
-                  Acceso rápido a todas las funcionalidades del sistema
+                  Horarios y Stock
                 </p>
               </div>
               <div className="flex items-center gap-1">
@@ -43,8 +43,8 @@ export default function PwaHomePage() {
                 <div className="flex items-center space-x-4">
                   <Calendar className="h-8 w-8 text-primary" />
                   <div className="flex-1">
-                    <h3 className="font-semibold">Horario Semanal</h3>
-                    <p className="text-sm text-muted-foreground">Vista y edición semanal</p>
+                    <h3 className="font-semibold">Horario</h3>
+                    <p className="text-sm text-muted-foreground">Horarios publicados esta semana</p>
                   </div>
                 </div>
                 <div className="mt-4">
@@ -64,8 +64,8 @@ export default function PwaHomePage() {
                 <div className="flex items-center space-x-4">
                   <FileText className="h-8 w-8 text-primary" />
                   <div className="flex-1">
-                    <h3 className="font-semibold">Horarios Mensuales</h3>
-                    <p className="text-sm text-muted-foreground">Vista mensual completa</p>
+                    <h3 className="font-semibold">Horarios completos</h3>
+                    <p className="text-sm text-muted-foreground">Vista individual histórico</p>
                   </div>
                 </div>
                 <div className="mt-4">
