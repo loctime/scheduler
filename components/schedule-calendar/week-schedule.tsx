@@ -60,6 +60,8 @@ interface WeekScheduleProps {
   onCopyCurrentWeek?: (weekStartDate: Date) => void
   onPasteCopiedWeek?: (targetWeekStartDate: Date) => Promise<void>
   isPastingWeek?: boolean
+  /** En móvil mostrar solo vista individual (sin Grilla completa). Usado en vista mensual. */
+  mobileIndividualOnly?: boolean
 }
 
 export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
@@ -94,6 +96,7 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
   onCopyCurrentWeek,
   onPasteCopiedWeek,
   isPastingWeek = false,
+  mobileIndividualOnly = false,
 }, ref) => {
   const weekStartDate = weekDays[0]
   const weekEndDate = weekDays[weekDays.length - 1]
@@ -293,6 +296,7 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
             onClearEmployeeRow={!readonly && user ? handleClearEmployeeRow : undefined}
             user={user}
             onExportEmployeeImage={undefined}
+            mobileIndividualOnly={mobileIndividualOnly}
           />
         </div>
       </CollapsibleContent>

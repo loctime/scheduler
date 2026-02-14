@@ -56,6 +56,8 @@ interface ScheduleGridProps {
   allSchedules?: Horario[] // Todos los horarios para análisis de patrones
   user?: any // Usuario opcional (para páginas públicas sin DataProvider)
   onExportEmployeeImage?: (employeeId: string, employeeName: string, weekStartDate: Date) => void // Función para exportar imagen de un empleado
+  /** En móvil mostrar solo vista individual (sin toggle Grilla completa). Usado en vista mensual. */
+  mobileIndividualOnly?: boolean
 }
 
 export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
@@ -76,6 +78,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
   allSchedules = [],
   user: userProp,
   onExportEmployeeImage,
+  mobileIndividualOnly = false,
 }, ref) => {
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
   const [cellUndoHistory, setCellUndoHistory] = useState<Map<string, ShiftAssignment[]>>(new Map())
@@ -86,7 +89,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     date: Date
   } | null>(null)
 
-  // Estado para controlar vista en móvil
+  // Estado para controlar vista en móvil (si mobileIndividualOnly, siempre individual)
   const [isIndividualView, setIsIndividualView] = useState(false)
   
   // Refs para generación de imagen
@@ -109,21 +112,6 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
   const isMobile = useIsMobile()
   const { updateEmployeeOrder, addSeparator, updateSeparator, deleteSeparator } = useEmployeeOrder()
 
-  // Efecto para generar imagen de la grilla en móvil
-  useEffect(() => {
-    if (!isMobile || !hiddenGridRef.current || imageUrl) return
-    
-    const id = requestAnimationFrame(() => {
-      // Dar tiempo extra para renderizado completo
-      setTimeout(() => {
-        if (hiddenGridRef.current) {
-          generateImage(hiddenGridRef.current)
-        }
-      }, 100)
-    })
-    
-    return () => cancelAnimationFrame(id)
-  }, [isMobile, generateImage, imageUrl])
 
   // Hook para reglas fijas
   const { hasFixedRule, getRuleForDay } = useEmployeeFixedRules({ 
@@ -203,6 +191,19 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     lastCompletedWeekStart: lastCompletedWeekStart ? new Date(lastCompletedWeekStart) : undefined,
     allEmployees: allEmployees || employees, // Todos los empleados (sin filtrar) para el filtrado correcto
   })
+
+  // Efecto para generar imagen de la grilla en móvil solo cuando hay datos (evita grilla en blanco en PWA/mensual)
+  useEffect(() => {
+    if (!isMobile || (orderedItems?.length ?? 0) === 0) return
+    const id = requestAnimationFrame(() => {
+      setTimeout(() => {
+        if (hiddenGridRef.current) {
+          generateImage(hiddenGridRef.current)
+        }
+      }, 300)
+    })
+    return () => cancelAnimationFrame(id)
+  }, [isMobile, generateImage, orderedItems?.length])
 
   // Hook para estilos de celdas
   const { getCellBackgroundStyle } = useCellBackgroundStyles({
@@ -598,9 +599,10 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
   // Vista móvil
   if (isMobile) {
     const weekStartDate = weekDays[0]
-    
-    // Renderizar vista individual solo si está seleccionada
-    if (isIndividualView) {
+    const showOnlyIndividual = mobileIndividualOnly || isIndividualView
+
+    // Renderizar vista individual (o siempre si mobileIndividualOnly, p. ej. mensual)
+    if (showOnlyIndividual) {
       return (
         <>
           <ScheduleGridMobile
@@ -634,39 +636,40 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
       )
     }
     
-    // Renderizar vista completa con imagen generada
+    // Renderizar vista completa con imagen generada (ocultar toggle si mobileIndividualOnly)
     return (
       <>
-        {/* Botones de toggle solo en móvil */}
-        <div className="flex justify-center mb-4 gap-2">
-          <button
-            onClick={() => setIsIndividualView(false)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              !isIndividualView
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            <Grid className="h-4 w-4" />
-            Grilla completa
-          </button>
-          <button
-            onClick={() => setIsIndividualView(true)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              isIndividualView
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            <User className="h-4 w-4" />
-            Vista individual
-          </button>
-        </div>
+        {!mobileIndividualOnly && (
+          <div className="flex justify-center mb-4 gap-2">
+            <button
+              onClick={() => setIsIndividualView(false)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                !isIndividualView
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              <Grid className="h-4 w-4" />
+              Grilla completa
+            </button>
+            <button
+              onClick={() => setIsIndividualView(true)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                isIndividualView
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              <User className="h-4 w-4" />
+              Vista individual
+            </button>
+          </div>
+        )}
         
         {/* Contenedor oculto para generar imagen - ref directo al Card */}
         {renderDesktopGrid({ containerRef: hiddenGridRef })}
         
-        {/* Vista de imagen generada */}
+        {/* Vista de imagen generada o fallback a grilla real si falla (p. ej. PWA/Safari) */}
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <div className="text-sm text-gray-500">Generando vista del horario...</div>
@@ -677,11 +680,15 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
               src={imageUrl}
               alt="Horario completo"
               style={{
-                width: '1400px',   // mismo ancho que arriba
-                maxWidth: 'none',  // 🔴 CLAVE
+                width: '1400px',
+                maxWidth: 'none',
                 height: 'auto',
               }}
             />
+          </div>
+        ) : (orderedItems?.length ?? 0) > 0 ? (
+          <div className="w-full overflow-x-auto">
+            {renderDesktopGrid()}
           </div>
         ) : (
           <div className="flex items-center justify-center py-8">

@@ -40,6 +40,8 @@ export interface MonthlyScheduleViewProps {
   onExportExcel?: (weekStartDate: Date, weekDays: Date[], weekSchedule: Horario | null) => void
   exporting?: boolean
   readonly?: boolean
+  /** En móvil mostrar solo vista individual (sin Grilla completa). */
+  mobileIndividualOnly?: boolean
 }
 
 /**
@@ -60,6 +62,7 @@ export function MonthlyScheduleView({
   onExportExcel,
   exporting = false,
   readonly = true,
+  mobileIndividualOnly = false,
 }: MonthlyScheduleViewProps) {
   if (isLoading) {
     return (
@@ -166,6 +169,7 @@ export function MonthlyScheduleView({
                       mediosTurnos={config?.mediosTurnos}
                       employeeStats={Object.values(weekStats)}
                       readonly={readonly}
+                      mobileIndividualOnly={mobileIndividualOnly}
                     />
                   )
                 })}

@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Check, X, Package, ArrowLeft } from "lucide-react"
+import { UserStatusMenu } from "@/components/pwa/UserStatusMenu"
 
 interface StockConsoleContentProps {
   companySlug?: string
@@ -84,6 +85,9 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
             </Link>
           ) : null}
           <h1 className="text-xl font-bold flex-1">Stock Rápido</h1>
+          <div className="[&_button]:text-white [&_button]:hover:bg-white/20 [&_button]:hover:text-white [&_.bg-green-500]:border-blue-500">
+            <UserStatusMenu />
+          </div>
         </div>
 
         {/* Selector de Pedido (compacto) — máx. 2 filas + scroll horizontal */}

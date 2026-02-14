@@ -191,6 +191,7 @@ export default function PwaMensualPage() {
           isLoading={false}
           calculateMonthlyStats={calculateMonthlyStats}
           readonly
+          mobileIndividualOnly
         />
       </div>
     </div>

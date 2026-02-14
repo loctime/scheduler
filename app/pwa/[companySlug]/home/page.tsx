@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Calendar, FileText, Users } from "lucide-react"
 import { PwaTodayScheduleCard } from "@/components/pwa-today-schedule-card"
+import { UserStatusMenu } from "@/components/pwa/UserStatusMenu"
 
 export default function PwaHomePage() {
   const router = useRouter()
@@ -17,11 +18,16 @@ export default function PwaHomePage() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Header */}
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold text-foreground">Panel PWA</h1>
-            <p className="text-muted-foreground">
-              Acceso rápido a todas las funcionalidades del sistema
-            </p>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-3xl font-bold text-foreground">Panel PWA</h1>
+                <p className="text-muted-foreground">
+                  Acceso rápido a todas las funcionalidades del sistema
+                </p>
+              </div>
+              <UserStatusMenu />
+            </div>
             <PwaTodayScheduleCard companySlug={companySlug} variant="inline" />
           </div>
 
