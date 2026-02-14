@@ -1,10 +1,14 @@
-import { useState, useEffect } from "react"
-import { doc, getDoc, collection, query, where, getDocs, limit } from "firebase/firestore"
+import { useState, useEffect, useContext } from "react"
+import { doc, getDoc } from "firebase/firestore"
 import { auth, db, COLLECTIONS } from "@/lib/firebase"
+import { DataContext } from "@/contexts/data-context"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
 export function useCompanySlug() {
   const [companySlug, setCompanySlug] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const dataContext = useContext(DataContext)
+  const userData = dataContext?.userData || null
 
   useEffect(() => {
     const load = async () => {
@@ -15,23 +19,14 @@ export function useCompanySlug() {
       }
 
       try {
-        // Buscar en la colección config donde se guarda el publicSlug
-        const configQuery = query(
-          collection(db, COLLECTIONS.CONFIG),
-          where("publicSlug", "!=", null),
-          where("userId", "==", user.uid),
-          limit(1)
-        )
-        const querySnapshot = await getDocs(configQuery)
-        
-        if (!querySnapshot.empty) {
-          const configDoc = querySnapshot.docs[0]
-          const data = configDoc.data()
-          if (data.publicSlug) {
-            setCompanySlug(data.publicSlug)
-          }
-        }
+        // Config se guarda con doc ID = ownerId (igual que configuracion)
+        const ownerId = getOwnerIdForActor(user, userData) || user.uid
+        const configRef = doc(db, COLLECTIONS.CONFIG, ownerId)
+        const configSnap = await getDoc(configRef)
 
+        if (configSnap.exists() && configSnap.data()?.publicSlug) {
+          setCompanySlug(configSnap.data().publicSlug)
+        }
       } catch (e) {
         console.error("Error cargando slug:", e)
       }
@@ -40,7 +35,7 @@ export function useCompanySlug() {
     }
 
     load()
-  }, [auth])
+  }, [auth, userData])
 
   return { companySlug, isLoading }
 }

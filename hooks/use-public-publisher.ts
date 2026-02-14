@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { doc, setDoc, serverTimestamp, getDoc, updateDoc, collection, query, where, getDocs, limit } from "firebase/firestore"
+import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { createPublicCompanySlug } from "@/lib/public-companies"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
@@ -81,30 +81,16 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
       console.log("🔧 [usePublicPublisher] WeekId:", options.weekId)
       console.log("🔧 [usePublicPublisher] Has publicImageUrl:", !!options.publicImageUrl)
 
-      // Guardar el companySlug en la configuración del usuario para que useCompanySlug lo encuentre
+      // Guardar el companySlug en la configuración (doc ID = ownerId, igual que configuracion)
       try {
-        const configQuery = query(
-          collection(db, COLLECTIONS.CONFIG),
-          where("userId", "==", user?.uid),
-          limit(1)
-        )
-        const configSnapshot = await getDocs(configQuery)
-        
-        if (!configSnapshot.empty) {
-          const configDoc = configSnapshot.docs[0]
-          await updateDoc(configDoc.ref, { publicSlug: companySlug })
-          console.log("🔧 [usePublicPublisher] CompanySlug guardado en config:", companySlug)
-        } else {
-          // Crear config si no existe
-          const configRef = doc(db, COLLECTIONS.CONFIG, user?.uid)
-          await setDoc(configRef, {
-            userId: user?.uid,
-            ownerId: ownerId,
-            publicSlug: companySlug,
-            createdAt: serverTimestamp()
-          })
-          console.log("🔧 [usePublicPublisher] Config creado con companySlug:", companySlug)
-        }
+        const configRef = doc(db, COLLECTIONS.CONFIG, ownerId)
+        await setDoc(configRef, {
+          ownerId,
+          publicSlug: companySlug,
+          userId: user?.uid,
+          updatedAt: serverTimestamp()
+        }, { merge: true })
+        console.log("🔧 [usePublicPublisher] CompanySlug guardado en config:", companySlug)
       } catch (configError) {
         console.warn("🔧 [usePublicPublisher] No se pudo guardar companySlug en config:", configError)
         // No fallar la publicación si no se puede guardar en config
@@ -175,20 +161,29 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
         throw new Error("No se pudo guardar el documento en publicSchedules")
       }
 
-      // Mantener el documento existente en enlaces_publicos para compatibilidad
-      // pero sin los datos del schedule (solo metadata)
+      // Mantener enlaces_publicos con datos completos para que la PWA pueda leerlos
+      // La PWA (usePublicHorario) lee de aquí y espera weeks[weekId].days (asignaciones)
+      const employeesForLegacy = options.employees?.length
+        ? options.employees
+        : (originalSchedule.employeesSnapshot || []).map((e: any) => ({
+            id: e.id || e.employeeId,
+            name: e.name || e.displayName || e.id || 'Empleado'
+          })).filter((e: any) => e.id)
+
       const legacyPublicData = {
         ownerId: ownerId,
         publishedWeekId: options.weekId,
         weeks: {
           [options.weekId]: {
             weekId: options.weekId,
-            weekLabel: options.weekData.startDate && options.weekData.endDate 
+            weekLabel: options.weekData.startDate && options.weekData.endDate
               ? `${options.weekData.startDate} - ${options.weekData.endDate}`
               : `Semana ${options.weekId}`,
             publishedAt: serverTimestamp(),
             publicImageUrl: options.publicImageUrl || null,
-            employees: options.employees || options.weekData.employees || []
+            days: originalSchedule.assignments || {},
+            dayStatus: originalSchedule.dayStatus || {},
+            employees: employeesForLegacy
           }
         },
         userId: user?.uid,
