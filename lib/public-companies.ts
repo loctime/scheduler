@@ -179,25 +179,24 @@ export async function getCurrentSlugForOwner(ownerId: string): Promise<string | 
  * @param ownerId ID del propietario
  * @returns Slug actual o null si no tiene
  */
-async function findCurrentSlugForOwner(ownerId: string): Promise<string | null> {
+export async function getCompanySlugFromOwnerId(ownerId: string | null): Promise<string | null> {
   if (!db || !ownerId) return null
-  
+
   try {
-    // Buscar por ownerId en la colección publicCompanies
     const publicCompaniesRef = collection(db!, PUBLIC_COMPANIES_COLLECTION)
     const q = query(publicCompaniesRef, where("ownerId", "==", ownerId), where("active", "==", true))
     const querySnapshot = await getDocs(q)
-    
-    if (querySnapshot.empty) {
-      return null
-    }
-    
-    // Retornar el primer slug encontrado (debería haber solo uno activo)
+
+    if (querySnapshot.empty) return null
     return querySnapshot.docs[0].id
   } catch (error) {
-    console.error(`❌ [findCurrentSlugForOwner] Error:`, error)
+    console.error(`❌ [getCompanySlugFromOwnerId] Error:`, error)
     return null
   }
+}
+
+async function findCurrentSlugForOwner(ownerId: string): Promise<string | null> {
+  return getCompanySlugFromOwnerId(ownerId)
 }
 
 /**

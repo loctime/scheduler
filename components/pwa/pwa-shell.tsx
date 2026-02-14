@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname, useParams } from "next/navigation"
+import { usePathname, useParams, useSearchParams } from "next/navigation"
 import { onAuthStateChanged } from "firebase/auth"
 import { Package, Loader2, Calendar, CalendarDays, Home } from "lucide-react"
 import { auth, isFirebaseConfigured } from "@/lib/firebase"
 import { DataProvider } from "@/contexts/data-context"
-import { useOwnerIdFromSlug } from "@/hooks/use-owner-data"
+import { useOwnerIdFromSlug, useCompanySlugFromOwnerId } from "@/hooks/use-owner-data"
 import { cn } from "@/lib/utils"
 
 function setAuthCookie(token?: string) {
@@ -22,12 +22,17 @@ function setAuthCookie(token?: string) {
 export function PwaShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const params = useParams()
+  const searchParams = useSearchParams()
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  // Slug solo desde la URL (multi-tenant público); no depende de autenticación
-  const companySlug = params?.companySlug as string
-  const { ownerId } = useOwnerIdFromSlug(companySlug ?? null)
-  const mensualHref = ownerId ? `/pwa/mensual?uid=${encodeURIComponent(ownerId)}` : "/pwa/mensual"
+  // Slug desde la URL (p. ej. /pwa/mi-empresa/home) o resuelto desde uid cuando estamos en /pwa/mensual?uid=xxx
+  const companySlugFromParams = params?.companySlug as string | undefined
+  const uidFromQuery = pathname === "/pwa/mensual" ? searchParams.get("uid") : null
+  const { companySlug: companySlugFromUid } = useCompanySlugFromOwnerId(uidFromQuery)
+  const effectiveSlug = companySlugFromParams ?? companySlugFromUid ?? null
+  const { ownerId } = useOwnerIdFromSlug(effectiveSlug)
+  const effectiveOwnerId = uidFromQuery ?? ownerId
+  const mensualHref = effectiveOwnerId ? `/pwa/mensual?uid=${encodeURIComponent(effectiveOwnerId)}` : "/pwa/mensual"
 
   useEffect(() => {
     if (!isFirebaseConfigured() || !auth) {
@@ -67,11 +72,11 @@ export function PwaShell({ children }: { children: React.ReactNode }) {
   const renderTabs = () => (
     <nav className="fixed bottom-0 left-0 right-0 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="mx-auto flex max-w-lg items-center justify-around px-3 py-2">
-        {companySlug ? [
-          { href: `/pwa/${companySlug}/horario`, label: "Horario", icon: Calendar, pathMatch: null as string | null },
+        {effectiveSlug ? [
+          { href: `/pwa/${effectiveSlug}/horario`, label: "Horario", icon: Calendar, pathMatch: null as string | null },
           { href: mensualHref, label: "Mensual", icon: CalendarDays, pathMatch: "/pwa/mensual" },
-          { href: `/pwa/${companySlug}/home`, label: "Panel", icon: Home, pathMatch: null as string | null },
-          { href: `/pwa/stock-console/${companySlug}`, label: "Stock", icon: Package, pathMatch: null as string | null }
+          { href: `/pwa/${effectiveSlug}/home`, label: "Panel", icon: Home, pathMatch: null as string | null },
+          { href: `/pwa/stock-console/${effectiveSlug}`, label: "Stock", icon: Package, pathMatch: null as string | null }
         ].map((item) => {
           const Icon = item.icon
           const isActive = pathname === item.href || (item.pathMatch != null && pathname === item.pathMatch)

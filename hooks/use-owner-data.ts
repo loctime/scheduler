@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { collection, query, where, orderBy, doc, onSnapshot } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
-import { resolvePublicCompany } from "@/lib/public-companies"
+import { resolvePublicCompany, getCompanySlugFromOwnerId } from "@/lib/public-companies"
 import type { Empleado, Turno, Configuracion } from "@/lib/types"
 
 /**
@@ -30,6 +30,30 @@ export function useOwnerIdFromSlug(companySlug: string | null) {
   }, [companySlug])
 
   return { ownerId, loading }
+}
+
+/**
+ * Resuelve ownerId (uid) a companySlug usando publicCompanies.
+ * Útil para mostrar la barra de tabs del PWA en /pwa/mensual?uid=XXX.
+ */
+export function useCompanySlugFromOwnerId(ownerId: string | null) {
+  const [companySlug, setCompanySlug] = useState<string | null>(null)
+  const [loading, setLoading] = useState(!!ownerId)
+
+  useEffect(() => {
+    if (!ownerId) {
+      setCompanySlug(null)
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    getCompanySlugFromOwnerId(ownerId)
+      .then(setCompanySlug)
+      .catch(() => setCompanySlug(null))
+      .finally(() => setLoading(false))
+  }, [ownerId])
+
+  return { companySlug, loading }
 }
 
 /**
