@@ -11,7 +11,6 @@ import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import { useToast } from "@/hooks/use-toast"
 import { useExportSchedule } from "@/hooks/use-export-schedule"
 import { ExportOverlay } from "@/components/export-overlay"
-import { useCompanySlug } from "@/hooks/use-company-slug"
 import { useMonthlySchedule } from "@/hooks/use-monthly-schedule"
 import { MonthlyScheduleView } from "@/components/monthly-schedule-view"
 import { Button } from "@/components/ui/button"
@@ -23,7 +22,6 @@ export default function HorariosMensualesPage() {
   const ownerId = useMemo(() => getOwnerIdForActor(user, userData), [user, userData])
   const { config } = useConfig(user)
   const { toast } = useToast()
-  const { companySlug, isLoading: slugLoading } = useCompanySlug()
   const { exporting, exportImage, exportPDF, exportExcel } = useExportSchedule()
 
   const {
@@ -79,8 +77,8 @@ export default function HorariosMensualesPage() {
   const handleShareLink = useCallback(async () => {
     if (!user) return
 
-    if (!slugLoading && companySlug) {
-      const shareUrl = `${window.location.origin}/pwa/mensual/${companySlug}`
+    if (ownerId) {
+      const shareUrl = `${window.location.origin}/pwa/mensual?uid=${ownerId}`
 
       try {
         await navigator.clipboard.writeText(shareUrl)
@@ -97,12 +95,12 @@ export default function HorariosMensualesPage() {
       }
     } else {
       toast({
-        title: "Publicación requerida",
-        description: "Para compartir el horario, primero publica usando el botón 'Publicar Horario'",
+        title: "No disponible",
+        description: "No se pudo obtener el identificador para compartir.",
         variant: "destructive",
       })
     }
-  }, [user, companySlug, slugLoading, toast])
+  }, [user, ownerId, toast])
 
   return (
     <>
