@@ -35,6 +35,22 @@ const buildShiftsFromAssignments = (ownerId: string, days?: Record<string, any>)
     id: shiftId,
     name: `Turno ${shiftId}`,
     color: "#9ca3af",
+    ownerId,
+    userId: ownerId,
+  })) as Turno[]
+}
+
+/** Convierte snapshot de turnos (id, name, color) del horario público a Turno[] */
+function shiftsFromWeekSnapshot(
+  weekShifts: Array<{ id: string; name: string; color: string }> | undefined,
+  ownerId: string
+): Turno[] | null {
+  if (!Array.isArray(weekShifts) || weekShifts.length === 0) return null
+  return weekShifts.map((s) => ({
+    id: s.id,
+    name: s.name || `Turno ${s.id}`,
+    color: s.color?.trim() || "#9ca3af",
+    ownerId,
     userId: ownerId,
   })) as Turno[]
 }
@@ -76,8 +92,11 @@ export function PwaTodayScheduleCard({ companySlug, horario: horarioProp, shifts
   const shifts = useMemo(() => {
     if (shiftsProp) return shiftsProp
     if (!horario) return []
+    const ownerId = horario.ownerId ?? ""
     const currentWeek = horario.weeks?.[horario.publishedWeekId]
-    return buildShiftsFromAssignments(horario.ownerId, currentWeek?.days)
+    const fromSnapshot = shiftsFromWeekSnapshot(currentWeek?.shifts, ownerId)
+    if (fromSnapshot) return fromSnapshot
+    return buildShiftsFromAssignments(ownerId, currentWeek?.days)
   }, [horario, shiftsProp])
 
   if (!currentViewer) return null
@@ -85,13 +104,13 @@ export function PwaTodayScheduleCard({ companySlug, horario: horarioProp, shifts
   const isLoadingState = !horarioProp && (isLoading || !horario?.publishedWeekId)
   if (isLoadingState) {
     return (
-      <Card className="overflow-hidden border-2">
-        <CardHeader className="pb-4">
-          <Skeleton className="h-8 w-48" />
+      <Card className="overflow-hidden border">
+        <CardHeader className="py-3 px-4">
+          <Skeleton className="h-5 w-36" />
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-16 w-full" />
+        <CardContent className="px-4 pb-3 space-y-2">
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
         </CardContent>
       </Card>
     )
@@ -151,62 +170,72 @@ function PwaTodayScheduleCardContent({ employeeName, scheduleInfo }: PwaTodaySch
   const v = variants[status]
   const Icon = v.icon
 
+  const barColorFallback = "#9ca3af"
+
   return (
-    <Card className={`overflow-hidden border-2 ${v.card} w-full`}>
-      <CardHeader className="pb-3 pt-6 px-6 sm:px-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg bg-white/60 dark:bg-black/20 ${v.iconColor}`}>
-              <Calendar className="h-6 w-6 sm:h-7 sm:w-7" />
+    <Card className={`overflow-hidden border ${v.card} w-full`}>
+      <CardHeader className="py-3 px-4 sm:px-5 pb-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className={`p-1.5 rounded-md bg-white/60 dark:bg-black/20 ${v.iconColor}`}>
+              <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
             <div>
-              <CardTitle className={`text-xl sm:text-2xl font-bold ${v.title}`}>
+              <CardTitle className={`text-base sm:text-lg font-bold ${v.title}`}>
                 HORARIO DE HOY
               </CardTitle>
-              <p className="text-sm sm:text-base font-medium text-muted-foreground mt-0.5">
+              <p className="text-xs sm:text-sm font-medium text-muted-foreground mt-0.5">
                 {employeeName}
               </p>
             </div>
           </div>
-          <Badge variant="outline" className={`${v.badge} text-xs sm:text-sm font-bold px-4 py-1.5 w-fit`}>
+          <Badge variant="outline" className={`${v.badge} text-xs font-bold px-3 py-1 w-fit`}>
             {v.label}
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="px-6 sm:px-8 pb-8 pt-0">
+      <CardContent className="px-4 sm:px-5 pb-4 pt-0">
         {status === "franco" ? (
-          <div className="flex flex-col items-center justify-center py-8 sm:py-12 gap-4">
-            <Icon className={`h-12 w-12 sm:h-16 sm:w-16 ${v.iconColor}`} />
-            <p className="text-2xl sm:text-3xl font-bold text-slate-600 dark:text-slate-400">
+          <div className="flex flex-col items-center justify-center py-6 sm:py-8 gap-2">
+            <Icon className={`h-10 w-10 sm:h-12 sm:w-12 ${v.iconColor}`} />
+            <p className="text-lg sm:text-xl font-bold text-slate-600 dark:text-slate-400">
               ¡Franco completo!
             </p>
-            <p className="text-base sm:text-lg text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Hoy tenés descanso
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-2">
             {timeBlocks.length > 0 ? (
               timeBlocks.map((block, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-4 p-4 sm:p-5 rounded-xl bg-white/70 dark:bg-black/20 border"
+                  className="flex items-center gap-3 py-2 px-2 rounded-md bg-white/50 dark:bg-black/10 min-h-0"
                 >
-                  <Clock className={`h-6 w-6 sm:h-7 sm:w-7 shrink-0 ${v.iconColor}`} />
+                  <div
+                    className="w-1 shrink-0 self-stretch rounded-full min-h-[2rem]"
+                    style={{ backgroundColor: block.color || barColorFallback }}
+                    aria-hidden
+                  />
                   <div className="flex-1 min-w-0">
                     {block.label && (
-                      <p className="text-sm font-medium text-muted-foreground mb-1">{block.label}</p>
+                      <p className="text-xs font-medium text-muted-foreground mb-0.5">{block.label}</p>
                     )}
-                    <p className="text-2xl sm:text-3xl font-bold tabular-nums tracking-tight">
+                    <p className="text-base sm:text-lg font-semibold tabular-nums tracking-tight">
                       {block.startTime} – {block.endTime}
                     </p>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="flex items-center gap-4 p-4 sm:p-5 rounded-xl bg-white/70 dark:bg-black/20 border">
-                <Icon className={`h-6 w-6 sm:h-7 sm:w-7 shrink-0 ${v.iconColor}`} />
-                <p className="text-lg sm:text-xl font-medium text-muted-foreground">
+              <div className="flex items-center gap-3 py-2 px-2 rounded-md bg-white/50 dark:bg-black/10">
+                <div
+                  className="w-1 shrink-0 self-stretch rounded-full min-h-[2rem]"
+                  style={{ backgroundColor: barColorFallback }}
+                  aria-hidden
+                />
+                <p className="text-sm font-medium text-muted-foreground">
                   {status === "medio_franco"
                     ? "Medio franco asignado (sin horario detallado)"
                     : "Sin horario detallado"}

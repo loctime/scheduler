@@ -7,6 +7,8 @@ export interface TimeBlock {
   label?: string
   startTime: string
   endTime: string
+  /** Color del turno (hex) para barra/accento visual */
+  color?: string
 }
 
 export interface TodayScheduleInfo {
@@ -72,11 +74,13 @@ export function getTodayScheduleInfo(
 
     if (type === "medio_franco") {
       hasMedioFranco = true
+      // Medio franco: color por defecto ámbar para diferenciar
+      const medioFrancoColor = "#f59e0b"
       if (a.startTime && a.endTime) {
-        timeBlocks.push({ startTime: a.startTime, endTime: a.endTime })
+        timeBlocks.push({ startTime: a.startTime, endTime: a.endTime, color: medioFrancoColor })
       }
       if (a.startTime2 && a.endTime2) {
-        timeBlocks.push({ startTime: a.startTime2, endTime: a.endTime2 })
+        timeBlocks.push({ startTime: a.startTime2, endTime: a.endTime2, color: medioFrancoColor })
       }
       continue
     }
@@ -89,11 +93,13 @@ export function getTodayScheduleInfo(
         const shift = shiftId ? shifts.find((s) => s.id === shiftId) : undefined
         if (shift?.name) shiftName = shift.name
 
+        const blockColor = shift?.color
         if (a.startTime && a.endTime) {
           timeBlocks.push({
             label: shift?.name,
             startTime: a.startTime,
             endTime: a.endTime,
+            color: blockColor,
           })
         }
         if (a.startTime2 && a.endTime2) {
@@ -101,6 +107,7 @@ export function getTodayScheduleInfo(
             label: shift?.name,
             startTime: a.startTime2,
             endTime: a.endTime2,
+            color: blockColor,
           })
         }
         // Si solo tiene shiftId (sin startTime/endTime en assignment), buscar en shifts
@@ -109,12 +116,14 @@ export function getTodayScheduleInfo(
             label: shift.name,
             startTime: shift.startTime || "",
             endTime: shift.endTime || "",
+            color: blockColor,
           })
           if (shift.startTime2 && shift.endTime2) {
             timeBlocks.push({
               label: shift.name,
               startTime: shift.startTime2,
               endTime: shift.endTime2,
+              color: blockColor,
             })
           }
         }

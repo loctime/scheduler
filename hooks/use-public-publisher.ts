@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore"
+import { doc, setDoc, serverTimestamp, getDoc, collection, query, where, getDocs } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { createPublicCompanySlug } from "@/lib/public-companies"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
@@ -170,6 +170,22 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
             name: e.name || e.displayName || e.id || 'Empleado'
           })).filter((e: any) => e.id)
 
+      // Incluir turnos (id, name, color) para que la PWA muestre el color real en "Horario de Hoy"
+      let shiftsSnapshot: Array<{ id: string; name: string; color: string }> = []
+      try {
+        const shiftsQuery = query(
+          collection(db, COLLECTIONS.SHIFTS),
+          where("ownerId", "==", ownerId)
+        )
+        const shiftsSnap = await getDocs(shiftsQuery)
+        shiftsSnapshot = shiftsSnap.docs.map((d) => {
+          const data = d.data()
+          return { id: d.id, name: (data.name as string) || "", color: (data.color as string) || "#9ca3af" }
+        })
+      } catch (shiftsErr) {
+        console.warn("🔧 [usePublicPublisher] No se pudieron cargar turnos para snapshot:", shiftsErr)
+      }
+
       const legacyPublicData = {
         ownerId: ownerId,
         publishedWeekId: options.weekId,
@@ -183,7 +199,8 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
             publicImageUrl: options.publicImageUrl || null,
             days: originalSchedule.assignments || {},
             dayStatus: originalSchedule.dayStatus || {},
-            employees: employeesForLegacy
+            employees: employeesForLegacy,
+            shifts: shiftsSnapshot
           }
         },
         userId: user?.uid,

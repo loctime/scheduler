@@ -15,6 +15,8 @@ export interface SanitizedPublicHorarioData {
       id: string
       name: string
     }>
+    /** Turnos con id, name, color para mostrar color real en PWA (Horario de Hoy) */
+    shifts?: Array<{ id: string; name: string; color: string }>
   }>
   companyName?: string
 }
@@ -61,6 +63,17 @@ function sanitizeWeeks(weeks: Record<string, any>): Record<string, any> {
   Object.entries(weeks).forEach(([weekId, weekData]) => {
     if (!weekData || typeof weekData !== 'object') return
     
+    const rawShifts = weekData.shifts
+    const shifts: Array<{ id: string; name: string; color: string }> = Array.isArray(rawShifts)
+      ? rawShifts
+          .filter((s: any) => s && typeof s === "object" && s.id)
+          .map((s: any) => ({
+            id: String(s.id),
+            name: String(s.name ?? ""),
+            color: typeof s.color === "string" && s.color.trim() ? s.color.trim() : "#9ca3af"
+          }))
+      : []
+
     sanitized[weekId] = {
       weekId: weekData.weekId || weekId,
       weekLabel: weekData.weekLabel || `Semana ${weekId}`,
@@ -68,7 +81,8 @@ function sanitizeWeeks(weeks: Record<string, any>): Record<string, any> {
       publicImageUrl: weekData.publicImageUrl || null,
       days: weekData.days || {},
       dayStatus: weekData.dayStatus || {},
-      employees: sanitizeEmployees(weekData.employees || [])
+      employees: sanitizeEmployees(weekData.employees || []),
+      shifts: shifts.length > 0 ? shifts : undefined
     }
   })
   
