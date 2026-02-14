@@ -2,36 +2,41 @@
   <style>
     @media (prefers-color-scheme: light) {
       .background { fill: #3b82f6; }
-      .chef-hat { fill: white; }
-      .chef-hat-band { fill: #1e40af; }
+      .calendar-page { fill: white; }
+      .calendar-header { fill: #1e40af; }
+      .grid-line { stroke: #93c5fd; }
+      .ring { stroke: white; fill: none; }
     }
     @media (prefers-color-scheme: dark) {
       .background { fill: #1e40af; }
-      .chef-hat { fill: white; }
-      .chef-hat-band { fill: #60a5fa; }
+      .calendar-page { fill: white; }
+      .calendar-header { fill: #60a5fa; }
+      .grid-line { stroke: #3b82f6; }
+      .ring { stroke: white; fill: none; }
     }
   </style>
   <rect class="background" width="180" height="180" rx="37" />
   
-  <!-- Gorrito de chef -->
-  <g transform="translate(90, 75)">
-    <!-- Parte superior del gorrito (cúpula alta y ancha) -->
-    <path class="chef-hat" d="M-60,-40 
-      C-60,-65 -40,-70 -20,-65
-      C-10,-63 0,-65 10,-63
-      C30,-70 50,-65 60,-40
-      L60,30 
-      C60,40 50,40 45,40 
-      L-45,40 
-      C-50,40 -60,40 -60,30 Z" />
+  <!-- Calendario -->
+  <g transform="translate(90, 88)">
+    <!-- Página blanca del calendario -->
+    <rect class="calendar-page" x="-52" y="-48" width="104" height="96" rx="6" />
     
-    <!-- Banda del gorrito (más visible) -->
-    <rect class="chef-hat-band" x="-55" y="30" width="110" height="15" rx="4" />
+    <!-- Barra del encabezado (mes) -->
+    <rect class="calendar-header" x="-48" y="-44" width="96" height="20" rx="4" />
     
-    <!-- Detalles decorativos en la banda -->
-    <circle class="chef-hat-band" cx="-30" cy="37.5" r="2.5" fill-opacity="0.6" />
-    <circle class="chef-hat-band" cx="0" cy="37.5" r="2.5" fill-opacity="0.6" />
-    <circle class="chef-hat-band" cx="30" cy="37.5" r="2.5" fill-opacity="0.6" />
+    <!-- Anillos de encuadernación -->
+    <circle class="ring" cx="-28" cy="-56" r="7" stroke-width="3" />
+    <circle class="ring" cx="0" cy="-56" r="7" stroke-width="3" />
+    <circle class="ring" cx="28" cy="-56" r="7" stroke-width="3" />
+    
+    <!-- Líneas de la grilla (días de la semana) -->
+    <line class="grid-line" x1="-48" y1="-16" x2="48" y2="-16" stroke-width="1.5" />
+    <line class="grid-line" x1="-48" y1="4" x2="48" y2="4" stroke-width="1.5" />
+    <line class="grid-line" x1="-48" y1="24" x2="48" y2="24" stroke-width="1.5" />
+    <line class="grid-line" x1="-48" y1="44" x2="48" y2="44" stroke-width="1.5" />
+    <line class="grid-line" x1="-24" y1="-44" x2="-24" y2="48" stroke-width="1.5" />
+    <line class="grid-line" x1="0" y1="-44" x2="0" y2="48" stroke-width="1.5" />
+    <line class="grid-line" x1="24" y1="-44" x2="24" y2="48" stroke-width="1.5" />
   </g>
 </svg>
-

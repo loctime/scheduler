@@ -1,7 +1,7 @@
 {
-  "name": "PWA Operaciones",
-  "short_name": "Operaciones",
-  "description": "PWA unificada para módulos públicos y privados",
+  "name": "Horario y Stock",
+  "short_name": "Horarios",
+  "description": "App para visualizar los horarios y controlar stock",
   "start_url": "/pwa",
   "display": "standalone",
   "background_color": "#ffffff",
