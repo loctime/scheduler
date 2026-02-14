@@ -9,33 +9,45 @@ import { Share2, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { useMonthlySchedules } from "@/hooks/use-monthly-schedules"
+import { useEmployeesByOwnerId, useShiftsByOwnerId, useConfigByOwnerId } from "@/hooks/use-owner-data"
 import { MonthlyScheduleView } from "@/components/monthly-schedule-view"
 import type { MonthGroup } from "@/lib/monthly-utils"
 
 /**
  * Página PWA de horarios mensuales.
- * Usa la misma fuente que el dashboard: Firestore schedules (ownerId == uid).
+ * Misma fuente que el dashboard: Firestore schedules, employees, shifts, config (ownerId == uid).
  * Query: ?uid=XXXX (obligatorio). Opcional: ?year=YYYY&month=M
  */
 export default function PwaMensualPage() {
   const searchParams = useSearchParams()
   const uid = searchParams.get("uid") ?? ""
+  const ownerId = uid || null
   const year = searchParams.get("year") ? parseInt(searchParams.get("year")!, 10) : undefined
   const month = searchParams.get("month") ? parseInt(searchParams.get("month")!, 10) : undefined
   const { toast } = useToast()
 
+  const { employees, loading: employeesLoading } = useEmployeesByOwnerId(ownerId)
+  const { shifts, loading: shiftsLoading } = useShiftsByOwnerId(ownerId)
+  const { config, loading: configLoading } = useConfigByOwnerId(ownerId)
+
+  const monthStartDay = config?.mesInicioDia ?? 1
+  const weekStartsOn = (config?.semanaInicioDia ?? 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
+
   const {
     monthGroups: allMonthGroups,
-    isLoading,
+    isLoading: schedulesLoading,
     error,
     calculateMonthlyStats,
   } = useMonthlySchedules({
     ownerId: uid,
-    employees: [],
-    shifts: [],
-    monthStartDay: 1,
-    weekStartsOn: 1,
+    employees,
+    shifts,
+    config,
+    monthStartDay,
+    weekStartsOn,
   })
+
+  const isLoading = employeesLoading || shiftsLoading || configLoading || schedulesLoading
 
   const monthGroups = useMemo<MonthGroup[]>(() => {
     if (year == null && month == null) return allMonthGroups
@@ -148,7 +160,9 @@ export default function PwaMensualPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Horario mensual</h1>
+              <h1 className="text-2xl font-bold text-foreground">
+                {config?.nombreEmpresa ?? "Horario mensual"}
+              </h1>
               <p className="text-sm text-muted-foreground">Vista mensual (misma fuente que el dashboard)</p>
             </div>
             <div className="flex items-center gap-2">
@@ -169,10 +183,11 @@ export default function PwaMensualPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <MonthlyScheduleView
           monthGroups={monthGroups}
-          companyName={undefined}
-          employees={[]}
-          shifts={[]}
-          monthStartDay={1}
+          companyName={config?.nombreEmpresa}
+          employees={employees}
+          shifts={shifts}
+          config={config ?? undefined}
+          monthStartDay={monthStartDay}
           isLoading={false}
           calculateMonthlyStats={calculateMonthlyStats}
           readonly
