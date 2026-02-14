@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { format } from "date-fns"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Badge } from "@/components/ui/badge"
-import { Calendar, Clock, Coffee, PartyPopper } from "lucide-react"
+import { Calendar, Clock, Coffee } from "lucide-react"
 import { usePublicHorario } from "@/hooks/use-public-horario"
 import { getTodayScheduleInfo } from "@/lib/pwa-today-schedule-utils"
 import type { Turno } from "@/lib/types"
@@ -104,13 +103,13 @@ export function PwaTodayScheduleCard({ companySlug, horario: horarioProp, shifts
   const isLoadingState = !horarioProp && (isLoading || !horario?.publishedWeekId)
   if (isLoadingState) {
     return (
-      <Card className="overflow-hidden border">
+      <Card className="overflow-hidden border rounded-none sm:rounded-md">
         <CardHeader className="py-3 px-4">
-          <Skeleton className="h-5 w-36" />
+          <Skeleton className="h-4 w-48" />
         </CardHeader>
-        <CardContent className="px-4 pb-3 space-y-2">
-          <Skeleton className="h-8 w-full" />
-          <Skeleton className="h-8 w-full" />
+        <CardContent className="px-4 pb-3 space-y-1">
+          <Skeleton className="h-7 w-full" />
+          <Skeleton className="h-7 w-full" />
         </CardContent>
       </Card>
     )
@@ -143,101 +142,69 @@ function PwaTodayScheduleCardContent({ employeeName, scheduleInfo }: PwaTodaySch
   const variants = {
     trabaja: {
       card: "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800",
-      title: "text-blue-900 dark:text-blue-100",
-      badge: "bg-blue-600 text-white border-blue-700 hover:bg-blue-600",
-      label: "TRABAJA",
-      icon: Clock,
+      header: "text-blue-900 dark:text-blue-100",
       iconColor: "text-blue-600",
     },
     medio_franco: {
       card: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800",
-      title: "text-amber-900 dark:text-amber-100",
-      badge: "bg-amber-500 text-amber-950 border-amber-600 hover:bg-amber-500",
-      label: "MEDIO FRANCO",
-      icon: Coffee,
+      header: "text-amber-900 dark:text-amber-100",
       iconColor: "text-amber-600",
     },
     franco: {
       card: "bg-slate-100 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700",
-      title: "text-slate-700 dark:text-slate-300",
-      badge: "bg-slate-500 text-white border-slate-600 hover:bg-slate-500",
-      label: "FRANCO COMPLETO",
-      icon: PartyPopper,
+      header: "text-slate-700 dark:text-slate-300",
       iconColor: "text-slate-500",
     },
   } as const
 
   const v = variants[status]
-  const Icon = v.icon
-
   const barColorFallback = "#9ca3af"
 
   return (
-    <Card className={`overflow-hidden border ${v.card} w-full`}>
-      <CardHeader className="py-3 px-4 sm:px-5 pb-2">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className={`p-1.5 rounded-md bg-white/60 dark:bg-black/20 ${v.iconColor}`}>
-              <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
-            </div>
-            <div>
-              <CardTitle className={`text-base sm:text-lg font-bold ${v.title}`}>
-                HORARIO DE HOY
-              </CardTitle>
-              <p className="text-xs sm:text-sm font-medium text-muted-foreground mt-0.5">
-                {employeeName}
-              </p>
-            </div>
-          </div>
-          <Badge variant="outline" className={`${v.badge} text-xs font-bold px-3 py-1 w-fit`}>
-            {v.label}
-          </Badge>
+    <Card className={`overflow-hidden border rounded-none sm:rounded-md ${v.card} w-full`}>
+      <CardHeader className="py-3 px-4 sm:px-5 flex flex-row items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Calendar className={`h-4 w-4 sm:h-[18px] sm:w-[18px] shrink-0 ${v.iconColor}`} />
+          <span className={`font-semibold text-sm sm:text-base truncate ${v.header}`}>
+            HORARIO DE HOY – {employeeName}
+          </span>
         </div>
       </CardHeader>
       <CardContent className="px-4 sm:px-5 pb-4 pt-0">
         {status === "franco" ? (
-          <div className="flex flex-col items-center justify-center py-6 sm:py-8 gap-2">
-            <Icon className={`h-10 w-10 sm:h-12 sm:w-12 ${v.iconColor}`} />
-            <p className="text-lg sm:text-xl font-bold text-slate-600 dark:text-slate-400">
-              ¡Franco completo!
-            </p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Hoy tenés descanso
-            </p>
-          </div>
+          <p className="text-sm sm:text-base font-medium text-slate-600 dark:text-slate-400">
+            FRANCO
+          </p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1">
             {timeBlocks.length > 0 ? (
               timeBlocks.map((block, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-3 py-2 px-2 rounded-md bg-white/50 dark:bg-black/10 min-h-0"
-                >
+                <div key={i} className="flex items-center gap-3 py-2 min-h-0">
                   <div
-                    className="w-1 shrink-0 self-stretch rounded-full min-h-[2rem]"
+                    className="w-1 shrink-0 self-stretch rounded-full min-h-[1.5rem]"
                     style={{ backgroundColor: block.color || barColorFallback }}
                     aria-hidden
                   />
                   <div className="flex-1 min-w-0">
-                    {block.label && (
-                      <p className="text-xs font-medium text-muted-foreground mb-0.5">{block.label}</p>
-                    )}
                     <p className="text-base sm:text-lg font-semibold tabular-nums tracking-tight">
                       {block.startTime} – {block.endTime}
                     </p>
+                    {block.label && (
+                      <p className="text-xs font-medium text-muted-foreground mt-0.5">{block.label}</p>
+                    )}
                   </div>
                 </div>
               ))
             ) : (
-              <div className="flex items-center gap-3 py-2 px-2 rounded-md bg-white/50 dark:bg-black/10">
+              <div className="flex items-center gap-3 py-2">
                 <div
-                  className="w-1 shrink-0 self-stretch rounded-full min-h-[2rem]"
+                  className="w-1 shrink-0 self-stretch rounded-full min-h-[1.5rem]"
                   style={{ backgroundColor: barColorFallback }}
                   aria-hidden
                 />
                 <p className="text-sm font-medium text-muted-foreground">
                   {status === "medio_franco"
-                    ? "Medio franco asignado (sin horario detallado)"
+                    ? "Medio franco (sin horario detallado)"
                     : "Sin horario detallado"}
                 </p>
               </div>
