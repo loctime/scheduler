@@ -127,16 +127,47 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
               const stockDisponible = stock
               const cantidadMinimaPermitida = -stockDisponible
 
+              // Efecto "llenado de agua": % de fill según cantidad (max referencia: 15)
+              const maxFillRef = 15
+              const fillPct = cantidad > 0
+                ? Math.min(100, (cantidad / maxFillRef) * 100)
+                : cantidad < 0
+                  ? Math.min(100, (Math.abs(cantidad) / Math.max(stock, 1)) * 100)
+                  : 0
+              const fillColor = cantidad > 0 ? "sky" : cantidad < 0 ? "violet" : null
+
               return (
                 <div
                   key={producto.id}
                   className={cn(
-                    "rounded-2xl border border-gray-200/80 bg-white shadow-sm active:shadow-md transition-all flex overflow-hidden",
+                    "relative rounded-2xl border border-gray-200/80 bg-white shadow-sm active:shadow-md transition-all flex overflow-hidden",
                     isStockBajo && "border-amber-400"
                   )}
                 >
+                  {/* Capa de fill "como agua" con ondas */}
+                  {fillColor && fillPct > 0 && (
+                    <div
+                      className={cn(
+                        "absolute inset-x-0 bottom-0 transition-all duration-300 ease-out pointer-events-none overflow-visible",
+                        fillColor === "sky" && "bg-sky-200/50",
+                        fillColor === "violet" && "bg-violet-200/50"
+                      )}
+                      style={{
+                        height: `${fillPct}%`,
+                        maskImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,100 L0,8 Q10,22 20,8 T40,8 T60,8 T80,8 T100,8 L100,100 Z'/%3E%3C/svg%3E")`,
+                        WebkitMaskImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0,100 L0,8 Q10,22 20,8 T40,8 T60,8 T80,8 T100,8 L100,100 Z'/%3E%3C/svg%3E")`,
+                        maskSize: "100% 100%",
+                        maskPosition: "bottom",
+                        maskRepeat: "no-repeat",
+                        WebkitMaskSize: "100% 100%",
+                        WebkitMaskPosition: "bottom",
+                        WebkitMaskRepeat: "no-repeat",
+                      }}
+                    />
+                  )}
+
                   {/* Izquierda: info del producto */}
-                  <div className="flex-1 min-w-0 flex flex-col justify-center p-3">
+                  <div className="relative z-10 flex-1 min-w-0 flex flex-col justify-center p-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-base font-semibold truncate text-gray-900">{producto.nombre}</p>
                       <span className="text-[11px] text-gray-400 uppercase tracking-wide">{producto.unidad || "U"}</span>
@@ -150,7 +181,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                   </div>
 
                   {/* Derecha: [-] número [+] en fila */}
-                  <div className="flex items-center gap-1.5 pr-1.5 shrink-0">
+                  <div className="relative z-10 flex items-center gap-1.5 pr-1.5 shrink-0">
                     <Button
                       variant="outline"
                       size="icon"
