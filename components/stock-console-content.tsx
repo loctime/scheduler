@@ -95,19 +95,9 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
         {/* Selector de Pedido (compacto) — máx. 2 filas + scroll horizontal */}
         <div className="bg-white border-b">
           <div className="p-4">
-            <div className="text-sm text-gray-600 mb-2">Pedido (opcional)</div>
             <div className="overflow-x-auto overflow-y-hidden max-h-[4.75rem]">
               <div className="flex flex-wrap gap-2 w-max min-w-full max-h-[4.75rem]">
-                <button
-                  onClick={() => setSelectedPedidoId(null)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors shrink-0 ${
-                    !state.selectedPedidoId
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-200 text-gray-700"
-                  }`}
-                >
-                  Sin pedido
-                </button>
+                
                 {pedidos.map((pedido) => (
                   <button
                     key={pedido.id}
@@ -164,7 +154,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-11 w-11 rounded-full transition-transform active:scale-95 border-gray-200"
+                      className="h-11 w-11 rounded-full transition-transform active:scale-95 border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 hover:border-violet-400"
                       onClick={() => decrementarCantidad(producto.id)}
                       disabled={cantidad <= cantidadMinimaPermitida || state.loading}
                     >
@@ -185,7 +175,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-11 w-11 rounded-full transition-transform active:scale-95 border-gray-200"
+                      className="h-11 w-11 rounded-full transition-transform active:scale-95 border-sky-400 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:border-sky-500"
                       onClick={() => incrementarCantidad(producto.id)}
                       disabled={state.loading}
                     >
