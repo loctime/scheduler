@@ -23,6 +23,7 @@ export function useSeparators({
   const [editingSeparatorId, setEditingSeparatorId] = useState<string | null>(null)
   const [separatorEditName, setSeparatorEditName] = useState("")
   const [separatorEditColor, setSeparatorEditColor] = useState("")
+  const [separatorEditMinimoCobertura, setSeparatorEditMinimoCobertura] = useState("")
 
   // Handler para agregar separador en una posición específica
   const handleAddSeparator = useCallback(
@@ -47,6 +48,11 @@ export function useSeparators({
     setEditingSeparatorId(separator.id)
     setSeparatorEditName(separator.nombre)
     setSeparatorEditColor(separator.color || "")
+    setSeparatorEditMinimoCobertura(
+      separator.minimoCobertura !== undefined && separator.minimoCobertura !== null
+        ? String(separator.minimoCobertura)
+        : ""
+    )
   }, [])
 
   // Handler para guardar edición de separador
@@ -55,6 +61,7 @@ export function useSeparators({
       setEditingSeparatorId(null)
       setSeparatorEditName("")
       setSeparatorEditColor("")
+      setSeparatorEditMinimoCobertura("")
       return
     }
 
@@ -63,13 +70,19 @@ export function useSeparators({
       setEditingSeparatorId(null)
       setSeparatorEditName("")
       setSeparatorEditColor("")
+      setSeparatorEditMinimoCobertura("")
       return
     }
+
+    const parsedMin = separatorEditMinimoCobertura.trim() === ""
+      ? 1
+      : Math.max(0, Math.min(99, parseInt(separatorEditMinimoCobertura, 10) || 1))
 
     const updatedSeparator: Separador = {
       ...separator,
       nombre: separatorEditName.trim(),
       color: separatorEditColor.trim() || undefined,
+      minimoCobertura: parsedMin,
     }
 
     await updateSeparator(editingSeparatorId, updatedSeparator)
@@ -77,13 +90,15 @@ export function useSeparators({
     setEditingSeparatorId(null)
     setSeparatorEditName("")
     setSeparatorEditColor("")
-  }, [editingSeparatorId, separatorEditName, separatorEditColor, updateSeparator, separadorMap])
+    setSeparatorEditMinimoCobertura("")
+  }, [editingSeparatorId, separatorEditName, separatorEditColor, separatorEditMinimoCobertura, updateSeparator, separadorMap])
 
   // Handler para cancelar edición
   const handleCancelEdit = useCallback(() => {
     setEditingSeparatorId(null)
     setSeparatorEditName("")
     setSeparatorEditColor("")
+    setSeparatorEditMinimoCobertura("")
   }, [])
 
   // Handler para eliminar separador
@@ -106,8 +121,10 @@ export function useSeparators({
     editingSeparatorId,
     separatorEditName,
     separatorEditColor,
+    separatorEditMinimoCobertura,
     setSeparatorEditName,
     setSeparatorEditColor,
+    setSeparatorEditMinimoCobertura,
     handleAddSeparator,
     handleEditSeparator,
     handleSaveSeparatorEdit,

@@ -15,6 +15,7 @@ import { useScheduleGridData } from "./hooks/use-schedule-grid-data"
 import { useCellBackgroundStyles } from "./hooks/use-cell-background-styles"
 import { useDragAndDrop } from "./hooks/use-drag-and-drop"
 import { useSeparators } from "./hooks/use-separators"
+import { useSectorCoverage } from "./hooks/use-sector-coverage"
 import { GridHeader } from "./components/grid-header"
 import { SeparatorRow } from "./components/separator-row"
 import { EmployeeRow } from "./components/employee-row"
@@ -237,8 +238,10 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     editingSeparatorId,
     separatorEditName,
     separatorEditColor,
+    separatorEditMinimoCobertura,
     setSeparatorEditName,
     setSeparatorEditColor,
+    setSeparatorEditMinimoCobertura,
     handleAddSeparator,
     handleEditSeparator,
     handleSaveSeparatorEdit,
@@ -252,6 +255,14 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     updateSeparator,
     deleteSeparator,
     onOrderUpdate: updateEmployeeOrder,
+  })
+
+  // Análisis de cobertura mínima por sector (solo cuando cambian assignments, orden o separadores)
+  const sectorCoverage = useSectorCoverage({
+    orderedItems: orderedItems ?? [],
+    assignments: schedule?.assignments ?? {},
+    separadores: config?.separadores ?? [],
+    weekDays,
   })
 
   // Guardar estado de celda antes de cambiar
@@ -543,6 +554,8 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
                         editingSeparatorId={editingSeparatorId}
                         separatorEditName={separatorEditName}
                         separatorEditColor={separatorEditColor}
+                        separatorEditMinimoCobertura={separatorEditMinimoCobertura}
+                        onEditMinimoCoberturaChange={setSeparatorEditMinimoCobertura}
                         readonly={readonly}
                         onEditNameChange={setSeparatorEditName}
                         onEditColorChange={setSeparatorEditColor}
@@ -552,6 +565,13 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
                         onDelete={handleDeleteSeparator}
                         isFirstSeparator={isFirstSeparator}
                         onCloseSelector={() => setSelectedCell(null)}
+                        coverageAlertByDay={
+                          sectorCoverage[item.data.id]
+                            ? Object.fromEntries(
+                                Object.entries(sectorCoverage[item.data.id]).map(([k, v]) => [k, v.hasAlert])
+                              )
+                            : {}
+                        }
                       />
                     ) : (
                       <EmployeeRow
@@ -745,6 +765,8 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
                         editingSeparatorId={editingSeparatorId}
                         separatorEditName={separatorEditName}
                         separatorEditColor={separatorEditColor}
+                        separatorEditMinimoCobertura={separatorEditMinimoCobertura}
+                        onEditMinimoCoberturaChange={setSeparatorEditMinimoCobertura}
                         readonly={readonly}
                         onEditNameChange={setSeparatorEditName}
                         onEditColorChange={setSeparatorEditColor}
@@ -754,6 +776,13 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
                         onDelete={handleDeleteSeparator}
                         isFirstSeparator={isFirstSeparator}
                         onCloseSelector={() => setSelectedCell(null)}
+                        coverageAlertByDay={
+                          sectorCoverage[item.data.id]
+                            ? Object.fromEntries(
+                                Object.entries(sectorCoverage[item.data.id]).map(([k, v]) => [k, v.hasAlert])
+                              )
+                            : {}
+                        }
                       />
                     ) : (
                       <EmployeeRow

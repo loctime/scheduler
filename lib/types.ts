@@ -239,6 +239,8 @@ export interface Separador {
   nombre: string
   tipo: "puesto" | "personalizado"
   color?: string
+  /** Mínimo de personas que deben estar activas simultáneamente en el sector por bloque de 30 min. Default 1. */
+  minimoCobertura?: number
   createdAt?: any
   updatedAt?: any
 }
