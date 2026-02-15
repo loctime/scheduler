@@ -217,6 +217,14 @@ export function validateNoOverlaps(assignments: ShiftAssignment[]): ValidationRe
         continue
       }
 
+      // Licencia por embarazo reemplaza horas de trabajo: forma partición con shift/medio_franco,
+      // no solapamiento. La licencia marca "no trabaja" en ese rango; el trabajo queda en el resto.
+      const oneIsLicencia = a1.type === "licencia" || a2.type === "licencia"
+      const otherIsWork = a1.type === "shift" || a1.type === "medio_franco" || a2.type === "shift" || a2.type === "medio_franco"
+      if (oneIsLicencia && otherIsWork) {
+        continue
+      }
+
       // Verificar solapamiento entre primera franja de ambos
       if (hasTimeOverlap(
         a1.startTime!,

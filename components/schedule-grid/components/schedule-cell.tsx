@@ -197,20 +197,37 @@ function ScheduleCellComponent({
 
   // Encontrar todos los turnos asignados editables (con índice real)
   // CRÍTICO: Permitir assignments con shiftId huérfano (turno base eliminado)
+  // Incluye type "shift" con shiftId Y type "medio_franco" (no requiere shiftId)
   const editableShiftAssignments = React.useMemo(() => {
     return assignments
       .map((assignment, index) => {
-        // Solo incluir assignments de tipo "shift" con shiftId
-        if (assignment.type !== "shift" || !assignment.shiftId) return null
-        
-        const shift = getShiftInfo(assignment.shiftId)
-        // Permitir edición incluso si el turno base no existe (shift undefined)
-        // El assignment es autosuficiente si tiene startTime/endTime
-        return {
-          assignment,
-          shift: shift || undefined,
-          index, // Índice real en el array
+        if (assignment.type === "shift" && assignment.shiftId) {
+          const shift = getShiftInfo(assignment.shiftId)
+          return {
+            assignment,
+            shift: shift || undefined,
+            index,
+          }
         }
+        if (assignment.type === "medio_franco") {
+          const virtualShift: Turno = {
+            id: "medio_franco_virtual",
+            name: "1/2 Franco",
+            startTime: assignment.startTime || "",
+            endTime: assignment.endTime || "",
+            startTime2: assignment.startTime2,
+            endTime2: assignment.endTime2,
+            color: "#22c55e",
+            userId: "",
+            ownerId: "",
+          }
+          return {
+            assignment,
+            shift: virtualShift,
+            index,
+          }
+        }
+        return null
       })
       .filter((item): item is { assignment: ShiftAssignment; shift: Turno | undefined; index: number } => item !== null)
   }, [assignments, getShiftInfo])

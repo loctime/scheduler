@@ -456,9 +456,8 @@ export function LicenciaEmbarazoDialog({
   const shiftStartTime = assignment.startTime || shift?.startTime || ""
   const shiftEndTime = assignment.endTime || shift?.endTime || ""
 
-  if (!shiftStartTime || !shiftEndTime) {
-    return null
-  }
+  // Permitir abrir el diálogo aunque falten horarios; la validación se hace en submit
+  const hasShiftRange = !!(shiftStartTime && shiftEndTime)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -466,7 +465,7 @@ export function LicenciaEmbarazoDialog({
         <DialogHeader>
           <DialogTitle>Asignar licencia por embarazo</DialogTitle>
           <div className="text-sm text-muted-foreground">
-            Turno: {shiftStartTime} – {shiftEndTime}
+            Turno: {hasShiftRange ? `${shiftStartTime} – ${shiftEndTime}` : "Sin horario definido"}
           </div>
         </DialogHeader>
 
