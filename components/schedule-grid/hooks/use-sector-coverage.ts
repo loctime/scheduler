@@ -47,6 +47,20 @@ function blockOverlapsSegment(
   return blockStartMin < segEnd && blockEnd > segStart
 }
 
+/** Recupera todos los intervalos activos del sector en ese día (unión de todos los empleados). */
+function getSectorActiveIntervalsForDay(
+  sectorEmployeeIds: string[],
+  dayAssignments: Record<string, ShiftAssignment[]>
+): Array<[number, number]> {
+  const all: Array<[number, number]> = []
+  for (const empId of sectorEmployeeIds) {
+    const list = dayAssignments[empId]
+    if (!list?.length) continue
+    all.push(...getActiveMinutesFromAssignments(list))
+  }
+  return all
+}
+
 /** Cuenta cuántos empleados del sector están activos en el bloque de 30 min para ese día. */
 function countActiveInBlock(
   sectorEmployeeIds: string[],
@@ -124,8 +138,15 @@ export function useSectorCoverage({
       for (const day of weekDays) {
         const dayKey = formatDayKey(day)
         const dayAssignments = assignments[dayKey] || {}
+        const intervals = getSectorActiveIntervalsForDay(sector.employeeIds, dayAssignments)
+        if (intervals.length === 0) {
+          result[sector.separatorId][dayKey] = { hasAlert: false }
+          continue
+        }
+        const earliestStart = Math.min(...intervals.map(([s]) => s))
+        const latestEnd = Math.max(...intervals.map(([, e]) => e))
         let hasAlert = false
-        for (let blockStart = 0; blockStart < MINUTES_PER_DAY; blockStart += BLOCK_MINUTES) {
+        for (let blockStart = earliestStart; blockStart < latestEnd; blockStart += BLOCK_MINUTES) {
           const active = countActiveInBlock(
             sector.employeeIds,
             dayAssignments,
