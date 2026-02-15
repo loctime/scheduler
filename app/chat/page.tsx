@@ -10,8 +10,6 @@ import { ChatInterface } from "@/components/stock/chat-interface"
 import { useStockChatContext } from "@/contexts/stock-chat-context"
 import { Loader2, MessageCircle, RefreshCw, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { PWAUpdateNotification } from "@/components/pwa-update-notification"
-
 function ChatContent() {
   const {
     messages,
@@ -131,8 +129,6 @@ export default function ChatPage() {
     return () => unsubscribe()
   }, [router])
 
-  // El Service Worker se registra automáticamente mediante PWAUpdateNotification
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -149,7 +145,6 @@ export default function ChatPage() {
     <DataProvider user={user}>
       <StockChatProvider user={user}>
         <ChatContent />
-        <PWAUpdateNotification swPath="/sw-pwa.js" />
       </StockChatProvider>
     </DataProvider>
   )

@@ -42,8 +42,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { PWAUpdateNotification } from "@/components/pwa-update-notification"
-
 const FORMAT_EXAMPLES = [
   { format: "{nombre} ({cantidad})", example: "Leche (8)" },
   { format: "{cantidad} - {nombre}", example: "8 - Leche" },
@@ -60,8 +58,6 @@ export default function PedidosPage() {
   // Obtener stockActual del contexto global del chat
   const { stockActual: stockActualGlobal } = useStockChatContext()
 
-  // El Service Worker se registra automáticamente mediante PWAUpdateNotification
-  
   const {
     pedidos,
     products,
@@ -1716,7 +1712,6 @@ export default function PedidosPage() {
           await ejecutarGenerarEnlace()
         }}
       />
-      <PWAUpdateNotification swPath="/sw-pwa.js" />
     </DashboardLayout>
   )
 }

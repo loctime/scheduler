@@ -21,8 +21,6 @@ import { generarNumeroRemito, crearRemitoEnvioDesdeDisponibles } from "@/lib/rem
 import { useRemitos } from "@/hooks/use-remitos"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { logger } from "@/lib/logger"
-import { PWAUpdateNotification } from "@/components/pwa-update-notification"
-
 type FiltroEstado = "todos" | "pendientes" | "en-proceso"
 
 interface PedidoExpandido {
@@ -45,8 +43,6 @@ export default function FabricaPage() {
   const [mostrarFirmaDialog, setMostrarFirmaDialog] = useState(false)
   const [productosDisponiblesPendientes, setProductosDisponiblesPendientes] = useState<EnlacePublico["productosDisponibles"] | null>(null)
   const [aceptandoPedido, setAceptandoPedido] = useState<string | null>(null)
-
-  // El Service Worker se registra automáticamente mediante PWAUpdateNotification
 
   // Sincronizar el ref con el estado
   useEffect(() => {
@@ -574,7 +570,6 @@ export default function FabricaPage() {
           productosDisponibles={productosDisponiblesPendientes}
         />
       )}
-      <PWAUpdateNotification swPath="/sw-pwa.js" />
     </DashboardLayout>
   )
 }
