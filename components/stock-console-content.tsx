@@ -4,10 +4,10 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useData } from "@/contexts/data-context"
 import { useStockConsole } from "@/hooks/use-stock-console"
-import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Check, X, Package, ArrowLeft } from "lucide-react"
+import { Check, X, Package, ArrowLeft, Minus, Plus } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { UserStatusMenu } from "@/components/pwa/UserStatusMenu"
 import { PwaViewerBadge } from "@/components/pwa/PwaViewerBadge"
 
@@ -126,52 +126,45 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
           </div>
         </div>
 
-        {/* Lista de Productos */}
+        {/* Lista de Productos — cards compactas, número protagonista */}
         {state.selectedPedidoId && productos.length > 0 && (
-          <div className="p-4 space-y-4">
+          <div className="p-3 space-y-2">
             {productos.map((producto) => {
               const cantidad = state.cantidades[producto.id] || 0
               const stock = stockActual[producto.id] || 0
               const stockMinimo = producto.stockMinimo || 0
               const isStockBajo = stock < stockMinimo
+              const stockDisponible = stock
+              const cantidadMinimaPermitida = -stockDisponible
 
               return (
-                <Card
+                <div
                   key={producto.id}
-                  className="overflow-hidden shadow-md hover:shadow-lg transition-shadow"
+                  className={cn(
+                    "rounded-xl border bg-card px-3 py-3 shadow-sm hover:shadow-md transition-all flex gap-3",
+                    isStockBajo && "border-amber-400"
+                  )}
                 >
-                  {/* Header del producto */}
-                  <div className="bg-white p-3 border-b">
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="font-semibold text-gray-900">{producto.nombre}</span>
-                      <span className="text-gray-600">·</span>
-                      <span className="text-gray-600">
-                        Stock: <span className={`font-medium ${isStockBajo ? "text-red-600" : ""}`}>{stock}</span>
-                      </span>
-                      <span className="text-gray-600">·</span>
-                      <span className="text-gray-600">Mín: {stockMinimo}</span>
-                      <span className="text-gray-600">·</span>
-                      <span className="text-gray-600">{producto.unidad || "U"}</span>
+                  {/* Centro: info + número protagonista */}
+                  <div className="flex-1 min-w-0 flex flex-col justify-center">
+                    {/* Fila 1: Nombre + Unidad */}
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-base font-semibold truncate flex-1 min-w-0 text-gray-900">{producto.nombre}</p>
+                      <span className="text-xs text-muted-foreground shrink-0">{producto.unidad || "U"}</span>
                     </div>
-                  </div>
 
-                  {/* Zonas de interacción */}
-                  <div className="flex h-20">
-                    {/* Zona IZQUIERDA (rojo) */}
-                    <div
-                      className="flex-[0.46] bg-red-500 hover:bg-red-600 active:bg-red-700 transition-colors flex items-center justify-center cursor-pointer"
-                      onClick={() => decrementarCantidad(producto.id)}
-                    />
+                    {/* Fila 2: Stock: X | Mín: Y */}
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>Stock: {stock}</span>
+                      <span>|</span>
+                      <span>Mín: {stockMinimo}</span>
+                      {isStockBajo && (
+                        <span className="text-amber-600 font-medium">Bajo mínimo</span>
+                      )}
+                    </div>
 
-                    {/* Zona CENTRO (neutro - mínima) */}
-                    <div
-                      className="flex-[0.08] bg-gray-50 hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center cursor-pointer"
-                      onClick={() => {
-                        const input = document.getElementById(`input-${producto.id}`) as HTMLInputElement
-                        input?.focus()
-                        input?.click()
-                      }}
-                    >
+                    {/* Número en el centro de la card */}
+                    <div className="flex items-center justify-center py-2">
                       <Input
                         id={`input-${producto.id}`}
                         type="number"
@@ -180,19 +173,35 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                           e.stopPropagation()
                           setCantidad(producto.id, parseInt(e.target.value) || 0)
                         }}
-                        className="text-3xl font-bold text-center border-0 bg-transparent h-auto w-full p-0 focus:ring-0"
+                        className="h-12 w-16 text-center text-3xl font-bold tabular-nums border border-input"
                         placeholder="0"
                         disabled={state.loading}
                       />
                     </div>
-
-                    {/* Zona DERECHA (verde) */}
-                    <div
-                      className="flex-[0.46] bg-green-500 hover:bg-green-600 active:bg-green-700 transition-colors flex items-center justify-center cursor-pointer"
-                      onClick={() => incrementarCantidad(producto.id)}
-                    />
                   </div>
-                </Card>
+
+                  {/* Derecha: botones uno debajo del otro, más grandes */}
+                  <div className="flex flex-col justify-center gap-2 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-12 w-12 rounded-full transition-transform active:scale-95"
+                      onClick={() => incrementarCantidad(producto.id)}
+                      disabled={state.loading}
+                    >
+                      <Plus className="h-6 w-6" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-12 w-12 rounded-full transition-transform active:scale-95"
+                      onClick={() => decrementarCantidad(producto.id)}
+                      disabled={cantidad <= cantidadMinimaPermitida || state.loading}
+                    >
+                      <Minus className="h-6 w-6" />
+                    </Button>
+                  </div>
+                </div>
               )
             })}
           </div>
