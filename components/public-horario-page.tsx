@@ -3,13 +3,14 @@
 import { useMemo, useState, useEffect } from "react"
 import { addDays, format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
-import { Calendar, X } from "lucide-react"
+import { Calendar, UserCircle, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ScheduleGrid } from "@/components/schedule-grid"
 import { PwaTodayScheduleCard } from "@/components/pwa-today-schedule-card"
-import { notifyViewerChanged, notifyViewerCleared } from "@/components/pwa/PwaViewerBadge"
+import { PwaViewerBadge, notifyViewerChanged, notifyViewerCleared } from "@/components/pwa/PwaViewerBadge"
+import { UserStatusMenu } from "@/components/pwa/UserStatusMenu"
 import { usePublicHorario } from "@/hooks/use-public-horario"
 import { useConfig } from "@/hooks/use-config"
 import { useToast } from "@/hooks/use-toast"
@@ -411,7 +412,7 @@ export default function PublicHorarioPage({ companySlug, ImageWrapper }: PublicH
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
               SEMANAL
             </h1>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1 flex-wrap">
               <Button
                 variant="outline"
                 size="sm"
@@ -419,13 +420,21 @@ export default function PublicHorarioPage({ companySlug, ImageWrapper }: PublicH
               >
                 Vista individual
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleChangePerson}
+              <button
+                type="button"
+                onClick={() => setShowEmployeeSelector(true)}
+                className="shrink-0 rounded-full p-0 inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                aria-label="Cambiar empleado"
               >
-                Cambiar persona
-              </Button>
+                {currentViewer ? (
+                  <PwaViewerBadge companySlug={undefined} />
+                ) : (
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
+                    <UserCircle className="h-5 w-5" />
+                  </span>
+                )}
+              </button>
+              <UserStatusMenu />
             </div>
           </div>
         </div>

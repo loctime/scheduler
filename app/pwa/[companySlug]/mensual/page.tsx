@@ -3,12 +3,14 @@
 import { useMemo, useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2 } from "lucide-react"
+import { Loader2, UserCircle, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Share2, ArrowLeft } from "lucide-react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { PwaViewerBadge, useViewer, notifyViewerChanged } from "@/components/pwa/PwaViewerBadge"
+import { UserStatusMenu } from "@/components/pwa/UserStatusMenu"
+import { PwaEmployeeSelectorModal } from "@/components/pwa/PwaEmployeeSelectorModal"
 import { useToast } from "@/hooks/use-toast"
+import { useParams } from "next/navigation"
 import { useMonthlySchedules } from "@/hooks/use-monthly-schedules"
 import { useOwnerIdFromSlug, useEmployeesByOwnerId, useShiftsByOwnerId, useConfigByOwnerId } from "@/hooks/use-owner-data"
 import { MonthlyScheduleView } from "@/components/monthly-schedule-view"
@@ -24,21 +26,10 @@ export default function PwaMensualPage() {
   const searchParams = useSearchParams()
   const year = searchParams.get("year") ? parseInt(searchParams.get("year")!, 10) : undefined
   const month = searchParams.get("month") ? parseInt(searchParams.get("month")!, 10) : undefined
+  const viewer = useViewer()
+  const preferredEmployeeId = viewer?.employeeId ?? null
+  const [showEmployeeSelector, setShowEmployeeSelector] = useState(false)
   const { toast } = useToast()
-  const [preferredEmployeeId, setPreferredEmployeeId] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    try {
-      const saved = localStorage.getItem("horario.viewer")
-      if (saved) {
-        const viewer = JSON.parse(saved) as { employeeId?: string; employeeName?: string }
-        if (viewer?.employeeId) setPreferredEmployeeId(viewer.employeeId)
-      }
-    } catch {
-      // Ignorar errores de parse
-    }
-  }, [])
 
   const { ownerId } = useOwnerIdFromSlug(companySlug)
   const { employees, loading: employeesLoading } = useEmployeesByOwnerId(ownerId)
@@ -73,22 +64,6 @@ export default function PwaMensualPage() {
       return true
     })
   }, [allMonthGroups, year, month])
-
-  const handleShare = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href)
-      toast({
-        title: "Enlace copiado",
-        description: "El enlace del horario mensual se ha copiado al portapapeles",
-      })
-    } catch {
-      toast({
-        title: "Error",
-        description: "No se pudo copiar el enlace",
-        variant: "destructive",
-      })
-    }
-  }
 
   if (!companySlug) {
     return (
@@ -179,16 +154,22 @@ export default function PwaMensualPage() {
               </h1>
               <p className="text-sm text-muted-foreground">Vista mensual</p>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleShare} className="flex items-center gap-2">
-                <Share2 className="h-4 w-4" />
-                Compartir
-              </Button>
-              <Link href={`/pwa/${companySlug}/home`}>
-                <Button variant="outline" size="sm">
-                  Volver
-                </Button>
-              </Link>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setShowEmployeeSelector(true)}
+                className="shrink-0 rounded-full p-0 inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                aria-label="Cambiar empleado"
+              >
+                {viewer ? (
+                  <PwaViewerBadge companySlug={undefined} />
+                ) : (
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
+                    <UserCircle className="h-5 w-5" />
+                  </span>
+                )}
+              </button>
+              <UserStatusMenu />
             </div>
           </div>
         </div>
@@ -209,6 +190,21 @@ export default function PwaMensualPage() {
           preferredEmployeeId={preferredEmployeeId}
         />
       </div>
+
+      <PwaEmployeeSelectorModal
+        open={showEmployeeSelector}
+        onClose={() => setShowEmployeeSelector(false)}
+        employees={employees.map((e) => ({ id: e.id, name: e.name }))}
+        onSelect={(employeeId, employeeName) => {
+          const v = { employeeId, employeeName }
+          if (typeof window !== "undefined") {
+            localStorage.setItem("horario.viewer", JSON.stringify(v))
+            notifyViewerChanged(v)
+          }
+          toast({ title: "Identificación guardada", description: `Hola, ${employeeName}` })
+          setShowEmployeeSelector(false)
+        }}
+      />
     </div>
   )
 }

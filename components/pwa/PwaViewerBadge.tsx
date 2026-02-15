@@ -25,6 +25,18 @@ function readViewerFromStorage(): ViewerInfo | null {
   }
 }
 
+/** Hook para saber si hay un empleado seleccionado (sincronizado con localStorage y eventos). */
+export function useViewer(): ViewerInfo | null {
+  const [viewer, setViewer] = useState<ViewerInfo | null>(null)
+  useEffect(() => {
+    setViewer(readViewerFromStorage())
+    const handleChanged = () => setViewer(readViewerFromStorage())
+    window.addEventListener(VIEWER_CHANGED_EVENT, handleChanged)
+    return () => window.removeEventListener(VIEWER_CHANGED_EVENT, handleChanged)
+  }, [])
+  return viewer
+}
+
 interface PwaViewerBadgeProps {
   companySlug?: string
   className?: string
