@@ -320,19 +320,28 @@ export function useScheduleUpdates({
               return
             }
 
+            const otherAssignments = assignments.filter((a) => a.type !== "franco" && a.type !== "medio_franco")
+            const cellAssignments =
+              assignment.type === "medio_franco" && medioFrancoAssignment
+                ? [medioFrancoAssignment, ...otherAssignments]
+                : assignment.type === "franco"
+                  ? [assignment, ...otherAssignments]
+                  : []
+
             const newScheduleData = {
               nombre: `Semana del ${weekStartStr}`,
               weekStart: weekStartStr,
               semanaInicio: weekStartStr,
               semanaFin: weekEndStr,
               ownerId,
-              assignments: assignment.type === "medio_franco" && medioFrancoAssignment
-                ? {
-                    [date]: {
-                      [employeeId]: [medioFrancoAssignment],
-                    },
-                  }
-                : {},
+              assignments:
+                assignment.type === "medio_franco" || assignment.type === "franco"
+                  ? {
+                      [date]: {
+                        [employeeId]: cellAssignments,
+                      },
+                    }
+                  : {},
               dayStatus: {
                 [date]: {
                   [employeeId]: assignment.type as "franco" | "medio_franco"
@@ -365,16 +374,15 @@ export function useScheduleUpdates({
           }
 
           const updatedAssignments = { ...targetSchedule.assignments }
-          if (assignment.type === "medio_franco" && medioFrancoAssignment) {
-            updatedAssignments[date] = {
-              ...(updatedAssignments[date] || {}),
-              [employeeId]: [medioFrancoAssignment],
-            }
-          } else if (updatedAssignments[date]?.[employeeId]) {
-            delete updatedAssignments[date][employeeId]
-            if (Object.keys(updatedAssignments[date]).length === 0) {
-              delete updatedAssignments[date]
-            }
+          const otherAssignments = assignments.filter((a) => a.type !== "franco" && a.type !== "medio_franco")
+          const cellAssignments =
+            assignment.type === "medio_franco" && medioFrancoAssignment
+              ? [medioFrancoAssignment, ...otherAssignments]
+              : [assignment, ...otherAssignments]
+
+          updatedAssignments[date] = {
+            ...(updatedAssignments[date] || {}),
+            [employeeId]: cellAssignments,
           }
 
           const updateData = {
