@@ -141,64 +141,55 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                 <div
                   key={producto.id}
                   className={cn(
-                    "rounded-xl border bg-card px-3 py-3 shadow-sm hover:shadow-md transition-all flex gap-3",
+                    "rounded-2xl border border-gray-200/80 bg-white shadow-sm active:shadow-md transition-all flex overflow-hidden",
                     isStockBajo && "border-amber-400"
                   )}
                 >
-                  {/* Centro: info + número protagonista */}
-                  <div className="flex-1 min-w-0 flex flex-col justify-center">
-                    {/* Fila 1: Nombre + Unidad */}
+                  {/* Izquierda: info del producto */}
+                  <div className="flex-1 min-w-0 flex flex-col justify-center p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-base font-semibold truncate flex-1 min-w-0 text-gray-900">{producto.nombre}</p>
-                      <span className="text-xs text-muted-foreground shrink-0">{producto.unidad || "U"}</span>
+                      <p className="text-base font-semibold truncate text-gray-900">{producto.nombre}</p>
+                      <span className="text-[11px] text-gray-400 uppercase tracking-wide">{producto.unidad || "U"}</span>
                     </div>
 
-                    {/* Fila 2: Stock: X | Mín: Y */}
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {/* Stock arriba, Mín debajo */}
+                    <div className="flex flex-col gap-0.5 mt-1 text-[11px] text-gray-500">
                       <span>Stock: {stock}</span>
-                      <span>|</span>
-                      <span>Mín: {stockMinimo}</span>
-                      {isStockBajo && (
-                        <span className="text-amber-600 font-medium">Bajo mínimo</span>
-                      )}
-                    </div>
-
-                    {/* Número en el centro de la card */}
-                    <div className="flex items-center justify-center py-2">
-                      <Input
-                        id={`input-${producto.id}`}
-                        type="number"
-                        value={cantidad}
-                        onChange={(e) => {
-                          e.stopPropagation()
-                          setCantidad(producto.id, parseInt(e.target.value) || 0)
-                        }}
-                        className="h-12 w-16 text-center text-3xl font-bold tabular-nums border border-input"
-                        placeholder="0"
-                        disabled={state.loading}
-                      />
+                      <span>Mín: {stockMinimo}{isStockBajo && " · Bajo mínimo"}</span>
                     </div>
                   </div>
 
-                  {/* Derecha: botones uno debajo del otro, más grandes */}
-                  <div className="flex flex-col justify-center gap-2 shrink-0">
+                  {/* Derecha: [-] número [+] en fila */}
+                  <div className="flex items-center gap-1.5 pr-1.5 shrink-0">
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-12 w-12 rounded-full transition-transform active:scale-95"
-                      onClick={() => incrementarCantidad(producto.id)}
-                      disabled={state.loading}
-                    >
-                      <Plus className="h-6 w-6" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-12 w-12 rounded-full transition-transform active:scale-95"
+                      className="h-11 w-11 rounded-full transition-transform active:scale-95 border-gray-200"
                       onClick={() => decrementarCantidad(producto.id)}
                       disabled={cantidad <= cantidadMinimaPermitida || state.loading}
                     >
-                      <Minus className="h-6 w-6" />
+                      <Minus className="h-5 w-5" strokeWidth={2.5} />
+                    </Button>
+                    <Input
+                      id={`input-${producto.id}`}
+                      type="number"
+                      value={cantidad}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        setCantidad(producto.id, parseInt(e.target.value) || 0)
+                      }}
+                      className="h-11 w-12 text-center text-xl font-bold tabular-nums border border-gray-200/80 rounded-lg bg-gray-50/50 focus-visible:ring-2 focus-visible:ring-gray-300/50 p-0"
+                      placeholder="0"
+                      disabled={state.loading}
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-11 w-11 rounded-full transition-transform active:scale-95 border-gray-200"
+                      onClick={() => incrementarCantidad(producto.id)}
+                      disabled={state.loading}
+                    >
+                      <Plus className="h-5 w-5" strokeWidth={2.5} />
                     </Button>
                   </div>
                 </div>
