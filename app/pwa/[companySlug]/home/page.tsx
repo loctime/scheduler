@@ -57,8 +57,8 @@ export default function PwaHomePage() {
         {/* Columna izquierda (50%): espacio para más información después */}
         <div className="flex flex-col p-4 lg:p-8 border-r border-border/50 min-w-0 overflow-auto" />
 
-        {/* Columna derecha (50%): solo los 3 botones */}
-        <div className="flex flex-col gap-3 p-4 lg:p-8 justify-center min-w-0">
+        {/* Columna derecha (50%): solo los 3 botones, alineados arriba */}
+        <div className="flex flex-col gap-3 p-4 lg:p-8 justify-start min-w-0">
           <ActionCard
             icon={<FileText className="h-8 w-8 text-primary shrink-0" />}
             title="Mensual"
