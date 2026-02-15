@@ -74,8 +74,8 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
     <>
 
       <div className={`min-h-screen bg-gray-100 ${isPWA ? "pb-20" : "pb-24"}`}>
-        {/* Header simple */}
-        <div className="bg-blue-500 text-white p-4 shadow-lg flex items-center gap-3">
+        {/* Header simple — tema rojo en PWA */}
+        <div className={`p-4 shadow-lg flex items-center gap-3 ${isPWA ? "bg-red-100 text-red-900 border-b border-red-200" : "bg-blue-500 text-white"}`}>
           {companySlug ? (
             <Link
               href={`/pwa/${companySlug}/home`}
@@ -86,8 +86,11 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
             </Link>
           ) : null}
           <h1 className="text-xl font-bold flex-1">Stock Rápido</h1>
-          <div className="flex items-center gap-1 [&_button]:text-white [&_button]:hover:bg-white/20 [&_button]:hover:text-white [&_.bg-green-500]:border-blue-500">
-            <PwaViewerBadge companySlug={companySlug} variant="light-on-dark" />
+          <div className={cn(
+            "flex items-center gap-1",
+            isPWA ? "[&_button]:text-red-900 [&_button]:hover:bg-red-200 [&_button]:hover:text-red-900" : "[&_button]:text-white [&_button]:hover:bg-white/20 [&_button]:hover:text-white [&_.bg-green-500]:border-blue-500"
+          )}>
+            <PwaViewerBadge companySlug={companySlug} variant={isPWA ? "default" : "light-on-dark"} />
             <UserStatusMenu />
           </div>
         </div>

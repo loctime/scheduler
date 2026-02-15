@@ -22,6 +22,8 @@ interface PublicHorarioPageProps {
   companySlug: string
   /** Componente para envolver la imagen (ej. ZoomableImage). Si no se pasa, se usa <img>. */
   ImageWrapper?: React.ComponentType<ZoomableImageProps>
+  /** Clase opcional para el header (ej. tema PWA: bg-violet-100). */
+  headerClassName?: string
 }
 
 const buildFallbackEmployees = (ownerId: string, days?: Record<string, any>) => {
@@ -92,7 +94,7 @@ const getWeekStartDate = (weekId?: string, days?: Record<string, any>) => {
   return null
 }
 
-export default function PublicHorarioPage({ companySlug, ImageWrapper }: PublicHorarioPageProps) {
+export default function PublicHorarioPage({ companySlug, ImageWrapper, headerClassName }: PublicHorarioPageProps) {
   const { horario, isLoading, error } = usePublicHorario(companySlug)
   const { config } = useConfig()
   const [showIndividualView, setShowIndividualView] = useState(false)
@@ -390,7 +392,7 @@ export default function PublicHorarioPage({ companySlug, ImageWrapper }: PublicH
   return (
     <div className="min-h-screen bg-background">
       {/* Header Horario Semanal (mobile-first) */}
-      <div className="border-b bg-white">
+      <div className={["border-b", headerClassName ?? "bg-white"].join(" ")}>
         <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-3">
           {/* Fila 1: HORARIO — nombre — fecha */}
           <div className="flex items-center justify-between">

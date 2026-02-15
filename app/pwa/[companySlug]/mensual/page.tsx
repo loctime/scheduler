@@ -14,6 +14,7 @@ import { useParams } from "next/navigation"
 import { useMonthlySchedules } from "@/hooks/use-monthly-schedules"
 import { useOwnerIdFromSlug, useEmployeesByOwnerId, useShiftsByOwnerId, useConfigByOwnerId } from "@/hooks/use-owner-data"
 import { MonthlyScheduleView } from "@/components/monthly-schedule-view"
+import { PWA_THEMES } from "@/lib/pwa-themes"
 import type { MonthGroup } from "@/lib/monthly-utils"
 
 /**
@@ -145,7 +146,7 @@ export default function PwaMensualPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="border-b bg-card sticky top-0 z-10">
+      <div className={["border-b sticky top-0 z-10", PWA_THEMES.mensual.soft].join(" ")}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div>

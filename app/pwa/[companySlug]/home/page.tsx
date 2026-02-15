@@ -8,6 +8,7 @@ import { UserStatusMenu } from "@/components/pwa/UserStatusMenu"
 import { PwaViewerBadge, useViewer, notifyViewerChanged } from "@/components/pwa/PwaViewerBadge"
 import { PwaEmployeeSelectorModal } from "@/components/pwa/PwaEmployeeSelectorModal"
 import { ActionCard } from "@/components/pwa/ActionCard"
+import { PWA_THEMES } from "@/lib/pwa-themes"
 import { useOwnerIdFromSlug, useEmployeesByOwnerId } from "@/hooks/use-owner-data"
 import { useToast } from "@/hooks/use-toast"
 
@@ -64,18 +65,21 @@ export default function PwaHomePage() {
             title="Mensual"
             description="Vista individual histórico"
             href={`/pwa/${companySlug}/mensual`}
+            borderClassName={PWA_THEMES.mensual.border}
           />
           <ActionCard
             icon={<Calendar className="h-8 w-8 text-primary shrink-0" />}
             title="Horario"
             description="Horarios publicados esta semana"
             href={`/pwa/${companySlug}/horario`}
+            borderClassName={PWA_THEMES.horario.border}
           />
           <ActionCard
             icon={<Users className="h-8 w-8 text-primary shrink-0" />}
             title="Stock"
             description="Gestión de stock"
             href={`/pwa/${companySlug}/stock-console`}
+            borderClassName={PWA_THEMES.stock.border}
           />
         </div>
       </div>

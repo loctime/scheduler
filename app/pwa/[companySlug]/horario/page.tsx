@@ -8,5 +8,11 @@ export default function PwaHorarioPublicPage() {
   const params = useParams()
   const companySlug = params.companySlug as string
 
-  return <PublicHorarioPage companySlug={companySlug} ImageWrapper={ZoomableImage} />
+  return (
+    <PublicHorarioPage
+      companySlug={companySlug}
+      ImageWrapper={ZoomableImage}
+      headerClassName="bg-violet-100"
+    />
+  )
 }

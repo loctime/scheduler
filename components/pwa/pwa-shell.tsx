@@ -8,6 +8,7 @@ import { Package, Loader2, Calendar, CalendarDays, Home } from "lucide-react"
 import { auth, isFirebaseConfigured } from "@/lib/firebase"
 import { DataProvider } from "@/contexts/data-context"
 import { savePwaLastSlug } from "@/components/pwa/pwa-company-selector"
+import { getPwaSoftThemeByPath } from "@/lib/pwa-themes"
 import { cn } from "@/lib/utils"
 
 function setAuthCookie(token?: string) {
@@ -22,7 +23,7 @@ function setAuthCookie(token?: string) {
 /** Fallback para la barra de tabs mientras se resuelve useSearchParams (evita error en build estático) */
 function PwaTabsFallback() {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 border-t border-border bg-background/95 backdrop-blur h-14" />
+    <nav className="fixed bottom-0 left-0 right-0 border-t border-border bg-gray-100 backdrop-blur h-14" />
   )
 }
 
@@ -31,13 +32,14 @@ function PwaTabs() {
   const pathname = usePathname()
   const params = useParams()
   const companySlug = params?.companySlug as string | undefined
+  const softTheme = getPwaSoftThemeByPath(pathname ?? "")
 
   useEffect(() => {
     if (companySlug) savePwaLastSlug(companySlug)
   }, [companySlug])
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <nav className={cn("fixed bottom-0 left-0 right-0 border-t border-border backdrop-blur", softTheme)}>
       <div className="mx-auto flex max-w-lg items-center justify-around px-3 py-2">
         {companySlug ? [
           { href: `/pwa/${companySlug}/horario`, label: "Horario", icon: Calendar, pathMatch: null as string | null },
