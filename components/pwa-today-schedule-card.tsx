@@ -132,7 +132,7 @@ export function PwaTodayScheduleCard({ companySlug, horario: horarioProp, shifts
             : "—"
     return (
       <p className="text-sm text-muted-foreground">
-        Hoy: <span className="font-medium text-foreground tabular-nums">{text}</span>
+        Hoy: <span className="font-medium text-foreground tabular-nums">{text} 👈(ﾟヮﾟ👈)   Tu horario</span>
       </p>
     )
   }

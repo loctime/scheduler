@@ -21,60 +21,62 @@ export default function PwaHomePage() {
   const { employees } = useEmployeesByOwnerId(ownerId)
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
-          {/* Header (izquierda) */}
-          <div className="flex flex-col gap-4 min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <h1 className="text-3xl font-bold text-foreground">{companySlug}</h1>
-                <p className="text-muted-foreground">
-                  Horarios y Stock
-                </p>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setShowEmployeeSelector(true)}
-                  className="shrink-0 rounded-full p-0 inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  aria-label="Cambiar empleado"
-                >
-                  {viewer ? (
-                    <PwaViewerBadge companySlug={undefined} />
-                  ) : (
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
-                      <UserCircle className="h-5 w-5" />
-                    </span>
-                  )}
-                </button>
-                <UserStatusMenu />
-              </div>
-            </div>
-            <PwaTodayScheduleCard companySlug={companySlug} variant="inline" />
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Header a ancho completo */}
+      <div className="flex flex-col gap-4 p-4 lg:p-8 border-b border-border/50 shrink-0">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-3xl font-bold text-foreground">{companySlug}</h1>
+            <p className="text-muted-foreground">
+              Horarios y Stock
+            </p>
           </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowEmployeeSelector(true)}
+              className="shrink-0 rounded-full p-0 inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              aria-label="Cambiar empleado"
+            >
+              {viewer ? (
+                <PwaViewerBadge companySlug={undefined} />
+              ) : (
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
+                  <UserCircle className="h-5 w-5" />
+                </span>
+              )}
+            </button>
+            <UserStatusMenu />
+          </div>
+        </div>
+        <PwaTodayScheduleCard companySlug={companySlug} variant="inline" />
+      </div>
 
-          {/* Botones a la derecha, uno debajo del otro: Mensual, Horario, Stock */}
-          <div className="flex flex-col gap-3 w-full lg:w-auto lg:min-w-[200px] shrink-0">
-            <ActionCard
-              icon={<FileText className="h-8 w-8 text-primary shrink-0" />}
-              title="Mensual"
-              description="Vista individual histórico"
-              href={`/pwa/${companySlug}/mensual`}
-            />
-            <ActionCard
-              icon={<Calendar className="h-8 w-8 text-primary shrink-0" />}
-              title="Horario"
-              description="Horarios publicados esta semana"
-              href={`/pwa/${companySlug}/horario`}
-            />
-            <ActionCard
-              icon={<Users className="h-8 w-8 text-primary shrink-0" />}
-              title="Stock"
-              description="Gestión de stock"
-              href={`/pwa/${companySlug}/stock-console`}
-            />
-          </div>
+      {/* Dos columnas debajo del header */}
+      <div className="grid grid-cols-2 flex-1 min-h-0 w-full">
+        {/* Columna izquierda (50%): espacio para más información después */}
+        <div className="flex flex-col p-4 lg:p-8 border-r border-border/50 min-w-0 overflow-auto" />
+
+        {/* Columna derecha (50%): solo los 3 botones */}
+        <div className="flex flex-col gap-3 p-4 lg:p-8 justify-center min-w-0">
+          <ActionCard
+            icon={<FileText className="h-8 w-8 text-primary shrink-0" />}
+            title="Mensual"
+            description="Vista individual histórico"
+            href={`/pwa/${companySlug}/mensual`}
+          />
+          <ActionCard
+            icon={<Calendar className="h-8 w-8 text-primary shrink-0" />}
+            title="Horario"
+            description="Horarios publicados esta semana"
+            href={`/pwa/${companySlug}/horario`}
+          />
+          <ActionCard
+            icon={<Users className="h-8 w-8 text-primary shrink-0" />}
+            title="Stock"
+            description="Gestión de stock"
+            href={`/pwa/${companySlug}/stock-console`}
+          />
         </div>
       </div>
 
