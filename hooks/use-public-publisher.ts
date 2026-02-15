@@ -124,13 +124,46 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
         start.setDate(start.getDate() + 6)
         weekEnd = start.toISOString().slice(0, 10)
       }
+
+      // Snapshot de empleados: del documento o construido desde options.employees + assignments
+      let employeesSnapshot: Array<{ id: string; name: string }> =
+        originalSchedule.employeesSnapshot || originalSchedule.empleadosSnapshot || []
+      if (employeesSnapshot.length === 0 && options.employees?.length) {
+        const idsInWeek = new Set<string>()
+        const assignments = originalSchedule.assignments || {}
+        Object.values(assignments).forEach((dayData: any) => {
+          if (dayData && typeof dayData === "object") {
+            Object.keys(dayData).forEach((id) => idsInWeek.add(id))
+          }
+        })
+        const empMap = new Map(
+          options.employees.map((e: any) => [e.id, { id: e.id, name: e.name || e.displayName || e.id }])
+        )
+        const orden = originalSchedule.ordenEmpleadosSnapshot || []
+        const ordered = Array.from(idsInWeek)
+        if (orden.length) {
+          ordered.sort((a, b) => {
+            const i = orden.indexOf(a)
+            const j = orden.indexOf(b)
+            if (i === -1 && j === -1) return 0
+            if (i === -1) return 1
+            if (j === -1) return -1
+            return i - j
+          })
+        }
+        employeesSnapshot = ordered.map((id) => ({
+          id,
+          name: empMap.get(id)?.name ?? id,
+        }))
+      }
+
       // Las reglas exigen request.resource.data.ownerId == request.auth.uid
       const publicScheduleData = {
         ownerId: user?.uid,
         weekStart,
         weekEnd,
         assignments: originalSchedule.assignments || {},
-        employeesSnapshot: originalSchedule.employeesSnapshot || originalSchedule.empleadosSnapshot || [],
+        employeesSnapshot,
         ordenEmpleadosSnapshot: originalSchedule.ordenEmpleadosSnapshot || [],
         publishedAt: serverTimestamp(),
         publishedBy: user?.uid,
