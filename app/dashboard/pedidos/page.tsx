@@ -17,7 +17,7 @@ import { useEnlacePublico } from "@/hooks/use-enlace-publico"
 import { useRemitos } from "@/hooks/use-remitos"
 import { useRecepciones } from "@/hooks/use-recepciones"
 import { db, COLLECTIONS } from "@/lib/firebase"
-import { doc, setDoc, serverTimestamp, getDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where } from "firebase/firestore"
+import { doc, serverTimestamp, getDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where } from "firebase/firestore"
 import type { Remito, Recepcion } from "@/lib/types"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import { PedidoTimeline } from "@/components/pedidos/pedido-timeline"
@@ -799,57 +799,21 @@ export default function PedidosPage() {
       // Actualizar stock: sumar cantidad recibida
       if (db && recepcion.productos) {
         for (const productoRecepcion of recepcion.productos) {
-          // Sumar la cantidad recibida al stock
           if (productoRecepcion.cantidadRecibida > 0) {
             try {
-              const stockDocId = `${ownerId}_${productoRecepcion.productoId}`
-              const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
-              
-              // Intentar actualizar usando transacción o incremento
-              // Primero intentar actualizar (si existe)
-              try {
-                const stockDoc = await getDoc(stockDocRef)
-                if (stockDoc.exists()) {
-                  const stockActual = stockDoc.data().cantidad || 0
-                  const nuevoStock = stockActual + productoRecepcion.cantidadRecibida
-                  await updateDoc(stockDocRef, {
-                    cantidad: nuevoStock,
-                    ultimaActualizacion: serverTimestamp(),
-                    ownerId,
-                    userId: user.uid,
-                  })
-                  setStockActual(prev => ({ ...prev, [productoRecepcion.productoId]: nuevoStock }))
-                } else {
-                  // Crear nuevo documento
-                  await setDoc(stockDocRef, {
-                    productoId: productoRecepcion.productoId,
-                    pedidoId: selectedPedido.id,
-                    cantidad: productoRecepcion.cantidadRecibida,
-                    ultimaActualizacion: serverTimestamp(),
-                    ownerId,
-                    userId: user.uid,
-                  })
-                  setStockActual(prev => ({ ...prev, [productoRecepcion.productoId]: productoRecepcion.cantidadRecibida }))
-                }
-              } catch (error: any) {
-                // Si falla la lectura o actualización, intentar crear directamente
-                if (error?.code === 'permission-denied' || error?.code === 'not-found') {
-                  await setDoc(stockDocRef, {
-                    productoId: productoRecepcion.productoId,
-                    pedidoId: selectedPedido.id,
-                    cantidad: productoRecepcion.cantidadRecibida,
-                    ultimaActualizacion: serverTimestamp(),
-                    ownerId,
-                    userId: user.uid,
-                  })
-                  setStockActual(prev => ({ ...prev, [productoRecepcion.productoId]: productoRecepcion.cantidadRecibida }))
-                } else {
-                  throw error
-                }
-              }
+              const productRef = doc(db, COLLECTIONS.PRODUCTS, productoRecepcion.productoId)
+              const productDoc = await getDoc(productRef)
+              const stockActual = productDoc.exists() ? (productDoc.data().stockActual ?? 0) : 0
+              const nuevoStock = stockActual + productoRecepcion.cantidadRecibida
+              await updateDoc(productRef, {
+                stockActual: nuevoStock,
+                updatedAt: serverTimestamp(),
+                ownerId,
+                userId: user.uid,
+              })
+              setStockActual(prev => ({ ...prev, [productoRecepcion.productoId]: nuevoStock }))
             } catch (stockError) {
               console.error("Error al actualizar stock para producto:", productoRecepcion.productoId, stockError)
-              // Continuar con otros productos aunque falle uno
             }
           }
         }
@@ -977,27 +941,18 @@ export default function PedidosPage() {
 
 
   const handleStockChange = async (productId: string, value: number) => {
-    // Actualizar estado local inmediatamente para feedback visual
     setStockActual(prev => ({ ...prev, [productId]: value }))
-    
-    // Actualizar en Firestore para sincronizar con el contexto global
     try {
-      if (!db || !user || !selectedPedido || !ownerId) return
-      
-      const stockDocId = `${ownerId}_${productId}`
-      const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
-      
-      await setDoc(stockDocRef, {
-        productoId: productId, // Corregir: usar productoId en lugar de productId
-        pedidoId: selectedPedido.id, // Agregar pedidoId
-        cantidad: value,
-        ultimaActualizacion: serverTimestamp(),
+      if (!db || !user || !ownerId) return
+      const productRef = doc(db, COLLECTIONS.PRODUCTS, productId)
+      await updateDoc(productRef, {
+        stockActual: value,
+        updatedAt: serverTimestamp(),
         ownerId,
         userId: user.uid,
-      }, { merge: true })
+      })
     } catch (error) {
       console.error("Error actualizando stock:", error)
-      // Revertir cambio local si falla
       setStockActual(prev => ({ ...prev, [productId]: stockActualGlobal[productId] ?? 0 }))
     }
   }

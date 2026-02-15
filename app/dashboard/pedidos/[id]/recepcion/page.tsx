@@ -14,7 +14,7 @@ import { RecepcionForm } from "@/components/pedidos/recepcion-form"
 import { crearRemitoRecepcion, eliminarRemitosAnteriores } from "@/lib/remito-utils"
 import type { Remito, Pedido, Producto } from "@/lib/types"
 import { db, COLLECTIONS } from "@/lib/firebase"
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import type { Recepcion } from "@/lib/types"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
@@ -253,36 +253,17 @@ export default function RecepcionPage() {
       // Actualizar stock: sumar cantidad recibida
       if (db && recepcion.productos) {
         for (const productoRecepcion of recepcion.productos) {
-          // Sumar la cantidad recibida al stock
           if (productoRecepcion.cantidadRecibida > 0) {
-            const stockDocId = `${ownerId}_${productoRecepcion.productoId}`
-            const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
-            
-            // Obtener stock actual
-            const stockDoc = await getDoc(stockDocRef)
-            const stockActual = stockDoc.exists() ? stockDoc.data().cantidad || 0 : 0
+            const productRef = doc(db, COLLECTIONS.PRODUCTS, productoRecepcion.productoId)
+            const productDoc = await getDoc(productRef)
+            const stockActual = productDoc.exists() ? (productDoc.data().stockActual ?? 0) : 0
             const nuevoStock = stockActual + productoRecepcion.cantidadRecibida
-            
-            // Actualizar o crear stock según exista
-            if (stockDoc.exists()) {
-              // Actualizar documento existente
-              await updateDoc(stockDocRef, {
-                cantidad: nuevoStock,
-                ultimaActualizacion: serverTimestamp(),
-                ownerId,
-                userId: user.uid,
-              })
-            } else {
-              // Crear nuevo documento
-              await setDoc(stockDocRef, {
-                productoId: productoRecepcion.productoId,
-                pedidoId: pedido.id,
-                cantidad: nuevoStock,
-                ultimaActualizacion: serverTimestamp(),
-                ownerId,
-                userId: user.uid,
-              })
-            }
+            await updateDoc(productRef, {
+              stockActual: nuevoStock,
+              updatedAt: serverTimestamp(),
+              ownerId,
+              userId: user.uid,
+            })
           }
         }
       }

@@ -20,7 +20,6 @@ import type {
   ChatMessage, 
   StockAccionParsed, 
   StockMovimiento, 
-  StockActual,
   Producto,
   Pedido,
   TipoAccion
@@ -204,6 +203,14 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
           ...doc.data()
         })) as Producto[]
         
+        // Stock único por empresa: se deriva del documento del producto (misma fuente que PWA)
+        const stockMap: Record<string, number> = {}
+        snapshot.docs.forEach(d => {
+          const data = d.data()
+          stockMap[d.id] = (data.stockActual ?? 0) as number
+        })
+        setStockActual(stockMap)
+        
         // Filtrar productos que tengan pedidoId válido (solo cuando ya tenemos pedidos cargados)
         // Si no hay pedidos cargados aún, esperamos a que se carguen
         const productosFiltrados = pedidos.length > 0
@@ -241,35 +248,8 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     return () => unsubscribe()
   }, [ownerId, pedidos])
 
-  // Cargar stock actual
-  useEffect(() => {
-    if (!db || !ownerId) return
-
-    const stockRef = collection(db, COLLECTIONS.STOCK_ACTUAL)
-    const q = query(stockRef, where("ownerId", "==", ownerId))
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const stockData: Record<string, number> = {}
-        snapshot.docs.forEach(doc => {
-          const data = doc.data() as StockActual
-          stockData[data.productoId] = data.cantidad
-        })
-        setStockActual(stockData)
-      },
-      (error) => {
-        // Manejar errores de permisos silenciosamente
-        if (error.code === 'permission-denied') {
-          console.warn("Error de permisos al cargar stock actual:", error)
-        } else {
-          console.error("Error al cargar stock actual:", error)
-        }
-      }
-    )
-
-    return () => unsubscribe()
-  }, [ownerId])
+  // Stock actual: se lee del documento del producto (apps/horarios/products), mismo origen que PWA.
+  // No se usa la colección stock_actual para evitar desincronización owner/colaborador.
 
   // Cargar historial de movimientos recientes
   useEffect(() => {
@@ -425,19 +405,10 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     })
   }, [db, ownerId, actorUserId])
 
-  // Eliminar producto
+  // Eliminar producto (el stock vive en el doc del producto, no hay doc separado que borrar)
   const eliminarProducto = useCallback(async (productoId: string) => {
     if (!db || !ownerId) throw new Error("No hay conexión")
-
     await deleteDoc(doc(db, COLLECTIONS.PRODUCTS, productoId))
-    
-    // También eliminar el stock actual
-    const stockDocId = `${ownerId}_${productoId}`
-    try {
-      await deleteDoc(doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId))
-    } catch (e) {
-      // Puede no existir
-    }
   }, [db, ownerId])
 
   // Actualizar stock
@@ -502,38 +473,22 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
       throw error
     }
 
-    // Actualizar stock actual
-    const stockDocId = `${ownerId}_${productoId}`
-    const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
-    
-    const stockData = {
-      productoId,
-      cantidad: nuevoStock,
-      ultimaActualizacion: serverTimestamp(),
-      ownerId,
-      userId: actorUserId,
-      // Solo incluir pedidoId si tiene valor
-      ...(producto.pedidoId && { pedidoId: producto.pedidoId }),
-    }
-    
-    console.log(`[STOCK] Intentando crear/actualizar stock:`, {
-      stockDocId,
-      ownerId,
-      userUid: user?.uid,
-      userDataRole: userData?.role,
-      userDataOwnerId: userData?.ownerId,
-      stockData
-    })
-    
+    // Actualizar stock en el documento del producto (misma fuente que PWA, un solo origen por empresa)
+    const productRef = doc(db, COLLECTIONS.PRODUCTS, productoId)
     try {
-      await setDoc(stockDocRef, stockData)
-      console.log(`[STOCK] Stock actualizado exitosamente`)
+      await updateDoc(productRef, {
+        stockActual: nuevoStock,
+        updatedAt: serverTimestamp(),
+        ownerId,
+        userId: actorUserId,
+      })
+      console.log(`[STOCK] Stock actualizado en producto (productoId=${productoId})`)
     } catch (error: any) {
-      console.error(`[STOCK] Error al actualizar stock:`, {
+      console.error(`[STOCK] Error al actualizar stock en producto:`, {
         error,
         code: error?.code,
         message: error?.message,
-        stockDocId,
+        productoId,
         ownerId,
         userUid: user?.uid
       })
@@ -543,7 +498,7 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     return { stockAnterior, nuevoStock, producto }
   }, [db, ownerId, actorUserId, userName, productos, stockActual, user, userData])
 
-  // Actualizar stock directamente (reemplazar valor)
+  // Actualizar stock directamente (reemplazar valor) en el documento del producto (mismo origen que PWA)
   const actualizarStockDirecto = useCallback(async (
     productoId: string,
     cantidad: number,
@@ -562,7 +517,6 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
     const diferencia = cantidad - stockAnterior
 
     // Crear movimiento para registrar el cambio
-    // Si la diferencia es positiva, es una entrada; si es negativa, es una salida
     const tipoMovimiento: "entrada" | "salida" = diferencia >= 0 ? "entrada" : "salida"
     const cantidadMovimiento = Math.abs(diferencia)
 
@@ -580,47 +534,35 @@ export function useStockChat({ userId, userName, user }: UseStockChatOptions) {
         motivo: motivo || `Actualización directa: ${stockAnterior} → ${cantidad}`,
         ...(producto.pedidoId && { pedidoId: producto.pedidoId }),
       }
-
       await addDoc(collection(db, COLLECTIONS.STOCK_MOVIMIENTOS), movimiento)
     }
 
-    // Actualizar stock actual
-    const stockDocId = `${ownerId}_${productoId}`
-    const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
-    
-    await setDoc(stockDocRef, {
-      productoId,
-      cantidad: cantidad,
-      ultimaActualizacion: serverTimestamp(),
+    // Escribir en el documento del producto (única fuente de verdad, igual que PWA)
+    const productRef = doc(db, COLLECTIONS.PRODUCTS, productoId)
+    await updateDoc(productRef, {
+      stockActual: cantidad,
+      updatedAt: serverTimestamp(),
       ownerId,
       userId: actorUserId,
-      // Solo incluir pedidoId si tiene valor
-      ...(producto.pedidoId && { pedidoId: producto.pedidoId }),
     })
 
     return { stockAnterior, nuevoStock: cantidad, producto }
   }, [db, ownerId, actorUserId, userName, productos, stockActual])
 
-  // Inicializar stock de productos
+  // Inicializar stock de productos en el documento del producto (misma fuente que PWA)
   const inicializarStockProductos = useCallback(async (cantidadInicial: number = 0) => {
     if (!db || !ownerId || !actorUserId) throw new Error("No hay conexión")
     if (productos.length === 0) throw new Error("No hay productos para inicializar")
 
     let inicializados = 0
     for (const producto of productos) {
-      const stockDocId = `${ownerId}_${producto.id}`
-      const stockDocRef = doc(db, COLLECTIONS.STOCK_ACTUAL, stockDocId)
-      
-      // Solo inicializar si no tiene stock aún
       if (stockActual[producto.id] === undefined || stockActual[producto.id] === 0) {
-        await setDoc(stockDocRef, {
-          productoId: producto.id,
-          cantidad: cantidadInicial,
-          ultimaActualizacion: serverTimestamp(),
+        const productRef = doc(db, COLLECTIONS.PRODUCTS, producto.id)
+        await updateDoc(productRef, {
+          stockActual: cantidadInicial,
+          updatedAt: serverTimestamp(),
           ownerId,
           userId: actorUserId,
-          // Solo incluir pedidoId si tiene valor
-          ...(producto.pedidoId && { pedidoId: producto.pedidoId }),
         })
         inicializados++
       }
