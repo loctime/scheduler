@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Trash2, Upload, Package, Minus, Plus, GripVertical, PlusCircle, X } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { Producto } from "@/lib/types"
 import { getCantidadPorPack, unidadesToPacks, packsToUnidades, esModoPack } from "@/lib/unidades-utils"
@@ -29,6 +30,20 @@ interface ProductosTableProps {
 }
 
 const btnIcon = "h-7 w-7 rounded-full transition-transform active:scale-95 shrink-0"
+
+/** Abrevia el nombre para vista móvil: primeras 3 letras por palabra (+ punto), mantiene números y no abrevia de/y/en/con. */
+function abbreviateProductName(nombre: string): string {
+  const skipWords = new Set(["de", "y", "en", "con"])
+  return nombre
+    .split(/\s+/)
+    .map((word) => {
+      if (skipWords.has(word.toLowerCase())) return word
+      if (/^\d+(x\d+)?$/i.test(word)) return word
+      if (word.length <= 3) return word
+      return word.slice(0, 3) + "."
+    })
+    .join(" ")
+}
 
 function StockInput({ value, onChange, onFocus, className }: { value: number | undefined; onChange: (v: number) => void; onFocus?: () => void; className?: string }) {
   return (
@@ -327,27 +342,27 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
                   <GripVertical className="h-3.5 w-3.5" />
                 </div>
               )}
-              <p className="text-sm font-medium truncate flex-1 min-w-0">{product.nombre}</p>
+              <p className="text-sm font-medium truncate flex-1 min-w-0">
+                <span className="lg:hidden">{abbreviateProductName(product.nombre)}</span>
+                <span className="hidden lg:inline">{product.nombre}</span>
+              </p>
               {configMode && (
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <Select
-                    value={modoCompraLocal[product.id] ?? product.modoCompra ?? "unidad"}
-                    onValueChange={(v: "unidad" | "pack") => {
-                      setModoCompraLocal(prev => ({ ...prev, [product.id]: v }))
-                      onUpdateProduct(product.id, "modoCompra", v)
-                      if (v === "pack" && (!product.cantidadPorPack || product.cantidadPorPack < 2)) {
-                        onUpdateProduct(product.id, "cantidadPorPack", "6")
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="h-7 w-[90px] text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unidad">Unidad</SelectItem>
-                      <SelectItem value="pack">Pack</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Unidad</span>
+                    <Switch
+                      checked={(modoCompraLocal[product.id] ?? product.modoCompra ?? "unidad") === "pack"}
+                      onCheckedChange={(checked) => {
+                        const v = checked ? "pack" : "unidad"
+                        setModoCompraLocal(prev => ({ ...prev, [product.id]: v }))
+                        onUpdateProduct(product.id, "modoCompra", v)
+                        if (v === "pack" && (!product.cantidadPorPack || product.cantidadPorPack < 2)) {
+                          onUpdateProduct(product.id, "cantidadPorPack", "6")
+                        }
+                      }}
+                    />
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Pack</span>
+                  </div>
                   {(modoCompraLocal[product.id] ?? product.modoCompra ?? "unidad") === "pack" && (
                     <div className="flex items-center gap-1">
                       <span className="text-[10px] text-muted-foreground">/pack</span>
