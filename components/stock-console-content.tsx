@@ -208,41 +208,41 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
                     {/* Fila 2: Stock (izq) y Unidad/Pack solo si el producto tiene pack */}
                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <span className="text-[11px] text-gray-500">Stock: {stock}</span>
+                      <span className="text-sm font-medium text-gray-700">Stock: {stock}</span>
                       {isPackProduct ? (
-                        <div className="flex items-center gap-1 shrink-0">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <button
                             type="button"
                             onClick={() => setVisualModeFor(producto.id, "unidad")}
                             className={cn(
-                              "px-2 py-1 text-[11px] font-medium rounded-md transition-colors",
-                              vm === "unidad" ? "bg-gray-300 text-gray-900" : "text-gray-500 hover:bg-gray-100"
+                              "px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors",
+                              vm === "unidad" ? "bg-gray-300 text-gray-900" : "text-gray-600 hover:bg-gray-100"
                             )}
                           >
                             Unidad
                           </button>
-                          <span className="text-gray-300 text-[10px]">/</span>
+                          <span className="text-gray-400 text-xs">/</span>
                           <button
                             type="button"
                             onClick={() => setVisualModeFor(producto.id, "pack")}
                             className={cn(
-                              "px-2 py-1 text-[11px] font-medium rounded-md transition-colors",
-                              vm === "pack" ? "bg-gray-300 text-gray-900" : "text-gray-500 hover:bg-gray-100"
+                              "px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors",
+                              vm === "pack" ? "bg-gray-300 text-gray-900" : "text-gray-600 hover:bg-gray-100"
                             )}
                           >
                             Pack
                           </button>
                         </div>
                       ) : (
-                        <span className="text-[11px] text-gray-400 uppercase tracking-wide">{unidadLabel}</span>
+                        <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">{unidadLabel}</span>
                       )}
                     </div>
 
                     {/* Fila 3: Min y equivalencia (1 pack (12u) / 12 u (1 pack)) en la misma línea */}
-                    <div className="flex items-center gap-2 flex-wrap text-[11px] text-gray-500">
-                      <span>Mín: {stockMinimo}</span>
+                    <div className="flex items-center gap-2 flex-wrap text-sm text-gray-700">
+                      <span className="font-medium">Mín: {stockMinimo}</span>
                       {cantidad !== 0 && (
-                        <span className="text-gray-400">{equivalenciaText}</span>
+                        <span className="text-gray-600">{equivalenciaText}</span>
                       )}
                     </div>
                   </div>
