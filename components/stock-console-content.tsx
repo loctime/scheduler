@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
 import { useData } from "@/contexts/data-context"
 import { useStockConsole } from "@/hooks/use-stock-console"
@@ -10,6 +10,7 @@ import { Check, X, Package, ArrowLeft, Minus, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { UserStatusMenu } from "@/components/pwa/UserStatusMenu"
 import { PwaViewerBadge } from "@/components/pwa/PwaViewerBadge"
+import { esModoPack, getCantidadPorPack, unidadesSignedToPacksFloor, packsSignedToUnidades } from "@/lib/unidades-utils"
 
 interface StockConsoleContentProps {
   companySlug?: string
@@ -35,8 +36,26 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
   // Hook siempre llamado antes de cualquier return (regla de hooks de React)
   const stockConsole = useStockConsole(user)
+  const { state, pedidos, productos, stockActual, movimientosPendientes, totalIngresos, totalEgresos, setSelectedPedidoId, incrementarCantidad, decrementarCantidad, setCantidad, limpiarCantidades, confirmarMovimientos } = stockConsole
 
-  // Si no tiene permisos, mostrar mensaje de acceso denegado
+  // visualMode: solo visual, no persiste. Debe ir ANTES de cualquier return (Rules of Hooks)
+  const [visualMode, setVisualMode] = useState<Record<string, "unidad" | "pack">>({})
+  const getVisualMode = useCallback((productoId: string, producto: { modoCompra?: "unidad" | "pack"; cantidadPorPack?: number }) =>
+    visualMode[productoId] ?? (esModoPack(producto) ? "pack" : "unidad"),
+  [visualMode])
+  const setVisualModeFor = useCallback((productoId: string, mode: "unidad" | "pack") => {
+    setVisualMode(prev => ({ ...prev, [productoId]: mode }))
+  }, [])
+  useEffect(() => {
+    const productIds = new Set(productos.map(p => p.id))
+    setVisualMode(prev => {
+      const next = { ...prev }
+      Object.keys(next).forEach(id => { if (!productIds.has(id)) delete next[id] })
+      return next
+    })
+  }, [productos])
+
+  // Si no tiene permisos, mostrar mensaje de acceso denegado (después de todos los hooks)
   if (!tienePermisoPedidos) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -53,22 +72,6 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
       </div>
     )
   }
-
-  const {
-    state,
-    pedidos,
-    productos,
-    stockActual,
-    movimientosPendientes,
-    totalIngresos,
-    totalEgresos,
-    setSelectedPedidoId,
-    incrementarCantidad,
-    decrementarCantidad,
-    setCantidad,
-    limpiarCantidades,
-    confirmarMovimientos,
-  } = stockConsole
 
   return (
     <>
@@ -129,6 +132,17 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
               const isStockBajo = stock < stockMinimo
               const stockDisponible = stock
               const cantidadMinimaPermitida = -stockDisponible
+              const vm = getVisualMode(producto.id, producto)
+              const isPackProduct = esModoPack(producto)
+              const delta = vm === "pack" ? getCantidadPorPack(producto) : 1
+              const displayValue = vm === "pack" ? unidadesSignedToPacksFloor(producto, cantidad) : cantidad
+              const unidadLabel = producto.unidadBase || producto.unidad || "U"
+              const packsDisplay = isPackProduct ? unidadesSignedToPacksFloor(producto, Math.abs(cantidad)) : 0
+              const equivalenciaText = vm === "pack"
+                ? `${displayValue} pack${Math.abs(displayValue) !== 1 ? "s" : ""} (${cantidad} ${unidadLabel})`
+                : isPackProduct
+                  ? `${cantidad} ${unidadLabel} (${packsDisplay} pack${packsDisplay !== 1 ? "s" : ""})`
+                  : `${cantidad} ${unidadLabel}`
 
               // Efecto "llenado de agua": % de fill según cantidad (max referencia: 15)
               const maxFillRef = 15
@@ -173,7 +187,34 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                   <div className="relative z-10 flex-1 min-w-0 flex flex-col justify-center p-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-base font-semibold truncate text-gray-900">{producto.nombre}</p>
-                      <span className="text-[11px] text-gray-400 uppercase tracking-wide">{producto.unidad || "U"}</span>
+                      {isPackProduct && (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setVisualModeFor(producto.id, "unidad")}
+                            className={cn(
+                              "px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors",
+                              vm === "unidad" ? "bg-gray-200 text-gray-800" : "text-gray-500 hover:bg-gray-100"
+                            )}
+                          >
+                            Unidad
+                          </button>
+                          <span className="text-gray-300">/</span>
+                          <button
+                            type="button"
+                            onClick={() => setVisualModeFor(producto.id, "pack")}
+                            className={cn(
+                              "px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors",
+                              vm === "pack" ? "bg-gray-200 text-gray-800" : "text-gray-500 hover:bg-gray-100"
+                            )}
+                          >
+                            Pack
+                          </button>
+                        </div>
+                      )}
+                      {!isPackProduct && (
+                        <span className="text-[11px] text-gray-400 uppercase tracking-wide">{unidadLabel}</span>
+                      )}
                     </div>
 
                     {/* Stock arriba, Mín debajo */}
@@ -181,6 +222,10 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                       <span>Stock: {stock}</span>
                       <span>Mín: {stockMinimo}{isStockBajo && " · Bajo mínimo"}</span>
                     </div>
+                    {/* Equivalencia */}
+                    {cantidad !== 0 && (
+                      <span className="text-[10px] text-gray-400 mt-0.5 block">{equivalenciaText}</span>
+                    )}
                   </div>
 
                   {/* Derecha: [-] número [+] en fila */}
@@ -189,7 +234,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                       variant="outline"
                       size="icon"
                       className="h-11 w-11 rounded-full transition-transform active:scale-95 border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 hover:border-violet-400"
-                      onClick={() => decrementarCantidad(producto.id)}
+                      onClick={() => decrementarCantidad(producto.id, delta)}
                       disabled={cantidad <= cantidadMinimaPermitida || state.loading}
                     >
                       <Minus className="h-5 w-5" strokeWidth={2.5} />
@@ -197,10 +242,14 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                     <Input
                       id={`input-${producto.id}`}
                       type="number"
-                      value={cantidad}
+                      step="1"
+                      value={displayValue}
                       onChange={(e) => {
                         e.stopPropagation()
-                        setCantidad(producto.id, parseInt(e.target.value) || 0)
+                        const raw = parseInt(e.target.value, 10)
+                        if (isNaN(raw)) return
+                        const unidades = vm === "pack" ? packsSignedToUnidades(producto, raw) : raw
+                        setCantidad(producto.id, unidades)
                       }}
                       className="h-11 w-12 text-center text-xl font-bold tabular-nums border border-gray-200/80 rounded-lg bg-gray-50/50 focus-visible:ring-2 focus-visible:ring-gray-300/50 p-0"
                       placeholder="0"
@@ -210,7 +259,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                       variant="outline"
                       size="icon"
                       className="h-11 w-11 rounded-full transition-transform active:scale-95 border-sky-400 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:border-sky-500"
-                      onClick={() => incrementarCantidad(producto.id)}
+                      onClick={() => incrementarCantidad(producto.id, delta)}
                       disabled={state.loading}
                     >
                       <Plus className="h-5 w-5" strokeWidth={2.5} />

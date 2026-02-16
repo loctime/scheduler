@@ -62,3 +62,17 @@ export function unidadesToPacksFloor(product: ProductoLike, unidades: number): n
 export function esModoPack(product: ProductoLike): boolean {
   return product.modoCompra === "pack" && getCantidadPorPack(product) > 1
 }
+
+/** Unidades (signed) a packs (signed) con floor. Para display: -18 u → -3 packs */
+export function unidadesSignedToPacksFloor(product: ProductoLike, unidades: number): number {
+  if (unidades === 0) return 0
+  const absPacks = unidadesToPacksFloor(product, Math.abs(unidades))
+  return unidades >= 0 ? absPacks : -absPacks
+}
+
+/** Packs (signed) a unidades (signed). Para input: -3 packs → -18 u */
+export function packsSignedToUnidades(product: ProductoLike, packs: number): number {
+  if (packs === 0) return 0
+  const absUnidades = packsToUnidades(product, Math.abs(packs))
+  return packs >= 0 ? absUnidades : -absUnidades
+}

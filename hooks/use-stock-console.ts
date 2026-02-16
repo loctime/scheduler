@@ -207,34 +207,32 @@ export function useStockConsole(user: any) {
     setState(prev => ({ ...prev, selectedPedidoId: pedidoId }))
   }, [ownerId])
 
-  const incrementarCantidad = useCallback((productoId: string) => {
+  /** delta en unidades (default 1). Para pack mode, pasar packsToUnidades(product, 1) */
+  const incrementarCantidad = useCallback((productoId: string, delta: number = 1) => {
+    const d = Math.max(0, Math.floor(delta))
+    if (d === 0) return
     setState(prev => ({
       ...prev,
       cantidades: {
         ...prev.cantidades,
-        [productoId]: (prev.cantidades[productoId] || 0) + 1
+        [productoId]: (prev.cantidades[productoId] || 0) + d
       }
     }))
   }, [])
 
-  const decrementarCantidad = useCallback((productoId: string) => {
+  /** delta en unidades (default 1). Para pack mode, pasar packsToUnidades(product, 1) */
+  const decrementarCantidad = useCallback((productoId: string, delta: number = 1) => {
+    const d = Math.max(0, Math.floor(delta))
+    if (d === 0) return
     setState(prev => {
       const cantidadActual = prev.cantidades[productoId] || 0
       const stockDisponible = stockActual[productoId] || 0
       const cantidadMinimaPermitida = -stockDisponible
-      
-      // No permitir ir más abajo del stock disponible
-      const nuevaCantidad = cantidadActual - 1
-      if (nuevaCantidad < cantidadMinimaPermitida) {
-        return prev // No hacer nada si viola la regla
-      }
-      
+      const nuevaCantidad = cantidadActual - d
+      if (nuevaCantidad < cantidadMinimaPermitida) return prev
       return {
         ...prev,
-        cantidades: {
-          ...prev.cantidades,
-          [productoId]: nuevaCantidad
-        }
+        cantidades: { ...prev.cantidades, [productoId]: nuevaCantidad }
       }
     })
   }, [stockActual])
