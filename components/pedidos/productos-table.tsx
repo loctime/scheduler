@@ -26,7 +26,7 @@ interface ProductosTableProps {
   viewMode?: "pedir" | "stock"
 }
 
-const btnIcon = "h-8 w-8 rounded-full transition-transform active:scale-95 shrink-0"
+const btnIcon = "h-7 w-7 rounded-full transition-transform active:scale-95 shrink-0"
 
 function StockInput({ value, onChange, onFocus, className }: { value: number | undefined; onChange: (v: number) => void; onFocus?: () => void; className?: string }) {
   return (
@@ -41,7 +41,7 @@ function StockInput({ value, onChange, onFocus, className }: { value: number | u
         setTimeout(() => (e.target as HTMLInputElement).select(), 0)
       }}
       placeholder="0"
-      className={cn("h-10 w-16 text-center text-sm font-medium px-1", className)}
+      className={cn("h-7 w-14 text-center text-sm font-medium px-1", className)}
     />
   )
 }
@@ -208,7 +208,7 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
         )}
       </div>
 
-      <div className="space-y-2 p-2">
+      <div className="space-y-1 p-2">
         {products.map((product) => {
           const stockActualValue = stockActual[product.id] ?? 0
           const stockMinimoValue = stockMinimoLocal[product.id] ?? product.stockMinimo
@@ -217,6 +217,7 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
           const pedidoCalculado = Math.max(0, pedidoBase + ajuste)
           const displayPedido = pedidoCalculado
           const isBajoMinimo = stockActualValue < stockMinimoValue
+          const pedidoMayorCero = viewMode === "pedir" && pedidoCalculado > 0
 
           return (
             <div
@@ -228,92 +229,72 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, product.id)}
               className={cn(
-                "rounded-xl border bg-card px-3 py-3 space-y-2 shadow-sm hover:shadow-md transition-all",
-                isBajoMinimo && "border-amber-400",
+                "rounded-lg border bg-card px-3 py-1.5 flex items-center gap-3 shadow-sm hover:shadow-md transition-all",
+                isBajoMinimo && !pedidoMayorCero && "border-amber-300/60",
                 dragOverProductId === product.id && "ring-2 ring-primary/20",
                 draggedProductId === product.id && "opacity-50"
               )}
             >
-              <div className={cn("flex gap-2", onProductsOrderUpdate && "flex-row")}>
-                {onProductsOrderUpdate && (
-                  <div className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors pt-0.5">
-                    <GripVertical className="h-4 w-4" />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0 flex flex-col space-y-2">
-                {/* Fila 1: Nombre + Unidad */}
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-base font-semibold truncate flex-1 min-w-0">{product.nombre}</p>
-                  <span className="text-xs text-muted-foreground shrink-0">{product.unidad || "U"}</span>
-                  {configMode && (
-                    <Button variant="ghost" size="icon" onClick={() => onDeleteProduct(product.id)} className="h-7 w-7 shrink-0 rounded-full opacity-60 hover:opacity-100 -mr-1">
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+              {onProductsOrderUpdate && (
+                <div className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors">
+                  <GripVertical className="h-3.5 w-3.5" />
+                </div>
+              )}
+              <p className="text-sm font-medium truncate flex-1 min-w-0">{product.nombre}</p>
+              <div className="flex items-center gap-1.5 shrink-0 text-xs text-muted-foreground tabular-nums">
+                {stockActualValue} / {configMode ? (
+                  <span className="inline-flex items-center gap-0.5">
+                    <Button variant="outline" size="icon" className="h-6 w-6 rounded-full shrink-0" onClick={() => {
+                      const nuevoValor = Math.max(0, stockMinimoValue - 1)
+                      setStockMinimoLocal(prev => ({ ...prev, [product.id]: nuevoValor }))
+                      onUpdateProduct(product.id, "stockMinimo", nuevoValor.toString())
+                    }} disabled={stockMinimoValue <= 0}>
+                      <Minus className="h-2.5 w-2.5" />
                     </Button>
-                  )}
-                </div>
-
-                {/* Fila 2: Stock: X | Mín: Y */}
-                <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                  <span>Stock: {stockActualValue}</span>
-                  <span>|</span>
-                  {configMode ? (
-                    <div className="flex items-center gap-1">
-                      <span>Mín:</span>
-                      <Button variant="outline" size="icon" className="h-6 w-6 rounded-full shrink-0" onClick={() => {
-                        const nuevoValor = Math.max(0, stockMinimoValue - 1)
-                        setStockMinimoLocal(prev => ({ ...prev, [product.id]: nuevoValor }))
-                        onUpdateProduct(product.id, "stockMinimo", nuevoValor.toString())
-                      }} disabled={stockMinimoValue <= 0}>
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <StockInput value={stockMinimoValue} onChange={(v) => {
-                        setStockMinimoLocal(prev => ({ ...prev, [product.id]: v }))
-                        onUpdateProduct(product.id, "stockMinimo", v.toString())
-                      }} className="h-6 w-12 text-xs" />
-                      <Button variant="outline" size="icon" className="h-6 w-6 rounded-full shrink-0" onClick={() => {
-                        const nuevoValor = stockMinimoValue + 1
-                        setStockMinimoLocal(prev => ({ ...prev, [product.id]: nuevoValor }))
-                        onUpdateProduct(product.id, "stockMinimo", nuevoValor.toString())
-                      }}>
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <span>Mín: {stockMinimoValue}</span>
-                      {isBajoMinimo && (
-                        <span className="text-amber-600 font-medium">Bajo mínimo</span>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                {/* Fila 3: [-] NÚMERO [+] — protagonista */}
-                <div className="flex items-center justify-center gap-2 pt-0.5">
-                  {viewMode === "pedir" ? (
-                    <>
-                      <Button variant="outline" size="icon" className={btnIcon} onClick={() => onAjustePedidoChange?.(product.id, (ajuste ?? 0) - 1)} disabled={pedidoCalculado <= 0 && (ajuste ?? 0) <= 0}>
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <StockInput value={displayPedido} onChange={(v) => { if (onAjustePedidoChange) { const newAjuste = v - pedidoBase; onAjustePedidoChange(product.id, newAjuste) } }} className="!h-10 !w-12 !text-2xl !font-bold !tabular-nums" />
-                      <Button variant="outline" size="icon" className={btnIcon} onClick={() => onAjustePedidoChange?.(product.id, (ajuste ?? 0) + 1)}>
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button variant="outline" size="icon" className={btnIcon} onClick={() => onStockChange(product.id, Math.max(0, (stockActualValue ?? 0) - 1))} disabled={(stockActualValue ?? 0) <= 0}>
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <StockInput value={stockActual[product.id]} onChange={(v) => onStockChange(product.id, v)} onFocus={() => startEditing(product.id, "stockActual", (stockActual[product.id] ?? 0).toString())} className="!h-10 !w-12 !text-2xl !font-bold !tabular-nums" />
-                      <Button variant="outline" size="icon" className={btnIcon} onClick={() => onStockChange(product.id, (stockActualValue ?? 0) + 1)}>
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
-                </div>
+                    <StockInput value={stockMinimoValue} onChange={(v) => {
+                      setStockMinimoLocal(prev => ({ ...prev, [product.id]: v }))
+                      onUpdateProduct(product.id, "stockMinimo", v.toString())
+                    }} className="h-6 w-10 text-xs" />
+                    <Button variant="outline" size="icon" className="h-6 w-6 rounded-full shrink-0" onClick={() => {
+                      const nuevoValor = stockMinimoValue + 1
+                      setStockMinimoLocal(prev => ({ ...prev, [product.id]: nuevoValor }))
+                      onUpdateProduct(product.id, "stockMinimo", nuevoValor.toString())
+                    }}>
+                      <Plus className="h-2.5 w-2.5" />
+                    </Button>
+                  </span>
+                ) : (
+                  <span>{stockMinimoValue}</span>
+                )}
               </div>
-            </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {viewMode === "pedir" ? (
+                  <>
+                    <Button variant="outline" size="icon" className={btnIcon} onClick={() => onAjustePedidoChange?.(product.id, (ajuste ?? 0) - 1)} disabled={pedidoCalculado <= 0 && (ajuste ?? 0) <= 0}>
+                      <Minus className="h-3.5 w-3.5" />
+                    </Button>
+                    <StockInput value={displayPedido} onChange={(v) => { if (onAjustePedidoChange) { const newAjuste = v - pedidoBase; onAjustePedidoChange(product.id, newAjuste) } }} className="h-7 w-14 text-sm" />
+                    <Button variant="outline" size="icon" className={btnIcon} onClick={() => onAjustePedidoChange?.(product.id, (ajuste ?? 0) + 1)}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="outline" size="icon" className={btnIcon} onClick={() => onStockChange(product.id, Math.max(0, (stockActualValue ?? 0) - 1))} disabled={(stockActualValue ?? 0) <= 0}>
+                      <Minus className="h-3.5 w-3.5" />
+                    </Button>
+                    <StockInput value={stockActual[product.id]} onChange={(v) => onStockChange(product.id, v)} onFocus={() => startEditing(product.id, "stockActual", (stockActual[product.id] ?? 0).toString())} className="h-7 w-14 text-sm" />
+                    <Button variant="outline" size="icon" className={btnIcon} onClick={() => onStockChange(product.id, (stockActualValue ?? 0) + 1)}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </>
+                )}
+              </div>
+              {configMode && (
+                <Button variant="ghost" size="icon" onClick={() => onDeleteProduct(product.id)} className="h-7 w-7 shrink-0 rounded-full opacity-60 hover:opacity-100">
+                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                </Button>
+              )}
             </div>
           )
         })}
