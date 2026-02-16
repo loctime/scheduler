@@ -160,68 +160,77 @@ function CellUnidadesPorPack({
   onBlur: (num: number) => void
   inputRef?: React.RefObject<HTMLInputElement | null>
 }) {
-  if (!isPack(product)) return null
+  const disabled = !isPack(product)
   return (
     <div className="flex items-center gap-1 shrink-0">
       <Input
         ref={inputRef}
         type="number"
         inputMode="numeric"
-        min={2}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        min={disabled ? 1 : 2}
+        value={disabled ? "1" : value}
+        onChange={(e) => !disabled && onChange(e.target.value)}
         onBlur={(e) => {
+          if (disabled) return
           const n = parseInt(e.target.value, 10)
           if (!isNaN(n) && n >= 2) onBlur(n)
         }}
-        className="h-7 w-14 text-center text-sm"
+        disabled={disabled}
+        className={cn(
+          "h-7 w-14 text-center text-sm",
+          disabled && "opacity-60 cursor-not-allowed"
+        )}
       />
     </div>
   )
 }
 
+/** Mín: en unidades si producto es unidad; en packs si producto es pack. Se guarda siempre en unidades en Firestore. */
 function CellStockMinimo({
-  onUpdate,
-  localValue,
-  onLocalChange,
+  product,
+  localValueUnits,
+  onLocalChangeUnits,
+  onUpdateUnits,
 }: {
-  onUpdate: (v: number) => void
-  localValue: number
-  onLocalChange: (v: number) => void
+  product: Producto
+  localValueUnits: number
+  onLocalChangeUnits: (units: number) => void
+  onUpdateUnits: (units: number) => void
 }) {
-  const v = localValue
+  const unidadesPorPack = getUnidadesPorPack(product)
+  const isPackProduct = isPack(product)
+
+  const displayValue = isPackProduct
+    ? Math.floor(localValueUnits / unidadesPorPack)
+    : localValueUnits
+
+  const handleChange = (n: number) => {
+    const units = isPackProduct ? n * unidadesPorPack : n
+    onLocalChangeUnits(units)
+    onUpdateUnits(units)
+  }
+
   return (
     <div className="flex items-center gap-0.5 shrink-0">
       <Button
         variant="outline"
         size="icon"
         className="h-6 w-6 rounded-full shrink-0"
-        onClick={() => {
-          const next = Math.max(0, v - 1)
-          onLocalChange(next)
-          onUpdate(next)
-        }}
-        disabled={v <= 0}
+        onClick={() => handleChange(Math.max(0, displayValue - 1))}
+        disabled={displayValue <= 0}
       >
         <Minus className="h-2.5 w-2.5" />
       </Button>
       <NumericInput
-        value={v}
-        onChange={(n) => {
-          onLocalChange(n)
-          onUpdate(n)
-        }}
+        value={displayValue}
+        onChange={(n) => handleChange(Math.max(0, n))}
         className="h-6 w-10 text-xs"
       />
       <Button
         variant="outline"
         size="icon"
         className="h-6 w-6 rounded-full shrink-0"
-        onClick={() => {
-          const next = v + 1
-          onLocalChange(next)
-          onUpdate(next)
-        }}
+        onClick={() => handleChange(displayValue + 1)}
       >
         <Plus className="h-2.5 w-2.5" />
       </Button>
@@ -322,6 +331,15 @@ function ProductoRow({
 }: ProductoRowProps) {
   const isEditingNombre = editingField?.id === product.id && editingField?.field === "nombre"
   const unidadesPorPackInputRef = useRef<HTMLInputElement | null>(null)
+  const [focusUnidadesPorPack, setFocusUnidadesPorPack] = useState(false)
+
+  useEffect(() => {
+    if (focusUnidadesPorPack && isPack(product) && unidadesPorPackInputRef.current) {
+      unidadesPorPackInputRef.current.focus()
+      unidadesPorPackInputRef.current.select()
+      setFocusUnidadesPorPack(false)
+    }
+  }, [focusUnidadesPorPack, product.modoCompra, product.cantidadPorPack])
 
   const handleSaveNombre = useCallback(async () => {
     const ok = await onUpdateProduct(product.id, "nombre", inlineValue.trim())
@@ -343,10 +361,7 @@ function ProductoRow({
         onUpdateProduct(product.id, "cantidadPorPack", "6")
       }
       if (tipo === "pack") {
-        setTimeout(() => {
-          unidadesPorPackInputRef.current?.focus()
-          unidadesPorPackInputRef.current?.select()
-        }, 0)
+        setFocusUnidadesPorPack(true)
       }
     },
     [product.id, product.cantidadPorPack, onUpdateProduct]
@@ -396,29 +411,28 @@ function ProductoRow({
           <CellTipo product={product} onChange={handleTipoChange} />
         </div>
 
-        {isPack(product) && (
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="text-[10px] text-muted-foreground">U/pack</span>
-            <CellUnidadesPorPack
-              product={product}
-              value={unidadesPorPackValue}
-              onChange={(v) => setUnidadesPorPackEdit(product.id, v)}
-              onBlur={(num) => {
-                if (num >= 2 && num !== (product.cantidadPorPack ?? 6)) {
-                  onUpdateProduct(product.id, "cantidadPorPack", String(num))
-                }
-              }}
-              inputRef={unidadesPorPackInputRef}
-            />
-          </div>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="text-[10px] text-muted-foreground">U/pack</span>
+          <CellUnidadesPorPack
+            product={product}
+            value={unidadesPorPackValue}
+            onChange={(v) => setUnidadesPorPackEdit(product.id, v)}
+            onBlur={(num) => {
+              if (num >= 2 && num !== (product.cantidadPorPack ?? 6)) {
+                onUpdateProduct(product.id, "cantidadPorPack", String(num))
+              }
+            }}
+            inputRef={unidadesPorPackInputRef}
+          />
+        </div>
 
         <div className="flex items-center gap-1 shrink-0">
           <span className="text-[10px] text-muted-foreground">Mín</span>
           <CellStockMinimo
-            localValue={stockMinimoLocal}
-            onLocalChange={(v) => setStockMinimoLocal(product.id, v)}
-            onUpdate={(v) => onUpdateProduct(product.id, "stockMinimo", String(v))}
+            product={product}
+            localValueUnits={stockMinimoLocal}
+            onLocalChangeUnits={(v) => setStockMinimoLocal(product.id, v)}
+            onUpdateUnits={(v) => onUpdateProduct(product.id, "stockMinimo", String(v))}
           />
         </div>
 
