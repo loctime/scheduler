@@ -31,8 +31,9 @@ interface ProductosTableProps {
 
 const btnIcon = "h-7 w-7 rounded-full transition-transform active:scale-95 shrink-0"
 
-/** Abrevia el nombre para vista móvil: primeras 3 letras por palabra (+ punto), mantiene números y no abrevia de/y/en/con. */
+/** Abrevia el nombre para vista móvil si supera 15 caracteres; si no, lo deja igual. */
 function abbreviateProductName(nombre: string): string {
+  if (nombre.length <= 15) return nombre
   const skipWords = new Set(["de", "y", "en", "con"])
   return nombre
     .split(/\s+/)
@@ -331,126 +332,139 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, product.id)}
               className={cn(
-                "rounded-lg border bg-card px-3 py-1.5 flex items-center gap-3 shadow-sm hover:shadow-md transition-all",
+                "rounded-lg border bg-card px-3 py-2 flex flex-col gap-1.5 shadow-sm hover:shadow-md transition-all",
                 isBajoMinimo && !pedidoMayorCero && "border-amber-300/60",
                 dragOverProductId === product.id && "ring-2 ring-primary/20",
                 draggedProductId === product.id && "opacity-50"
               )}
             >
-              {onProductsOrderUpdate && (
-                <div className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors">
-                  <GripVertical className="h-3.5 w-3.5" />
-                </div>
-              )}
-              <p className="text-sm font-medium truncate flex-1 min-w-0">
-                <span className="lg:hidden">{abbreviateProductName(product.nombre)}</span>
-                <span className="hidden lg:inline">{product.nombre}</span>
-              </p>
-              {configMode && (
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Unidad</span>
-                    <Switch
-                      checked={(modoCompraLocal[product.id] ?? product.modoCompra ?? "unidad") === "pack"}
-                      onCheckedChange={(checked) => {
-                        const v = checked ? "pack" : "unidad"
-                        setModoCompraLocal(prev => ({ ...prev, [product.id]: v }))
-                        onUpdateProduct(product.id, "modoCompra", v)
-                        if (v === "pack" && (!product.cantidadPorPack || product.cantidadPorPack < 2)) {
-                          onUpdateProduct(product.id, "cantidadPorPack", "6")
-                        }
-                      }}
-                    />
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Pack</span>
+              {/* Fila 1: solo nombre (+ grip) */}
+              <div className="flex items-center gap-2 min-w-0">
+                {onProductsOrderUpdate && (
+                  <div className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors">
+                    <GripVertical className="h-3.5 w-3.5" />
                   </div>
-                  {(modoCompraLocal[product.id] ?? product.modoCompra ?? "unidad") === "pack" && (
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-muted-foreground">/pack</span>
-                      <Input
-                        type="number"
-                        inputMode="numeric"
-                        min="2"
-                        value={cantidadPorPackEdit[product.id] ?? String(product.cantidadPorPack ?? 6)}
-                        onChange={(e) => setCantidadPorPackEdit(prev => ({ ...prev, [product.id]: e.target.value }))}
-                        onBlur={(e) => {
-                          const num = parseInt(e.target.value, 10)
-                          if (!isNaN(num) && num >= 2 && num !== (product.cantidadPorPack ?? 6)) {
-                            onUpdateProduct(product.id, "cantidadPorPack", String(num))
+                )}
+                <p className="text-sm font-medium truncate flex-1 min-w-0">
+                  <span className="lg:hidden">{abbreviateProductName(product.nombre)}</span>
+                  <span className="hidden lg:inline">{product.nombre}</span>
+                </p>
+                {configMode && (
+                  <Button variant="ghost" size="icon" onClick={() => onDeleteProduct(product.id)} className="h-7 w-7 shrink-0 rounded-full opacity-60 hover:opacity-100">
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  </Button>
+                )}
+              </div>
+
+              {/* Fila 2: Stock (izq) y Unidad/Pack (der) */}
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground tabular-nums">Stock: {stockActualValue}</span>
+                {configMode && (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">Unidad</span>
+                      <Switch
+                        checked={(modoCompraLocal[product.id] ?? product.modoCompra ?? "unidad") === "pack"}
+                        onCheckedChange={(checked) => {
+                          const v = checked ? "pack" : "unidad"
+                          setModoCompraLocal(prev => ({ ...prev, [product.id]: v }))
+                          onUpdateProduct(product.id, "modoCompra", v)
+                          if (v === "pack" && (!product.cantidadPorPack || product.cantidadPorPack < 2)) {
+                            onUpdateProduct(product.id, "cantidadPorPack", "6")
                           }
-                          setCantidadPorPackEdit(prev => {
-                            const next = { ...prev }
-                            delete next[product.id]
-                            return next
-                          })
                         }}
-                        className="h-7 w-12 text-center text-xs"
                       />
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">Pack</span>
                     </div>
+                    {(modoCompraLocal[product.id] ?? product.modoCompra ?? "unidad") === "pack" && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-muted-foreground">/pack</span>
+                        <Input
+                          type="number"
+                          inputMode="numeric"
+                          min="2"
+                          value={cantidadPorPackEdit[product.id] ?? String(product.cantidadPorPack ?? 6)}
+                          onChange={(e) => setCantidadPorPackEdit(prev => ({ ...prev, [product.id]: e.target.value }))}
+                          onBlur={(e) => {
+                            const num = parseInt(e.target.value, 10)
+                            if (!isNaN(num) && num >= 2 && num !== (product.cantidadPorPack ?? 6)) {
+                              onUpdateProduct(product.id, "cantidadPorPack", String(num))
+                            }
+                            setCantidadPorPackEdit(prev => {
+                              const next = { ...prev }
+                              delete next[product.id]
+                              return next
+                            })
+                          }}
+                          className="h-7 w-12 text-center text-xs"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Fila 3: Min (izq) y cantidad pedido/stock (der) */}
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
+                  <span>Min:</span>
+                  {configMode ? (
+                    <span className="inline-flex items-center gap-0.5">
+                      <Button variant="outline" size="icon" className="h-6 w-6 rounded-full shrink-0" onClick={() => {
+                        const nuevoValor = Math.max(0, stockMinimoValue - 1)
+                        setStockMinimoLocal(prev => ({ ...prev, [product.id]: nuevoValor }))
+                        onUpdateProduct(product.id, "stockMinimo", nuevoValor.toString())
+                      }} disabled={stockMinimoValue <= 0}>
+                        <Minus className="h-2.5 w-2.5" />
+                      </Button>
+                      <StockInput value={stockMinimoValue} onChange={(v) => {
+                        setStockMinimoLocal(prev => ({ ...prev, [product.id]: v }))
+                        onUpdateProduct(product.id, "stockMinimo", v.toString())
+                      }} className="h-6 w-10 text-xs" />
+                      <Button variant="outline" size="icon" className="h-6 w-6 rounded-full shrink-0" onClick={() => {
+                        const nuevoValor = stockMinimoValue + 1
+                        setStockMinimoLocal(prev => ({ ...prev, [product.id]: nuevoValor }))
+                        onUpdateProduct(product.id, "stockMinimo", nuevoValor.toString())
+                      }}>
+                        <Plus className="h-2.5 w-2.5" />
+                      </Button>
+                    </span>
+                  ) : (
+                    <span>{stockMinimoValue}</span>
                   )}
                 </div>
-              )}
-              <div className="flex items-center gap-1.5 shrink-0 text-xs text-muted-foreground tabular-nums">
-                {stockActualValue} / {configMode ? (
-                  <span className="inline-flex items-center gap-0.5">
-                    <Button variant="outline" size="icon" className="h-6 w-6 rounded-full shrink-0" onClick={() => {
-                      const nuevoValor = Math.max(0, stockMinimoValue - 1)
-                      setStockMinimoLocal(prev => ({ ...prev, [product.id]: nuevoValor }))
-                      onUpdateProduct(product.id, "stockMinimo", nuevoValor.toString())
-                    }} disabled={stockMinimoValue <= 0}>
-                      <Minus className="h-2.5 w-2.5" />
-                    </Button>
-                    <StockInput value={stockMinimoValue} onChange={(v) => {
-                      setStockMinimoLocal(prev => ({ ...prev, [product.id]: v }))
-                      onUpdateProduct(product.id, "stockMinimo", v.toString())
-                    }} className="h-6 w-10 text-xs" />
-                    <Button variant="outline" size="icon" className="h-6 w-6 rounded-full shrink-0" onClick={() => {
-                      const nuevoValor = stockMinimoValue + 1
-                      setStockMinimoLocal(prev => ({ ...prev, [product.id]: nuevoValor }))
-                      onUpdateProduct(product.id, "stockMinimo", nuevoValor.toString())
-                    }}>
-                      <Plus className="h-2.5 w-2.5" />
-                    </Button>
-                  </span>
-                ) : (
-                  <span>{stockMinimoValue}</span>
-                )}
-              </div>
-              <div className={cn("flex items-center gap-1 shrink-0", displaySuffix && "flex-col items-end")}>
-                {viewMode === "pedir" ? (
-                  <>
-                    <div className="flex flex-col items-end gap-0.5">
-                      <div className="flex items-center gap-1">
-                        <Button variant="outline" size="icon" className={btnIcon} onClick={() => onAjustePedidoChange?.(product.id, (ajuste ?? 0) - 1)} disabled={pedidoCalculado <= 0 && (ajuste ?? 0) <= 0}>
-                          <Minus className="h-3.5 w-3.5" />
-                        </Button>
-                        <StockInput value={displayPedido} onChange={onDisplayChange} className="h-7 w-14 text-sm" />
-                        <Button variant="outline" size="icon" className={btnIcon} onClick={() => onAjustePedidoChange?.(product.id, (ajuste ?? 0) + 1)}>
-                          <Plus className="h-3.5 w-3.5" />
-                        </Button>
+                <div className={cn("flex items-center gap-1 shrink-0", displaySuffix && "flex-col items-end")}>
+                  {viewMode === "pedir" ? (
+                    <>
+                      <div className="flex flex-col items-end gap-0.5">
+                        <div className="flex items-center gap-1">
+                          <Button variant="outline" size="icon" className={btnIcon} onClick={() => onAjustePedidoChange?.(product.id, (ajuste ?? 0) - 1)} disabled={pedidoCalculado <= 0 && (ajuste ?? 0) <= 0}>
+                            <Minus className="h-3.5 w-3.5" />
+                          </Button>
+                          <StockInput value={displayPedido} onChange={onDisplayChange} className="h-7 w-14 text-sm" />
+                          <Button variant="outline" size="icon" className={btnIcon} onClick={() => onAjustePedidoChange?.(product.id, (ajuste ?? 0) + 1)}>
+                            <Plus className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                        {displaySuffix}
+                        {porDebajoMinimo && (
+                          <span className="text-[10px] font-medium text-red-600 dark:text-red-400">Por debajo del mínimo</span>
+                        )}
                       </div>
-                      {displaySuffix}
-                      {porDebajoMinimo && (
-                        <span className="text-[10px] font-medium text-red-600 dark:text-red-400">Por debajo del mínimo</span>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <Button variant="outline" size="icon" className={btnIcon} onClick={() => onStockChange(product.id, Math.max(0, (stockActualValue ?? 0) - 1))} disabled={(stockActualValue ?? 0) <= 0}>
-                      <Minus className="h-3.5 w-3.5" />
-                    </Button>
-                    <StockInput value={stockActual[product.id]} onChange={(v) => onStockChange(product.id, v)} onFocus={() => startEditing(product.id, "stockActual", (stockActual[product.id] ?? 0).toString())} className="h-7 w-14 text-sm" />
-                    <Button variant="outline" size="icon" className={btnIcon} onClick={() => onStockChange(product.id, (stockActualValue ?? 0) + 1)}>
-                      <Plus className="h-3.5 w-3.5" />
-                    </Button>
-                  </>
-                )}
+                    </>
+                  ) : (
+                    <>
+                      <Button variant="outline" size="icon" className={btnIcon} onClick={() => onStockChange(product.id, Math.max(0, (stockActualValue ?? 0) - 1))} disabled={(stockActualValue ?? 0) <= 0}>
+                        <Minus className="h-3.5 w-3.5" />
+                      </Button>
+                      <StockInput value={stockActual[product.id]} onChange={(v) => onStockChange(product.id, v)} onFocus={() => startEditing(product.id, "stockActual", (stockActual[product.id] ?? 0).toString())} className="h-7 w-14 text-sm" />
+                      <Button variant="outline" size="icon" className={btnIcon} onClick={() => onStockChange(product.id, (stockActualValue ?? 0) + 1)}>
+                        <Plus className="h-3.5 w-3.5" />
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
-              {configMode && (
-                <Button variant="ghost" size="icon" onClick={() => onDeleteProduct(product.id)} className="h-7 w-7 shrink-0 rounded-full opacity-60 hover:opacity-100">
-                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                </Button>
-              )}
             </div>
           )
         })}
