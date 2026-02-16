@@ -1,6 +1,7 @@
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import type { Remito, Pedido, Producto } from "./types"
+import { esModoPack, unidadesToPacks, packsToUnidades } from "./unidades-utils"
 
 /**
  * Normaliza el nombre del pedido para usar en la numeración de remitos
@@ -76,7 +77,14 @@ export function crearRemitoPedido(
     .map(p => {
       const pedidoBase = calcularPedido(p.stockMinimo, stockActual[p.id])
       const ajuste = ajustesPedido?.[p.id] ?? 0
-      const cantidadFinal = Math.max(0, pedidoBase + ajuste)
+      let cantidadFinal: number
+      if (esModoPack(p)) {
+        const pedidoBasePacks = unidadesToPacks(p, pedidoBase)
+        const totalPacks = Math.max(0, pedidoBasePacks + ajuste)
+        cantidadFinal = packsToUnidades(p, totalPacks)
+      } else {
+        cantidadFinal = Math.max(0, pedidoBase + ajuste)
+      }
       return { producto: p, cantidadFinal }
     })
     .filter(({ cantidadFinal }) => cantidadFinal > 0)

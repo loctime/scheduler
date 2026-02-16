@@ -18,7 +18,8 @@ import { useRemitos } from "@/hooks/use-remitos"
 import { useRecepciones } from "@/hooks/use-recepciones"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { doc, serverTimestamp, getDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where } from "firebase/firestore"
-import type { Remito, Recepcion } from "@/lib/types"
+import type { Remito, Recepcion, Producto } from "@/lib/types"
+import { esModoPack, unidadesToPacks, packsToUnidades, unidadesToPacksFloor } from "@/lib/unidades-utils"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import { PedidoTimeline } from "@/components/pedidos/pedido-timeline"
 import { crearRemitoPedido, crearRemitoRecepcion } from "@/lib/remito-utils"
@@ -48,6 +49,7 @@ const FORMAT_EXAMPLES = [
   { format: "({cantidad}) {nombre}", example: "(8) Leche" },
   { format: "• {nombre}: {cantidad} {unidad}", example: "• Leche: 8 litros" },
   { format: "{nombre} x{cantidad}", example: "Leche x8" },
+  { format: "{nombre} ({cantidadPacks} packs - {cantidadUnidades} {unidad})", example: "Coca 500 (2 packs - 12 unidades)" },
 ]
 
 export default function PedidosPage() {
@@ -179,12 +181,17 @@ export default function PedidosPage() {
   // Estado para ajustes manuales de pedido (no afecta el stock real)
   const [ajustesPedido, setAjustesPedido] = useState<Record<string, number>>({})
   
-  // Función para calcular pedido con ajuste
-  const calcularPedidoConAjuste = useCallback((stockMinimo: number, stockActualValue: number | undefined, productoId: string): number => {
-    const pedidoBase = calcularPedido(stockMinimo, stockActualValue)
-    const ajuste = ajustesPedido[productoId] ?? 0
+  // Función para calcular pedido con ajuste (retorna cantidad en UNIDADES BASE)
+  const calcularPedidoConAjuste = useCallback((p: Producto): number => {
+    const pedidoBase = calcularPedido(p.stockMinimo, stockActual[p.id])
+    const ajuste = ajustesPedido[p.id] ?? 0
+    if (esModoPack(p)) {
+      const pedidoBasePacks = unidadesToPacks(p, pedidoBase)
+      const totalPacks = Math.max(0, pedidoBasePacks + ajuste)
+      return packsToUnidades(p, totalPacks)
+    }
     return Math.max(0, pedidoBase + ajuste)
-  }, [calcularPedido, ajustesPedido])
+  }, [calcularPedido, ajustesPedido, stockActual])
   
   // Función para cambiar el ajuste de pedido
   const handleAjustePedidoChange = useCallback((productId: string, ajuste: number) => {
@@ -200,7 +207,7 @@ export default function PedidosPage() {
   
   // Recalcular productosAPedir con el stock global y ajustes
   const productosAPedirActualizados = useMemo(() => {
-    return products.filter(p => calcularPedidoConAjuste(p.stockMinimo, stockActual[p.id], p.id) > 0)
+    return products.filter(p => calcularPedidoConAjuste(p) > 0)
   }, [products, stockActual, calcularPedidoConAjuste])
   
   // Dialog states
@@ -362,6 +369,8 @@ export default function PedidosPage() {
               cantidadPedida: cantidadPedida,
               cantidadEnviada: cantidadEnviada,
               observacionesEnvio: observacion,
+              modoCompra: producto.modoCompra,
+              cantidadPorPack: producto.cantidadPorPack,
             }
           })
           
@@ -411,6 +420,8 @@ export default function PedidosPage() {
                 cantidadPedida: cantidadPedida,
                 cantidadEnviada: cantidadEnviada,
                 observacionesEnvio: infoEnvio?.observaciones || undefined,
+                modoCompra: producto.modoCompra,
+                cantidadPorPack: producto.cantidadPorPack,
               }
             })
 
@@ -553,21 +564,25 @@ export default function PedidosPage() {
   // Generar texto del pedido con ajustes
   const generarTextoPedidoConAjustes = useCallback((): string => {
     if (!selectedPedido) return ""
+    const unidadDefault = "U"
     
     const lineas = productosAPedirActualizados.map(p => {
-      const cantidad = calcularPedidoConAjuste(p.stockMinimo, stockActual[p.id], p.id)
+      const cantidadUnidades = calcularPedidoConAjuste(p)
+      const cantidadPacks = esModoPack(p) ? unidadesToPacksFloor(p, cantidadUnidades) : cantidadUnidades
+      const unidad = p.unidadBase || p.unidad || unidadDefault
       let texto = selectedPedido.formatoSalida
       texto = texto.replace(/{nombre}/g, p.nombre)
-      texto = texto.replace(/{cantidad}/g, (cantidad ?? 0).toString())
-      texto = texto.replace(/{unidad}/g, p.unidad || "")
+      texto = texto.replace(/{cantidad}/g, cantidadUnidades.toString())
+      texto = texto.replace(/{cantidadUnidades}/g, cantidadUnidades.toString())
+      texto = texto.replace(/{cantidadPacks}/g, cantidadPacks.toString())
+      texto = texto.replace(/{unidad}/g, unidad)
       return texto.trim()
     })
     
-    // Usar mensaje previo personalizado o el default con emoji
     const encabezado = selectedPedido.mensajePrevio?.trim() || `📦 ${selectedPedido.nombre}`
     
     return `${encabezado}\n\n${lineas.join("\n")}\n\nTotal: ${productosAPedirActualizados.length} productos`
-  }, [selectedPedido, productosAPedirActualizados, stockActual, calcularPedidoConAjuste])
+  }, [selectedPedido, productosAPedirActualizados, calcularPedidoConAjuste])
 
   const handleCopyPedido = async () => {
     if (productosAPedirActualizados.length === 0) {
@@ -601,7 +616,7 @@ export default function PedidosPage() {
     try {
       // Copiar solo la columna "Pedir" (una línea por producto, respetando el orden actual)
       const cantidadesPedir = products.map(p => {
-        const cantidad = calcularPedidoConAjuste(p.stockMinimo, stockActual[p.id], p.id)
+        const cantidad = calcularPedidoConAjuste(p)
         return (cantidad ?? 0).toString()
       })
       
@@ -726,7 +741,7 @@ export default function PedidosPage() {
       // Calcular cantidades a pedir solo para productos que realmente necesitan ser pedidos
       const cantidadesPedidas: Record<string, number> = {}
       products.forEach(p => {
-        const cantidad = calcularPedidoConAjuste(p.stockMinimo, stockActual[p.id], p.id)
+        const cantidad = calcularPedidoConAjuste(p)
         if (cantidad > 0) {
           cantidadesPedidas[p.id] = cantidad // Solo guardar productos que necesitan ser pedidos
           console.log(`Producto ${p.nombre}: stockMinimo=${p.stockMinimo}, stockActual=${stockActual[p.id]}, cantidadPedida=${cantidad}`)
@@ -910,7 +925,7 @@ export default function PedidosPage() {
     // Calcular cantidades a pedir solo para productos que realmente necesitan ser pedidos
     const cantidadesPedidas: Record<string, number> = {}
     products.forEach(p => {
-      const cantidad = calcularPedidoConAjuste(p.stockMinimo, stockActual[p.id], p.id)
+      const cantidad = calcularPedidoConAjuste(p)
       if (cantidad > 0) {
         cantidadesPedidas[p.id] = cantidad // Solo guardar productos que necesitan ser pedidos
       }

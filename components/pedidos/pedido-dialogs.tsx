@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Upload, AlertTriangle, Package } from "lucide-react"
 import { Pedido } from "@/lib/types"
+import { esModoPack, unidadesToPacksFloor } from "@/lib/unidades-utils"
 
 const DEFAULT_FORMAT = "{nombre} ({cantidad})"
 
@@ -254,6 +255,8 @@ interface ConfirmarEnvioDialogProps {
     cantidadEnviada: number
     unidad: string
     observaciones?: string
+    modoCompra?: "unidad" | "pack"
+    cantidadPorPack?: number
   }>
   nombrePedido?: string
   nombreEmpresa?: string
@@ -299,15 +302,21 @@ export function ConfirmarEnvioDialog({
                 No hay productos para enviar
               </div>
             ) : (
-              productos.map((producto, index) => (
+              productos.map((producto, index) => {
+                const isPack = esModoPack(producto)
+                const packs = isPack ? unidadesToPacksFloor(producto, producto.cantidadEnviada) : 0
+                const unidad = producto.unidad || "U"
+                const displayEnvio = isPack && packs > 0
+                  ? `${packs} pack${packs !== 1 ? "s" : ""} (${producto.cantidadEnviada} ${unidad})`
+                  : `${producto.cantidadEnviada} ${unidad}`
+                return (
                 <div key={index} className="p-2.5 sm:p-3 hover:bg-muted/50 transition-colors">
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <div className="font-medium text-sm flex-1 min-w-0">{producto.nombre}</div>
                     <div className="flex items-center gap-2 text-xs sm:text-sm flex-shrink-0">
                       <span className="text-muted-foreground">Pedido: <strong className="text-foreground">{producto.cantidadPedida}</strong></span>
                       <span className="text-muted-foreground">→</span>
-                      <span className="font-semibold text-foreground">Envío: {producto.cantidadEnviada}</span>
-                      <span className="text-muted-foreground">{producto.unidad}</span>
+                      <span className="font-semibold text-foreground">Envío: {displayEnvio}</span>
                     </div>
                   </div>
                   {producto.observaciones && (
@@ -316,7 +325,7 @@ export function ConfirmarEnvioDialog({
                     </div>
                   )}
                 </div>
-              ))
+              )})
             )}
           </div>
         </div>

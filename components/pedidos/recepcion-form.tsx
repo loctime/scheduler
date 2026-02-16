@@ -10,6 +10,7 @@ import { Package, Check, AlertTriangle, Plus, Minus } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { cn } from "@/lib/utils"
 import type { Recepcion } from "@/lib/types"
+import { esModoPack, getCantidadPorPack, packsToUnidades, unidadesToPacksFloor } from "@/lib/unidades-utils"
 import { validarRecepcion, calcularCantidadDevolucion } from "@/src/domain/pedidos/recepcionRules"
 import { prepararRecepcion } from "@/src/domain/pedidos/prepararRecepcion"
 
@@ -20,6 +21,8 @@ interface RecepcionFormProps {
     cantidadPedida: number
     cantidadEnviada: number
     observacionesEnvio?: string
+    modoCompra?: "unidad" | "pack"
+    cantidadPorPack?: number
   }>
   onConfirmar: (recepcion: Omit<Recepcion, "id" | "createdAt">) => void | Promise<void>
   loading?: boolean
@@ -114,6 +117,27 @@ export function RecepcionForm({
   const [erroresValidacion, setErroresValidacion] = useState<Array<{productoId: string, mensaje: string}>>([])
 
   const handleConfirmar = async () => {
+    // Validar productos pack: cantidadRecibida debe ser múltiplo de cantidadPorPack
+    const erroresPack: Array<{ productoId: string; mensaje: string }> = []
+    productosEnviados.forEach((p) => {
+      if (esModoPack(p)) {
+        const data = productosRecepcion[p.productoId]
+        if (data && data.cantidadRecibida > 0) {
+          const qty = getCantidadPorPack(p)
+          if (data.cantidadRecibida % qty !== 0) {
+            erroresPack.push({
+              productoId: p.productoId,
+              mensaje: `${p.productoNombre}: La cantidad recibida (${data.cantidadRecibida}) debe ser múltiplo de ${qty} (1 pack). Recibí packs completos.`,
+            })
+          }
+        }
+      }
+    })
+    if (erroresPack.length > 0) {
+      setErroresValidacion(erroresPack)
+      throw new Error(erroresPack.map((e) => e.mensaje).join(". "))
+    }
+
     // Convertir al formato esperado por el dominio
     const recepcionInput: Record<string, { productoId: string, cantidadRecibida: number, esDevolucion?: boolean, observaciones?: string }> = {}
     
@@ -148,21 +172,23 @@ export function RecepcionForm({
     })
   }
 
-  // Función para incrementar cantidad recibida
+  // Función para incrementar cantidad recibida (+1 unidad, o +1 pack si modoCompra es pack)
   const incrementarCantidad = (productoId: string) => {
     const producto = productosEnviados.find(p => p.productoId === productoId)
     if (!producto) return
     const data = productosRecepcion[productoId] || { cantidadRecibida: producto.cantidadEnviada }
-    updateProducto(productoId, "cantidadRecibida", data.cantidadRecibida + 1)
+    const incremento = esModoPack(producto) ? getCantidadPorPack(producto) : 1
+    updateProducto(productoId, "cantidadRecibida", data.cantidadRecibida + incremento)
   }
 
-  // Función para decrementar cantidad recibida
+  // Función para decrementar cantidad recibida (-1 unidad, o -1 pack si modoCompra es pack)
   const decrementarCantidad = (productoId: string) => {
     const producto = productosEnviados.find(p => p.productoId === productoId)
     if (!producto) return
     const data = productosRecepcion[productoId] || { cantidadRecibida: producto.cantidadEnviada }
-    if (data.cantidadRecibida > 0) {
-      updateProducto(productoId, "cantidadRecibida", data.cantidadRecibida - 1)
+    const decremento = esModoPack(producto) ? getCantidadPorPack(producto) : 1
+    if (data.cantidadRecibida >= decremento) {
+      updateProducto(productoId, "cantidadRecibida", data.cantidadRecibida - decremento)
     }
   }
 
@@ -261,21 +287,43 @@ export function RecepcionForm({
                     {producto.cantidadEnviada}
                   </div>
                   <div className="flex items-center justify-end">
-                    <Input
-                      id={`cantidad-${producto.productoId}`}
-                      type="number"
-                      inputMode="numeric"
-                      min="0"
-                      value={data.cantidadRecibida}
-                      onChange={(e) =>
-                        updateProducto(
-                          producto.productoId,
-                          "cantidadRecibida",
-                          parseInt(e.target.value) || 0
-                        )
-                      }
-                      className="text-2xl sm:text-3xl font-bold text-center h-auto border-2 w-20 sm:w-24 px-1 py-1"
-                    />
+                    {esModoPack(producto) ? (
+                      <>
+                        <Input
+                          id={`cantidad-${producto.productoId}`}
+                          type="number"
+                          inputMode="numeric"
+                          min="0"
+                          step="1"
+                          value={unidadesToPacksFloor(producto, data.cantidadRecibida)}
+                          onChange={(e) => {
+                            const packs = parseInt(e.target.value, 10) || 0
+                            const unidades = packsToUnidades(producto, Math.max(0, packs))
+                            updateProducto(producto.productoId, "cantidadRecibida", unidades)
+                          }}
+                          className="text-2xl sm:text-3xl font-bold text-center h-auto border-2 w-20 sm:w-24 px-1 py-1"
+                        />
+                        <span className="text-xs text-muted-foreground ml-1 self-center">
+                          packs ({data.cantidadRecibida} u)
+                        </span>
+                      </>
+                    ) : (
+                      <Input
+                        id={`cantidad-${producto.productoId}`}
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        value={data.cantidadRecibida}
+                        onChange={(e) =>
+                          updateProducto(
+                            producto.productoId,
+                            "cantidadRecibida",
+                            parseInt(e.target.value) || 0
+                          )
+                        }
+                        className="text-2xl sm:text-3xl font-bold text-center h-auto border-2 w-20 sm:w-24 px-1 py-1"
+                      />
+                    )}
                     {data.cantidadRecibida !== producto.cantidadEnviada && (
                       <div className="flex items-center gap-0.5 ml-2">
                         {data.cantidadRecibida < producto.cantidadEnviada && (

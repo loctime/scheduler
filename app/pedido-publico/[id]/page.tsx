@@ -412,7 +412,7 @@ export default function PedidoPublicoPage() {
               return acc
             }, {} as Record<string, { productoId: string; disponible: boolean; cantidadEnviar?: number }>)
 
-            const productosFiltrados = productos
+                const productosFiltrados = productos
               .map(p => {
                 const productoData = productosDisponiblesMap[p.id]
                 const cantidadEnviada = productoData?.cantidadEnviar ?? 0
@@ -424,8 +424,10 @@ export default function PedidoPublicoPage() {
                     nombre: p.nombre,
                     cantidadPedida: cantidadPedida,
                     cantidadEnviada: cantidadEnviada,
-                    unidad: p.unidad || "U",
-                    observaciones: undefined
+                    unidad: p.unidadBase || p.unidad || "U",
+                    observaciones: undefined,
+                    modoCompra: p.modoCompra,
+                    cantidadPorPack: p.cantidadPorPack
                   }
                 }
                 return null

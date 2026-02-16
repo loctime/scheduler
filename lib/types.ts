@@ -300,6 +300,12 @@ export interface Producto {
   nombre: string
   stockMinimo: number
   unidad?: string
+  /** Unidad base para stock y pedidos (ej: "unidad", "kg", "litro"). Default "U". */
+  unidadBase?: string
+  /** Si se compra por unidad o por pack. Default "unidad". */
+  modoCompra?: "unidad" | "pack"
+  /** Cantidad de unidades que trae cada pack. Requerido si modoCompra === "pack". */
+  cantidadPorPack?: number
   orden?: number
   cantidadPedida?: number
   ownerId: string

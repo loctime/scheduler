@@ -19,6 +19,7 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
 import { Pedido, Producto } from "@/lib/types"
+import { esModoPack, unidadesToPacksFloor } from "@/lib/unidades-utils"
 import { useData } from "@/contexts/data-context"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
@@ -508,7 +509,13 @@ export function usePedidos(user: any) {
   }, [loadProducts, ownerId, user, toast])
 
   // Crear producto individual
-  const createProduct = useCallback(async (nombre: string, stockMinimo?: number, unidad?: string) => {
+  const createProduct = useCallback(async (
+    nombre: string,
+    stockMinimo?: number,
+    unidad?: string,
+    modoCompra?: "unidad" | "pack",
+    cantidadPorPack?: number
+  ) => {
     if (!db || !user || !selectedPedido) return null
 
     if (!nombre.trim()) {
@@ -534,11 +541,17 @@ export function usePedidos(user: any) {
         return null
       }
 
+      const modo = modoCompra || "unidad"
       const docRef = await addDoc(collection(db, COLLECTIONS.PRODUCTS), {
         pedidoId: selectedPedido.id,
         nombre: nombre.trim(),
         stockMinimo: stockMinimo ?? selectedPedido.stockMinimoDefault,
         unidad: unidad?.trim() || "U",
+        unidadBase: unidad?.trim() || "U",
+        modoCompra: modo,
+        ...(modo === "pack" && cantidadPorPack != null && cantidadPorPack > 1
+          ? { cantidadPorPack }
+          : {}),
         orden: maxOrden,
         ownerId,
         userId: user.uid,
@@ -625,16 +638,20 @@ export function usePedidos(user: any) {
     }
   }, [db, ownerId, user, loadProducts, toast])
 
-  // Generar texto del pedido
+  // Generar texto del pedido (usa placeholders {cantidad}, {cantidadUnidades}, {cantidadPacks}, {unidad})
   const generarTextoPedido = useCallback((): string => {
     if (!selectedPedido) return ""
     
     const lineas = productosAPedir.map(p => {
-      const cantidad = calcularPedido(p.stockMinimo, stockActual[p.id])
+      const cantidadUnidades = calcularPedido(p.stockMinimo, stockActual[p.id])
+      const cantidadPacks = esModoPack(p) ? unidadesToPacksFloor(p, cantidadUnidades) : cantidadUnidades
+      const unidad = p.unidadBase || p.unidad || "U"
       let texto = selectedPedido.formatoSalida
       texto = texto.replace(/{nombre}/g, p.nombre)
-      texto = texto.replace(/{cantidad}/g, cantidad.toString())
-      texto = texto.replace(/{unidad}/g, p.unidad || "")
+      texto = texto.replace(/{cantidad}/g, cantidadUnidades.toString())
+      texto = texto.replace(/{cantidadUnidades}/g, cantidadUnidades.toString())
+      texto = texto.replace(/{cantidadPacks}/g, cantidadPacks.toString())
+      texto = texto.replace(/{unidad}/g, unidad)
       return texto.trim()
     })
     

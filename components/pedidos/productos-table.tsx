@@ -4,8 +4,10 @@ import React, { useCallback, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Trash2, Upload, Package, Minus, Plus, GripVertical, PlusCircle, X } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { Producto } from "@/lib/types"
+import { getCantidadPorPack, unidadesToPacks, packsToUnidades, esModoPack } from "@/lib/unidades-utils"
 
 type TableMode = "config" | "pedido"
 
@@ -15,7 +17,7 @@ interface ProductosTableProps {
   onStockChange: (productId: string, value: number) => void
   onUpdateProduct: (productId: string, field: string, value: string) => Promise<boolean>
   onDeleteProduct: (productId: string) => void
-  onCreateProduct?: (nombre: string, stockMinimo?: number, unidad?: string) => Promise<string | null>
+  onCreateProduct?: (nombre: string, stockMinimo?: number, unidad?: string, modoCompra?: "unidad" | "pack", cantidadPorPack?: number) => Promise<string | null>
   onImport: () => void
   onProductsOrderUpdate?: (newOrder: string[]) => Promise<boolean>
   calcularPedido: (stockMinimo: number, stockActualValue: number | undefined) => number
@@ -46,16 +48,48 @@ function StockInput({ value, onChange, onFocus, className }: { value: number | u
   )
 }
 
-function CreateProductForm({ nombre, onNombreChange, stockMinimo, onStockMinimoChange, unidad, onUnidadChange, onCreate, onCancel }: { nombre: string; onNombreChange: (v: string) => void; stockMinimo: string; onStockMinimoChange: (v: string) => void; unidad: string; onUnidadChange: (v: string) => void; onCreate: () => void; onCancel: () => void }) {
+function CreateProductForm({
+  nombre, onNombreChange,
+  stockMinimo, onStockMinimoChange,
+  unidad, onUnidadChange,
+  modoCompra, onModoCompraChange,
+  cantidadPorPack, onCantidadPorPackChange,
+  onCreate, onCancel,
+}: {
+  nombre: string; onNombreChange: (v: string) => void
+  stockMinimo: string; onStockMinimoChange: (v: string) => void
+  unidad: string; onUnidadChange: (v: string) => void
+  modoCompra: "unidad" | "pack"; onModoCompraChange: (v: "unidad" | "pack") => void
+  cantidadPorPack: string; onCantidadPorPackChange: (v: string) => void
+  onCreate: () => void; onCancel: () => void
+}) {
+  const isPack = modoCompra === "pack"
+  const qtyPack = parseInt(cantidadPorPack, 10)
+  const canCreate = nombre.trim() && (!isPack || (qtyPack > 1))
   return (
     <div className="rounded-xl border border-border bg-card px-3 py-3 space-y-2 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <Input value={nombre} onChange={(e) => onNombreChange(e.target.value)} placeholder="Nombre del producto" className="h-8 text-sm flex-1" />
+      <div className="flex flex-wrap items-center gap-2">
+        <Input value={nombre} onChange={(e) => onNombreChange(e.target.value)} placeholder="Nombre del producto" className="h-8 text-sm flex-1 min-w-[120px]" />
         <span className="text-xs text-muted-foreground">Mín</span>
         <Input type="number" inputMode="numeric" min="0" value={stockMinimo} onChange={(e) => onStockMinimoChange(e.target.value)} className="h-8 w-12 text-center text-sm" />
         <Input value={unidad} onChange={(e) => onUnidadChange(e.target.value)} placeholder="U" className="h-8 w-10 text-center text-xs" />
+        <Select value={modoCompra} onValueChange={(v: "unidad" | "pack") => onModoCompraChange(v)}>
+          <SelectTrigger className="h-8 w-[110px]">
+            <SelectValue placeholder="Se compra por" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="unidad">Unidad</SelectItem>
+            <SelectItem value="pack">Pack</SelectItem>
+          </SelectContent>
+        </Select>
+        {isPack && (
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-muted-foreground">Cant./pack</span>
+            <Input type="number" inputMode="numeric" min="2" value={cantidadPorPack} onChange={(e) => onCantidadPorPackChange(e.target.value)} className="h-8 w-14 text-center text-sm" />
+          </div>
+        )}
         <div className="flex gap-1">
-          <Button variant="ghost" size="icon" onClick={onCreate} disabled={!nombre.trim()} className="h-7 w-7 shrink-0 rounded-full">
+          <Button variant="ghost" size="icon" onClick={onCreate} disabled={!canCreate} className="h-7 w-7 shrink-0 rounded-full">
             <Plus className="h-3.5 w-3.5" />
           </Button>
           <Button variant="ghost" size="icon" onClick={onCancel} className="h-7 w-7 shrink-0 rounded-full">
@@ -78,6 +112,8 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
   const [newProductNombre, setNewProductNombre] = useState("")
   const [newProductStockMinimo, setNewProductStockMinimo] = useState((stockMinimoDefault ?? 0).toString())
   const [newProductUnidad, setNewProductUnidad] = useState("U")
+  const [newProductModoCompra, setNewProductModoCompra] = useState<"unidad" | "pack">("unidad")
+  const [newProductCantidadPorPack, setNewProductCantidadPorPack] = useState("6")
   const newProductInputRef = useRef<HTMLInputElement | null>(null)
 
   // Estado local para stockMinimo (actualización inmediata en UI)
@@ -163,14 +199,18 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
     if (!onCreateProduct || !newProductNombre.trim()) return
     const stockMinimo = parseInt(newProductStockMinimo, 10) || stockMinimoDefault
     const unidad = newProductUnidad.trim() || "U"
-    const productId = await onCreateProduct(newProductNombre.trim(), stockMinimo, unidad)
+    const modoCompra = newProductModoCompra
+    const cantidadPorPack = modoCompra === "pack" ? parseInt(newProductCantidadPorPack, 10) : undefined
+    const productId = await onCreateProduct(newProductNombre.trim(), stockMinimo, unidad, modoCompra, cantidadPorPack)
     if (productId) {
       setNewProductNombre("")
       setNewProductStockMinimo((stockMinimoDefault ?? 0).toString())
       setNewProductUnidad("U")
+      setNewProductModoCompra("unidad")
+      setNewProductCantidadPorPack("6")
       setIsCreatingProduct(false)
     }
-  }, [onCreateProduct, newProductNombre, newProductStockMinimo, newProductUnidad, stockMinimoDefault])
+  }, [onCreateProduct, newProductNombre, newProductStockMinimo, newProductUnidad, newProductModoCompra, newProductCantidadPorPack, stockMinimoDefault])
 
   if (products.length === 0) {
     return (
@@ -214,10 +254,42 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
           const stockMinimoValue = stockMinimoLocal[product.id] ?? product.stockMinimo
           const pedidoBase = calcularPedido(stockMinimoValue, stockActualValue)
           const ajuste = ajustesPedido[product.id] ?? 0
-          const pedidoCalculado = Math.max(0, pedidoBase + ajuste)
-          const displayPedido = pedidoCalculado
+          const isPack = esModoPack(product)
+          let pedidoCalculado: number
+          let displayPedido: number
+          let onDisplayChange: (v: number) => void
+          let displaySuffix: React.ReactNode = null
+          const unidadBase = product.unidadBase || product.unidad || "U"
+
+          if (isPack) {
+            const pedidoBasePacks = unidadesToPacks(product, pedidoBase)
+            const totalPacks = Math.max(0, pedidoBasePacks + ajuste)
+            pedidoCalculado = packsToUnidades(product, totalPacks)
+            displayPedido = totalPacks
+            onDisplayChange = (v: number) => {
+              if (onAjustePedidoChange) {
+                onAjustePedidoChange(product.id, v - pedidoBasePacks)
+              }
+            }
+            displaySuffix = totalPacks > 0 ? (
+              <span className="text-[10px] text-muted-foreground block leading-tight mt-0.5">
+                {totalPacks} pack{totalPacks !== 1 ? "s" : ""} ({pedidoCalculado} {unidadBase})
+              </span>
+            ) : null
+          } else {
+            pedidoCalculado = Math.max(0, pedidoBase + ajuste)
+            displayPedido = pedidoCalculado
+            onDisplayChange = (v: number) => {
+              if (onAjustePedidoChange) {
+                onAjustePedidoChange(product.id, v - pedidoBase)
+              }
+            }
+          }
+
           const isBajoMinimo = stockActualValue < stockMinimoValue
           const pedidoMayorCero = viewMode === "pedir" && pedidoCalculado > 0
+          // El sistema PERMITE pedir menos que el mínimo si el usuario reduce packs manualmente. Solo indicador visual.
+          const porDebajoMinimo = viewMode === "pedir" && pedidoCalculado > 0 && pedidoCalculado < stockMinimoValue
 
           return (
             <div
@@ -267,16 +339,24 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
                   <span>{stockMinimoValue}</span>
                 )}
               </div>
-              <div className="flex items-center gap-1 shrink-0">
+              <div className={cn("flex items-center gap-1 shrink-0", displaySuffix && "flex-col items-end")}>
                 {viewMode === "pedir" ? (
                   <>
-                    <Button variant="outline" size="icon" className={btnIcon} onClick={() => onAjustePedidoChange?.(product.id, (ajuste ?? 0) - 1)} disabled={pedidoCalculado <= 0 && (ajuste ?? 0) <= 0}>
-                      <Minus className="h-3.5 w-3.5" />
-                    </Button>
-                    <StockInput value={displayPedido} onChange={(v) => { if (onAjustePedidoChange) { const newAjuste = v - pedidoBase; onAjustePedidoChange(product.id, newAjuste) } }} className="h-7 w-14 text-sm" />
-                    <Button variant="outline" size="icon" className={btnIcon} onClick={() => onAjustePedidoChange?.(product.id, (ajuste ?? 0) + 1)}>
-                      <Plus className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex flex-col items-end gap-0.5">
+                      <div className="flex items-center gap-1">
+                        <Button variant="outline" size="icon" className={btnIcon} onClick={() => onAjustePedidoChange?.(product.id, (ajuste ?? 0) - 1)} disabled={pedidoCalculado <= 0 && (ajuste ?? 0) <= 0}>
+                          <Minus className="h-3.5 w-3.5" />
+                        </Button>
+                        <StockInput value={displayPedido} onChange={onDisplayChange} className="h-7 w-14 text-sm" />
+                        <Button variant="outline" size="icon" className={btnIcon} onClick={() => onAjustePedidoChange?.(product.id, (ajuste ?? 0) + 1)}>
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      {displaySuffix}
+                      {porDebajoMinimo && (
+                        <span className="text-[10px] font-medium text-red-600 dark:text-red-400">Por debajo del mínimo</span>
+                      )}
+                    </div>
                   </>
                 ) : (
                   <>
@@ -307,12 +387,18 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
             onStockMinimoChange={setNewProductStockMinimo}
             unidad={newProductUnidad}
             onUnidadChange={setNewProductUnidad}
+            modoCompra={newProductModoCompra}
+            onModoCompraChange={setNewProductModoCompra}
+            cantidadPorPack={newProductCantidadPorPack}
+            onCantidadPorPackChange={setNewProductCantidadPorPack}
             onCreate={handleCreateProduct}
             onCancel={() => {
               setIsCreatingProduct(false)
               setNewProductNombre("")
               setNewProductStockMinimo((stockMinimoDefault ?? 0).toString())
               setNewProductUnidad("U")
+              setNewProductModoCompra("unidad")
+              setNewProductCantidadPorPack("6")
             }}
           />
         )}

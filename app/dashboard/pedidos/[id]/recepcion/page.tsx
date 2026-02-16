@@ -159,6 +159,8 @@ export default function RecepcionPage() {
                 cantidadPedida: cantidadPedida,
                 cantidadEnviada: cantidadEnviada,
                 observacionesEnvio: observacion,
+                modoCompra: producto.modoCompra,
+                cantidadPorPack: producto.cantidadPorPack,
               }
             })
             
@@ -211,6 +213,8 @@ export default function RecepcionPage() {
                     cantidadPedida: cantidadPedida,
                     cantidadEnviada: cantidadEnviada,
                     observacionesEnvio: infoEnvio?.observaciones || undefined,
+                    modoCompra: producto.modoCompra,
+                    cantidadPorPack: producto.cantidadPorPack,
                   }
                 })
 
