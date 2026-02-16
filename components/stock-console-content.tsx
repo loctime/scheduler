@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useData } from "@/contexts/data-context"
 import { useStockConsole } from "@/hooks/use-stock-console"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { PwaNumericInput } from "@/components/pwa/pwa-numeric-input"
 import { Check, X, Package, ArrowLeft, Minus, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { UserStatusMenu } from "@/components/pwa/UserStatusMenu"
@@ -219,7 +219,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                               vm === "unidad" ? "bg-gray-300 text-gray-900" : "text-gray-600 hover:bg-gray-100"
                             )}
                           >
-                            Unidad
+                            U
                           </button>
                           <span className="text-gray-400 text-xs">/</span>
                           <button
@@ -258,10 +258,9 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                     >
                       <Minus className="h-5 w-5" strokeWidth={2.5} />
                     </Button>
-                    <Input
+                    <PwaNumericInput
                       id={`input-${producto.id}`}
-                      type="number"
-                      step="1"
+                      step={1}
                       value={displayValue}
                       onChange={(e) => {
                         e.stopPropagation()
@@ -273,6 +272,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                       className="h-11 w-12 text-center text-xl font-bold tabular-nums border border-gray-200/80 rounded-lg bg-gray-50/50 focus-visible:ring-2 focus-visible:ring-gray-300/50 p-0"
                       placeholder="0"
                       disabled={state.loading}
+                      allowNegative
                     />
                     <Button
                       variant="outline"
