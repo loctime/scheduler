@@ -7,6 +7,9 @@ import {
   where,
   getDocs,
   onSnapshot,
+  doc,
+  updateDoc,
+  serverTimestamp,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
@@ -259,6 +262,31 @@ export function useStockConsole(user: any) {
     setState(prev => ({ ...prev, cantidades: {} }))
   }, [])
 
+  /** Actualiza el stock real del producto en Firestore (modo control físico). */
+  const setStockReal = useCallback(async (productoId: string, value: number): Promise<boolean> => {
+    if (!db || !user?.uid || !ownerId || value < 0) return false
+    const val = Math.floor(value)
+    try {
+      const productRef = doc(db, "apps/horarios/products", productoId)
+      await updateDoc(productRef, {
+        stockActual: val,
+        updatedAt: serverTimestamp(),
+        ownerId,
+        userId: user.uid,
+      })
+      setStockActual(prev => ({ ...prev, [productoId]: val }))
+      return true
+    } catch (err) {
+      console.error("Error actualizando stock real:", err)
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el stock",
+        variant: "destructive",
+      })
+      return false
+    }
+  }, [db, user, ownerId, toast])
+
   // Resumen de movimientos pendientes
   const movimientosPendientes = useMemo(() => {
     return Object.entries(state.cantidades)
@@ -401,5 +429,6 @@ export function useStockConsole(user: any) {
     setCantidad,
     limpiarCantidades,
     confirmarMovimientos,
+    setStockReal,
   }
 }

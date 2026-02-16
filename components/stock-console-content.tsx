@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useData } from "@/contexts/data-context"
 import { useStockConsole } from "@/hooks/use-stock-console"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import { PwaNumericInput } from "@/components/pwa/pwa-numeric-input"
 import { Check, X, Package, ArrowLeft, Minus, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -51,7 +52,9 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
   // Hook siempre llamado antes de cualquier return (regla de hooks de React)
   const stockConsole = useStockConsole(user)
-  const { state, pedidos, productos, stockActual, movimientosPendientes, totalIngresos, totalEgresos, setSelectedPedidoId, incrementarCantidad, decrementarCantidad, setCantidad, limpiarCantidades, confirmarMovimientos } = stockConsole
+  const { state, pedidos, productos, stockActual, movimientosPendientes, totalIngresos, totalEgresos, setSelectedPedidoId, incrementarCantidad, decrementarCantidad, setCantidad, limpiarCantidades, confirmarMovimientos, setStockReal } = stockConsole
+
+  const [mode, setMode] = useState<"work" | "control">("work")
 
   // visualMode: solo visual, no persiste. Debe ir ANTES de cualquier return (Rules of Hooks)
   const [visualMode, setVisualMode] = useState<Record<string, "unidad" | "pack">>({})
@@ -104,6 +107,23 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
             </Link>
           ) : null}
           <h1 className="text-xl font-bold flex-1">Stock Rápido</h1>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className={cn(
+              "text-xs font-medium hidden sm:inline",
+              isPWA ? "text-red-800" : "text-white/90"
+            )}>
+              {mode === "work" ? "Modo Work" : "Modo Control"}
+            </span>
+            <Switch
+              checked={mode === "control"}
+              onCheckedChange={() => setMode(m => m === "work" ? "control" : "work")}
+              className={cn(
+                "scale-90 data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-blue-500",
+                isPWA && "data-[state=unchecked]:bg-red-400 data-[state=checked]:bg-green-600"
+              )}
+              aria-label={mode === "work" ? "Cambiar a modo control" : "Cambiar a modo work"}
+            />
+          </div>
           <div className={cn(
             "flex items-center gap-1",
             isPWA ? "[&_button]:text-red-900 [&_button]:hover:bg-red-200 [&_button]:hover:text-red-900" : "[&_button]:text-white [&_button]:hover:bg-white/20 [&_button]:hover:text-white [&_.bg-green-500]:border-blue-500"
@@ -150,23 +170,26 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
               const vm = getVisualMode(producto.id, producto)
               const isPackProduct = esModoPack(producto)
               const delta = vm === "pack" ? getCantidadPorPack(producto) : 1
-              const displayValue = vm === "pack" ? unidadesSignedToPacksFloor(producto, cantidad) : cantidad
               const unidadLabel = producto.unidadBase || producto.unidad || "U"
-              const packsDisplay = isPackProduct ? unidadesSignedToPacksFloor(producto, Math.abs(cantidad)) : 0
-              const equivalenciaText = vm === "pack"
-                ? `${displayValue} pack${Math.abs(displayValue) !== 1 ? "s" : ""} (${cantidad} ${unidadLabel})`
-                : isPackProduct
-                  ? `${cantidad} ${unidadLabel} (${packsDisplay} pack${packsDisplay !== 1 ? "s" : ""})`
-                  : `${cantidad} ${unidadLabel}`
 
-              // Efecto "llenado de agua": % de fill según cantidad (max referencia: 15)
+              // Modo work: input = cantidad a pedir. Modo control: input = stock real.
+              const isControl = mode === "control"
+              const displayValue = isControl
+                ? (vm === "pack" ? unidadesSignedToPacksFloor(producto, stock) : stock)
+                : (vm === "pack" ? unidadesSignedToPacksFloor(producto, cantidad) : cantidad)
+              const packsDisplay = isPackProduct ? unidadesSignedToPacksFloor(producto, Math.abs(isControl ? stock : cantidad)) : 0
+              const equivalenciaText = isControl
+                ? (vm === "pack" ? `${displayValue} pack${Math.abs(displayValue) !== 1 ? "s" : ""} (${stock} ${unidadLabel})` : isPackProduct ? `${stock} ${unidadLabel} (${packsDisplay} pack${packsDisplay !== 1 ? "s" : ""})` : `${stock} ${unidadLabel}`)
+                : (vm === "pack" ? `${displayValue} pack${Math.abs(displayValue) !== 1 ? "s" : ""} (${cantidad} ${unidadLabel})` : isPackProduct ? `${cantidad} ${unidadLabel} (${packsDisplay} pack${packsDisplay !== 1 ? "s" : ""})` : `${cantidad} ${unidadLabel}`)
+
+              // Efecto "llenado de agua" solo en modo work
               const maxFillRef = 15
-              const fillPct = cantidad > 0
+              const fillPct = !isControl && cantidad > 0
                 ? Math.min(100, (cantidad / maxFillRef) * 100)
-                : cantidad < 0
+                : !isControl && cantidad < 0
                   ? Math.min(100, (Math.abs(cantidad) / Math.max(stock, 1)) * 100)
                   : 0
-              const fillColor = cantidad > 0 ? "sky" : cantidad < 0 ? "violet" : null
+              const fillColor = !isControl && cantidad > 0 ? "sky" : !isControl && cantidad < 0 ? "violet" : null
 
               return (
                 <div
@@ -241,7 +264,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                     {/* Fila 3: Min y equivalencia (1 pack (12u) / 12 u (1 pack)) en la misma línea */}
                     <div className="flex items-center gap-2 flex-wrap text-sm text-gray-700">
                       <span className="font-medium">Mín: {stockMinimo}</span>
-                      {cantidad !== 0 && (
+                      {(isControl ? stock !== 0 : cantidad !== 0) && (
                         <span className="text-gray-600">{equivalenciaText}</span>
                       )}
                     </div>
@@ -249,40 +272,81 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
                   {/* Derecha: [-] número [+] en fila */}
                   <div className="relative z-10 flex items-center gap-1.5 pr-1.5 shrink-0">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-11 w-11 rounded-full transition-transform active:scale-95 border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 hover:border-violet-400"
-                      onClick={() => decrementarCantidad(producto.id, delta)}
-                      disabled={cantidad <= cantidadMinimaPermitida || state.loading}
-                    >
-                      <Minus className="h-5 w-5" strokeWidth={2.5} />
-                    </Button>
-                    <PwaNumericInput
-                      id={`input-${producto.id}`}
-                      step={1}
-                      value={displayValue}
-                      onChange={(e) => {
-                        e.stopPropagation()
-                        const raw = parseInt(e.target.value, 10)
-                        if (isNaN(raw)) return
-                        const unidades = vm === "pack" ? packsSignedToUnidades(producto, raw) : raw
-                        setCantidad(producto.id, unidades)
-                      }}
-                      className="h-11 w-12 text-center text-xl font-bold tabular-nums border border-gray-200/80 rounded-lg bg-gray-50/50 focus-visible:ring-2 focus-visible:ring-gray-300/50 p-0"
-                      placeholder="0"
-                      disabled={state.loading}
-                      allowNegative
-                    />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-11 w-11 rounded-full transition-transform active:scale-95 border-sky-400 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:border-sky-500"
-                      onClick={() => incrementarCantidad(producto.id, delta)}
-                      disabled={state.loading}
-                    >
-                      <Plus className="h-5 w-5" strokeWidth={2.5} />
-                    </Button>
+                    {isControl ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-11 w-11 rounded-full transition-transform active:scale-95 border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 hover:border-violet-400"
+                          onClick={() => setStockReal(producto.id, Math.max(0, stock - delta))}
+                          disabled={stock <= 0 || state.loading}
+                        >
+                          <Minus className="h-5 w-5" strokeWidth={2.5} />
+                        </Button>
+                        <PwaNumericInput
+                          id={`input-${producto.id}`}
+                          step={1}
+                          value={displayValue}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            const raw = parseInt(e.target.value, 10)
+                            if (isNaN(raw) || raw < 0) return
+                            const unidades = vm === "pack" ? packsSignedToUnidades(producto, raw) : raw
+                            setStockReal(producto.id, unidades)
+                          }}
+                          className="h-11 w-12 text-center text-xl font-bold tabular-nums border border-gray-200/80 rounded-lg bg-gray-50/50 focus-visible:ring-2 focus-visible:ring-gray-300/50 p-0"
+                          placeholder="0"
+                          disabled={state.loading}
+                          allowNegative={false}
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-11 w-11 rounded-full transition-transform active:scale-95 border-sky-400 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:border-sky-500"
+                          onClick={() => setStockReal(producto.id, stock + delta)}
+                          disabled={state.loading}
+                        >
+                          <Plus className="h-5 w-5" strokeWidth={2.5} />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-11 w-11 rounded-full transition-transform active:scale-95 border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 hover:border-violet-400"
+                          onClick={() => decrementarCantidad(producto.id, delta)}
+                          disabled={cantidad <= cantidadMinimaPermitida || state.loading}
+                        >
+                          <Minus className="h-5 w-5" strokeWidth={2.5} />
+                        </Button>
+                        <PwaNumericInput
+                          id={`input-${producto.id}`}
+                          step={1}
+                          value={displayValue}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            const raw = parseInt(e.target.value, 10)
+                            if (isNaN(raw)) return
+                            const unidades = vm === "pack" ? packsSignedToUnidades(producto, raw) : raw
+                            setCantidad(producto.id, unidades)
+                          }}
+                          className="h-11 w-12 text-center text-xl font-bold tabular-nums border border-gray-200/80 rounded-lg bg-gray-50/50 focus-visible:ring-2 focus-visible:ring-gray-300/50 p-0"
+                          placeholder="0"
+                          disabled={state.loading}
+                          allowNegative
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-11 w-11 rounded-full transition-transform active:scale-95 border-sky-400 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:border-sky-500"
+                          onClick={() => incrementarCantidad(producto.id, delta)}
+                          disabled={state.loading}
+                        >
+                          <Plus className="h-5 w-5" strokeWidth={2.5} />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               )
@@ -305,37 +369,39 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
           </div>
         )}
 
-        {/* Panel de resumen y acciones */}
-        <div className={`fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-3 z-50 ${isPWA ? "p-2" : "p-3"}`}>
-          <div className={`max-w-md mx-auto flex items-center justify-between ${isPWA ? "gap-1" : ""}`}>
-            <Button
-              variant="outline"
-              onClick={limpiarCantidades}
-              disabled={state.loading}
-              className={`h-10 ${isPWA ? "px-2 text-xs" : "px-4"}`}
-            >
-              <X className={`w-4 h-4 ${isPWA ? "mr-1" : "mr-2"}`} />
-              Limpiar
-            </Button>
-            <div className={`flex items-center ${isPWA ? "gap-0.5" : "gap-1"}`}>
-              <span className={`font-bold text-red-600 ${isPWA ? "text-lg" : "text-2xl"}`}>
-                -{totalEgresos}
-              </span>
-              <span className={`text-gray-500 ${isPWA ? "text-sm" : "text-xl"}`}>|</span>
-              <span className={`font-bold text-green-600 ${isPWA ? "text-lg" : "text-2xl"}`}>
-                +{totalIngresos}
-              </span>
+        {/* Panel de resumen y acciones — solo en modo work */}
+        {mode === "work" && (
+          <div className={`fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-3 z-50 ${isPWA ? "p-2" : "p-3"}`}>
+            <div className={`max-w-md mx-auto flex items-center justify-between ${isPWA ? "gap-1" : ""}`}>
+              <Button
+                variant="outline"
+                onClick={limpiarCantidades}
+                disabled={state.loading}
+                className={`h-10 ${isPWA ? "px-2 text-xs" : "px-4"}`}
+              >
+                <X className={`w-4 h-4 ${isPWA ? "mr-1" : "mr-2"}`} />
+                Limpiar
+              </Button>
+              <div className={`flex items-center ${isPWA ? "gap-0.5" : "gap-1"}`}>
+                <span className={`font-bold text-red-600 ${isPWA ? "text-lg" : "text-2xl"}`}>
+                  -{totalEgresos}
+                </span>
+                <span className={`text-gray-500 ${isPWA ? "text-sm" : "text-xl"}`}>|</span>
+                <span className={`font-bold text-green-600 ${isPWA ? "text-lg" : "text-2xl"}`}>
+                  +{totalIngresos}
+                </span>
+              </div>
+              <Button
+                onClick={confirmarMovimientos}
+                disabled={state.loading || movimientosPendientes.length === 0}
+                className={`h-10 bg-blue-600 hover:bg-blue-700 ${isPWA ? "px-2 text-xs" : "px-4"}`}
+              >
+                <Check className={`w-4 h-4 ${isPWA ? "mr-1" : "mr-2"}`} />
+                {state.loading ? "Procesando..." : "Confirmar"}
+              </Button>
             </div>
-            <Button
-              onClick={confirmarMovimientos}
-              disabled={state.loading || movimientosPendientes.length === 0}
-              className={`h-10 bg-blue-600 hover:bg-blue-700 ${isPWA ? "px-2 text-xs" : "px-4"}`}
-            >
-              <Check className={`w-4 h-4 ${isPWA ? "mr-1" : "mr-2"}`} />
-              {state.loading ? "Procesando..." : "Confirmar"}
-            </Button>
           </div>
-        </div>
+        )}
       </div>
     </>
   )
