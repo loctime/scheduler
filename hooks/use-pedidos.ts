@@ -496,6 +496,21 @@ export function usePedidos(user: any) {
         updateData.stockMinimo = num
       } else if (field === "unidad") {
         updateData.unidad = value.trim() || "U"
+        updateData.unidadBase = value.trim() || "U"
+      } else if (field === "modoCompra") {
+        const modo = value as "unidad" | "pack"
+        if (modo !== "unidad" && modo !== "pack") return false
+        updateData.modoCompra = modo
+        if (modo === "unidad") {
+          updateData.cantidadPorPack = undefined
+        }
+      } else if (field === "cantidadPorPack") {
+        const num = parseInt(value, 10)
+        if (isNaN(num) || num < 2) {
+          toast({ title: "Error", description: "Cantidad por pack debe ser al menos 2", variant: "destructive" })
+          return false
+        }
+        updateData.cantidadPorPack = num
       }
 
       await updateDoc(doc(db, COLLECTIONS.PRODUCTS, productId), updateData)

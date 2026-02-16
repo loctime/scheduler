@@ -118,21 +118,36 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
 
   // Estado local para stockMinimo (actualización inmediata en UI)
   const [stockMinimoLocal, setStockMinimoLocal] = useState<Record<string, number>>({})
+  // Estado local para cantidadPorPack mientras se edita
+  const [cantidadPorPackEdit, setCantidadPorPackEdit] = useState<Record<string, string>>({})
+  // Estado local para modoCompra (UI optimista al cambiar Select antes de que llegue la respuesta)
+  const [modoCompraLocal, setModoCompraLocal] = useState<Record<string, "unidad" | "pack">>({})
 
   useEffect(() => {
     if (isCreatingProduct && newProductInputRef.current) newProductInputRef.current.focus()
   }, [isCreatingProduct])
 
-  // Sincronizar stockMinimoLocal cuando cambia products (solo limpiar productos eliminados)
+  // Sincronizar stockMinimoLocal y cantidadPorPackEdit cuando cambia products (limpiar productos eliminados)
   useEffect(() => {
+    const productIds = new Set(products.map(p => p.id))
     setStockMinimoLocal(prev => {
-      const productIds = new Set(products.map(p => p.id))
       const nuevo: Record<string, number> = {}
-      // Solo mantener valores locales para productos que aún existen
       Object.keys(prev).forEach(productId => {
-        if (productIds.has(productId)) {
-          nuevo[productId] = prev[productId]
-        }
+        if (productIds.has(productId)) nuevo[productId] = prev[productId]
+      })
+      return nuevo
+    })
+    setCantidadPorPackEdit(prev => {
+      const nuevo: Record<string, string> = {}
+      Object.keys(prev).forEach(productId => {
+        if (productIds.has(productId)) nuevo[productId] = prev[productId]
+      })
+      return nuevo
+    })
+    setModoCompraLocal(prev => {
+      const nuevo: Record<string, "unidad" | "pack"> = {}
+      Object.keys(prev).forEach(productId => {
+        if (productIds.has(productId)) nuevo[productId] = prev[productId]
       })
       return nuevo
     })
@@ -313,6 +328,52 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
                 </div>
               )}
               <p className="text-sm font-medium truncate flex-1 min-w-0">{product.nombre}</p>
+              {configMode && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Select
+                    value={modoCompraLocal[product.id] ?? product.modoCompra ?? "unidad"}
+                    onValueChange={(v: "unidad" | "pack") => {
+                      setModoCompraLocal(prev => ({ ...prev, [product.id]: v }))
+                      onUpdateProduct(product.id, "modoCompra", v)
+                      if (v === "pack" && (!product.cantidadPorPack || product.cantidadPorPack < 2)) {
+                        onUpdateProduct(product.id, "cantidadPorPack", "6")
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-7 w-[90px] text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unidad">Unidad</SelectItem>
+                      <SelectItem value="pack">Pack</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {(modoCompraLocal[product.id] ?? product.modoCompra ?? "unidad") === "pack" && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-muted-foreground">/pack</span>
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        min="2"
+                        value={cantidadPorPackEdit[product.id] ?? String(product.cantidadPorPack ?? 6)}
+                        onChange={(e) => setCantidadPorPackEdit(prev => ({ ...prev, [product.id]: e.target.value }))}
+                        onBlur={(e) => {
+                          const num = parseInt(e.target.value, 10)
+                          if (!isNaN(num) && num >= 2 && num !== (product.cantidadPorPack ?? 6)) {
+                            onUpdateProduct(product.id, "cantidadPorPack", String(num))
+                          }
+                          setCantidadPorPackEdit(prev => {
+                            const next = { ...prev }
+                            delete next[product.id]
+                            return next
+                          })
+                        }}
+                        className="h-7 w-12 text-center text-xs"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="flex items-center gap-1.5 shrink-0 text-xs text-muted-foreground tabular-nums">
                 {stockActualValue} / {configMode ? (
                   <span className="inline-flex items-center gap-0.5">
