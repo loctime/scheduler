@@ -238,14 +238,13 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                       )}
                     </div>
 
-                    {/* Fila 3: Min (izq) — controles cantidad a la derecha en el bloque siguiente */}
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <span className="text-[11px] text-gray-500">Mín: {stockMinimo}{isStockBajo && " · Bajo mínimo"}</span>
+                    {/* Fila 3: Min y equivalencia (1 pack (12u) / 12 u (1 pack)) en la misma línea */}
+                    <div className="flex items-center gap-2 flex-wrap text-[11px] text-gray-500">
+                      <span>Mín: {stockMinimo}</span>
+                      {cantidad !== 0 && (
+                        <span className="text-gray-400">{equivalenciaText}</span>
+                      )}
                     </div>
-                    {/* Equivalencia */}
-                    {cantidad !== 0 && (
-                      <span className="text-[10px] text-gray-400 block">{equivalenciaText}</span>
-                    )}
                   </div>
 
                   {/* Derecha: [-] número [+] en fila */}

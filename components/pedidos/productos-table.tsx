@@ -396,7 +396,7 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
                               return next
                             })
                           }}
-                          className="h-7 w-12 text-center text-xs"
+                          className="h-7 min-w-[2.5rem] w-14 text-center text-sm font-medium tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </div>
                     )}
