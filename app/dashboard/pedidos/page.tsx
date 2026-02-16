@@ -235,8 +235,6 @@ export default function PedidosPage() {
   
   // Tab state
   const [activeTab, setActiveTab] = useState<"productos" | "remitos" | "recepcion">("productos")
-  // Vista: 'pedir' para ajustar cantidades a pedir, 'stock' para editar stock
-  const [viewMode, setViewMode] = useState<"pedir" | "stock">("pedir")
 
   // Focus input when entering edit mode
   useEffect(() => {
@@ -1346,31 +1344,6 @@ export default function PedidosPage() {
                           : "✓ OK"
                         }
                       </span>
-                        {/* View mode tabs: 'Pedir' (ajustar cantidades) vs 'Stock' (editar stock) */}
-                        <div className="flex items-center gap-2 ml-2">
-                        <button
-                          type="button"
-                          aria-pressed={viewMode === "pedir"}
-                          onClick={() => setViewMode("pedir")}
-                          className={cn(
-                            "text-[11px] px-2 py-0.5 rounded transition-colors",
-                            viewMode === "pedir" ? "bg-primary text-primary-foreground border border-primary" : "bg-muted hover:bg-accent border border-border"
-                          )}
-                        >
-                          Pedir
-                        </button>
-                        <button
-                          type="button"
-                          aria-pressed={viewMode === "stock"}
-                          onClick={() => setViewMode("stock")}
-                          className={cn(
-                            "text-[11px] px-2 py-0.5 rounded transition-colors",
-                            viewMode === "stock" ? "bg-primary text-primary-foreground border border-primary" : "bg-muted hover:bg-accent border border-border"
-                          )}
-                        >
-                          Stock
-                        </button>
-                        </div>
                         <div className="flex-1" />
                       </div>
 
@@ -1467,11 +1440,6 @@ export default function PedidosPage() {
                   onCreateProduct={createProduct}
                   onImport={() => setImportDialogOpen(true)}
                   onProductsOrderUpdate={updateProductsOrder}
-                  calcularPedido={calcularPedido}
-                  ajustesPedido={ajustesPedido}
-                  onAjustePedidoChange={handleAjustePedidoChange}
-                  configMode={showConfig}
-                  viewMode={viewMode}
                   stockMinimoDefault={selectedPedido?.stockMinimoDefault ?? 0}
                 />
               ) : activeTab === "recepcion" ? (

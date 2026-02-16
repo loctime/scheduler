@@ -3,14 +3,25 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Trash2, Upload, Package, Minus, Plus, GripVertical, PlusCircle, X } from "lucide-react"
+import { Trash2, Upload, Package, Minus, Plus, GripVertical, PlusCircle, X, Check } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { Producto } from "@/lib/types"
-import { getCantidadPorPack, unidadesToPacks, packsToUnidades, esModoPack } from "@/lib/unidades-utils"
 
-type TableMode = "config" | "pedido"
+const btnIcon = "h-7 w-7 rounded-full transition-transform active:scale-95 shrink-0"
+
+/** Unidades por pack: 1 si es unidad, cantidadPorPack si es pack. */
+function getUnidadesPorPack(p: Producto): number {
+  if (p.modoCompra !== "pack" || !p.cantidadPorPack || p.cantidadPorPack < 1) return 1
+  return p.cantidadPorPack
+}
+
+function isPack(p: Producto): boolean {
+  return p.modoCompra === "pack" && getUnidadesPorPack(p) > 1
+}
+
+// --- Props de la tabla (sin modos ni lógica de pedido) ---
 
 interface ProductosTableProps {
   products: Producto[]
@@ -18,80 +29,461 @@ interface ProductosTableProps {
   onStockChange: (productId: string, value: number) => void
   onUpdateProduct: (productId: string, field: string, value: string) => Promise<boolean>
   onDeleteProduct: (productId: string) => void
-  onCreateProduct?: (nombre: string, stockMinimo?: number, unidad?: string, modoCompra?: "unidad" | "pack", cantidadPorPack?: number) => Promise<string | null>
+  onCreateProduct?: (
+    nombre: string,
+    stockMinimo?: number,
+    unidad?: string,
+    modoCompra?: "unidad" | "pack",
+    cantidadPorPack?: number
+  ) => Promise<string | null>
   onImport: () => void
   onProductsOrderUpdate?: (newOrder: string[]) => Promise<boolean>
-  calcularPedido: (stockMinimo: number, stockActualValue: number | undefined) => number
-  ajustesPedido?: Record<string, number>
-  onAjustePedidoChange?: (productId: string, ajuste: number) => void
-  configMode?: boolean
   stockMinimoDefault?: number
-  viewMode?: "pedir" | "stock"
 }
 
-const btnIcon = "h-7 w-7 rounded-full transition-transform active:scale-95 shrink-0"
+// --- Input numérico reutilizable ---
 
-/** Abrevia el nombre para vista móvil si supera 15 caracteres; si no, lo deja igual. */
-function abbreviateProductName(nombre: string): string {
-  if (nombre.length <= 15) return nombre
-  const skipWords = new Set(["de", "y", "en", "con"])
-  return nombre
-    .split(/\s+/)
-    .map((word) => {
-      if (skipWords.has(word.toLowerCase())) return word
-      if (/^\d+(x\d+)?$/i.test(word)) return word
-      if (word.length <= 3) return word
-      return word.slice(0, 3) + "."
-    })
-    .join(" ")
-}
-
-function StockInput({ value, onChange, onFocus, className }: { value: number | undefined; onChange: (v: number) => void; onFocus?: () => void; className?: string }) {
+function NumericInput({
+  value,
+  onChange,
+  min = 0,
+  className,
+  onFocus,
+}: {
+  value: number | undefined
+  onChange: (v: number) => void
+  min?: number
+  className?: string
+  onFocus?: () => void
+}) {
+  const num = value !== undefined ? value : 0
   return (
     <Input
       type="number"
       inputMode="numeric"
-      min="0"
-      value={value !== undefined ? String(value) : ""}
-      onChange={(e) => onChange(e.target.value === "" ? 0 : parseInt(e.target.value, 10) || 0)}
+      min={min}
+      value={num}
+      onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)}
       onFocus={(e) => {
         onFocus?.()
         setTimeout(() => (e.target as HTMLInputElement).select(), 0)
       }}
-      placeholder="0"
       className={cn("h-7 w-14 text-center text-sm font-medium px-1", className)}
     />
   )
 }
 
-function CreateProductForm({
-  nombre, onNombreChange,
-  stockMinimo, onStockMinimoChange,
-  unidad, onUnidadChange,
-  modoCompra, onModoCompraChange,
-  cantidadPorPack, onCantidadPorPackChange,
-  onCreate, onCancel,
+// --- Celdas ---
+
+function CellNombre({
+  product,
+  isEditing,
+  value,
+  onStartEdit,
+  onValueChange,
+  onSave,
+  onCancel,
+  inputRef,
 }: {
-  nombre: string; onNombreChange: (v: string) => void
-  stockMinimo: string; onStockMinimoChange: (v: string) => void
-  unidad: string; onUnidadChange: (v: string) => void
-  modoCompra: "unidad" | "pack"; onModoCompraChange: (v: "unidad" | "pack") => void
-  cantidadPorPack: string; onCantidadPorPackChange: (v: string) => void
-  onCreate: () => void; onCancel: () => void
+  product: Producto
+  isEditing: boolean
+  value: string
+  onStartEdit: () => void
+  onValueChange: (v: string) => void
+  onSave: () => void
+  onCancel: () => void
+  inputRef: React.RefObject<HTMLInputElement | null>
 }) {
-  const isPack = modoCompra === "pack"
-  const qtyPack = parseInt(cantidadPorPack, 10)
-  const canCreate = nombre.trim() && (!isPack || (qtyPack > 1))
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-1 min-w-0 flex-1">
+        <Input
+          ref={inputRef}
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onSave()
+            if (e.key === "Escape") onCancel()
+          }}
+          className="h-7 text-sm flex-1 min-w-0"
+        />
+        <Button variant="ghost" size="icon" onClick={onSave} className="h-6 w-6 shrink-0 text-green-600">
+          <Check className="h-3 w-3" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={onCancel} className="h-6 w-6 shrink-0">
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={onStartEdit}
+      className="text-left text-sm font-medium truncate flex-1 min-w-0 hover:bg-muted/50 rounded px-1 -mx-1"
+    >
+      {product.nombre}
+    </button>
+  )
+}
+
+function CellTipo({
+  product,
+  onChange,
+}: {
+  product: Producto
+  onChange: (tipo: "unidad" | "pack") => void
+}) {
+  const isPack = (product.modoCompra ?? "unidad") === "pack"
+  return (
+    <div className="flex items-center gap-2 shrink-0">
+      <span className="text-[10px] text-muted-foreground whitespace-nowrap">Unidad</span>
+      <Switch
+        checked={isPack}
+        onCheckedChange={(checked) => onChange(checked ? "pack" : "unidad")}
+      />
+      <span className="text-[10px] text-muted-foreground whitespace-nowrap">Pack</span>
+    </div>
+  )
+}
+
+function CellUnidadesPorPack({
+  product,
+  value,
+  onChange,
+  onBlur,
+  inputRef,
+}: {
+  product: Producto
+  value: string
+  onChange: (v: string) => void
+  onBlur: (num: number) => void
+  inputRef?: React.RefObject<HTMLInputElement | null>
+}) {
+  if (!isPack(product)) return null
+  return (
+    <div className="flex items-center gap-1 shrink-0">
+      <Input
+        ref={inputRef}
+        type="number"
+        inputMode="numeric"
+        min={2}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={(e) => {
+          const n = parseInt(e.target.value, 10)
+          if (!isNaN(n) && n >= 2) onBlur(n)
+        }}
+        className="h-7 w-14 text-center text-sm"
+      />
+    </div>
+  )
+}
+
+function CellStockMinimo({
+  onUpdate,
+  localValue,
+  onLocalChange,
+}: {
+  onUpdate: (v: number) => void
+  localValue: number
+  onLocalChange: (v: number) => void
+}) {
+  const v = localValue
+  return (
+    <div className="flex items-center gap-0.5 shrink-0">
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-6 w-6 rounded-full shrink-0"
+        onClick={() => {
+          const next = Math.max(0, v - 1)
+          onLocalChange(next)
+          onUpdate(next)
+        }}
+        disabled={v <= 0}
+      >
+        <Minus className="h-2.5 w-2.5" />
+      </Button>
+      <NumericInput
+        value={v}
+        onChange={(n) => {
+          onLocalChange(n)
+          onUpdate(n)
+        }}
+        className="h-6 w-10 text-xs"
+      />
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-6 w-6 rounded-full shrink-0"
+        onClick={() => {
+          const next = v + 1
+          onLocalChange(next)
+          onUpdate(next)
+        }}
+      >
+        <Plus className="h-2.5 w-2.5" />
+      </Button>
+    </div>
+  )
+}
+
+function CellStockActual({
+  value,
+  onChange,
+}: {
+  value: number
+  onChange: (v: number) => void
+}) {
+  const v = value ?? 0
+  return (
+    <div className="flex items-center gap-0.5 shrink-0">
+      <Button
+        variant="outline"
+        size="icon"
+        className={btnIcon}
+        onClick={() => onChange(Math.max(0, v - 1))}
+        disabled={v <= 0}
+      >
+        <Minus className="h-3.5 w-3.5" />
+      </Button>
+      <NumericInput value={v} onChange={onChange} className="h-7 w-14 text-sm" />
+      <Button variant="outline" size="icon" className={btnIcon} onClick={() => onChange(v + 1)}>
+        <Plus className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  )
+}
+
+function CellDelete({ onDelete }: { onDelete: () => void }) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={onDelete}
+      className="h-7 w-7 shrink-0 rounded-full opacity-60 hover:opacity-100"
+    >
+      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+    </Button>
+  )
+}
+
+// --- Fila de producto ---
+
+interface ProductoRowProps {
+  product: Producto
+  stockActualValue: number
+  stockMinimoLocal: number
+  setStockMinimoLocal: (productId: string, v: number) => void
+  unidadesPorPackEdit: string
+  setUnidadesPorPackEdit: (productId: string, v: string) => void
+  editingField: { id: string; field: string } | null
+  inlineValue: string
+  setEditingField: (f: { id: string; field: string } | null) => void
+  setInlineValue: (v: string) => void
+  inputRef: React.RefObject<HTMLInputElement | null>
+  isDragging: boolean
+  isDragOver: boolean
+  onDragStart: (e: React.DragEvent, id: string) => void
+  onDragEnd: (e: React.DragEvent) => void
+  onDragOver: (e: React.DragEvent, id: string) => void
+  onDragLeave: () => void
+  onDrop: (e: React.DragEvent, id: string) => void
+  onUpdateProduct: (productId: string, field: string, value: string) => Promise<boolean>
+  onStockChange: (productId: string, value: number) => void
+  onDeleteProduct: (productId: string) => void
+  draggable: boolean
+}
+
+function ProductoRow({
+  product,
+  stockActualValue,
+  stockMinimoLocal,
+  setStockMinimoLocal,
+  unidadesPorPackEdit,
+  setUnidadesPorPackEdit,
+  editingField,
+  inlineValue,
+  setEditingField,
+  setInlineValue,
+  inputRef,
+  isDragging,
+  isDragOver,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onUpdateProduct,
+  onStockChange,
+  onDeleteProduct,
+  draggable,
+}: ProductoRowProps) {
+  const isEditingNombre = editingField?.id === product.id && editingField?.field === "nombre"
+  const unidadesPorPackInputRef = useRef<HTMLInputElement | null>(null)
+
+  const handleSaveNombre = useCallback(async () => {
+    const ok = await onUpdateProduct(product.id, "nombre", inlineValue.trim())
+    if (ok) {
+      setEditingField(null)
+      setInlineValue("")
+    }
+  }, [product.id, inlineValue, onUpdateProduct, setEditingField, setInlineValue])
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingField(null)
+    setInlineValue("")
+  }, [setEditingField, setInlineValue])
+
+  const handleTipoChange = useCallback(
+    (tipo: "unidad" | "pack") => {
+      onUpdateProduct(product.id, "modoCompra", tipo)
+      if (tipo === "pack" && (!product.cantidadPorPack || product.cantidadPorPack < 2)) {
+        onUpdateProduct(product.id, "cantidadPorPack", "6")
+      }
+      if (tipo === "pack") {
+        setTimeout(() => {
+          unidadesPorPackInputRef.current?.focus()
+          unidadesPorPackInputRef.current?.select()
+        }, 0)
+      }
+    },
+    [product.id, product.cantidadPorPack, onUpdateProduct]
+  )
+
+  const unidadesPorPackValue = unidadesPorPackEdit || String(product.cantidadPorPack ?? 6)
+
+  return (
+    <div
+      key={product.id}
+      draggable={draggable}
+      onDragStart={(e) => onDragStart(e, product.id)}
+      onDragEnd={onDragEnd}
+      onDragOver={(e) => onDragOver(e, product.id)}
+      onDragLeave={onDragLeave}
+      onDrop={(e) => onDrop(e, product.id)}
+      className={cn(
+        "rounded-lg border bg-card px-3 py-2 flex flex-col sm:flex-row sm:items-center gap-2 shadow-sm hover:shadow-md transition-all",
+        isDragOver && "ring-2 ring-primary/20",
+        isDragging && "opacity-50"
+      )}
+    >
+      {draggable && (
+        <div className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
+          <GripVertical className="h-3.5 w-3.5" />
+        </div>
+      )}
+
+      <div className="flex-1 min-w-0 flex items-center gap-2">
+        <CellNombre
+          product={product}
+          isEditing={isEditingNombre}
+          value={inlineValue}
+          onStartEdit={() => {
+            setEditingField({ id: product.id, field: "nombre" })
+            setInlineValue(product.nombre)
+          }}
+          onValueChange={setInlineValue}
+          onSave={handleSaveNombre}
+          onCancel={handleCancelEdit}
+          inputRef={inputRef}
+        />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 shrink-0">
+          <CellTipo product={product} onChange={handleTipoChange} />
+        </div>
+
+        {isPack(product) && (
+          <div className="flex items-center gap-1 shrink-0">
+            <span className="text-[10px] text-muted-foreground">U/pack</span>
+            <CellUnidadesPorPack
+              product={product}
+              value={unidadesPorPackValue}
+              onChange={(v) => setUnidadesPorPackEdit(product.id, v)}
+              onBlur={(num) => {
+                if (num >= 2 && num !== (product.cantidadPorPack ?? 6)) {
+                  onUpdateProduct(product.id, "cantidadPorPack", String(num))
+                }
+              }}
+              inputRef={unidadesPorPackInputRef}
+            />
+          </div>
+        )}
+
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="text-[10px] text-muted-foreground">Mín</span>
+          <CellStockMinimo
+            localValue={stockMinimoLocal}
+            onLocalChange={(v) => setStockMinimoLocal(product.id, v)}
+            onUpdate={(v) => onUpdateProduct(product.id, "stockMinimo", String(v))}
+          />
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="text-[10px] text-muted-foreground">Stock</span>
+          <CellStockActual value={stockActualValue} onChange={(v) => onStockChange(product.id, v)} />
+        </div>
+
+        <CellDelete onDelete={() => onDeleteProduct(product.id)} />
+      </div>
+    </div>
+  )
+}
+
+// --- Formulario de creación inline ---
+
+function CreateProductForm({
+  nombre,
+  onNombreChange,
+  stockMinimo,
+  onStockMinimoChange,
+  tipoCompra,
+  onTipoCompraChange,
+  unidadesPorPack,
+  onUnidadesPorPackChange,
+  onCreate,
+  onCancel,
+  stockMinimoDefault,
+}: {
+  nombre: string
+  onNombreChange: (v: string) => void
+  stockMinimo: string
+  onStockMinimoChange: (v: string) => void
+  tipoCompra: "unidad" | "pack"
+  onTipoCompraChange: (v: "unidad" | "pack") => void
+  unidadesPorPack: string
+  onUnidadesPorPackChange: (v: string) => void
+  onCreate: () => void
+  onCancel: () => void
+  stockMinimoDefault: number
+}) {
+  const isPack = tipoCompra === "pack"
+  const qty = parseInt(unidadesPorPack, 10)
+  const canCreate = nombre.trim() && (!isPack || (qty >= 2))
   return (
     <div className="rounded-xl border border-border bg-card px-3 py-3 space-y-2 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <Input value={nombre} onChange={(e) => onNombreChange(e.target.value)} placeholder="Nombre del producto" className="h-8 text-sm flex-1 min-w-[120px]" />
+        <Input
+          value={nombre}
+          onChange={(e) => onNombreChange(e.target.value)}
+          placeholder="Nombre del producto"
+          className="h-8 text-sm flex-1 min-w-[120px]"
+        />
         <span className="text-xs text-muted-foreground">Mín</span>
-        <Input type="number" inputMode="numeric" min="0" value={stockMinimo} onChange={(e) => onStockMinimoChange(e.target.value)} className="h-8 w-12 text-center text-sm" />
-        <Input value={unidad} onChange={(e) => onUnidadChange(e.target.value)} placeholder="U" className="h-8 w-10 text-center text-xs" />
-        <Select value={modoCompra} onValueChange={(v: "unidad" | "pack") => onModoCompraChange(v)}>
-          <SelectTrigger className="h-8 w-[110px]">
-            <SelectValue placeholder="Se compra por" />
+        <Input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          value={stockMinimo}
+          onChange={(e) => onStockMinimoChange(e.target.value)}
+          className="h-8 w-12 text-center text-sm"
+        />
+        <Select value={tipoCompra} onValueChange={(v: "unidad" | "pack") => onTipoCompraChange(v)}>
+          <SelectTrigger className="h-8 w-[100px]">
+            <SelectValue placeholder="Tipo" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="unidad">Unidad</SelectItem>
@@ -99,13 +491,26 @@ function CreateProductForm({
           </SelectContent>
         </Select>
         {isPack && (
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-muted-foreground">Cant./pack</span>
-            <Input type="number" inputMode="numeric" min="2" value={cantidadPorPack} onChange={(e) => onCantidadPorPackChange(e.target.value)} className="h-8 w-14 text-center text-sm" />
-          </div>
+          <>
+            <span className="text-xs text-muted-foreground">U/pack</span>
+            <Input
+              type="number"
+              inputMode="numeric"
+              min={2}
+              value={unidadesPorPack}
+              onChange={(e) => onUnidadesPorPackChange(e.target.value)}
+              className="h-8 w-14 text-center text-sm"
+            />
+          </>
         )}
         <div className="flex gap-1">
-          <Button variant="ghost" size="icon" onClick={onCreate} disabled={!canCreate} className="h-7 w-7 shrink-0 rounded-full">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onCreate}
+            disabled={!canCreate}
+            className="h-7 w-7 shrink-0 rounded-full"
+          >
             <Plus className="h-3.5 w-3.5" />
           </Button>
           <Button variant="ghost" size="icon" onClick={onCancel} className="h-7 w-7 shrink-0 rounded-full">
@@ -117,74 +522,62 @@ function CreateProductForm({
   )
 }
 
-export function ProductosTable({ products, stockActual, onStockChange, onUpdateProduct, onDeleteProduct, onCreateProduct, onImport, onProductsOrderUpdate, calcularPedido, ajustesPedido = {}, onAjustePedidoChange, configMode = false, stockMinimoDefault = 0, viewMode = "pedir", }: ProductosTableProps) {
-  const mode: TableMode = configMode ? "config" : "pedido"
+// --- Tabla principal ---
 
+export function ProductosTable({
+  products,
+  stockActual,
+  onStockChange,
+  onUpdateProduct,
+  onDeleteProduct,
+  onCreateProduct,
+  onImport,
+  onProductsOrderUpdate,
+  stockMinimoDefault = 0,
+}: ProductosTableProps) {
   const [editingField, setEditingField] = useState<{ id: string; field: string } | null>(null)
   const [inlineValue, setInlineValue] = useState("")
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   const [isCreatingProduct, setIsCreatingProduct] = useState(false)
   const [newProductNombre, setNewProductNombre] = useState("")
-  const [newProductStockMinimo, setNewProductStockMinimo] = useState((stockMinimoDefault ?? 0).toString())
-  const [newProductUnidad, setNewProductUnidad] = useState("U")
-  const [newProductModoCompra, setNewProductModoCompra] = useState<"unidad" | "pack">("unidad")
-  const [newProductCantidadPorPack, setNewProductCantidadPorPack] = useState("6")
+  const [newProductStockMinimo, setNewProductStockMinimo] = useState(String(stockMinimoDefault))
+  const [newProductTipoCompra, setNewProductTipoCompra] = useState<"unidad" | "pack">("unidad")
+  const [newProductUnidadesPorPack, setNewProductUnidadesPorPack] = useState("6")
   const newProductInputRef = useRef<HTMLInputElement | null>(null)
 
-  // Estado local para stockMinimo (actualización inmediata en UI)
   const [stockMinimoLocal, setStockMinimoLocal] = useState<Record<string, number>>({})
-  // Estado local para cantidadPorPack mientras se edita
-  const [cantidadPorPackEdit, setCantidadPorPackEdit] = useState<Record<string, string>>({})
-  // Estado local para modoCompra (UI optimista al cambiar Select antes de que llegue la respuesta)
-  const [modoCompraLocal, setModoCompraLocal] = useState<Record<string, "unidad" | "pack">>({})
-  const cantidadPorPackInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const [unidadesPorPackEdit, setUnidadesPorPackEditState] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (isCreatingProduct && newProductInputRef.current) newProductInputRef.current.focus()
   }, [isCreatingProduct])
 
-  // Sincronizar stockMinimoLocal y cantidadPorPackEdit cuando cambia products (limpiar productos eliminados)
   useEffect(() => {
-    const productIds = new Set(products.map(p => p.id))
-    setStockMinimoLocal(prev => {
-      const nuevo: Record<string, number> = {}
-      Object.keys(prev).forEach(productId => {
-        if (productIds.has(productId)) nuevo[productId] = prev[productId]
+    const ids = new Set(products.map((p) => p.id))
+    setStockMinimoLocal((prev) => {
+      const next: Record<string, number> = {}
+      Object.keys(prev).forEach((id) => {
+        if (ids.has(id)) next[id] = prev[id]
       })
-      return nuevo
+      return next
     })
-    setCantidadPorPackEdit(prev => {
-      const nuevo: Record<string, string> = {}
-      Object.keys(prev).forEach(productId => {
-        if (productIds.has(productId)) nuevo[productId] = prev[productId]
+    setUnidadesPorPackEditState((prev) => {
+      const next: Record<string, string> = {}
+      Object.keys(prev).forEach((id) => {
+        if (ids.has(id)) next[id] = prev[id]
       })
-      return nuevo
-    })
-    setModoCompraLocal(prev => {
-      const nuevo: Record<string, "unidad" | "pack"> = {}
-      Object.keys(prev).forEach(productId => {
-        if (productIds.has(productId)) nuevo[productId] = prev[productId]
-      })
-      return nuevo
+      return next
     })
   }, [products])
 
-  const startEditing = (id: string, field: string, value = "") => {
-    setEditingField({ id, field })
-    setInlineValue(value)
-    setTimeout(() => inputRef.current?.focus(), 0)
-  }
+  const setStockMinimoLocalFor = useCallback((productId: string, v: number) => {
+    setStockMinimoLocal((prev) => ({ ...prev, [productId]: v }))
+  }, [])
 
-  const cancelEditing = () => {
-    setEditingField(null)
-    setInlineValue("")
-  }
-
-  const handleInlineSave = useCallback(async (productId: string, field: string, value: string) => {
-    const success = await onUpdateProduct(productId, field, value)
-    if (success) cancelEditing()
-  }, [onUpdateProduct])
+  const setUnidadesPorPackEdit = useCallback((productId: string, v: string) => {
+    setUnidadesPorPackEditState((prev) => ({ ...prev, [productId]: v }))
+  }, [])
 
   const orderedProductIds = products.map((p) => p.id)
   const [draggedProductId, setDraggedProductId] = useState<string | null>(null)
@@ -211,8 +604,6 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
     setDragOverProductId(productId)
   }, [onProductsOrderUpdate, draggedProductId])
 
-  const handleDragLeave = useCallback(() => setDragOverProductId(null), [])
-
   const handleDrop = useCallback(async (e: React.DragEvent, targetId: string) => {
     if (!onProductsOrderUpdate || !draggedProductId || draggedProductId === targetId) return
     e.preventDefault()
@@ -230,19 +621,23 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
   const handleCreateProduct = useCallback(async () => {
     if (!onCreateProduct || !newProductNombre.trim()) return
     const stockMinimo = parseInt(newProductStockMinimo, 10) || stockMinimoDefault
-    const unidad = newProductUnidad.trim() || "U"
-    const modoCompra = newProductModoCompra
-    const cantidadPorPack = modoCompra === "pack" ? parseInt(newProductCantidadPorPack, 10) : undefined
-    const productId = await onCreateProduct(newProductNombre.trim(), stockMinimo, unidad, modoCompra, cantidadPorPack)
+    const modoCompra = newProductTipoCompra
+    const cantidadPorPack = modoCompra === "pack" ? parseInt(newProductUnidadesPorPack, 10) : undefined
+    const productId = await onCreateProduct(
+      newProductNombre.trim(),
+      stockMinimo,
+      "U",
+      modoCompra,
+      cantidadPorPack && cantidadPorPack >= 2 ? cantidadPorPack : undefined
+    )
     if (productId) {
       setNewProductNombre("")
-      setNewProductStockMinimo((stockMinimoDefault ?? 0).toString())
-      setNewProductUnidad("U")
-      setNewProductModoCompra("unidad")
-      setNewProductCantidadPorPack("6")
+      setNewProductStockMinimo(String(stockMinimoDefault))
+      setNewProductTipoCompra("unidad")
+      setNewProductUnidadesPorPack("6")
       setIsCreatingProduct(false)
     }
-  }, [onCreateProduct, newProductNombre, newProductStockMinimo, newProductUnidad, newProductModoCompra, newProductCantidadPorPack, stockMinimoDefault])
+  }, [onCreateProduct, newProductNombre, newProductStockMinimo, newProductTipoCompra, newProductUnidadesPorPack, stockMinimoDefault])
 
   if (products.length === 0) {
     return (
@@ -272,8 +667,13 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
           <h3 className="text-sm font-semibold">Productos</h3>
           <p className="text-xs text-muted-foreground">{products.length} productos</p>
         </div>
-        {onCreateProduct && configMode && (
-          <Button variant="ghost" size="sm" onClick={() => setIsCreatingProduct(true)} className="h-7 text-xs px-2 rounded-full">
+        {onCreateProduct && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsCreatingProduct(true)}
+            className="h-7 text-xs px-2 rounded-full"
+          >
             <PlusCircle className="h-3.5 w-3.5 mr-1" />
             Agregar
           </Button>
@@ -281,235 +681,56 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
       </div>
 
       <div className="space-y-1 p-2">
-        {products.map((product) => {
-          const stockActualValue = stockActual[product.id] ?? 0
-          const stockMinimoValue = stockMinimoLocal[product.id] ?? product.stockMinimo
-          const pedidoBase = calcularPedido(stockMinimoValue, stockActualValue)
-          const ajuste = ajustesPedido[product.id] ?? 0
-          const isPack = esModoPack(product)
-          let pedidoCalculado: number
-          let displayPedido: number
-          let onDisplayChange: (v: number) => void
-          let displaySuffix: React.ReactNode = null
-          const unidadBase = product.unidadBase || product.unidad || "U"
+        {products.map((product) => (
+          <ProductoRow
+            key={product.id}
+            product={product}
+            stockActualValue={stockActual[product.id] ?? 0}
+            stockMinimoLocal={stockMinimoLocal[product.id] ?? product.stockMinimo}
+            setStockMinimoLocal={setStockMinimoLocalFor}
+            unidadesPorPackEdit={unidadesPorPackEdit[product.id] ?? ""}
+            setUnidadesPorPackEdit={setUnidadesPorPackEdit}
+            editingField={editingField}
+            inlineValue={inlineValue}
+            setEditingField={setEditingField}
+            setInlineValue={setInlineValue}
+            inputRef={inputRef}
+            isDragging={draggedProductId === product.id}
+            isDragOver={dragOverProductId === product.id}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDragOver={handleDragOver}
+            onDragLeave={() => setDragOverProductId(null)}
+            onDrop={handleDrop}
+            onUpdateProduct={onUpdateProduct}
+            onStockChange={onStockChange}
+            onDeleteProduct={onDeleteProduct}
+            draggable={!!onProductsOrderUpdate}
+          />
+        ))}
 
-          if (isPack) {
-            const pedidoBasePacks = unidadesToPacks(product, pedidoBase)
-            const totalPacks = Math.max(0, pedidoBasePacks + ajuste)
-            pedidoCalculado = packsToUnidades(product, totalPacks)
-            displayPedido = totalPacks
-            onDisplayChange = (v: number) => {
-              if (onAjustePedidoChange) {
-                onAjustePedidoChange(product.id, v - pedidoBasePacks)
-              }
-            }
-            displaySuffix = totalPacks > 0 ? (
-              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                ({totalPacks} pack{totalPacks !== 1 ? "s" : ""} = {pedidoCalculado} {unidadBase})
-              </span>
-            ) : null
-          } else {
-            pedidoCalculado = Math.max(0, pedidoBase + ajuste)
-            displayPedido = pedidoCalculado
-            onDisplayChange = (v: number) => {
-              if (onAjustePedidoChange) {
-                onAjustePedidoChange(product.id, v - pedidoBase)
-              }
-            }
-          }
-
-          const isBajoMinimo = stockActualValue < stockMinimoValue
-          const pedidoMayorCero = viewMode === "pedir" && pedidoCalculado > 0
-          // El sistema PERMITE pedir menos que el mínimo si el usuario reduce packs manualmente. Solo indicador visual.
-          const porDebajoMinimo = viewMode === "pedir" && pedidoCalculado > 0 && pedidoCalculado < stockMinimoValue
-
-          return (
-            <div
-              key={product.id}
-              draggable={!!onProductsOrderUpdate}
-              onDragStart={(e) => handleDragStart(e, product.id)}
-              onDragEnd={handleDragEnd}
-              onDragOver={(e) => handleDragOver(e, product.id)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, product.id)}
-              className={cn(
-                "rounded-lg border bg-card px-3 py-2 flex flex-col gap-1.5 shadow-sm hover:shadow-md transition-all",
-                isBajoMinimo && !pedidoMayorCero && "border-amber-300/60",
-                dragOverProductId === product.id && "ring-2 ring-primary/20",
-                draggedProductId === product.id && "opacity-50"
-              )}
-            >
-              {/* Fila 1: nombre + switch Unidad/Pack (arriba, fijo) + eliminar */}
-              <div className="flex items-center gap-2 min-w-0">
-                {onProductsOrderUpdate && (
-                  <div className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors">
-                    <GripVertical className="h-3.5 w-3.5" />
-                  </div>
-                )}
-                <p className="text-sm font-medium truncate flex-1 min-w-0">
-                  <span className="lg:hidden">{abbreviateProductName(product.nombre)}</span>
-                  <span className="hidden lg:inline">{product.nombre}</span>
-                </p>
-                {configMode && (
-                  <>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">Unidad</span>
-                      <Switch
-                        checked={(modoCompraLocal[product.id] ?? product.modoCompra ?? "unidad") === "pack"}
-                        onCheckedChange={(checked) => {
-                          const v = checked ? "pack" : "unidad"
-                          setModoCompraLocal(prev => ({ ...prev, [product.id]: v }))
-                          onUpdateProduct(product.id, "modoCompra", v)
-                          if (v === "pack" && (!product.cantidadPorPack || product.cantidadPorPack < 2)) {
-                            onUpdateProduct(product.id, "cantidadPorPack", "6")
-                          }
-                          if (v === "pack") {
-                            setTimeout(() => {
-                              const input = cantidadPorPackInputRefs.current[product.id]
-                              input?.focus()
-                              input?.select()
-                            }, 0)
-                          }
-                        }}
-                      />
-                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">Pack</span>
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={() => onDeleteProduct(product.id)} className="h-7 w-7 shrink-0 rounded-full opacity-60 hover:opacity-100">
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
-                  </>
-                )}
-              </div>
-
-              {/* Fila 2: Stock | Min | Cant por pack (si pack) | cantidad pedido/stock - Todo en una línea en desktop */}
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 lg:gap-4">
-                <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-4">
-                  {/* Stock */}
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-xs text-muted-foreground tabular-nums">Stock:</span>
-                    <span className="text-xs font-medium tabular-nums">{stockActualValue}</span>
-                  </div>
-
-                  {/* Min */}
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground tabular-nums shrink-0">
-                    <span>Min:</span>
-                    {configMode ? (
-                      <span className="inline-flex items-center gap-0.5">
-                        <Button variant="outline" size="icon" className="h-6 w-6 rounded-full shrink-0" onClick={() => {
-                          const nuevoValor = Math.max(0, stockMinimoValue - 1)
-                          setStockMinimoLocal(prev => ({ ...prev, [product.id]: nuevoValor }))
-                          onUpdateProduct(product.id, "stockMinimo", nuevoValor.toString())
-                        }} disabled={stockMinimoValue <= 0}>
-                          <Minus className="h-2.5 w-2.5" />
-                        </Button>
-                        <StockInput value={stockMinimoValue} onChange={(v) => {
-                          setStockMinimoLocal(prev => ({ ...prev, [product.id]: v }))
-                          onUpdateProduct(product.id, "stockMinimo", v.toString())
-                        }} className="h-6 w-10 text-xs" />
-                        <Button variant="outline" size="icon" className="h-6 w-6 rounded-full shrink-0" onClick={() => {
-                          const nuevoValor = stockMinimoValue + 1
-                          setStockMinimoLocal(prev => ({ ...prev, [product.id]: nuevoValor }))
-                          onUpdateProduct(product.id, "stockMinimo", nuevoValor.toString())
-                        }}>
-                          <Plus className="h-2.5 w-2.5" />
-                        </Button>
-                      </span>
-                    ) : (
-                      <span>{stockMinimoValue}</span>
-                    )}
-                  </div>
-
-                  {/* Cant por pack (solo si es pack y configMode) */}
-                  {configMode && (modoCompraLocal[product.id] ?? product.modoCompra ?? "unidad") === "pack" && (
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span className="text-[10px] text-muted-foreground">Cant./pack</span>
-                      <Input
-                        ref={(el) => { cantidadPorPackInputRefs.current[product.id] = el }}
-                        type="number"
-                        inputMode="numeric"
-                        min="2"
-                        value={cantidadPorPackEdit[product.id] ?? String(product.cantidadPorPack ?? 6)}
-                        onChange={(e) => setCantidadPorPackEdit(prev => ({ ...prev, [product.id]: e.target.value }))}
-                        onBlur={(e) => {
-                          const num = parseInt(e.target.value, 10)
-                          if (!isNaN(num) && num >= 2 && num !== (product.cantidadPorPack ?? 6)) {
-                            onUpdateProduct(product.id, "cantidadPorPack", String(num))
-                          }
-                          setCantidadPorPackEdit(prev => {
-                            const next = { ...prev }
-                            delete next[product.id]
-                            return next
-                          })
-                        }}
-                        className="h-7 min-w-[2.5rem] w-14 text-center text-sm font-medium tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Cantidad pedido/stock - Alineado a la derecha */}
-                <div className="flex items-center gap-1.5 shrink-0 ml-auto lg:ml-0 flex-wrap">
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {viewMode === "pedir" ? "Pedido:" : "Stock:"}
-                  </span>
-                  {viewMode === "pedir" ? (
-                    <>
-                      <div className="flex items-center gap-1">
-                        <Button variant="outline" size="icon" className={btnIcon} onClick={() => onAjustePedidoChange?.(product.id, (ajuste ?? 0) - 1)} disabled={pedidoCalculado <= 0 && (ajuste ?? 0) <= 0}>
-                          <Minus className="h-3.5 w-3.5" />
-                        </Button>
-                        <StockInput value={displayPedido} onChange={onDisplayChange} className="h-7 w-14 text-sm" />
-                        <Button variant="outline" size="icon" className={btnIcon} onClick={() => onAjustePedidoChange?.(product.id, (ajuste ?? 0) + 1)}>
-                          <Plus className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                      {displaySuffix}
-                      {porDebajoMinimo && (
-                        <span className="text-[10px] font-medium text-red-600 dark:text-red-400 w-full">Por debajo del mínimo</span>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <Button variant="outline" size="icon" className={btnIcon} onClick={() => onStockChange(product.id, Math.max(0, (stockActualValue ?? 0) - 1))} disabled={(stockActualValue ?? 0) <= 0}>
-                        <Minus className="h-3.5 w-3.5" />
-                      </Button>
-                      <StockInput value={stockActual[product.id]} onChange={(v) => onStockChange(product.id, v)} onFocus={() => startEditing(product.id, "stockActual", (stockActual[product.id] ?? 0).toString())} className="h-7 w-14 text-sm" />
-                      <Button variant="outline" size="icon" className={btnIcon} onClick={() => onStockChange(product.id, (stockActualValue ?? 0) + 1)}>
-                        <Plus className="h-3.5 w-3.5" />
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          )
-        })}
-
-        {isCreatingProduct && onCreateProduct && configMode && (
+        {isCreatingProduct && onCreateProduct && (
           <CreateProductForm
             nombre={newProductNombre}
             onNombreChange={setNewProductNombre}
             stockMinimo={newProductStockMinimo}
             onStockMinimoChange={setNewProductStockMinimo}
-            unidad={newProductUnidad}
-            onUnidadChange={setNewProductUnidad}
-            modoCompra={newProductModoCompra}
-            onModoCompraChange={setNewProductModoCompra}
-            cantidadPorPack={newProductCantidadPorPack}
-            onCantidadPorPackChange={setNewProductCantidadPorPack}
+            tipoCompra={newProductTipoCompra}
+            onTipoCompraChange={setNewProductTipoCompra}
+            unidadesPorPack={newProductUnidadesPorPack}
+            onUnidadesPorPackChange={setNewProductUnidadesPorPack}
             onCreate={handleCreateProduct}
             onCancel={() => {
               setIsCreatingProduct(false)
               setNewProductNombre("")
-              setNewProductStockMinimo((stockMinimoDefault ?? 0).toString())
-              setNewProductUnidad("U")
-              setNewProductModoCompra("unidad")
-              setNewProductCantidadPorPack("6")
+              setNewProductStockMinimo(String(stockMinimoDefault))
+              setNewProductTipoCompra("unidad")
+              setNewProductUnidadesPorPack("6")
             }}
+            stockMinimoDefault={stockMinimoDefault}
           />
         )}
       </div>
     </div>
   )
 }
-            
