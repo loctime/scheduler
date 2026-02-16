@@ -14,6 +14,7 @@ import {
   getDoc,
   writeBatch,
   onSnapshot,
+  deleteField,
 } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
@@ -502,7 +503,7 @@ export function usePedidos(user: any) {
         if (modo !== "unidad" && modo !== "pack") return false
         updateData.modoCompra = modo
         if (modo === "unidad") {
-          updateData.cantidadPorPack = undefined
+          updateData.cantidadPorPack = deleteField()
         }
       } else if (field === "cantidadPorPack") {
         const num = parseInt(value, 10)
