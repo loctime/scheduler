@@ -156,40 +156,34 @@ export function useInvitaciones(user: any, userData?: { grupoIds?: string[] } | 
 
       const linkData = linkDoc.data() as InvitacionLink
 
-      // Si se solicita eliminar el usuario y existe un usuario vinculado
+      let usuarioEliminadoEnServidor = false
       if (eliminarUsuario && linkData.usadoPor) {
         try {
-          console.log("🗑️ Eliminando usuario:", linkData.usadoPor)
           await deleteDoc(doc(db, COLLECTIONS.USERS, linkData.usadoPor))
-          console.log("✅ Usuario eliminado exitosamente")
-          toast({
-            title: "Usuario eliminado",
-            description: "El usuario vinculado ha sido eliminado",
-          })
+          usuarioEliminadoEnServidor = true
         } catch (error: any) {
-          console.error("❌ Error eliminando usuario:", error)
-          console.error("❌ Código de error:", error.code)
-          console.error("❌ Mensaje:", error.message)
-          toast({
-            title: "Error al eliminar usuario",
-            description: error.message || "No se pudo eliminar el usuario. Verifica las reglas de Firestore.",
-            variant: "destructive",
-          })
-          // No continuar si no se pudo eliminar el usuario
-          return
+          // Si fallan permisos, igual seguimos: eliminamos el link y actualizamos el front
+          console.warn("No se pudo eliminar el usuario en el servidor:", error?.code, error?.message)
         }
       }
 
-      // Eliminar el link
-      console.log("🗑️ Eliminando link:", linkId)
+      // Eliminar el link (siempre, para que desaparezca del front)
       await deleteDoc(doc(db, COLLECTIONS.INVITACIONES, linkId))
-      console.log("✅ Link eliminado exitosamente")
       await cargarLinks()
-      
-      toast({
-        title: "Link eliminado",
-        description: "El link de invitación ha sido eliminado completamente",
-      })
+
+      if (eliminarUsuario && linkData.usadoPor && !usuarioEliminadoEnServidor) {
+        toast({
+          title: "Link eliminado",
+          description: "El link se eliminó. El usuario ya no aparecerá en la lista. No se pudo eliminarlo del servidor (permisos).",
+        })
+      } else {
+        toast({
+          title: "Link eliminado",
+          description: usuarioEliminadoEnServidor
+            ? "El link y el usuario vinculado han sido eliminados."
+            : "El link de invitación ha sido eliminado.",
+        })
+      }
     } catch (error: any) {
       console.error("Error eliminando link:", error)
       toast({

@@ -258,7 +258,37 @@ service cloud.firestore {
        =============================== */
     
     match /apps/horarios/users/{userId} {
-      allow read, write: if isAuth() && userId == uid();
+      allow read: if isAuth()
+        && (
+          userId == uid()
+          || (
+            exists(/databases/$(db)/documents/apps/horarios/users/$(userId))
+            && horariosCanActFor(
+              get(/databases/$(db)/documents/apps/horarios/users/$(userId)).data.ownerId
+            )
+          )
+        );
+
+      allow create: if isAuth() && userId == uid();
+
+      allow update: if isAuth()
+        && (
+          userId == uid()
+          || (
+            resource.data.ownerId != null
+            && horariosCanActFor(resource.data.ownerId)
+          )
+        );
+
+      allow delete: if isAuth()
+        && (
+          userId == uid()
+          || resource.data.ownerId == uid()
+          || (
+            resource.data.ownerId != null
+            && horariosCanActFor(resource.data.ownerId)
+          )
+        );
     }
     
     /* ===============================
@@ -282,7 +312,9 @@ service cloud.firestore {
           )
         );
     
-      allow delete: if false;
+      allow delete: if isAuth()
+        && resource.data.ownerId != null
+        && horariosCanActFor(resource.data.ownerId);
     }
     
     /* ===============================
