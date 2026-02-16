@@ -138,6 +138,7 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
   const [cantidadPorPackEdit, setCantidadPorPackEdit] = useState<Record<string, string>>({})
   // Estado local para modoCompra (UI optimista al cambiar Select antes de que llegue la respuesta)
   const [modoCompraLocal, setModoCompraLocal] = useState<Record<string, "unidad" | "pack">>({})
+  const cantidadPorPackInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   useEffect(() => {
     if (isCreatingProduct && newProductInputRef.current) newProductInputRef.current.focus()
@@ -338,7 +339,7 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
                 draggedProductId === product.id && "opacity-50"
               )}
             >
-              {/* Fila 1: solo nombre (+ grip) */}
+              {/* Fila 1: nombre + switch Unidad/Pack (arriba, fijo) + eliminar */}
               <div className="flex items-center gap-2 min-w-0">
                 {onProductsOrderUpdate && (
                   <div className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors">
@@ -350,18 +351,8 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
                   <span className="hidden lg:inline">{product.nombre}</span>
                 </p>
                 {configMode && (
-                  <Button variant="ghost" size="icon" onClick={() => onDeleteProduct(product.id)} className="h-7 w-7 shrink-0 rounded-full opacity-60 hover:opacity-100">
-                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                  </Button>
-                )}
-              </div>
-
-              {/* Fila 2: Stock (izq) y Unidad/Pack (der) */}
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <span className="text-xs text-muted-foreground tabular-nums">Stock: {stockActualValue}</span>
-                {configMode && (
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <div className="flex items-center gap-2">
+                  <>
+                    <div className="flex items-center gap-2 shrink-0">
                       <span className="text-[10px] text-muted-foreground whitespace-nowrap">Unidad</span>
                       <Switch
                         checked={(modoCompraLocal[product.id] ?? product.modoCompra ?? "unidad") === "pack"}
@@ -372,34 +363,50 @@ export function ProductosTable({ products, stockActual, onStockChange, onUpdateP
                           if (v === "pack" && (!product.cantidadPorPack || product.cantidadPorPack < 2)) {
                             onUpdateProduct(product.id, "cantidadPorPack", "6")
                           }
+                          if (v === "pack") {
+                            setTimeout(() => {
+                              const input = cantidadPorPackInputRefs.current[product.id]
+                              input?.focus()
+                              input?.select()
+                            }, 0)
+                          }
                         }}
                       />
                       <span className="text-[10px] text-muted-foreground whitespace-nowrap">Pack</span>
                     </div>
-                    {(modoCompraLocal[product.id] ?? product.modoCompra ?? "unidad") === "pack" && (
-                      <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-muted-foreground">/pack</span>
-                        <Input
-                          type="number"
-                          inputMode="numeric"
-                          min="2"
-                          value={cantidadPorPackEdit[product.id] ?? String(product.cantidadPorPack ?? 6)}
-                          onChange={(e) => setCantidadPorPackEdit(prev => ({ ...prev, [product.id]: e.target.value }))}
-                          onBlur={(e) => {
-                            const num = parseInt(e.target.value, 10)
-                            if (!isNaN(num) && num >= 2 && num !== (product.cantidadPorPack ?? 6)) {
-                              onUpdateProduct(product.id, "cantidadPorPack", String(num))
-                            }
-                            setCantidadPorPackEdit(prev => {
-                              const next = { ...prev }
-                              delete next[product.id]
-                              return next
-                            })
-                          }}
-                          className="h-7 min-w-[2.5rem] w-14 text-center text-sm font-medium tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                      </div>
-                    )}
+                    <Button variant="ghost" size="icon" onClick={() => onDeleteProduct(product.id)} className="h-7 w-7 shrink-0 rounded-full opacity-60 hover:opacity-100">
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              {/* Fila 2: Stock (izq) y si Pack: cantidad por pack (der) */}
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground tabular-nums">Stock: {stockActualValue}</span>
+                {configMode && (modoCompraLocal[product.id] ?? product.modoCompra ?? "unidad") === "pack" && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-[10px] text-muted-foreground">Cant./pack</span>
+                    <Input
+                      ref={(el) => { cantidadPorPackInputRefs.current[product.id] = el }}
+                      type="number"
+                      inputMode="numeric"
+                      min="2"
+                      value={cantidadPorPackEdit[product.id] ?? String(product.cantidadPorPack ?? 6)}
+                      onChange={(e) => setCantidadPorPackEdit(prev => ({ ...prev, [product.id]: e.target.value }))}
+                      onBlur={(e) => {
+                        const num = parseInt(e.target.value, 10)
+                        if (!isNaN(num) && num >= 2 && num !== (product.cantidadPorPack ?? 6)) {
+                          onUpdateProduct(product.id, "cantidadPorPack", String(num))
+                        }
+                        setCantidadPorPackEdit(prev => {
+                          const next = { ...prev }
+                          delete next[product.id]
+                          return next
+                        })
+                      }}
+                      className="h-7 min-w-[2.5rem] w-14 text-center text-sm font-medium tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
                   </div>
                 )}
               </div>
