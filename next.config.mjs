@@ -77,14 +77,15 @@ const nextConfig = {
         "img-src 'self' data: blob: " +
           "https://controlfile.onrender.com " +
           "https://lh3.googleusercontent.com; " +
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live blob:; " +
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://cdn.jsdelivr.net blob:; " +
         "style-src 'self' 'unsafe-inline'; " +
         "connect-src 'self' data: blob: " +
           "https://controlfile.onrender.com " +
           "https://firestore.googleapis.com " +
           "https://identitytoolkit.googleapis.com " +
           "https://securetoken.googleapis.com " +
-          "https://*.googleapis.com; " +
+          "https://*.googleapis.com " +
+          "https://cdn.jsdelivr.net; " +
         "frame-src https://vercel.live; " +
         "worker-src 'self' blob:;"
           },
