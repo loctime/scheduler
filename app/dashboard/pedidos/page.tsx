@@ -35,6 +35,7 @@ import {
   ConfirmarNuevoEnlaceDialog,
   DEFAULT_FORMAT 
 } from "@/components/pedidos/pedido-dialogs"
+import { FacturaImportDialog } from "@/components/pedidos/FacturaImportDialog"
 import { cn } from "@/lib/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
@@ -213,6 +214,7 @@ export default function PedidosPage() {
   // Dialog states
   const [createPedidoOpen, setCreatePedidoOpen] = useState(false)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [facturaImportOpen, setFacturaImportOpen] = useState(false)
   const [deletePedidoDialogOpen, setDeletePedidoDialogOpen] = useState(false)
   const [clearDialogOpen, setClearDialogOpen] = useState(false)
   const [confirmarNuevoEnlaceOpen, setConfirmarNuevoEnlaceOpen] = useState(false)
@@ -1163,6 +1165,9 @@ export default function PedidosPage() {
                       <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setImportDialogOpen(true)}>
                         <Upload className="h-4 w-4" />
                       </Button>
+                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setFacturaImportOpen(true)} title="Importar desde factura (OCR)">
+                        <FileText className="h-4 w-4" />
+                      </Button>
                       <Button 
                         variant="outline" 
                         size="icon"
@@ -1671,6 +1676,14 @@ export default function PedidosPage() {
         onImportTextChange={setImportText}
         onImport={handleImport}
         stockMinimoDefault={selectedPedido?.stockMinimoDefault}
+      />
+
+      <FacturaImportDialog
+        open={facturaImportOpen}
+        onOpenChange={setFacturaImportOpen}
+        products={products}
+        stockActual={stockActual}
+        onStockChange={handleStockChange}
       />
 
       <DeletePedidoDialog
