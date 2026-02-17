@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useCallback } from "react"
+import React, { useState, useCallback, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,22 +16,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Upload, CheckCircle, AlertTriangle, X } from "lucide-react"
 import Tesseract from "tesseract.js"
 import type { Producto } from "@/lib/types"
-
-// Types for the OCR processing
-interface ParsedItem {
-  rawText: string
-  nombreDetectado: string
-  cantidad: number
-}
-
-interface MatchedItem {
-  rawText: string
-  nombreDetectado: string
-  cantidad: number
-  matchedProductId: string | null
-  status: "ok" | "unknown"
-  similarity?: number
-}
+import { getOCRConfig, DEFAULT_OCR_CONFIG } from "@/lib/ocr-config"
+import { parseFactura, matchProducts, type ParsedItem, type MatchedItem } from "@/lib/ocr-utils"
 
 interface FacturaImportDialogProps {
   open: boolean
@@ -39,153 +25,6 @@ interface FacturaImportDialogProps {
   products: Producto[]
   stockActual: Record<string, number>
   onStockChange: (productId: string, newValue: number) => void
-}
-
-// Normalization function for text matching
-function normalizeText(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Remove accents
-    .replace(/\b(x\d+|pack|unidad|unidades|uds)\b/g, '') // Remove irrelevant words
-    .replace(/[^a-z0-9\s]/g, '') // Remove special chars
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-// Calculate string similarity (Levenshtein distance based)
-function calculateSimilarity(str1: string, str2: string): number {
-  const longer = str1.length > str2.length ? str1 : str2
-  const shorter = str1.length > str2.length ? str2 : str1
-  
-  if (longer.length === 0) return 1.0
-  
-  const distance = levenshteinDistance(longer, shorter)
-  return (longer.length - distance) / longer.length
-}
-
-function levenshteinDistance(str1: string, str2: string): number {
-  const matrix = []
-  
-  for (let i = 0; i <= str2.length; i++) {
-    matrix[i] = [i]
-  }
-  
-  for (let j = 0; j <= str1.length; j++) {
-    matrix[0][j] = j
-  }
-  
-  for (let i = 1; i <= str2.length; i++) {
-    for (let j = 1; j <= str1.length; j++) {
-      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
-        matrix[i][j] = matrix[i - 1][j - 1]
-      } else {
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j - 1] + 1,
-          matrix[i][j - 1] + 1,
-          matrix[i - 1][j] + 1
-        )
-      }
-    }
-  }
-  
-  return matrix[str2.length][str1.length]
-}
-
-// Validate image file
-function validateImageFile(file: File): { valid: boolean; error?: string } {
-  const maxSize = 5 * 1024 * 1024 // 5MB
-  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-  
-  if (file.size > maxSize) {
-    return { valid: false, error: "La imagen es demasiado grande. Máximo 5MB." }
-  }
-  
-  if (!allowedTypes.includes(file.type)) {
-    return { valid: false, error: "Formato no válido. Usa JPG, PNG o WebP." }
-  }
-  
-  return { valid: true }
-}
-
-// Parse invoice text to extract products and quantities
-function parseFactura(text: string): ParsedItem[] {
-  const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0)
-  const excludeWords = ['TOTAL', 'IVA', 'CUIT', 'FECHA', 'SUBTOTAL', '$', 'IMPORTE', 'PRECIO']
-  
-  const items: ParsedItem[] = []
-  
-  for (const line of lines) {
-    // Skip lines with exclude words
-    if (excludeWords.some(word => line.toUpperCase().includes(word))) {
-      continue
-    }
-    
-    // Find all numbers in the line
-    const numbers = line.match(/\b(\d+)\b/g)
-    if (!numbers || numbers.length === 0) {
-      continue
-    }
-    
-    // Convert all numbers to integers and filter reasonable quantities
-    const quantities = numbers
-      .map(n => parseInt(n, 10))
-      .filter(n => n > 0 && n <= 200) // Reasonable quantity range
-    
-    if (quantities.length === 0) {
-      continue
-    }
-    
-    // Choose the smallest number as the likely quantity (prices are usually larger)
-    const cantidad = Math.min(...quantities)
-    
-    // Remove the quantity number and clean up the product name
-    const nombreDetectado = line
-      .replace(new RegExp(`\\b${cantidad}\\b`), '')
-      .replace(/\b\d+\b/g, '') // Remove any remaining numbers
-      .replace(/\s+/g, ' ')
-      .trim()
-    
-    if (cantidad > 0 && nombreDetectado.length > 0) {
-      items.push({
-        rawText: line,
-        nombreDetectado,
-        cantidad
-      })
-    }
-  }
-  
-  return items
-}
-
-// Match parsed items with existing products
-function matchProducts(parsedItems: ParsedItem[], products: Producto[]): MatchedItem[] {
-  return parsedItems.map(item => {
-    const normalizedDetected = normalizeText(item.nombreDetectado)
-    let bestMatch: { productId: string; similarity: number } | null = null
-    
-    // Always calculate similarity for all products
-    for (const product of products) {
-      const normalizedProduct = normalizeText(product.nombre)
-      const similarity = calculateSimilarity(normalizedDetected, normalizedProduct)
-      
-      if (!bestMatch || similarity > bestMatch.similarity) {
-        bestMatch = { productId: product.id, similarity }
-      }
-    }
-    
-    // Determine status based on best similarity
-    const status = bestMatch && bestMatch.similarity >= 0.6 ? "ok" : "unknown"
-    
-    return {
-      rawText: item.rawText,
-      nombreDetectado: item.nombreDetectado,
-      cantidad: item.cantidad,
-      matchedProductId: bestMatch?.productId || null,
-      status,
-      similarity: bestMatch?.similarity
-    }
-  })
 }
 
 export function FacturaImportDialog({
@@ -201,6 +40,37 @@ export function FacturaImportDialog({
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([])
   const [matchedItems, setMatchedItems] = useState<MatchedItem[]>([])
   const [confirming, setConfirming] = useState(false)
+  const [config, setConfig] = useState(DEFAULT_OCR_CONFIG)
+
+  // Load OCR config on mount
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const ocrConfig = await getOCRConfig()
+        setConfig(ocrConfig)
+      } catch (error) {
+        console.error("Error loading OCR config:", error)
+      }
+    }
+    
+    loadConfig()
+  }, [])
+
+  // Validate image file
+  function validateImageFile(file: File): { valid: boolean; error?: string } {
+    const maxSize = 5 * 1024 * 1024 // 5MB
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+    
+    if (file.size > maxSize) {
+      return { valid: false, error: "La imagen es demasiado grande. Máximo 5MB." }
+    }
+    
+    if (!allowedTypes.includes(file.type)) {
+      return { valid: false, error: "Formato no válido. Usa JPG, PNG o WebP." }
+    }
+    
+    return { valid: true }
+  }
 
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -233,11 +103,11 @@ export function FacturaImportDialog({
       setOcrText(text)
       
       // Parse the text
-      const parsed = parseFactura(text)
+      const parsed = parseFactura(text, config)
       setParsedItems(parsed)
       
-      // Match with products
-      const matched = matchProducts(parsed, products)
+      // Match with products using current config
+      const matched = matchProducts(parsed, products, config)
       setMatchedItems(matched)
       
       if (matched.length === 0) {
@@ -250,7 +120,7 @@ export function FacturaImportDialog({
     } finally {
       setLoading(false)
     }
-  }, [products])
+  }, [config, products])
 
   const handleConfirm = useCallback(async () => {
     // Prevent double-click
