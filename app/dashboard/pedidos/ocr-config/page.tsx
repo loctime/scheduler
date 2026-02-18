@@ -13,6 +13,8 @@ import type { Producto } from "@/lib/types"
 import { OCRConfig, getOCRConfig, saveOCRConfig, DEFAULT_OCR_CONFIG } from "@/lib/ocr-config"
 import { parseFactura, matchProducts, normalizeText, type ParsedItem, type MatchedItem } from "@/lib/ocr-utils"
 import { saveProductAliases, getProductAliases } from "@/lib/ocr-config"
+import { collection, doc, getDoc, getDocs, updateDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 export default function OCRConfigPage() {
   const [config, setConfig] = useState<OCRConfig>(DEFAULT_OCR_CONFIG)
@@ -23,33 +25,83 @@ export default function OCRConfigPage() {
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([])
   const [matchedItems, setMatchedItems] = useState<MatchedItem[]>([])
   const [products, setProducts] = useState<Producto[]>([])
+  const [pedidos, setPedidos] = useState<any[]>([])
+  const [pedidoSeleccionadoId, setPedidoSeleccionadoId] = useState<string>("")
   const [selectedUnknownItem, setSelectedUnknownItem] = useState<MatchedItem | null>(null)
-  const [assigningProduct, setAssigningProduct] = useState<string | null>(null)
+  const [assigningMap, setAssigningMap] = useState<Record<string, string>>({})
 
-  // Load config and products on mount
+  // Load pedidos on mount
   useEffect(() => {
-    const loadData = async () => {
+    const loadPedidos = async () => {
       try {
-        const [loadedConfig, loadedProducts] = await Promise.all([
-          getOCRConfig(),
-          // Mock products for testing - in real implementation, load from your data source
-          Promise.resolve([
-            { id: '1', nombre: 'coca cola 2l', aliases: ['coca cola', 'cocacola', 'cola'] },
-            { id: '2', nombre: 'sprite', aliases: ['sprite', 'sprite soda'] },
-            { id: '3', nombre: 'agua mineral', aliases: ['agua', 'agua mineral', 'mineral'] },
-            { id: '4', nombre: 'azucar', aliases: ['azucar', 'sugar'] },
-          ] as Producto[])
-        ])
+        if (!db) return
         
-        setConfig(loadedConfig)
-        setProducts(loadedProducts)
+        const pedidosSnapshot = await getDocs(collection(db, "pedidos"))
+        const pedidosList = pedidosSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        
+        setPedidos(pedidosList)
+        
+        // Auto-select first pedido if available
+        if (pedidosList.length > 0) {
+          setPedidoSeleccionadoId(pedidosList[0].id)
+        }
       } catch (err) {
-        console.error("Error loading data:", err)
+        console.error("Error loading pedidos:", err)
+        setError("Error al cargar pedidos")
+      }
+    }
+    
+    loadPedidos()
+  }, [])
+
+  // Load products when pedido is selected
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        if (!db || !pedidoSeleccionadoId) return
+        
+        const pedidoDoc = await getDoc(doc(db, "pedidos", pedidoSeleccionadoId))
+        if (!pedidoDoc.exists()) return
+        
+        const pedidoData = pedidoDoc.data()
+        const productosSnapshot = await getDocs(collection(db, "pedidos", pedidoSeleccionadoId, "productos"))
+        
+        const productosList = productosSnapshot.docs.map(doc => ({
+          id: doc.id,
+          nombre: doc.data().nombre || '',
+          stockMinimo: doc.data().stockMinimo || 0,
+          aliases: doc.data().aliases || [],
+          pedidoId: pedidoSeleccionadoId,
+          ownerId: doc.data().ownerId || '',
+          userId: doc.data().userId || ''
+        } as Producto))
+        
+        setProducts(productosList)
+      } catch (err) {
+        console.error("Error loading products:", err)
+        setError("Error al cargar productos")
+      }
+    }
+    
+    loadProducts()
+  }, [pedidoSeleccionadoId])
+
+  // Load config on mount
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const loadedConfig = await getOCRConfig()
+        setConfig(loadedConfig)
+      } catch (err) {
+        console.error("Error loading config:", err)
         setError("Error al cargar configuración")
       }
     }
     
-    loadData()
+    loadConfig()
   }, [])
 
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -132,46 +184,57 @@ export default function OCRConfigPage() {
     setError(null)
   }, [])
 
-  const handleAssignProduct = useCallback(async (item: MatchedItem) => {
+  const handleAssignProduct = useCallback((item: MatchedItem) => {
     if (!item.matchedProductId) return
     
-    setAssigningProduct(item.matchedProductId)
     setSelectedUnknownItem(item)
+    setAssigningMap(prev => ({
+      ...prev,
+      [item.nombreDetectado]: ''
+    }))
   }, [])
 
-  const handleSaveAlias = useCallback(async () => {
-    if (!selectedUnknownItem || !assigningProduct) return
+  const handleSaveAlias = useCallback(async (item: MatchedItem) => {
+    const productId = assigningMap[item.nombreDetectado]
+    if (!productId) return
     
     try {
       // Get current aliases
-      const currentAliases = await getProductAliases(assigningProduct)
+      const currentAliases = await getProductAliases(productId)
       
       // Add detected name as new alias
-      const normalizedDetected = normalizeText(selectedUnknownItem.nombreDetectado)
+      const normalizedDetected = normalizeText(item.nombreDetectado)
       const newAliases = [...(currentAliases || []), normalizedDetected]
       
       // Limit to 20 aliases per product
       const limitedAliases = newAliases.slice(-20)
       
-      await saveProductAliases(assigningProduct, limitedAliases)
+      // Remove duplicates
+      const uniqueAliases = [...new Set(limitedAliases)]
+      
+      await saveProductAliases(productId, uniqueAliases)
       
       // Update local products state
       setProducts(prev => prev.map(p => 
-        p.id === assigningProduct 
-          ? { ...p, aliases: limitedAliases }
+        p.id === productId 
+          ? { ...p, aliases: uniqueAliases }
           : p
       ))
       
-      // Reset selection
+      // Reset selection for this item
+      setAssigningMap(prev => {
+        const newMap = { ...prev }
+        delete newMap[item.nombreDetectado]
+        return newMap
+      })
       setSelectedUnknownItem(null)
-      setAssigningProduct(null)
       
       // Re-process OCR text with new aliases
       if (ocrText) {
         const parsed = parseFactura(ocrText, config)
         const updatedProducts = products.map(p => 
-          p.id === assigningProduct 
-            ? { ...p, aliases: limitedAliases }
+          p.id === productId 
+            ? { ...p, aliases: uniqueAliases }
             : p
         )
         const matched = await matchProducts(parsed, updatedProducts, config)
@@ -182,29 +245,46 @@ export default function OCRConfigPage() {
       console.error("Error saving aliases:", error)
       setError("Error al guardar alias")
     }
-  }, [selectedUnknownItem, assigningProduct, products, config, ocrText])
+  }, [assigningMap, products, config, ocrText])
 
   const handleConfigChange = useCallback((field: keyof OCRConfig, value: any) => {
     setConfig(prev => ({ ...prev, [field]: value }))
   }, [])
 
-  const okItems = matchedItems.filter(item => item.status === "ok")
-  const unknownItems = matchedItems.filter(item => item.status === "unknown")
+const okItems = matchedItems.filter(item => item.status === "ok")
+const unknownItems = matchedItems.filter(item => item.status === "unknown")
 
-  return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-2 mb-6">
-        <Settings className="h-6 w-6" />
-        <h1 className="text-2xl font-bold">Configuración OCR de Facturas</h1>
-      </div>
-
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Section 1 - Upload Image */}
+return (
+  <div className="container mx-auto p-6 space-y-6">
+    {/* Pedido Selector */}
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Settings className="h-5 w-5" />
+          Configuración OCR
+        </CardTitle>
+        <CardDescription>
+          Selecciona un pedido para cargar sus productos y entrenar el sistema de reconocimiento.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <Label htmlFor="pedido-select">Seleccionar Pedido</Label>
+          <select
+              id="pedido-select"
+              value={pedidoSeleccionadoId}
+              onChange={(e) => setPedidoSeleccionadoId(e.target.value)}
+              className="w-full border rounded-md px-3 py-2"
+              disabled={pedidos.length === 0}
+            >
+              <option value="">Seleccionar pedido...</option>
+              {pedidos.map(pedido => (
+                <option key={pedido.id} value={pedido.id}>
+                  {pedido.id} - {new Date(pedido.createdAt?.seconds * 1000).toLocaleDateString()}
+                </option>
+              ))}
+            </select>
+          </div>
       <Card>
         <CardHeader>
           <CardTitle>🔹 Sección 1 – Subir imagen</CardTitle>
@@ -332,31 +412,33 @@ export default function OCRConfigPage() {
                         </td>
                         <td className="text-center p-2">
                           {item.status === "unknown" && (
-                            <div className="flex items-center gap-2">
-                              <Label htmlFor="product-select" className="text-sm">Asignar a producto:</Label>
-                              <select
-                                id="product-select"
-                                value={assigningProduct || ""}
-                                onChange={(e) => setAssigningProduct(e.target.value)}
-                                className="border rounded px-2 py-1 text-sm"
-                                disabled={assigningProduct !== null}
-                              >
-                                <option value="">Seleccionar producto...</option>
-                                {products.map(product => (
-                                  <option key={product.id} value={product.id}>
-                                    {product.nombre}
-                                  </option>
-                                ))}
-                              </select>
-                              <Button
-                                size="sm"
-                                onClick={handleSaveAlias}
-                                disabled={!selectedUnknownItem || !assigningProduct}
-                              >
-                                Guardar Alias
-                              </Button>
-                            </div>
-                          )}
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor={`product-select-${index}`} className="text-sm">Asignar a producto:</Label>
+                          <select
+                            id={`product-select-${index}`}
+                            value={assigningMap[item.nombreDetectado] || ""}
+                            onChange={(e) => setAssigningMap(prev => ({
+                              ...prev,
+                              [item.nombreDetectado]: e.target.value
+                            }))}
+                            className="border rounded px-2 py-1 text-sm"
+                          >
+                            <option value="">Seleccionar producto...</option>
+                            {products.map(product => (
+                              <option key={product.id} value={product.id}>
+                                {product.nombre}
+                              </option>
+                            ))}
+                          </select>
+                          <Button
+                            size="sm"
+                            onClick={() => handleSaveAlias(item)}
+                            disabled={!assigningMap[item.nombreDetectado]}
+                          >
+                            Guardar Alias
+                          </Button>
+                        </div>
+                      )}
                         </td>
                       </tr>
                     ))}
@@ -454,3 +536,5 @@ export default function OCRConfigPage() {
     </div>
   )
 }
+
+export default OCRConfigPage
