@@ -319,6 +319,7 @@ return (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 Procesando OCR...
               </>
+              </>
             ) : (
               <>
                 <Upload className="h-4 w-4 mr-2" />
@@ -335,9 +336,7 @@ return (
         <Card>
           <CardHeader>
             <CardTitle>🔹 Sección 2 – Texto OCR crudo</CardTitle>
-            <CardDescription>
-              Texto detectado por OCR sin procesamiento
-            </CardDescription>
+            <CardDescription>Texto detectado por OCR sin procesamiento</CardDescription>
           </CardHeader>
           <CardContent>
             <Textarea
@@ -404,11 +403,11 @@ return (
                           {item.matchedAlias || '-'}
                         </td>
                         <td className="text-center p-2">
-                          <span className={`text-xs px-2 py-1 rounded ${
+                          <span className={"text-xs px-2 py-1 rounded " + (
                             item.status === "ok" 
                               ? "bg-green-100 text-green-800" 
                               : "bg-yellow-100 text-yellow-800"
-                          }`}>
+                          ) + ">"}>
                             {item.status}
                           </span>
                         </td>
