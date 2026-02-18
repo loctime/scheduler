@@ -116,7 +116,7 @@ export default function OCRConfigPage() {
       if (ocrText) {
         const parsed = parseFactura(ocrText, config)
         setParsedItems(parsed)
-        const matched = matchProducts(parsed, products, config)
+        const matched = await matchProducts(parsed, products, config)
         setMatchedItems(matched)
       }
     } catch (err) {
@@ -169,7 +169,12 @@ export default function OCRConfigPage() {
       // Re-process OCR text with new aliases
       if (ocrText) {
         const parsed = parseFactura(ocrText, config)
-        const matched = await matchProducts(parsed, products, config)
+        const updatedProducts = products.map(p => 
+          p.id === assigningProduct 
+            ? { ...p, aliases: limitedAliases }
+            : p
+        )
+        const matched = await matchProducts(parsed, updatedProducts, config)
         setMatchedItems(matched)
       }
       
