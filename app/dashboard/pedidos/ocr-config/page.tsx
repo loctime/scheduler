@@ -285,7 +285,8 @@ return (
               ))}
             </select>
           </div>
-      <Card>
+        </CardContent>
+      </Card>
         <CardHeader>
           <CardTitle>🔹 Sección 1 – Subir imagen</CardTitle>
           <CardDescription>
@@ -325,6 +326,7 @@ return (
               </>
             )}
           </Button>
+        </div>
         </CardContent>
       </Card>
 
