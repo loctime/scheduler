@@ -1,5 +1,5 @@
 import type { Producto } from "@/lib/types"
-import { OCRConfig } from "./ocr-config"
+import { OCRConfig, getProductAliases } from "./ocr-config"
 
 // Types for the OCR processing
 export interface ParsedItem {
@@ -15,6 +15,9 @@ export interface MatchedItem {
   matchedProductId: string | null
   status: "ok" | "unknown"
   similarity?: number
+  tokenScore?: number
+  finalScore?: number
+  matchedAlias?: string
 }
 
 // Normalization function for text matching
@@ -27,6 +30,19 @@ export function normalizeText(text: string): string {
     .replace(/[^a-z0-9\s]/g, '') // Remove special chars
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+// Token scoring function
+export function tokenScore(detected: string, product: Producto): number {
+  const detectedTokens = normalizeText(detected).split(/\s+/).filter(t => t.length >= 3)
+  const productTokens = normalizeText(product.nombre).split(/\s+/).filter(t => t.length >= 3)
+  
+  if (detectedTokens.length === 0 || productTokens.length === 0) return 0
+  
+  const commonTokens = detectedTokens.filter(token => productTokens.includes(token))
+  const score = commonTokens.length / Math.max(detectedTokens.length, productTokens.length)
+  
+  return score
 }
 
 // Calculate string similarity (Levenshtein distance based)
@@ -147,32 +163,75 @@ export function parseFactura(text: string, config: OCRConfig): ParsedItem[] {
   return items
 }
 
-// Match parsed items with existing products
-export function matchProducts(parsedItems: ParsedItem[], products: Producto[], config: OCRConfig): MatchedItem[] {
-  return parsedItems.map(item => {
+// Match parsed items with existing products using hybrid scoring
+export async function matchProducts(parsedItems: ParsedItem[], products: Producto[], config: OCRConfig): Promise<MatchedItem[]> {
+  const results: MatchedItem[] = []
+  
+  for (const item of parsedItems) {
     const normalizedDetected = normalizeText(item.nombreDetectado)
-    let bestMatch: { productId: string; similarity: number } | null = null
+    let bestMatch: {
+      productId: string
+      similarity: number
+      tokenScore: number
+      finalScore: number
+      matchedAlias?: string
+    } | null = null
     
-    // Always calculate similarity for all products
+    // Check each product with aliases support
     for (const product of products) {
       const normalizedProduct = normalizeText(product.nombre)
-      const similarity = calculateSimilarity(normalizedDetected, normalizedProduct)
+      const levenshteinScore = calculateSimilarity(normalizedDetected, normalizedProduct)
+      const tokenScoreValue = tokenScore(item.nombreDetectado, product)
       
-      if (!bestMatch || similarity > bestMatch.similarity) {
-        bestMatch = { productId: product.id, similarity }
+      // Load aliases for this product
+      const aliases = product.aliases || []
+      let bestAliasScore = 0
+      let matchedAlias: string | undefined
+      
+      // Check against main name and all aliases
+      for (const alias of [product.nombre, ...aliases]) {
+        const normalizedAlias = normalizeText(alias)
+        const aliasLevenshteinScore = calculateSimilarity(normalizedDetected, normalizedAlias)
+        const aliasTokenScore = tokenScore(item.nombreDetectado, { ...product, nombre: alias })
+        
+        // Calculate final score for this alias
+        const aliasFinalScore = (aliasTokenScore * 0.7) + (aliasLevenshteinScore * 0.3)
+        
+        if (aliasFinalScore > bestAliasScore) {
+          bestAliasScore = aliasFinalScore
+          matchedAlias = alias
+        }
+      }
+      
+      // Calculate final score for this product
+      const finalScore = (tokenScoreValue * 0.7) + (levenshteinScore * 0.3)
+      
+      if (!bestMatch || finalScore > bestMatch.finalScore) {
+        bestMatch = {
+          productId: product.id,
+          similarity: levenshteinScore,
+          tokenScore: tokenScoreValue,
+          finalScore,
+          matchedAlias
+        }
       }
     }
     
     // Determine status based on dynamic similarity threshold
-    const status = bestMatch && bestMatch.similarity >= config.similarityThreshold ? "ok" : "unknown"
+    const status = bestMatch && bestMatch.finalScore >= config.similarityThreshold ? "ok" : "unknown"
     
-    return {
+    results.push({
       rawText: item.rawText,
       nombreDetectado: item.nombreDetectado,
       cantidad: item.cantidad,
       matchedProductId: bestMatch?.productId || null,
       status,
-      similarity: bestMatch?.similarity
-    }
-  })
+      similarity: bestMatch?.similarity,
+      tokenScore: bestMatch?.tokenScore,
+      finalScore: bestMatch?.finalScore,
+      matchedAlias: bestMatch?.matchedAlias
+    })
+  }
+  
+  return results
 }

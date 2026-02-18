@@ -11,7 +11,8 @@ import { Loader2, Upload, Settings, RotateCcw } from "lucide-react"
 import Tesseract from "tesseract.js"
 import type { Producto } from "@/lib/types"
 import { OCRConfig, getOCRConfig, saveOCRConfig, DEFAULT_OCR_CONFIG } from "@/lib/ocr-config"
-import { parseFactura, matchProducts, type ParsedItem, type MatchedItem } from "@/lib/ocr-utils"
+import { parseFactura, matchProducts, normalizeText, type ParsedItem, type MatchedItem } from "@/lib/ocr-utils"
+import { saveProductAliases, getProductAliases } from "@/lib/ocr-config"
 
 export default function OCRConfigPage() {
   const [config, setConfig] = useState<OCRConfig>(DEFAULT_OCR_CONFIG)
@@ -22,6 +23,8 @@ export default function OCRConfigPage() {
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([])
   const [matchedItems, setMatchedItems] = useState<MatchedItem[]>([])
   const [products, setProducts] = useState<Producto[]>([])
+  const [selectedUnknownItem, setSelectedUnknownItem] = useState<MatchedItem | null>(null)
+  const [assigningProduct, setAssigningProduct] = useState<string | null>(null)
 
   // Load config and products on mount
   useEffect(() => {
@@ -31,10 +34,10 @@ export default function OCRConfigPage() {
           getOCRConfig(),
           // Mock products for testing - in real implementation, load from your data source
           Promise.resolve([
-            { id: '1', nombre: 'coca cola 2l' },
-            { id: '2', nombre: 'sprite' },
-            { id: '3', nombre: 'agua mineral' },
-            { id: '4', nombre: 'azucar' },
+            { id: '1', nombre: 'coca cola 2l', aliases: ['coca cola', 'cocacola', 'cola'] },
+            { id: '2', nombre: 'sprite', aliases: ['sprite', 'sprite soda'] },
+            { id: '3', nombre: 'agua mineral', aliases: ['agua', 'agua mineral', 'mineral'] },
+            { id: '4', nombre: 'azucar', aliases: ['azucar', 'sugar'] },
           ] as Producto[])
         ])
         
@@ -88,7 +91,7 @@ export default function OCRConfigPage() {
       setParsedItems(parsed)
       
       // Match with products using current config
-      const matched = matchProducts(parsed, products, config)
+      const matched = await matchProducts(parsed, products, config)
       setMatchedItems(matched)
       
       if (matched.length === 0) {
@@ -128,6 +131,53 @@ export default function OCRConfigPage() {
     setConfig(DEFAULT_OCR_CONFIG)
     setError(null)
   }, [])
+
+  const handleAssignProduct = useCallback(async (item: MatchedItem) => {
+    if (!item.matchedProductId) return
+    
+    setAssigningProduct(item.matchedProductId)
+    setSelectedUnknownItem(item)
+  }, [])
+
+  const handleSaveAlias = useCallback(async () => {
+    if (!selectedUnknownItem || !assigningProduct) return
+    
+    try {
+      // Get current aliases
+      const currentAliases = await getProductAliases(assigningProduct)
+      
+      // Add detected name as new alias
+      const normalizedDetected = normalizeText(selectedUnknownItem.nombreDetectado)
+      const newAliases = [...(currentAliases || []), normalizedDetected]
+      
+      // Limit to 20 aliases per product
+      const limitedAliases = newAliases.slice(-20)
+      
+      await saveProductAliases(assigningProduct, limitedAliases)
+      
+      // Update local products state
+      setProducts(prev => prev.map(p => 
+        p.id === assigningProduct 
+          ? { ...p, aliases: limitedAliases }
+          : p
+      ))
+      
+      // Reset selection
+      setSelectedUnknownItem(null)
+      setAssigningProduct(null)
+      
+      // Re-process OCR text with new aliases
+      if (ocrText) {
+        const parsed = parseFactura(ocrText, config)
+        const matched = await matchProducts(parsed, products, config)
+        setMatchedItems(matched)
+      }
+      
+    } catch (error) {
+      console.error("Error saving aliases:", error)
+      setError("Error al guardar alias")
+    }
+  }, [selectedUnknownItem, assigningProduct, products, config, ocrText])
 
   const handleConfigChange = useCallback((field: keyof OCRConfig, value: any) => {
     setConfig(prev => ({ ...prev, [field]: value }))
@@ -242,6 +292,9 @@ export default function OCRConfigPage() {
                       <th className="text-left p-2">Producto detectado</th>
                       <th className="text-center p-2">Cantidad detectada</th>
                       <th className="text-center p-2">Similarity</th>
+                      <th className="text-center p-2">Token Score</th>
+                      <th className="text-center p-2">Final Score</th>
+                      <th className="text-center p-2">Alias</th>
                       <th className="text-center p-2">Estado</th>
                     </tr>
                   </thead>
@@ -254,6 +307,15 @@ export default function OCRConfigPage() {
                         <td className="text-center p-2 font-mono">
                           {item.similarity?.toFixed(2) || '-'}
                         </td>
+                        <td className="text-center p-2 font-mono">
+                          {item.tokenScore?.toFixed(2) || '-'}
+                        </td>
+                        <td className="text-center p-2 font-mono">
+                          {item.finalScore?.toFixed(2) || '-'}
+                        </td>
+                        <td className="text-center p-2">
+                          {item.matchedAlias || '-'}
+                        </td>
                         <td className="text-center p-2">
                           <span className={`text-xs px-2 py-1 rounded ${
                             item.status === "ok" 
@@ -262,6 +324,34 @@ export default function OCRConfigPage() {
                           }`}>
                             {item.status}
                           </span>
+                        </td>
+                        <td className="text-center p-2">
+                          {item.status === "unknown" && (
+                            <div className="flex items-center gap-2">
+                              <Label htmlFor="product-select" className="text-sm">Asignar a producto:</Label>
+                              <select
+                                id="product-select"
+                                value={assigningProduct || ""}
+                                onChange={(e) => setAssigningProduct(e.target.value)}
+                                className="border rounded px-2 py-1 text-sm"
+                                disabled={assigningProduct !== null}
+                              >
+                                <option value="">Seleccionar producto...</option>
+                                {products.map(product => (
+                                  <option key={product.id} value={product.id}>
+                                    {product.nombre}
+                                  </option>
+                                ))}
+                              </select>
+                              <Button
+                                size="sm"
+                                onClick={handleSaveAlias}
+                                disabled={!selectedUnknownItem || !assigningProduct}
+                              >
+                                Guardar Alias
+                              </Button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}

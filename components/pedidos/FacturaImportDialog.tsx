@@ -107,7 +107,7 @@ export function FacturaImportDialog({
       setParsedItems(parsed)
       
       // Match with products using current config
-      const matched = matchProducts(parsed, products, config)
+      const matched = await matchProducts(parsed, products, config)
       setMatchedItems(matched)
       
       if (matched.length === 0) {

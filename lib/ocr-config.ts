@@ -36,3 +36,29 @@ export async function saveOCRConfig(config: OCRConfig): Promise<void> {
     throw error
   }
 }
+
+// Product alias training functions
+export async function getProductAliases(productId: string): Promise<string[]> {
+  try {
+    if (!db) return []
+    const productDoc = await getDoc(doc(db, "products", productId))
+    if (productDoc.exists()) {
+      const product = productDoc.data()
+      return (product.aliases as string[]) || []
+    }
+    return []
+  } catch (error) {
+    console.error("Error loading product aliases:", error)
+    return []
+  }
+}
+
+export async function saveProductAliases(productId: string, aliases: string[]): Promise<void> {
+  try {
+    if (!db) throw new Error("Firestore not available")
+    await setDoc(doc(db, "products", productId), { aliases })
+  } catch (error) {
+    console.error("Error saving product aliases:", error)
+    throw error
+  }
+}
