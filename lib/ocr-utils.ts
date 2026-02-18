@@ -75,39 +75,69 @@ export function parseFactura(text: string, config: OCRConfig): ParsedItem[] {
   
   const items: ParsedItem[] = []
   
-  for (const line of lines) {
+  // Find the start of product table
+  let productTableStart = -1
+  let foundHeader = false
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].toUpperCase()
+    
+    // Look for product table headers
+    if (line.includes('DESCRIPCIÓN') || line.includes('COD') || line.includes('CANT')) {
+      productTableStart = i
+      foundHeader = true
+      break
+    }
+  }
+  
+  // If no product table found, use all lines
+  const startIdx = productTableStart >= 0 ? productTableStart + 1 : 0
+  
+  for (let i = startIdx; i < lines.length; i++) {
+    const line = lines[i]
+    
     // Skip lines with exclude words
     if (excludeWords.some(word => line.toUpperCase().includes(word))) {
       continue
     }
     
-    // Find all numbers in line
-    const numbers = line.match(/\b(\d+)\b/g)
-    if (!numbers || numbers.length === 0) {
+    // Structural filter: Only process lines that start with product code
+    // Real products typically start with numeric codes (4-6 digits)
+    const codeMatch = line.match(/^(\d{4,6})\s+(.+)/)
+    if (!codeMatch) {
       continue
+    }
+    
+    const fullLine = codeMatch[0]
+    const productInfo = codeMatch[2]
+    
+    // Find all numbers in the product line
+    const numbers = fullLine.match(/\b(\d+)\b/g)
+    if (!numbers || numbers.length < 2) {
+      continue // Require at least 2 numbers (code + quantity/price)
     }
     
     // Convert all numbers to integers and filter reasonable quantities
     const quantities = numbers
       .map(n => parseInt(n, 10))
-      .filter(n => n > 0 && n <= config.maxCantidadPermitida) // Dynamic max quantity
+      .filter(n => n > 0 && n <= config.maxCantidadPermitida)
     
     if (quantities.length === 0) {
       continue
     }
     
-    // Choose the smallest number as the likely quantity (prices are usually larger)
+    // Choose the smallest number as likely quantity (prices are usually larger)
     const cantidad = Math.min(...quantities)
     
     // Remove only the chosen quantity number, keep other numbers in product name
-    const nombreDetectado = line
+    const nombreDetectado = productInfo
       .replace(new RegExp(`\\b${cantidad}\\b`, 'g'), '')
       .replace(/\s+/g, ' ')
       .trim()
     
     if (cantidad > 0 && nombreDetectado.length > 0) {
       items.push({
-        rawText: line,
+        rawText: fullLine,
         nombreDetectado,
         cantidad
       })
