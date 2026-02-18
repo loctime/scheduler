@@ -63,7 +63,9 @@ export default function OCRConfigPage() {
   useEffect(() => {
     const loadPedidos = async () => {
       if (!db) return
-      const snap = await getDocs(collection(db, "pedidos"))
+const snap = await getDocs(
+  collection(db, "apps", "horarios", "pedidos")
+)
       const list = snap.docs.map((d) => ({
         id: d.id,
         ...d.data(),
