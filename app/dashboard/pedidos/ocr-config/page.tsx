@@ -37,14 +37,19 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
+  where,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { useOwnerId } from "@/hooks/use-owner-id"
 
 export default function OCRConfigPage() {
   const [config, setConfig] = useState<OCRConfig>(DEFAULT_OCR_CONFIG)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  
+  const ownerId = useOwnerId()
 
   const [ocrText, setOcrText] = useState("")
   const [matchedItems, setMatchedItems] = useState<MatchedItem[]>([])
@@ -62,10 +67,14 @@ export default function OCRConfigPage() {
 
   useEffect(() => {
     const loadPedidos = async () => {
-      if (!db) return
-const snap = await getDocs(
-  collection(db, "apps", "horarios", "pedidos")
-)
+      if (!db || !ownerId) return
+      
+      const snap = await getDocs(
+        query(
+          collection(db, "apps", "horarios", "pedidos"),
+          where("ownerId", "==", ownerId)
+        )
+      )
       const list = snap.docs.map((d) => ({
         id: d.id,
         ...d.data(),
@@ -76,7 +85,7 @@ const snap = await getDocs(
       }
     }
     loadPedidos()
-  }, [])
+  }, [ownerId])
 
   /* =========================
      LOAD PRODUCTS
@@ -191,11 +200,19 @@ const snap = await getDocs(
             className="w-full border rounded px-3 py-2"
           >
             <option value="">Seleccionar pedido...</option>
-            {pedidos.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.id}
-              </option>
-            ))}
+            {pedidos.map((p) => {
+              const displayName = p.nombre || p.id
+              const dateStr = p.createdAt 
+                ? new Date(p.createdAt.seconds * 1000).toLocaleDateString()
+                : ''
+              const fullDisplay = dateStr ? `${displayName} - ${dateStr}` : displayName
+              
+              return (
+                <option key={p.id} value={p.id}>
+                  {fullDisplay}
+                </option>
+              )
+            })}
           </select>
         </CardContent>
       </Card>
