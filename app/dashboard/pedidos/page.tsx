@@ -21,6 +21,7 @@ import { doc, serverTimestamp, getDoc, updateDoc, deleteDoc, onSnapshot, collect
 import type { Remito, Recepcion, Producto } from "@/lib/types"
 import { esModoPack, unidadesToPacks, packsToUnidades, unidadesToPacksFloor } from "@/lib/unidades-utils"
 import { ejecutarPedidoEngine } from "@/lib/pedido-engine"
+import { buildPedidoOficial } from "@/lib/build-pedido-oficial"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import { PedidoTimeline } from "@/components/pedidos/pedido-timeline"
 import { crearRemitoPedido, crearRemitoRecepcion } from "@/lib/remito-utils"
@@ -183,11 +184,11 @@ export default function PedidosPage() {
   // Estado para ajustes manuales de pedido (no afecta el stock real)
   const [ajustesPedido, setAjustesPedido] = useState<Record<string, number>>({})
   
-  // Cache del engine para evitar recálculos múltiples
+  // Cache del engine usando la función oficial unificada
   const resultadoEngine = useMemo(() => {
     if (!selectedPedido) return null
     
-    return ejecutarPedidoEngine({
+    return buildPedidoOficial({
       pedido: {
         nombre: selectedPedido.nombre,
         formatoSalida: selectedPedido.formatoSalida,
@@ -196,9 +197,9 @@ export default function PedidosPage() {
       productos: products,
       stockActual,
       ajustesPedido,
-      calcularPedido
+      usarCantidadesManuales: false // Usar modo automático con cálculo basado en stock mínimo
     })
-  }, [selectedPedido, products, stockActual, ajustesPedido, calcularPedido])
+  }, [selectedPedido, products, stockActual, ajustesPedido])
 
   // Función para cambiar el ajuste de pedido
   const handleAjustePedidoChange = useCallback((productId: string, ajuste: number) => {

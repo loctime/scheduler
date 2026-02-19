@@ -148,8 +148,7 @@ export function useStockConsole(user: any) {
       })
       setStockActual(stockMap)
       
-      // Resetear cantidades al cambiar de pedido
-      setState(prev => ({ ...prev, cantidades: {} }))
+      // NO resetear cantidades al cambiar de pedido - mantener las cantidades existentes
     } catch (error: any) {
       console.error("Error al cargar productos:", error)
       toast({

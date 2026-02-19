@@ -14,6 +14,7 @@ import { UserStatusMenu } from "@/components/pwa/UserStatusMenu"
 import { PwaViewerBadge } from "@/components/pwa/PwaViewerBadge"
 import { esModoPack, getCantidadPorPack, unidadesSignedToPacksFloor, packsSignedToUnidades } from "@/lib/unidades-utils"
 import { ejecutarPedidoEngine } from "@/lib/pedido-engine"
+import { buildPedidoOficial } from "@/lib/build-pedido-oficial"
 
 /** Abrevia el nombre para vista móvil si supera 15 caracteres; si no, lo deja igual. */
 function abbreviateProductName(nombre: string): string {
@@ -57,26 +58,53 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
   const stockConsole = useStockConsole(user)
   const { state, pedidos, productos, stockActual, movimientosPendientes, totalIngresos, totalEgresos, setSelectedPedidoId, incrementarCantidad, decrementarCantidad, setCantidad, limpiarCantidades, confirmarMovimientos, setStockReal } = stockConsole
 
-  // Cache del pedido-engine para generar texto cuando sea necesario
-  const resultadoEngine = useMemo(() => {
+  // Generación automática del texto del pedido (basado en stock mínimo, ignora cantidades manuales)
+  const textoPedidoAutomatico = useMemo(() => {
     const selectedPedido = pedidos.find(p => p.id === state.selectedPedidoId)
     if (!selectedPedido) return null
     
-    return ejecutarPedidoEngine({
-      pedido: {
-        nombre: selectedPedido.nombre,
-        formatoSalida: selectedPedido.formatoSalida || "{nombre}: {cantidad} {unidad}",
-        mensajePrevio: selectedPedido.mensajePrevio,
-      },
-      productos,
-      stockActual,
-      ajustesPedido: {}, // Stock console no tiene ajustes manuales
-      calcularPedido: (stockMinimo: number, stockActualProducto?: number) => {
-        // Stock console usa cantidades manuales, no stockMinimo
-        return state.cantidades[selectedPedido.id] || 0
-      },
+    // Calcular cantidades automáticas basadas en stock mínimo
+    const productosCalculados = productos
+      .map(producto => {
+        const stockMinimo = producto.stockMinimo || 0
+        const stockActualProducto = stockActual[producto.id] || 0
+        const cantidadPedida = Math.max(0, stockMinimo - stockActualProducto)
+        
+        if (cantidadPedida === 0) return null
+        
+        const unidad = producto.unidadBase || producto.unidad || "U"
+        
+        return {
+          productoId: producto.id,
+          nombre: producto.nombre,
+          cantidad: cantidadPedida,
+          unidad
+        }
+      })
+      .filter((p): p is NonNullable<typeof p> => p !== null)
+    
+    if (productosCalculados.length === 0) {
+      // Si no hay productos que pedir, generar texto vacío
+      const encabezado = selectedPedido.mensajePrevio?.trim() || `📦 ${selectedPedido.nombre}`
+      return `${encabezado}\n\nTotal: 0 productos`
+    }
+    
+    // Generar líneas de texto
+    const lineas = productosCalculados.map(p => {
+      const formato = selectedPedido.formatoSalida || "{nombre}: {cantidad} {unidad}"
+      
+      return formato
+        .replace(/{nombre}/g, p.nombre)
+        .replace(/{cantidad}/g, p.cantidad.toString())
+        .replace(/{cantidadUnidades}/g, p.cantidad.toString())
+        .replace(/{cantidadPacks}/g, p.cantidad.toString())
+        .replace(/{unidad}/g, p.unidad)
+        .trim()
     })
-  }, [state.selectedPedidoId, pedidos, productos, stockActual, state.cantidades])
+    
+    const encabezado = selectedPedido.mensajePrevio?.trim() || `📦 ${selectedPedido.nombre}`
+    return `${encabezado}\n\n${lineas.join("\n")}\n\nTotal: ${productosCalculados.length} productos`
+  }, [state.selectedPedidoId, pedidos, productos, stockActual])
 
   const [mode, setMode] = useState<"work" | "control">("work")
 
@@ -406,12 +434,12 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                 <X className={`w-4 h-4 ${isPWA ? "mr-1" : "mr-2"}`} />
                 Limpiar
               </Button>
-              {/* Botón para generar texto del pedido usando pedido-engine */}
-              {resultadoEngine && (
+              {/* Botón para generar texto del pedido usando cálculo automático */}
+              {state.selectedPedidoId && textoPedidoAutomatico && (
                 <Button
                   onClick={async () => {
                     try {
-                      await navigator.clipboard.writeText(resultadoEngine.texto)
+                      await navigator.clipboard.writeText(textoPedidoAutomatico)
                       toast({
                         title: "Texto copiado",
                         description: "El texto del pedido se ha copiado al portapapeles",
