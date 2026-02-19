@@ -256,12 +256,25 @@ export default function PwaHorariosMensualesPage() {
   }, [exportImage, config])
 
   const handleExportWeekPDF = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
-    const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
-    await exportPDF(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.pdf`, {
-      nombreEmpresa: config?.nombreEmpresa,
-      colorEmpresa: config?.colorEmpresa,
-    })
-  }, [exportPDF, config])
+    const filename = `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.pdf`
+    
+    // Create getWeekSchedule function to find schedule by weekStart
+    const getWeekSchedule = (weekStartStr: string) =>
+      schedules.find(s => s.weekStart === weekStartStr) || null
+
+    await exportPDF(
+      weekStartDate,
+      weekEndDate,
+      employees,
+      shifts,
+      filename,
+      getWeekSchedule,
+      {
+        nombreEmpresa: config?.nombreEmpresa,
+        colorEmpresa: config?.colorEmpresa,
+      }
+    )
+  }, [exportPDF, config, employees, shifts, schedules])
 
   const handleExportWeekExcel = useCallback(async (weekStartDate: Date, weekDays: Date[], weekSchedule: Horario | null) => {
     await exportExcel(

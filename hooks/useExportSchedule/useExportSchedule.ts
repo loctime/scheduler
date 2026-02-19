@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import type { Empleado, Turno, Horario, Separador, MedioTurno } from "@/lib/types"
-import { format } from "date-fns"
 import { useExportImage } from "./image/exportImage"
 import { useExportWeekPDF } from "./pdf/exportWeekPDF"
 import { useExportMonthPDF } from "./pdf/exportMonthPDF"
@@ -17,11 +16,6 @@ export function useExportSchedule() {
   const { exportMonthPDF } = useExportMonthPDF()
   const { exportExcel } = useExportExcel()
 
-  // Wrapper para compatibilidad con getWeekSchedule
-  const getWeekScheduleWrapper = (weekStartDate: Date, getWeekSchedule: (weekStartStr: string) => Horario | null) => {
-    const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
-    return getWeekSchedule(weekStartStr)
-  }
 
   // Wrapper para exportImage que maneja el estado de exporting
   const handleExportImage = useCallback(async (
@@ -47,25 +41,16 @@ export function useExportSchedule() {
   // Wrapper para exportPDF que maneja el estado de exporting
   const handleExportWeekPDF = useCallback(
     async (
-      weekStartDate: Date,
-      weekEndDate: Date,
-      employees: Empleado[],
-      shifts: Turno[],
+      elementId: string,
       filename: string,
-      getWeekSchedule: (weekStartStr: string) => Horario | null,
       config?: { 
         nombreEmpresa?: string; 
         colorEmpresa?: string;
-        monthRange?: { startDate: Date; endDate: Date };
-        mediosTurnos?: MedioTurno[];
-        employeeMonthlyStats?: Record<string, any>;
-        minutosDescanso?: number;
-        horasMinimasParaDescanso?: number;
       }
     ) => {
       setExporting(true)
       try {
-        await exportPDF(weekStartDate, weekEndDate, employees, shifts, filename, getWeekScheduleWrapper, config)
+        await exportPDF(elementId, filename, config)
       } finally {
         setExporting(false)
       }
@@ -91,7 +76,7 @@ export function useExportSchedule() {
     ) => {
       setExporting(true)
       try {
-        await exportMonthPDF(monthWeeks, employees, shifts, filename, getWeekScheduleWrapper, config)
+        await exportMonthPDF(monthWeeks, getWeekSchedule, employees, shifts, filename, config)
       } finally {
         setExporting(false)
       }
@@ -104,7 +89,6 @@ export function useExportSchedule() {
     shifts: Turno[],
     schedule: Horario | null,
     filename: string,
-    getWeekSchedule: (weekStartStr: string) => Horario | null,
     config?: { 
       separadores?: Separador[]; 
       ordenEmpleados?: string[]; 
@@ -114,7 +98,7 @@ export function useExportSchedule() {
   ) => {
     setExporting(true)
     try {
-      await exportExcel(weekDays, employees, shifts, schedule, filename, getWeekScheduleWrapper, config)
+      await exportExcel(weekDays, employees, shifts, schedule, filename, config)
     } finally {
       setExporting(false)
     }
