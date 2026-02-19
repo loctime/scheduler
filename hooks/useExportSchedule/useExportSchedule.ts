@@ -60,10 +60,10 @@ export function useExportSchedule() {
   const handleExportMonthPDF = useCallback(
     async (
       monthWeeks: Date[][],
+      getWeekSchedule: (weekStartStr: string) => Horario | null,
       employees: Empleado[],
       shifts: Turno[],
       filename: string,
-      getWeekSchedule: (weekStartStr: string) => Horario | null,
       config?: { 
         nombreEmpresa?: string; 
         colorEmpresa?: string;

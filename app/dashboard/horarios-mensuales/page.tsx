@@ -53,34 +53,19 @@ export default function HorariosMensualesPage() {
 
   const handleExportWeekPDF = useCallback(
     async (weekStartDate: Date, weekEndDate: Date) => {
+      const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
       const filename = `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.pdf`
       
-      // Create getWeekSchedule function to find schedule by weekStart
-      const getWeekSchedule = (weekStartStr: string) => {
-        // Find the schedule matching the weekStart string from monthGroups
-        for (const monthGroup of monthGroups) {
-          const week = monthGroup.weeks.find(w => w.weekStartStr === weekStartStr)
-          if (week?.schedule) {
-            return week.schedule
-          }
-        }
-        return null
-      }
-
       await exportPDF(
-        weekStartDate,
-        weekEndDate,
-        employees,
-        shifts,
+        weekId,
         filename,
-        getWeekSchedule,
         {
           nombreEmpresa: config?.nombreEmpresa,
           colorEmpresa: config?.colorEmpresa,
         }
       )
     },
-    [exportPDF, config, employees, shifts, monthGroups]
+    [exportPDF, config]
   )
 
   const handleExportWeekExcel = useCallback(
