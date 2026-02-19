@@ -55,6 +55,7 @@ interface GeneralViewProps {
   onCopyCurrentWeek?: (weekStartDate: Date) => void
   onPasteCopiedWeek?: (targetWeekStartDate: Date) => Promise<void>
   isPastingWeek?: boolean
+  targetWeekStartDate?: Date
 }
 
 export function GeneralView({
@@ -87,6 +88,7 @@ export function GeneralView({
   onCopyCurrentWeek,
   onPasteCopiedWeek,
   isPastingWeek = false,
+  targetWeekStartDate,
 }: GeneralViewProps) {
   const DEBUG = false
   // Create shift map for efficient lookup
@@ -96,6 +98,12 @@ export function GeneralView({
 
   const getShiftInfo = (shiftId: string) => {
     return shiftMap.get(shiftId)
+  }
+
+  // Wrapper para compatibilidad con getWeekSchedule
+  const getWeekScheduleWrapper = (weekStartDate: Date) => {
+    const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+    return getWeekSchedule(weekStartStr)
   }
 
   // Crear un mapa de semanas expandidas usando la fecha de inicio de semana como clave
@@ -249,7 +257,7 @@ export function GeneralView({
               open={isExpanded}
               onOpenChange={(open: boolean) => handleWeekToggle(weekStartDate, open)}
               onWeekScheduleRef={handleWeekScheduleRef}
-              getWeekSchedule={getWeekSchedule}
+              getWeekSchedule={getWeekScheduleWrapper}
               allSchedules={allSchedules}
               user={user}
               onMarkComplete={onMarkWeekComplete ? (weekId: string) => {
