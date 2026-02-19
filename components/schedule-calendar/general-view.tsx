@@ -35,7 +35,7 @@ interface GeneralViewProps {
   exporting: boolean
   mediosTurnos?: MedioTurno[]
   employeeMonthlyStats: Record<string, EmployeeMonthlyStats>
-  getWeekSchedule: (weekStartDate: Date) => Horario | null
+  getWeekSchedule: (weekStartStr: string) => Horario | null // 🔥 Cambio: string en lugar de Date
   onAssignmentUpdate?: AssignmentUpdateHandler
   onExportMonthPDF: () => Promise<void>
   onExportWeekImage: (weekStartDate: Date, weekEndDate: Date) => Promise<void>
@@ -44,7 +44,7 @@ interface GeneralViewProps {
   onPreviousMonth: () => void
   onNextMonth: () => void
   user?: any
-  onMarkWeekComplete?: (weekStartDate: Date, completed: boolean) => Promise<void>
+  onMarkWeekComplete?: (weekStartStr: string, completed: boolean) => Promise<void> // 🔥 Cambio: string en lugar de Date
   lastCompletedWeekStart?: string | null
   allSchedules?: Horario[]
   config?: Configuracion | null
@@ -160,7 +160,8 @@ export function GeneralView({
   // IMPORTANTE: Este hook debe estar antes de cualquier return condicional
   const hasCompletedWeeks = useMemo(() => {
     return monthWeeks.some((weekDays) => {
-      const weekSchedule = getWeekSchedule(weekDays[0])
+      const weekStartStr = format(weekDays[0], "yyyy-MM-dd")
+      const weekSchedule = getWeekSchedule(weekStartStr)
       return weekSchedule?.completada === true
     })
   }, [monthWeeks, getWeekSchedule])
@@ -194,8 +195,9 @@ export function GeneralView({
       <div id="schedule-month-container" className="space-y-6">
         {monthWeeks.map((weekDays, weekIndex) => {
           const weekStartDate = weekDays[0]
-          const weekSchedule = getWeekSchedule(weekStartDate)
-          const weekKey = format(weekStartDate, "yyyy-MM-dd")
+          const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+          const weekSchedule = getWeekSchedule(weekStartStr)
+          const weekKey = weekStartStr
           const isExpanded = expandedWeeks.has(weekKey)
 
           // Si la semana está completada y tiene snapshot, usar empleados del snapshot
@@ -251,8 +253,8 @@ export function GeneralView({
               allSchedules={allSchedules}
               user={user}
               onMarkComplete={onMarkWeekComplete ? (weekId: string) => {
-                const weekDate = new Date(weekId.replace('schedule-week-', ''))
-                onMarkWeekComplete(weekDate, !weekSchedule?.completada)
+                const weekStartStr = weekId.replace('schedule-week-', '')
+                onMarkWeekComplete(weekStartStr, !weekSchedule?.completada)
               } : undefined}
               lastCompletedWeekStart={lastCompletedWeekStart ? new Date(lastCompletedWeekStart) : undefined}
               onPublishSchedule={onPublishSchedule}

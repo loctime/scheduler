@@ -173,14 +173,14 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
   const getDateAssignments = useCallback(
     (date: Date) => {
       const weekStartDate = startOfWeek(date, { weekStartsOn })
-      const weekSchedule = getWeekSchedule(weekStartDate)
+      const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+      const weekSchedule = getWeekSchedule(weekStartStr)
       if (!weekSchedule?.assignments) return null
       const dateStr = format(date, "yyyy-MM-dd")
       return weekSchedule.assignments[dateStr] || null
     },
-    [weekStartsOn, getWeekSchedule],
+    [getWeekSchedule, weekStartsOn],
   )
-
 
   const { handleAssignmentUpdate, handleMarkWeekComplete, pendingEdit, setPendingEdit } = useScheduleUpdates({
     user: userData,
@@ -237,7 +237,8 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
   }, [exportPDF, config])
 
   const copyCurrentWeek = useCallback((weekStartDate: Date) => {
-    const weekSchedule = getWeekSchedule(weekStartDate)
+    const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+    const weekSchedule = getWeekSchedule(weekStartStr)
 
     if (!weekSchedule?.assignments && !weekSchedule?.dayStatus) {
       toast({
@@ -393,7 +394,8 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
     }
     
     // Obtener datos de la semana actual
-    const weekSchedule = getWeekSchedule(weekStartDate)
+    const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+    const weekSchedule = getWeekSchedule(weekStartStr)
     console.log("🔧 [ScheduleCalendar] weekSchedule obtenido:", {
       hasData: !!weekSchedule,
       keys: weekSchedule ? Object.keys(weekSchedule) : []
@@ -727,7 +729,7 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
         weekDays={monthWeeks[0] || []}
         employees={employees}
         shifts={shifts}
-        schedule={getWeekSchedule(monthWeeks[0]?.[0])}
+        schedule={getWeekSchedule(format(monthWeeks[0]?.[0] || new Date(), "yyyy-MM-dd"))}
         allEmployees={employees}
       />
     </>

@@ -15,7 +15,7 @@ interface UseImplicitFixedRulesProps {
   employees: Array<{ id: string; name: string }>
   shifts: Turno[]
   weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6
-  getWeekSchedule: (weekStartDate: Date) => Horario | null
+  getWeekSchedule: (weekStartStr: string) => Horario | null // 🔥 Cambio: string en lugar de Date
   onWeekScheduleCreated?: (schedule: Horario) => void
 }
 
@@ -298,7 +298,8 @@ export function useImplicitFixedRules({
       weekStart: format(weekStartDate, "yyyy-MM-dd"),
       employeeId
     })
-    const weekSchedule = getWeekSchedule(weekStartDate)
+    const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+    const weekSchedule = getWeekSchedule(weekStartStr)
     
     // 1. Detectar si la semana está vacía para este empleado
     const isEmpty = isWeekEmptyForEmployee(weekSchedule, employeeId, weekStartDate)

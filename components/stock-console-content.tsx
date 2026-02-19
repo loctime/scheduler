@@ -1,9 +1,10 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import Link from "next/link"
 import { useData } from "@/contexts/data-context"
 import { useStockConsole } from "@/hooks/use-stock-console"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { PwaNumericInput } from "@/components/pwa/pwa-numeric-input"
@@ -12,6 +13,7 @@ import { cn } from "@/lib/utils"
 import { UserStatusMenu } from "@/components/pwa/UserStatusMenu"
 import { PwaViewerBadge } from "@/components/pwa/PwaViewerBadge"
 import { esModoPack, getCantidadPorPack, unidadesSignedToPacksFloor, packsSignedToUnidades } from "@/lib/unidades-utils"
+import { ejecutarPedidoEngine } from "@/lib/pedido-engine"
 
 /** Abrevia el nombre para vista móvil si supera 15 caracteres; si no, lo deja igual. */
 function abbreviateProductName(nombre: string): string {
@@ -34,6 +36,7 @@ interface StockConsoleContentProps {
 
 export function StockConsoleContent({ companySlug }: StockConsoleContentProps = {}) {
   const { user, userData } = useData()
+  const { toast } = useToast()
 
   // Validar permisos antes de renderizar la página
   const tienePermisoPedidos = userData?.permisos?.paginas?.includes("pedidos")
@@ -53,6 +56,27 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
   // Hook siempre llamado antes de cualquier return (regla de hooks de React)
   const stockConsole = useStockConsole(user)
   const { state, pedidos, productos, stockActual, movimientosPendientes, totalIngresos, totalEgresos, setSelectedPedidoId, incrementarCantidad, decrementarCantidad, setCantidad, limpiarCantidades, confirmarMovimientos, setStockReal } = stockConsole
+
+  // Cache del pedido-engine para generar texto cuando sea necesario
+  const resultadoEngine = useMemo(() => {
+    const selectedPedido = pedidos.find(p => p.id === state.selectedPedidoId)
+    if (!selectedPedido) return null
+    
+    return ejecutarPedidoEngine({
+      pedido: {
+        nombre: selectedPedido.nombre,
+        formatoSalida: selectedPedido.formatoSalida || "{nombre}: {cantidad} {unidad}",
+        mensajePrevio: selectedPedido.mensajePrevio,
+      },
+      productos,
+      stockActual,
+      ajustesPedido: {}, // Stock console no tiene ajustes manuales
+      calcularPedido: (stockMinimo: number, stockActualProducto?: number) => {
+        // Stock console usa cantidades manuales, no stockMinimo
+        return state.cantidades[selectedPedido.id] || 0
+      },
+    })
+  }, [state.selectedPedidoId, pedidos, productos, stockActual, state.cantidades])
 
   const [mode, setMode] = useState<"work" | "control">("work")
 
@@ -382,6 +406,31 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                 <X className={`w-4 h-4 ${isPWA ? "mr-1" : "mr-2"}`} />
                 Limpiar
               </Button>
+              {/* Botón para generar texto del pedido usando pedido-engine */}
+              {resultadoEngine && (
+                <Button
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(resultadoEngine.texto)
+                      toast({
+                        title: "Texto copiado",
+                        description: "El texto del pedido se ha copiado al portapapeles",
+                      })
+                    } catch {
+                      toast({
+                        title: "Error",
+                        description: "No se pudo copiar el texto",
+                        variant: "destructive",
+                      })
+                    }
+                  }}
+                  disabled={state.loading}
+                  className={`h-10 ${isPWA ? "px-2 text-xs" : "px-4"}`}
+                >
+                  <Package className={`w-4 h-4 ${isPWA ? "mr-1" : "mr-2"}`} />
+                  Copiar Texto
+                </Button>
+              )}
               <div className={`flex items-center ${isPWA ? "gap-0.5" : "gap-1"}`}>
                 <span className={`font-bold text-red-600 ${isPWA ? "text-lg" : "text-2xl"}`}>
                   -{totalEgresos}

@@ -13,7 +13,7 @@ interface UseEmployeeMonthStatsProps {
   shifts: Turno[]
   monthWeeks: Date[][]
   monthRange: { startDate: Date; endDate: Date }
-  getWeekSchedule: (weekStart: Date) => any
+  getWeekSchedule: (weekStartStr: string) => any // 🔥 Cambio: string en lugar de Date
   config?: Configuracion | null
   mediosTurnos?: MedioTurno[]
 }
@@ -49,7 +49,8 @@ export function useEmployeeMonthStats({
 
     // Procesar cada semana del mes
     monthWeeks.forEach((weekDays) => {
-      const weekSchedule = getWeekSchedule(weekDays[0])
+      const weekStartStr = format(weekDays[0], "yyyy-MM-dd")
+      const weekSchedule = getWeekSchedule(weekStartStr)
       if (!weekSchedule?.assignments) return
 
       // Procesar cada día de la semana

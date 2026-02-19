@@ -20,8 +20,8 @@ interface UseScheduleUpdatesProps {
   shifts: Turno[]
   schedules: Horario[]
   weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6
-  getWeekSchedule: (weekStartDate: Date) => Horario | null
-  getWeekScheduleFromFirestore: (weekStartDate: Date) => Promise<Horario | null> // 🔥 Nueva función
+  getWeekSchedule: (weekStartStr: string) => Horario | null // 🔥 Cambio: string en lugar de Date
+  getWeekScheduleFromFirestore: (weekStartStr: string) => Promise<Horario | null> // 🔥 Cambio: string en lugar de Date
 }
 
 export function useScheduleUpdates({
@@ -47,7 +47,7 @@ export function useScheduleUpdates({
   } | null>(null)
 
   const handleMarkWeekComplete = useCallback(
-    async (weekStartDate: Date, completed: boolean) => {
+    async (weekStartStr: string, completed: boolean) => {
       if (!db || !user) {
         toast({
           title: "Error",
@@ -58,14 +58,14 @@ export function useScheduleUpdates({
       }
 
       try {
-        const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
-        let weekSchedule = getWeekSchedule(weekStartDate)
+        console.log("🔍 [handleMarkWeekComplete] Iniciando con weekStartStr:", weekStartStr)
+        let weekSchedule = getWeekSchedule(weekStartStr)
 
         // 🔥 FALLBACK CRÍTICO: Si no está en memoria, buscar directamente en Firestore
         if (!weekSchedule) {
           console.log("🔍 [handleMarkWeekComplete] Schedule no encontrado en memoria, usando getWeekScheduleFromFirestore...")
           
-          weekSchedule = await getWeekScheduleFromFirestore(weekStartDate)
+          weekSchedule = await getWeekScheduleFromFirestore(weekStartStr)
           
           if (weekSchedule) {
             console.log("🔍 [handleMarkWeekComplete] Schedule encontrado en Firestore:", {
@@ -89,7 +89,7 @@ export function useScheduleUpdates({
             nombre: `Semana del ${weekStartStr}`,
             weekStart: weekStartStr,
             semanaInicio: weekStartStr,
-            semanaFin: format(addDays(weekStartDate, 6), "yyyy-MM-dd"),
+            semanaFin: format(addDays(new Date(weekStartStr), 6), "yyyy-MM-dd"),
             ownerId,
             assignments: {},
             dayStatus: {},
@@ -188,7 +188,7 @@ export function useScheduleUpdates({
         })
       }
     },
-    [user, getWeekSchedule, toast],
+    [user, getWeekSchedule, getWeekScheduleFromFirestore, ownerId, employees, config, toast],
   )
 
   const handleAssignmentUpdate = useCallback(
@@ -245,7 +245,8 @@ export function useScheduleUpdates({
           weekSchedule = schedules.find((s) => s.id === options.scheduleId) || null
         }
         if (!weekSchedule) {
-          weekSchedule = getWeekSchedule(weekStartDate)
+          const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+          weekSchedule = getWeekSchedule(weekStartStr)
         }
 
         // Verificar si la semana está completada y mostrar diálogo de confirmación
@@ -490,7 +491,8 @@ export function useScheduleUpdates({
           weekSchedule = schedules.find((s) => s.id === options.scheduleId) || null
         }
         if (!weekSchedule) {
-          weekSchedule = getWeekSchedule(weekStartDate)
+          const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+          weekSchedule = getWeekSchedule(weekStartStr)
         }
 
         // Permitir editar si el usuario confirmó (el modal ya lo maneja)

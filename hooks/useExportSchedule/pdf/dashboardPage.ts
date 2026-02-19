@@ -10,7 +10,7 @@ export const addDashboardPage = (
   employeeMonthlyStats: Record<string, any>,
   monthRange: { startDate: Date; endDate: Date },
   monthWeeks: Date[][],
-  getWeekSchedule: (weekStartDate: Date) => Horario | null,
+  getWeekSchedule: (weekStartStr: string) => Horario | null, // 🔥 Cambio: string en lugar de Date
   shifts: Turno[],
   nombreEmpresa?: string,
   config?: { minutosDescanso?: number; horasMinimasParaDescanso?: number }
@@ -45,7 +45,8 @@ export const addDashboardPage = (
   
   // 2. Agregar empleados de snapshots de semanas completadas
   monthWeeks.forEach((weekDays) => {
-    const weekSchedule = getWeekSchedule(weekDays[0])
+    const weekStartStr = format(weekDays[0], "yyyy-MM-dd")
+    const weekSchedule = getWeekSchedule(weekStartStr)
     if (weekSchedule?.empleadosSnapshot) {
       weekSchedule.empleadosSnapshot.forEach((snapshotEmp) => {
         allEmployeeIds.add(snapshotEmp.id)
@@ -64,7 +65,8 @@ export const addDashboardPage = (
   
   // 3. Agregar empleados que aparecen en asignaciones (por si acaso no están en lista activa ni en snapshots)
   monthWeeks.forEach((weekDays) => {
-    const weekSchedule = getWeekSchedule(weekDays[0])
+    const weekStartStr = format(weekDays[0], "yyyy-MM-dd")
+    const weekSchedule = getWeekSchedule(weekStartStr)
     if (weekSchedule?.assignments) {
       Object.values(weekSchedule.assignments).forEach((dateAssignments) => {
         if (dateAssignments && typeof dateAssignments === 'object') {
@@ -103,7 +105,8 @@ export const addDashboardPage = (
     let totalMedioFranco = 0
 
     monthWeeks.forEach((weekDays) => {
-      const weekSchedule = getWeekSchedule(weekDays[0])
+      const weekStartStr = format(weekDays[0], "yyyy-MM-dd")
+      const weekSchedule = getWeekSchedule(weekStartStr)
       if (!weekSchedule?.assignments) return
 
       weekDays.forEach((day) => {

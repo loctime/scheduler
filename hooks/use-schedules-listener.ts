@@ -17,8 +17,8 @@ interface UseSchedulesListenerReturn {
   schedules: Horario[]
   loading: boolean
   error: Error | null
-  getWeekSchedule: (weekStartDate: Date) => Horario | null
-  getWeekScheduleFromFirestore: (weekStartDate: Date) => Promise<Horario | null> // 🔥 Nueva función
+  getWeekSchedule: (weekStartStr: string) => Horario | null // 🔥 Cambio: string en lugar de Date
+  getWeekScheduleFromFirestore: (weekStartStr: string) => Promise<Horario | null> // 🔥 Cambio: string en lugar de Date
 }
 
 /**
@@ -125,12 +125,9 @@ export function useSchedulesListener({
 
   // Función para obtener schedule de una semana específica
   const getWeekSchedule = useMemo(
-    () => (weekStartDate: Date) => {
-      const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
-      
-      // 🔍 AUDITORÍA: Loguear valores reales
+    () => (weekStartStr: string) => {
+      // � AUDITORÍA: Loguear valores reales
       console.log("🔍 [getWeekSchedule] AUDITORÍA:", {
-        weekStartDate: weekStartDate.toISOString(),
         weekStartStr,
         tipoWeekStartStr: typeof weekStartStr,
         schedulesCount: schedules.length
@@ -142,15 +139,13 @@ export function useSchedulesListener({
   )
 
   // 🔥 FUNCIÓN CRÍTICA: Buscar documento real en Firestore (sin depender de array filtrado)
-  const getWeekScheduleFromFirestore = useCallback(async (weekStartDate: Date): Promise<Horario | null> => {
+  const getWeekScheduleFromFirestore = useCallback(async (weekStartStr: string): Promise<Horario | null> => {
     if (!db || !ownerId) {
       console.warn("🔍 [getWeekScheduleFromFirestore] No hay db u ownerId")
       return null
     }
 
     try {
-      const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
-      
       console.log("🔍 [getWeekScheduleFromFirestore] Query directa:", {
         collection: "apps/horarios/schedules",
         ownerId,

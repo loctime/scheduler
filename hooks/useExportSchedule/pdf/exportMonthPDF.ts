@@ -14,7 +14,7 @@ export const useExportMonthPDF = () => {
 
   const exportMonthPDF = useCallback(async (
     monthWeeks: Date[][],
-    getWeekSchedule: (weekStartDate: Date) => Horario | null,
+    getWeekSchedule: (weekStartStr: string) => Horario | null, // 🔥 Cambio: string en lugar de Date
     employees: Empleado[],
     shifts: Turno[],
     filename: string,
@@ -71,7 +71,8 @@ export const useExportMonthPDF = () => {
         const weekDays = monthWeeks[weekIndex]
         const weekStartDate = weekDays[0]
         const weekEndDate = weekDays[weekDays.length - 1]
-        const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
+        const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+        const weekId = `schedule-week-${weekStartStr}`
         
         // Feedback de progreso NO intrusivo
         if (weekIndex > 0) {
