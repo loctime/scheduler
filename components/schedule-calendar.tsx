@@ -653,9 +653,15 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
   }, [employeeMonthStats])
 
   const handleExportMonthPDF = useCallback(async () => {
+    // Wrapper temporal para compatibilidad con getWeekSchedule
+    const getWeekScheduleWrapper = (weekStartStr: string) => {
+      const weekStartDate = new Date(weekStartStr)
+      return getWeekSchedule(weekStartDate as any)
+    }
+    
     await exportMonthPDF(
       monthWeeks,
-      getWeekSchedule,
+      getWeekScheduleWrapper,
       employees,
       shiftsToUse,
       `horario-mes-${format(monthRange.startDate, "yyyy-MM-dd")}.pdf`,
