@@ -21,6 +21,7 @@ interface UseScheduleUpdatesProps {
   schedules: Horario[]
   weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6
   getWeekSchedule: (weekStartDate: Date) => Horario | null
+  getWeekScheduleFromFirestore: (weekStartDate: Date) => Promise<Horario | null> // 🔥 Nueva función
 }
 
 export function useScheduleUpdates({
@@ -30,6 +31,7 @@ export function useScheduleUpdates({
   schedules,
   weekStartsOn,
   getWeekSchedule,
+  getWeekScheduleFromFirestore, // 🔥 Nueva función
 }: UseScheduleUpdatesProps) {
   const DEBUG = false
   const { toast } = useToast()
@@ -61,26 +63,11 @@ export function useScheduleUpdates({
 
         // 🔥 FALLBACK CRÍTICO: Si no está en memoria, buscar directamente en Firestore
         if (!weekSchedule) {
-          console.log("🔍 [handleMarkWeekComplete] Schedule no encontrado en memoria, buscando en Firestore...")
+          console.log("🔍 [handleMarkWeekComplete] Schedule no encontrado en memoria, usando getWeekScheduleFromFirestore...")
           
-          // Query directa a Firestore
-          const q = query(
-            collection(db, COLLECTIONS.SCHEDULES),
-            where("ownerId", "==", ownerId),
-            where("weekStart", "==", weekStartStr),
-            limit(1)
-          )
-
-          const querySnapshot = await getDocs(q)
+          weekSchedule = await getWeekScheduleFromFirestore(weekStartDate)
           
-          if (!querySnapshot.empty) {
-            const doc = querySnapshot.docs[0]
-            const docData = doc.data()
-            weekSchedule = {
-              id: doc.id,
-              ...docData
-            } as Horario
-            
+          if (weekSchedule) {
             console.log("🔍 [handleMarkWeekComplete] Schedule encontrado en Firestore:", {
               id: weekSchedule.id,
               weekStart: weekSchedule.weekStart,
@@ -183,6 +170,8 @@ export function useScheduleUpdates({
 
         // Actualizar usando helper que preserva campos automáticamente
         await updateSchedulePreservingFields(weekSchedule.id, weekSchedule, updateData)
+
+        console.log("🔍 [handleMarkWeekComplete] Schedule actualizado exitosamente en Firestore")
 
         toast({
           title: completed ? "Semana marcada como completada" : "Semana desmarcada",

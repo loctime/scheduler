@@ -117,7 +117,7 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
   )
 
   // Usar hook centralizado para listener de schedules
-  const { schedules, loading: schedulesLoading, getWeekSchedule } = useSchedulesListener({
+  const { schedules, loading: schedulesLoading, getWeekSchedule, getWeekScheduleFromFirestore } = useSchedulesListener({
     user: userData,
     monthRange,
     enabled: !!userData,
@@ -189,6 +189,7 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
     schedules,
     weekStartsOn,
     getWeekSchedule,
+    getWeekScheduleFromFirestore, // 🔥 Pasar nueva función
   })
 
   const goToPreviousMonth = useCallback(() => {
