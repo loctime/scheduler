@@ -1,11 +1,12 @@
 import { useCallback, useMemo } from "react"
 import { format, addDays } from "date-fns"
-import { collection, doc, serverTimestamp, getDoc, addDoc } from "firebase/firestore"
+import { collection, doc, serverTimestamp, getDoc } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { ShiftAssignment, Horario, Turno } from "@/lib/types"
 import { useEmployeeFixedRules } from "./use-employee-fixed-rules"
 import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
+import { createScheduleIfMissing } from "@/lib/firestore-helpers"
 import { useFixedRulesEngine } from "@/hooks/use-fixed-rules-engine"
 import { useData } from "@/contexts/data-context"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
@@ -229,9 +230,17 @@ export function useImplicitFixedRules({
         createdBy: userId
       })
 
-      const docRef = await addDoc(collection(db, COLLECTIONS.SCHEDULES), newScheduleData)
+      const { id: scheduleId, created } = await createScheduleIfMissing(ownerId, weekStartStr, newScheduleData)
       
-      const newSchedule = { id: docRef.id, ...newScheduleData } as Horario
+      const newSchedule = { id: scheduleId, ...newScheduleData } as Horario
+
+      if (!created) {
+        logger.info("[ImplicitFixedRules] La semana ya existía, se evita duplicado", {
+          weekStart: weekStartStr,
+          ownerId,
+          scheduleId,
+        })
+      }
 
       logger.info("[ImplicitFixedRules] Schedule creado con éxito", {
         weekStart: weekStartStr,

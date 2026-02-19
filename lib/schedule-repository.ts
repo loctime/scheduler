@@ -2,7 +2,7 @@ import { doc, addDoc, updateDoc, collection, serverTimestamp, getDoc } from "fir
 import { db } from "@/lib/firebase"
 import { COLLECTIONS } from "@/lib/firebase"
 import type { Horario } from "@/lib/types"
-import { updateSchedulePreservingFields } from "@/lib/firestore-helpers"
+import { updateSchedulePreservingFields, createScheduleIfMissing } from "@/lib/firestore-helpers"
 
 export interface ScheduleRepository {
   createSchedule(data: any): Promise<string>
@@ -14,11 +14,19 @@ export interface ScheduleRepository {
 class FirestoreScheduleRepository implements ScheduleRepository {
   async createSchedule(data: any): Promise<string> {
     if (!db) throw new Error("Firestore not initialized")
-    const scheduleRef = await addDoc(collection(db, COLLECTIONS.SCHEDULES), {
+
+    const payload = {
       ...data,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    })
+    }
+
+    if (data?.ownerId && data?.weekStart) {
+      const result = await createScheduleIfMissing(data.ownerId, data.weekStart, payload)
+      return result.id
+    }
+
+    const scheduleRef = await addDoc(collection(db, COLLECTIONS.SCHEDULES), payload)
     return scheduleRef.id
   }
 

@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from "react"
 import { format, subDays, addDays } from "date-fns"
-import { serverTimestamp, addDoc, collection } from "firebase/firestore"
+import { serverTimestamp } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import type { Empleado, Horario, ShiftAssignment } from "@/lib/types"
@@ -14,6 +14,7 @@ import {
   createHistoryEntry,
   saveHistoryEntry,
   updateSchedulePreservingFields,
+  createScheduleIfMissing,
 } from "@/lib/firestore-helpers"
 import { useData } from "@/contexts/data-context"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
@@ -191,22 +192,25 @@ export function useWeekActions({
           createdByName: userName,
         }
 
-        const scheduleRef = await addDoc(collection(db, COLLECTIONS.SCHEDULES), newScheduleData)
-        const scheduleId = scheduleRef.id
+        const { id: scheduleId, created } = await createScheduleIfMissing(ownerId, weekStartStr, newScheduleData)
 
-        // Guardar en historial usando helper
-        const historyEntry = createHistoryEntry(
-          { id: scheduleId, ...newScheduleData } as Horario,
-          "creado",
-          user,
-          weekStartStr,
-          weekEndStr
-        )
-        await saveHistoryEntry(historyEntry)
+        if (created) {
+          // Guardar en historial usando helper
+          const historyEntry = createHistoryEntry(
+            { id: scheduleId, ...newScheduleData } as Horario,
+            "creado",
+            user,
+            weekStartStr,
+            weekEndStr
+          )
+          await saveHistoryEntry(historyEntry)
+        }
 
         toast({
           title: "Semana copiada",
-          description: `Se copiaron ${updatesToPerform.length} celda${updatesToPerform.length !== 1 ? 's' : ''} de la semana anterior.`,
+          description: created
+            ? `Se copiaron ${updatesToPerform.length} celda${updatesToPerform.length !== 1 ? 's' : ''} de la semana anterior.`
+            : "La semana ya existía; no se creó un duplicado.",
         })
         return
       }
@@ -336,22 +340,25 @@ export function useWeekActions({
           createdByName: userName,
         }
 
-        const scheduleRef = await addDoc(collection(db, COLLECTIONS.SCHEDULES), newScheduleData)
-        const scheduleId = scheduleRef.id
+        const { id: scheduleId, created } = await createScheduleIfMissing(ownerId, weekStartStr, newScheduleData)
 
-        // Guardar en historial usando helper
-        const historyEntry = createHistoryEntry(
-          { id: scheduleId, ...newScheduleData } as Horario,
-          "creado",
-          user,
-          weekStartStr,
-          weekEndStr
-        )
-        await saveHistoryEntry(historyEntry)
+        if (created) {
+          // Guardar en historial usando helper
+          const historyEntry = createHistoryEntry(
+            { id: scheduleId, ...newScheduleData } as Horario,
+            "creado",
+            user,
+            weekStartStr,
+            weekEndStr
+          )
+          await saveHistoryEntry(historyEntry)
+        }
 
         toast({
           title: "Semana limpiada",
-          description: "La semana fue creada y limpiada correctamente.",
+          description: created
+            ? "La semana fue creada y limpiada correctamente."
+            : "La semana ya existía; no se creó un duplicado.",
         })
         return
       }
