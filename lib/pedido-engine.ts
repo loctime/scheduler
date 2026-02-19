@@ -1,4 +1,4 @@
-import { esModoPack, unidadesToPacks, packsToUnidades, unidadesToPacksFloor } from "@/lib/unidades-utils"
+import { esModoPack, unidadesToPacks, packsToUnidades, unidadesToPacksFloor, type ProductoLike } from "@/lib/unidades-utils"
 
 export interface PedidoEngineInput {
   pedido: {
@@ -47,17 +47,17 @@ export function ejecutarPedidoEngine({
   for (const producto of productos) {
     const stockActualProducto = stockActual[producto.id] ?? 0
 
-    const pedidoBase = calcularPedido(producto.stockMinimo, stockActualProducto)
-    const ajuste = ajustesPedido[producto.id] ?? 0
-
     let cantidadUnidades = 0
     let cantidadPacks = 0
 
-    if (esModoPack(producto as any)) {
-      const pedidoBasePacks = unidadesToPacks(producto as any, pedidoBase)
+    const pedidoBase = calcularPedido(producto.stockMinimo, stockActualProducto)
+    const ajuste = ajustesPedido[producto.id] ?? 0
+
+    if (esModoPack(producto as ProductoLike)) {
+      const pedidoBasePacks = unidadesToPacks(producto as ProductoLike, pedidoBase)
       const totalPacks = Math.max(0, pedidoBasePacks + ajuste)
 
-      cantidadUnidades = packsToUnidades(producto as any, totalPacks)
+      cantidadUnidades = packsToUnidades(producto as ProductoLike, totalPacks)
       cantidadPacks = totalPacks
     } else {
       cantidadUnidades = Math.max(0, pedidoBase + ajuste)
@@ -71,8 +71,8 @@ export function ejecutarPedidoEngine({
         productoId: producto.id,
         nombre: producto.nombre,
         cantidadUnidades,
-        cantidadPacks: esModoPack(producto as any)
-          ? unidadesToPacksFloor(producto as any, cantidadUnidades)
+        cantidadPacks: esModoPack(producto as ProductoLike)
+          ? cantidadPacks
           : cantidadUnidades,
         unidad,
       })

@@ -183,8 +183,8 @@ export default function PedidosPage() {
   // Estado para ajustes manuales de pedido (no afecta el stock real)
   const [ajustesPedido, setAjustesPedido] = useState<Record<string, number>>({})
   
-  // Función para ejecutar el engine de pedidos con los datos actuales
-  const ejecutarEngineConDatosActuales = useCallback(() => {
+  // Cache del engine para evitar recálculos múltiples
+  const resultadoEngine = useMemo(() => {
     if (!selectedPedido) return null
     
     return ejecutarPedidoEngine({
@@ -212,16 +212,15 @@ export default function PedidosPage() {
     })
   }, [])
   
-  // Recalcular productosAPedir usando el engine
+  // Recalcular productosAPedir usando el engine cacheado
   const productosAPedirActualizados = useMemo(() => {
-    const resultado = ejecutarEngineConDatosActuales()
-    return resultado ? resultado.productosCalculados.map(producto => ({
+    return resultadoEngine ? resultadoEngine.productosCalculados.map(producto => ({
       id: producto.productoId,
       nombre: producto.nombre,
       stockMinimo: 0, // No se necesita para el filtrado
       cantidadUnidades: producto.cantidadUnidades
     })) : []
-  }, [ejecutarEngineConDatosActuales])
+  }, [resultadoEngine])
   
   // Dialog states
   const [createPedidoOpen, setCreatePedidoOpen] = useState(false)
@@ -578,13 +577,12 @@ export default function PedidosPage() {
       toast({ title: "Sin pedidos", description: "No hay productos que pedir" })
       return
     }
+    if (!resultadoEngine) {
+      toast({ title: "Error", description: "No se pudo generar el pedido", variant: "destructive" })
+      return
+    }
     try {
-      const resultado = ejecutarEngineConDatosActuales()
-      if (!resultado) {
-        toast({ title: "Error", description: "No se pudo generar el pedido", variant: "destructive" })
-        return
-      }
-      await navigator.clipboard.writeText(resultado.texto)
+      await navigator.clipboard.writeText(resultadoEngine.texto)
       toast({ title: "Copiado", description: "Pedido copiado al portapapeles" })
     } catch {
       toast({ title: "Error", description: "No se pudo copiar", variant: "destructive" })
@@ -608,9 +606,8 @@ export default function PedidosPage() {
     }
 
     try {
-      // Copiar solo la columna "Pedir" usando el engine (una línea por producto, respetando el orden actual)
-      const resultado = ejecutarEngineConDatosActuales()
-      if (!resultado) {
+      // Copiar solo la columna "Pedir" usando el engine cacheado (una línea por producto, respetando el orden actual)
+      if (!resultadoEngine) {
         toast({ 
           title: "Error", 
           description: "No se pudo generar el pedido", 
@@ -620,9 +617,9 @@ export default function PedidosPage() {
       }
       
       // Crear mapa de cantidades del engine para mantener el orden de todos los productos
-      const cantidadesMap = new Map(resultado.productosCalculados.map(p => [p.productoId, p.cantidadUnidades]))
+      const cantidadesMap = new Map(resultadoEngine.productosCalculados.map(p => [p.productoId, p.cantidadUnidades]))
       
-      const cantidadesPedir = products.map(p => {
+      const cantidadesPedir = products.map((p: Producto) => {
         const cantidad = cantidadesMap.get(p.id) || 0
         return cantidad.toString()
       })
@@ -652,12 +649,11 @@ export default function PedidosPage() {
       toast({ title: "Sin pedidos", description: "No hay productos que pedir" })
       return
     }
-    const resultado = ejecutarEngineConDatosActuales()
-    if (!resultado) {
+    if (!resultadoEngine) {
       toast({ title: "Error", description: "No se pudo generar el pedido", variant: "destructive" })
       return
     }
-    const encoded = encodeURIComponent(resultado.texto)
+    const encoded = encodeURIComponent(resultadoEngine.texto)
     window.open(`https://wa.me/?text=${encoded}`, "_blank")
   }
 
@@ -750,9 +746,8 @@ export default function PedidosPage() {
     }
 
     try {
-      // Usar el engine para calcular cantidades y generar texto
-      const resultado = ejecutarEngineConDatosActuales()
-      if (!resultado) {
+      // Usar el engine cacheado para calcular cantidades y generar texto
+      if (!resultadoEngine) {
         toast({
           title: "Error",
           description: "No se pudo generar el pedido",
@@ -761,15 +756,15 @@ export default function PedidosPage() {
         return
       }
       
-      console.log("Cantidades a pedir calculadas por el engine:", resultado.cantidadesPedidas)
+      console.log("Cantidades a pedir calculadas por el engine:", resultadoEngine.cantidadesPedidas)
       
-      const nuevoEnlace = await crearEnlacePublico(pedidoAUsar.id, resultado.cantidadesPedidas)
+      const nuevoEnlace = await crearEnlacePublico(pedidoAUsar.id, resultadoEngine.cantidadesPedidas)
       if (nuevoEnlace) {
         setEnlaceActivo({ id: nuevoEnlace.id })
         const url = `${window.location.origin}/pedido-publico/${nuevoEnlace.id}`
         
         // Combinar el texto del engine con el link
-        const textoCompleto = `${resultado.texto}\n\n\n${url}`
+        const textoCompleto = `${resultadoEngine.texto}\n\n\n${url}`
         
         await navigator.clipboard.writeText(textoCompleto)
         toast({
@@ -935,9 +930,8 @@ export default function PedidosPage() {
   const handleGenerarEnlacePublicoDesdeControl = async () => {
     if (!selectedPedido) return
 
-    // Usar el engine para calcular cantidades
-    const resultado = ejecutarEngineConDatosActuales()
-    if (!resultado) {
+    // Usar el engine cacheado para calcular cantidades
+    if (!resultadoEngine) {
       toast({
         title: "Error",
         description: "No se pudo generar el pedido",
@@ -946,15 +940,15 @@ export default function PedidosPage() {
       return
     }
     
-    const enlace = await crearEnlacePublico(selectedPedido.id, resultado.cantidadesPedidas)
+    const enlace = await crearEnlacePublico(selectedPedido.id, resultadoEngine.cantidadesPedidas)
     if (enlace) {
       await updateEnlacePublico(selectedPedido.id, enlace.id)
       setEnlaceActivo({ id: enlace.id })
       
       const url = `${window.location.origin}/pedido-publico/${enlace.id}`
       
-      // Generar texto del pedido usando el engine y combinarlo con el link
-      const textoCompleto = `${resultado.texto}\n\n\n${url}`
+      // Generar texto del pedido usando el engine cacheado y combinarlo con el link
+      const textoCompleto = `${resultadoEngine.texto}\n\n\n${url}`
       
       navigator.clipboard.writeText(textoCompleto)
       toast({
@@ -1530,9 +1524,8 @@ export default function PedidosPage() {
                               onClick={() => {
                                 const url = `${window.location.origin}/pedido-publico/${enlaceActivo.id}`
                                 
-                                // Generar texto del pedido usando el engine y combinarlo con el link
-                                const resultado = ejecutarEngineConDatosActuales()
-                                if (!resultado) {
+                                // Generar texto del pedido usando el engine cacheado y combinarlo con el link
+                                if (!resultadoEngine) {
                                   toast({ 
                                     title: "Error", 
                                     description: "No se pudo generar el pedido", 
@@ -1540,7 +1533,7 @@ export default function PedidosPage() {
                                   })
                                   return
                                 }
-                                const textoCompleto = `${resultado.texto}\n\n\n${url}`
+                                const textoCompleto = `${resultadoEngine.texto}\n\n\n${url}`
                                 
                                 navigator.clipboard.writeText(textoCompleto)
                                 toast({ title: "Pedido y enlace copiados", description: "El pedido y el enlace se han copiado al portapapeles" })

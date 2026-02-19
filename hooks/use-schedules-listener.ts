@@ -58,6 +58,15 @@ export function useSchedulesListener({
       orderBy("weekStart", "desc"),
     )
 
+    // 🔍 AUDITORÍA: Loguear parámetros de query
+    console.log("🔍 [useSchedulesListener] AUDITORÍA - Query:", {
+      collection: "apps/horarios/schedules",
+      ownerId,
+      tipoOwnerId: typeof ownerId,
+      startDate,
+      endDate
+    })
+
     const unsubscribe = onSnapshot(
       schedulesQuery,
       (snapshot) => {
@@ -65,6 +74,19 @@ export function useSchedulesListener({
           id: doc.id,
           ...doc.data(),
         })) as Horario[]
+
+        // 🔍 AUDITORÍA: Loguear todos los weekStart del listener
+        console.log("🔍 [useSchedulesListener] AUDITORÍA - Schedules recibidos:", {
+          ownerIdActual: ownerId,
+          schedulesCount: schedulesData.length,
+          schedules: schedulesData.map(s => ({
+            id: s.id,
+            weekStart: s.weekStart,
+            tipoWeekStart: typeof s.weekStart,
+            ownerId: s.ownerId,
+            coincideOwnerId: s.ownerId === ownerId
+          }))
+        })
 
         // Filtrar schedules por rango de fechas en el cliente
         // Ya están filtrados por createdBy en la query, solo necesitamos filtrar por fecha
@@ -97,6 +119,15 @@ export function useSchedulesListener({
   const getWeekSchedule = useMemo(
     () => (weekStartDate: Date) => {
       const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+      
+      // 🔍 AUDITORÍA: Loguear valores reales
+      console.log("🔍 [getWeekSchedule] AUDITORÍA:", {
+        weekStartDate: weekStartDate.toISOString(),
+        weekStartStr,
+        tipoWeekStartStr: typeof weekStartStr,
+        schedulesCount: schedules.length
+      })
+      
       return schedules.find((s) => s.weekStart === weekStartStr) || null
     },
     [schedules]
