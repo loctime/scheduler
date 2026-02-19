@@ -1,5 +1,5 @@
 import type { Horario, Empleado, Turno, ShiftAssignment } from "@/lib/types"
-import { format, startOfWeek, addDays } from "date-fns"
+import { format, startOfWeek, addDays, type Day } from "date-fns"
 
 export interface WeekScheduleData {
   weekStartDate: Date
@@ -46,15 +46,15 @@ export interface ScheduleUpdateData {
 
 export interface WeekCompletionData {
   completada: boolean
-  completadaPor: string
-  completadaPorNombre: string
+  completadaPor: string | null
+  completadaPorNombre: string | null
   completadaEn: any
-  empleadosSnapshot: any[]
-  ordenEmpleadosSnapshot: string[]
+  empleadosSnapshot: any[] | null
+  ordenEmpleadosSnapshot: string[] | null
 }
 
 // Funciones de dominio puras
-export function createWeekScheduleData(date: Date, weekStartsOn: number, user: any, userData: any): WeekScheduleData {
+export function createWeekScheduleData(date: Date, weekStartsOn: Day, user: any, userData: any): WeekScheduleData {
   const dateObj = new Date(date)
   const weekStartDate = startOfWeek(dateObj, { weekStartsOn })
   const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
@@ -155,9 +155,8 @@ export function createScheduleCreationData(
 
   return {
     nombre: `Semana del ${weekStartStr}`,
-    weekStart: weekStartStr,
-    semanaInicio: weekStartStr,
-    semanaFin: weekEndStr,
+    weekStartStr,
+    weekEndStr,
     ownerId,
     assignments: assignmentData.assignment.type === "medio_franco" || assignmentData.assignment.type === "franco"
       ? {
@@ -166,15 +165,15 @@ export function createScheduleCreationData(
           },
         }
       : {},
-    dayStatus: {
-      [date]: {
-        [employeeId]: assignmentData.assignment.type as "franco" | "medio_franco"
-      }
-    },
-    createdAt: null, // Se asignará en el repositorio
-    updatedAt: null, // Se asignará en el repositorio
-    createdBy: userId,
-    createdByName: userName,
+    dayStatus: assignmentData.assignment.type === "medio_franco" || assignmentData.assignment.type === "franco"
+      ? {
+          [date]: {
+            [employeeId]: assignmentData.assignment.type,
+          },
+        }
+      : {},
+    userId,
+    userName,
   }
 }
 
@@ -248,7 +247,7 @@ export function createWeekCompletionData(
 
   // Agregar empleados del orden personalizado (para mantener estructura visual)
   if (config?.ordenEmpleados) {
-    config.ordenEmpleados.forEach((id) => {
+    config.ordenEmpleados.forEach((id: string) => {
       if (employees.some((emp) => emp.id === id)) {
         empleadosEnSemana.add(id)
       }
