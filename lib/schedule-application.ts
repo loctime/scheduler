@@ -1,4 +1,5 @@
 import type { Horario, Empleado, Turno, ShiftAssignment } from "@/lib/types"
+import { format } from "date-fns"
 import { scheduleRepository } from "./schedule-repository"
 import {
   createWeekScheduleData,
@@ -27,7 +28,16 @@ class ScheduleApplication implements ScheduleApplicationService {
     config: any
   ): Promise<void> {
     // Implementación lógica de marcado de semana completa
-    const completionData = createWeekCompletionData(completed, null, employees, config)
+    const weekScheduleData = {
+      weekStartDate: new Date(weekStartStr),
+      weekStartStr,
+      weekEndStr: format(new Date(weekStartStr), 'yyyy-MM-dd'), // Simplified - should be actual week end
+      userName: user?.displayName || user?.email || 'Unknown',
+      userId: user?.uid || 'unknown',
+      ownerId: user?.uid || 'unknown'
+    }
+    
+    const completionData = createWeekCompletionData(completed, weekScheduleData, employees, config)
     
     // Lógica para crear o actualizar el schedule
     // Esta es una implementación simplificada, la completa requeriría más detalles
@@ -78,7 +88,7 @@ class ScheduleApplication implements ScheduleApplicationService {
     }
 
     const medioFrancoAssignment = createMedioFrancoAssignment(assignment, medioTurnoToUse)
-    const otherAssignments = [] // Se obtendrían de las asignaciones existentes
+    const otherAssignments: ShiftAssignment[] = [] // Se obtendrían de las asignaciones existentes
     const assignmentData = createAssignmentData(assignment, medioFrancoAssignment, otherAssignments)
 
     // Lógica para crear o actualizar schedule con asignación especial
