@@ -1,11 +1,12 @@
 import { useEffect, useState, useMemo, useCallback } from "react"
-import { collection, query, orderBy, onSnapshot, where, limit, getDocs } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, where, getDocs } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import type { Horario } from "@/lib/types"
 import { format, subMonths, addMonths } from "date-fns"
 import { logger } from "@/lib/logger"
 import { useData } from "@/contexts/data-context"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
+import { buildScheduleDocId } from "@/lib/firestore-helpers"
 
 interface UseSchedulesListenerProps {
   user: any
@@ -133,9 +134,22 @@ export function useSchedulesListener({
         schedulesCount: schedules.length
       })
       
-      return schedules.find((s) => s.weekStart === weekStartStr) || null
+      const matches = schedules.filter((s) => s.weekStart === weekStartStr)
+
+      if (matches.length > 1) {
+        console.warn("⚠️ [getWeekSchedule] Duplicados detectados para ownerId+weekStart", {
+          ownerId,
+          weekStartStr,
+          ids: matches.map((m) => m.id),
+        })
+      }
+
+      const deterministicId = ownerId ? buildScheduleDocId(ownerId, weekStartStr) : null
+      const preferred = deterministicId ? matches.find((m) => m.id === deterministicId) : null
+
+      return preferred || matches[0] || null
     },
-    [schedules]
+    [schedules, ownerId]
   )
 
   // 🔥 FUNCIÓN CRÍTICA: Buscar documento real en Firestore (sin depender de array filtrado)
@@ -159,7 +173,6 @@ export function useSchedulesListener({
         collection(db, COLLECTIONS.SCHEDULES),
         where("ownerId", "==", ownerId),
         where("weekStart", "==", weekStartStr),
-        limit(1)
       )
 
       const querySnapshot = await getDocs(q)
@@ -169,11 +182,17 @@ export function useSchedulesListener({
         return null
       }
 
-      const doc = querySnapshot.docs[0]
-      const scheduleData = {
-        id: doc.id,
-        ...doc.data()
-      } as Horario
+      const matches = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Horario))
+      if (matches.length > 1) {
+        console.warn("⚠️ [getWeekScheduleFromFirestore] Duplicados detectados para ownerId+weekStart", {
+          ownerId,
+          weekStartStr,
+          ids: matches.map((m) => m.id),
+        })
+      }
+
+      const deterministicId = buildScheduleDocId(ownerId, weekStartStr)
+      const scheduleData = matches.find((s) => s.id === deterministicId) || matches[0]
 
       console.log("🔍 [getWeekScheduleFromFirestore] Documento encontrado:", {
         id: scheduleData.id,

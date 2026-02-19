@@ -1,4 +1,4 @@
-import { doc, getDoc, addDoc, collection, serverTimestamp, updateDoc, writeBatch } from "firebase/firestore"
+import { doc, getDoc, addDoc, collection, serverTimestamp, updateDoc, writeBatch, setDoc } from "firebase/firestore"
 import { db, COLLECTIONS } from "./firebase"
 import type { Horario, HistorialItem } from "./types"
 
@@ -74,6 +74,39 @@ export function createWeekRef(dbInstance: any, ownerId: string, weekId: string) 
     console.error("🔧 [createWeekRef] Failed to create week reference:", error)
     throw new Error(`Failed to create week reference: ${error}`)
   }
+}
+
+/**
+ * ID determinístico para garantizar unicidad lógica por ownerId + weekStart.
+ */
+export function buildScheduleDocId(ownerId: string, weekStart: string): string {
+  const normalizedOwnerId = normalizeFirestoreId(ownerId)
+  const normalizedWeekStart = normalizeFirestoreId(weekStart)
+  return `${normalizedOwnerId}__${normalizedWeekStart}`
+}
+
+/**
+ * Crea el schedule de una semana únicamente si no existe ya el documento determinístico.
+ */
+export async function createScheduleIfMissing(
+  ownerId: string,
+  weekStart: string,
+  scheduleData: Record<string, any>,
+): Promise<{ id: string; created: boolean }> {
+  if (!db) {
+    throw new Error("Firebase no está configurado")
+  }
+
+  const scheduleId = buildScheduleDocId(ownerId, weekStart)
+  const scheduleRef = doc(db, COLLECTIONS.SCHEDULES, scheduleId)
+  const existing = await getDoc(scheduleRef)
+
+  if (existing.exists()) {
+    return { id: scheduleId, created: false }
+  }
+
+  await setDoc(scheduleRef, scheduleData)
+  return { id: scheduleId, created: true }
 }
 
 /**
