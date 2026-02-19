@@ -31,7 +31,7 @@ export function useScheduleUpdates({
   schedules,
   weekStartsOn,
   getWeekSchedule,
-  getWeekScheduleFromFirestore, // 🔥 Nueva función
+  getWeekScheduleFromFirestore, // 🔥 Nueva función.
 }: UseScheduleUpdatesProps) {
   const DEBUG = false
   const { toast } = useToast()
