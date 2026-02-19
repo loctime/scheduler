@@ -222,7 +222,7 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
     onExportPDF?.(weekStartDate, weekEndDate)
   }, [isOpen, handleOpenChange, onExportPDF, weekStartDate, weekEndDate])
 
-  // Handler para limpiar fila de empleado que maneja confirmaciones
+  //  Handler para limpiar fila de empleado que maneja confirmaciones
   const handleClearEmployeeRow = useCallback(
     async (employeeId: string): Promise<boolean> => {
       // Verificar si es una semana completada
