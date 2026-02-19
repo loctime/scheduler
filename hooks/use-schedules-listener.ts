@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo } from "react"
-import { collection, query, orderBy, onSnapshot, where, limit } from "firebase/firestore"
+import { useEffect, useState, useMemo, useCallback } from "react"
+import { collection, query, orderBy, onSnapshot, where, limit, getDocs } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import type { Horario } from "@/lib/types"
 import { format, subMonths, addMonths } from "date-fns"
@@ -13,6 +13,14 @@ interface UseSchedulesListenerProps {
   enabled?: boolean // Para poder habilitar/deshabilitar el listener
 }
 
+interface UseSchedulesListenerReturn {
+  schedules: Horario[]
+  loading: boolean
+  error: Error | null
+  getWeekSchedule: (weekStartDate: Date) => Horario | null
+  getWeekScheduleFromFirestore: (weekStartDate: Date) => Promise<Horario | null> // 🔥 Nueva función
+}
+
 /**
  * Hook centralizado para listener de schedules
  * Maneja filtros, límites y optimizaciones
@@ -21,7 +29,7 @@ export function useSchedulesListener({
   user,
   monthRange,
   enabled = true,
-}: UseSchedulesListenerProps) {
+}: UseSchedulesListenerProps): UseSchedulesListenerReturn {
   const [schedules, setSchedules] = useState<Horario[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
@@ -133,11 +141,65 @@ export function useSchedulesListener({
     [schedules]
   )
 
+  // 🔥 FUNCIÓN CRÍTICA: Buscar documento real en Firestore (sin depender de array filtrado)
+  const getWeekScheduleFromFirestore = useCallback(async (weekStartDate: Date): Promise<Horario | null> => {
+    if (!db || !ownerId) {
+      console.warn("🔍 [getWeekScheduleFromFirestore] No hay db u ownerId")
+      return null
+    }
+
+    try {
+      const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+      
+      console.log("🔍 [getWeekScheduleFromFirestore] Query directa:", {
+        collection: "apps/horarios/schedules",
+        ownerId,
+        weekStartStr,
+        tipoOwnerId: typeof ownerId,
+        tipoWeekStartStr: typeof weekStartStr
+      })
+
+      // Query directa a Firestore por ownerId + weekStart
+      const q = query(
+        collection(db, COLLECTIONS.SCHEDULES),
+        where("ownerId", "==", ownerId),
+        where("weekStart", "==", weekStartStr),
+        limit(1)
+      )
+
+      const querySnapshot = await getDocs(q)
+      
+      if (querySnapshot.empty) {
+        console.log("🔍 [getWeekScheduleFromFirestore] No se encontró documento para:", { weekStartStr, ownerId })
+        return null
+      }
+
+      const doc = querySnapshot.docs[0]
+      const scheduleData = {
+        id: doc.id,
+        ...doc.data()
+      } as Horario
+
+      console.log("🔍 [getWeekScheduleFromFirestore] Documento encontrado:", {
+        id: scheduleData.id,
+        weekStart: scheduleData.weekStart,
+        tipoWeekStart: typeof scheduleData.weekStart,
+        completada: scheduleData.completada
+      })
+
+      return scheduleData
+    } catch (error) {
+      console.error("🔍 [getWeekScheduleFromFirestore] Error en query directa:", error)
+      return null
+    }
+  }, [db, ownerId])
+
   return {
     schedules,
     loading,
     error,
     getWeekSchedule,
+    getWeekScheduleFromFirestore, // 🔥 Nueva función para query directa
   }
 }
 

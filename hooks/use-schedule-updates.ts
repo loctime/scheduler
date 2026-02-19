@@ -1,5 +1,5 @@
 import { useCallback, useState, useMemo } from "react"
-import { collection, addDoc, doc, serverTimestamp, getDoc } from "firebase/firestore"
+import { collection, addDoc, doc, serverTimestamp, getDoc, query, where, limit, getDocs } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { format, startOfWeek, addDays } from "date-fns"
 import { Empleado, Turno, Horario, ShiftAssignment } from "@/lib/types"
@@ -57,15 +57,65 @@ export function useScheduleUpdates({
 
       try {
         const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
-        const weekSchedule = getWeekSchedule(weekStartDate)
+        let weekSchedule = getWeekSchedule(weekStartDate)
+
+        // 🔥 FALLBACK CRÍTICO: Si no está en memoria, buscar directamente en Firestore
+        if (!weekSchedule) {
+          console.log("🔍 [handleMarkWeekComplete] Schedule no encontrado en memoria, buscando en Firestore...")
+          
+          // Query directa a Firestore
+          const q = query(
+            collection(db, COLLECTIONS.SCHEDULES),
+            where("ownerId", "==", ownerId),
+            where("weekStart", "==", weekStartStr),
+            limit(1)
+          )
+
+          const querySnapshot = await getDocs(q)
+          
+          if (!querySnapshot.empty) {
+            const doc = querySnapshot.docs[0]
+            const docData = doc.data()
+            weekSchedule = {
+              id: doc.id,
+              ...docData
+            } as Horario
+            
+            console.log("🔍 [handleMarkWeekComplete] Schedule encontrado en Firestore:", {
+              id: weekSchedule.id,
+              weekStart: weekSchedule.weekStart,
+              completada: weekSchedule.completada
+            })
+          } else {
+            console.log("🔍 [handleMarkWeekComplete] No existe schedule en Firestore, se creará uno nuevo")
+          }
+        }
 
         if (!weekSchedule) {
-          toast({
-            title: "Error",
-            description: "No se encontró el horario de esta semana",
-            variant: "destructive",
-          })
-          return
+          // 🔥 CREAR DOCUMENTO VACÍO si no existe
+          console.log("🔍 [handleMarkWeekComplete] Creando schedule vacío para:", weekStartStr)
+          
+          const userName = user?.displayName || user?.email || "Usuario desconocido"
+          const userId = user?.uid || ""
+
+          const newScheduleData = {
+            nombre: `Semana del ${weekStartStr}`,
+            weekStart: weekStartStr,
+            semanaInicio: weekStartStr,
+            semanaFin: format(addDays(weekStartDate, 6), "yyyy-MM-dd"),
+            ownerId,
+            assignments: {},
+            dayStatus: {},
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            createdBy: userId,
+            createdByName: userName,
+          }
+
+          const scheduleRef = await addDoc(collection(db, COLLECTIONS.SCHEDULES), newScheduleData)
+          weekSchedule = { id: scheduleRef.id, ...newScheduleData } as Horario
+          
+          console.log("🔍 [handleMarkWeekComplete] Schedule creado:", { id: weekSchedule.id })
         }
 
         const userName = user?.displayName || user?.email || "Usuario desconocido"
