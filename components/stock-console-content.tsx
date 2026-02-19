@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { PwaNumericInput } from "@/components/pwa/pwa-numeric-input"
-import { Check, X, Package, ArrowLeft, Minus, Plus } from "lucide-react"
+import { Check, X, Package, ArrowLeft, Minus, Plus, MessageCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { UserStatusMenu } from "@/components/pwa/UserStatusMenu"
 import { PwaViewerBadge } from "@/components/pwa/PwaViewerBadge"
@@ -158,8 +158,49 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
               <ArrowLeft className="w-6 h-6" />
             </Link>
           ) : null}
-          <h1 className="text-xl font-bold flex-1">Stock Rápido</h1>
+          <h1 className="text-xl font-bold flex-1">{isPWA ? "Stock" : "Stock Rápido"}</h1>
           <div className="flex items-center gap-2 shrink-0">
+            {/* Botones en header para PWA */}
+            {isPWA && state.selectedPedidoId && textoPedidoAutomatico && (
+              <>
+                <Button
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(textoPedidoAutomatico)
+                      toast({
+                        title: "Texto copiado",
+                        description: "El texto del pedido se ha copiado al portapapeles",
+                      })
+                    } catch {
+                      toast({
+                        title: "Error",
+                        description: "No se pudo copiar el texto",
+                        variant: "destructive",
+                      })
+                    }
+                  }}
+                  disabled={state.loading}
+                  size="sm"
+                  className="h-8 px-2 text-xs bg-red-600 hover:bg-red-700 text-white border-red-700"
+                >
+                  <Package className="w-3 h-3 mr-1" />
+                  Copiar
+                </Button>
+                <Button
+                  onClick={() => {
+                    const encodedText = encodeURIComponent(textoPedidoAutomatico)
+                    const whatsappUrl = `https://wa.me/5492944997155?text=${encodedText}`
+                    window.open(whatsappUrl, '_blank')
+                  }}
+                  disabled={state.loading}
+                  size="sm"
+                  className="h-8 px-2 text-xs bg-green-600 hover:bg-green-700 text-white border-green-700"
+                >
+                  <MessageCircle className="w-3 h-3 mr-1" />
+                  WhatsApp
+                </Button>
+              </>
+            )}
             <span className={cn(
               "text-xs font-medium hidden sm:inline",
               isPWA ? "text-red-800" : "text-white/90"
