@@ -70,11 +70,34 @@ export function useSchedulesListener({
     // 🔍 AUDITORÍA: Loguear parámetros de query
     console.log("🔍 [useSchedulesListener] AUDITORÍA - Query:", {
       collection: "apps/horarios/schedules",
+      collectionConstant: COLLECTIONS.SCHEDULES,
       ownerId,
       tipoOwnerId: typeof ownerId,
+      userData,
+      user: {
+        uid: user?.uid,
+        email: user?.email,
+        displayName: user?.displayName
+      },
       startDate,
       endDate
     })
+
+    // 🔍 AUDITORÍA: Verificar consistencia de ownerId
+    if (userData?.role === "invited" && userData?.ownerId) {
+      console.log("🔍 [useSchedulesListener] USUARIO INVITED - ownerId desde userData:", {
+        ownerIdFromUserData: userData.ownerId,
+        ownerIdCalculado: ownerId,
+        userUid: user.uid,
+        coinciden: userData.ownerId === ownerId
+      })
+    } else {
+      console.log("🔍 [useSchedulesListener] USUARIO NORMAL - ownerId desde user.uid:", {
+        ownerIdFromUser: user.uid,
+        ownerIdCalculado: ownerId,
+        coinciden: user.uid === ownerId
+      })
+    }
 
     const unsubscribe = onSnapshot(
       schedulesQuery,
@@ -88,14 +111,47 @@ export function useSchedulesListener({
         console.log("🔍 [useSchedulesListener] AUDITORÍA - Schedules recibidos:", {
           ownerIdActual: ownerId,
           schedulesCount: schedulesData.length,
+          snapshotSize: snapshot.size,
           schedules: schedulesData.map(s => ({
             id: s.id,
             weekStart: s.weekStart,
             tipoWeekStart: typeof s.weekStart,
             ownerId: s.ownerId,
-            coincideOwnerId: s.ownerId === ownerId
+            coincideOwnerId: s.ownerId === ownerId,
+            buildScheduleDocId: buildScheduleDocId(s.ownerId || '', s.weekStart || ''),
+            idCoincideConDocId: s.id === buildScheduleDocId(s.ownerId || '', s.weekStart || ''),
+            completada: s.completada,
+            createdBy: s.createdBy,
+            createdAt: s.createdAt
           }))
         })
+
+        // 🔍 AUDITORÍA: Verificar tipos de weekStart
+        const weekStartTypes = schedulesData.reduce((acc, s) => {
+          const type = typeof s.weekStart
+          acc[type] = (acc[type] || 0) + 1
+          return acc
+        }, {} as Record<string, number>)
+        
+        if (Object.keys(weekStartTypes).length > 1) {
+          console.warn("⚠️ [useSchedulesListener] TIPOS INCONSISTENTES de weekStart:", weekStartTypes)
+        } else {
+          console.log("✅ [useSchedulesListener] Tipos de weekStart consistentes:", weekStartTypes)
+        }
+
+        // 🔍 AUDITORÍA: Verificar si hay documentos con ownerId diferente
+        const ownerIdInconsistencias = schedulesData.filter(s => s.ownerId !== ownerId)
+        if (ownerIdInconsistencias.length > 0) {
+          console.warn("⚠️ [useSchedulesListener] DOCUMENTOS CON ownerId DIFERENTE:", {
+            ownerIdEsperado: ownerId,
+            documentosInconsistentes: ownerIdInconsistencias.map(s => ({
+              id: s.id,
+              weekStart: s.weekStart,
+              ownerIdGuardado: s.ownerId,
+              createdBy: s.createdBy
+            }))
+          })
+        }
 
         // Filtrar schedules por rango de fechas en el cliente
         // Ya están filtrados por createdBy en la query, solo necesitamos filtrar por fecha
@@ -127,7 +183,29 @@ export function useSchedulesListener({
   // Función para obtener schedule de una semana específica
   const getWeekSchedule = useMemo(
     () => (weekStartStr: string) => {
+      console.log("🔍 [getWeekSchedule] Búsqueda local:", {
+        weekStartStr,
+        totalSchedules: schedules.length,
+        ownerId,
+        schedulesDisponibles: schedules.map(s => ({
+          id: s.id,
+          weekStart: s.weekStart,
+          coincide: s.weekStart === weekStartStr
+        }))
+      })
+
       const matches = schedules.filter((s) => s.weekStart === weekStartStr)
+
+      console.log("🔍 [getWeekSchedule] Resultados coincidentes:", {
+        weekStartStr,
+        matchesCount: matches.length,
+        matches: matches.map(m => ({
+          id: m.id,
+          weekStart: m.weekStart,
+          ownerId: m.ownerId,
+          completada: m.completada
+        }))
+      })
 
       if (matches.length > 1) {
         console.warn("⚠️ [getWeekSchedule] Duplicados detectados para ownerId+weekStart", {
@@ -139,6 +217,14 @@ export function useSchedulesListener({
 
       const deterministicId = ownerId ? buildScheduleDocId(ownerId, weekStartStr) : null
       const preferred = deterministicId ? matches.find((m) => m.id === deterministicId) : null
+
+      console.log("🔍 [getWeekSchedule] Selección final:", {
+        weekStartStr,
+        deterministicId,
+        preferredId: preferred?.id,
+        fallbackId: matches[0]?.id,
+        selectedId: (preferred || matches[0])?.id
+      })
 
       return preferred || matches[0] || null
     },
@@ -155,11 +241,28 @@ export function useSchedulesListener({
     try {
       console.log("🔍 [getWeekScheduleFromFirestore] Query directa:", {
         collection: "apps/horarios/schedules",
+        collectionConstant: COLLECTIONS.SCHEDULES,
         ownerId,
         weekStartStr,
         tipoOwnerId: typeof ownerId,
-        tipoWeekStartStr: typeof weekStartStr
+        tipoWeekStartStr: typeof weekStartStr,
+        buildScheduleDocId: buildScheduleDocId(ownerId, weekStartStr)
       })
+
+      // 🔍 AUDITORÍA: Verificar consistencia de tipos
+      if (typeof weekStartStr !== 'string') {
+        console.warn("⚠️ [getWeekScheduleFromFirestore] weekStartStr no es string:", {
+          weekStartStr,
+          tipo: typeof weekStartStr
+        })
+      }
+
+      if (typeof ownerId !== 'string') {
+        console.warn("⚠️ [getWeekScheduleFromFirestore] ownerId no es string:", {
+          ownerId,
+          tipo: typeof ownerId
+        })
+      }
 
       // Query directa a Firestore por ownerId + weekStart
       const q = query(
@@ -170,8 +273,34 @@ export function useSchedulesListener({
 
       const querySnapshot = await getDocs(q)
       
+      console.log("🔍 [getWeekScheduleFromFirestore] Resultado query directa:", {
+        querySize: querySnapshot.size,
+        empty: querySnapshot.empty,
+        weekStartStr,
+        ownerId
+      })
+      
       if (querySnapshot.empty) {
         console.log("🔍 [getWeekScheduleFromFirestore] No se encontró documento para:", { weekStartStr, ownerId })
+        
+        // 🔍 AUDITORÍA: Intentar buscar SIN filtro de weekStart para ver qué existe
+        const debugQuery = query(
+          collection(db, COLLECTIONS.SCHEDULES),
+          where("ownerId", "==", ownerId)
+        )
+        const debugSnapshot = await getDocs(debugQuery)
+        
+        console.log("🔍 [getWeekScheduleFromFirestore] DEBUG - Todos los documentos del ownerId:", {
+          totalDocumentos: debugSnapshot.size,
+          documentos: debugSnapshot.docs.map(doc => ({
+            id: doc.id,
+            weekStart: doc.data().weekStart,
+            tipoWeekStart: typeof doc.data().weekStart,
+            weekStartBuscado: weekStartStr,
+            coincidenciaExacta: doc.data().weekStart === weekStartStr
+          }))
+        })
+        
         return null
       }
 
@@ -191,7 +320,11 @@ export function useSchedulesListener({
         id: scheduleData.id,
         weekStart: scheduleData.weekStart,
         tipoWeekStart: typeof scheduleData.weekStart,
-        completada: scheduleData.completada
+        completada: scheduleData.completada,
+        deterministicId,
+        coincideId: scheduleData.id === deterministicId,
+        ownerIdGuardado: scheduleData.ownerId,
+        ownerIdEsperado: ownerId
       })
 
       return scheduleData

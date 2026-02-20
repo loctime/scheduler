@@ -18,6 +18,7 @@ import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import type { Recepcion } from "@/lib/types"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
+import { logStockAction } from "@/lib/services/stockLogService"
 
 export default function RecepcionPage() {
   const params = useParams()
@@ -262,15 +263,56 @@ export default function RecepcionPage() {
             const productDoc = await getDoc(productRef)
             const stockActual = productDoc.exists() ? (productDoc.data().stockActual ?? 0) : 0
             const nuevoStock = stockActual + productoRecepcion.cantidadRecibida
+            
             await updateDoc(productRef, {
               stockActual: nuevoStock,
               updatedAt: serverTimestamp(),
               ownerId,
               userId: user.uid,
             })
+
+            // Log de auditoría para cada actualización de stock
+            await logStockAction({
+              ownerId,
+              productId: productoRecepcion.productoId,
+              productName: productoRecepcion.productoNombre || 'Producto desconocido',
+              action: "recepcion_confirm",
+              previousValue: stockActual,
+              newValue: nuevoStock,
+              recepcionId: recepcion.id,
+              user: {
+                uid: user.uid,
+                email: user.email || 'desconocido@example.com'
+              },
+              source: "pwa"
+            })
           }
         }
       }
+
+      // Log de auditoría para confirmación de recepción
+      await logStockAction({
+        ownerId,
+        action: "recepcion_confirm",
+        recepcionId: recepcion.id,
+        user: {
+          uid: user.uid,
+          email: user.email || 'desconocido@example.com'
+        },
+        source: "pwa"
+      })
+
+      // Log de auditoría para confirmación de pedido (cambio de estado)
+      await logStockAction({
+        ownerId,
+        action: "pedido_confirm",
+        pedidoId: pedido.id,
+        user: {
+          uid: user.uid,
+          email: user.email || 'desconocido@example.com'
+        },
+        source: "pwa"
+      })
 
       // Buscar remitos anteriores (pedido y envío) para consolidar
       const remitosAnteriores = await obtenerRemitosPorPedido(pedido.id)

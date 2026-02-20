@@ -11,6 +11,7 @@ import { Package, Loader2 } from "lucide-react"
 import { logger } from "@/lib/logger"
 import type { Pedido, Producto, EnlacePublico, Configuracion } from "@/lib/types"
 import { generarNumeroRemito, crearRemitoEnvioDesdeDisponibles } from "@/lib/remito-utils"
+import { logStockAction } from "@/lib/services/stockLogService"
 
 export default function PedidoPublicoPage() {
   const params = useParams()
@@ -307,6 +308,18 @@ export default function PedidoPublicoPage() {
       try {
         await updateDoc(doc(db, COLLECTIONS.PEDIDOS, pedido.id), updateData)
         console.log("✓ Pedido actualizado exitosamente")
+        
+        // Log de auditoría para confirmación de envío de pedido
+        await logStockAction({
+          ownerId: pedido.ownerId,
+          action: "pedido_confirm",
+          pedidoId: pedido.id,
+          user: {
+            uid: "fabrica_publica",
+            email: "fabrica@pedido-publico.com"
+          },
+          source: "pwa"
+        })
       } catch (updateError: any) {
         console.error("❌ Error específico al actualizar pedido:", updateError)
         console.error("Código de error:", updateError?.code)

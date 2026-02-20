@@ -6,6 +6,7 @@ import {
   query,
   where,
   getDocs,
+  getDoc,
   onSnapshot,
   doc,
   updateDoc,
@@ -16,6 +17,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
 import { confirmarMovimientos } from "@/src/services/stock/movimientosService"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
+import { logStockAction } from "@/lib/services/stockLogService"
 import type { 
   StockConsoleState,
   MovimientoInput,
@@ -266,14 +268,44 @@ export function useStockConsole(user: any) {
     if (!db || !user?.uid || !ownerId || value < 0) return false
     const val = Math.floor(value)
     try {
+      // Obtener valor anterior antes del update
       const productRef = doc(db, "apps/horarios/products", productoId)
+      const productDoc = await getDoc(productRef)
+      const previousValue = productDoc.exists() ? (productDoc.data().stockActual ?? 0) : 0
+      
+      // Evitar log si no hay cambio
+      if (previousValue === val) {
+        setStockActual(prev => ({ ...prev, [productoId]: val }))
+        return true
+      }
+
+      // Obtener nombre del producto para el log
+      const productName = productDoc.exists() ? (productDoc.data().nombre || 'Producto desconocido') : 'Producto desconocido'
+
       await updateDoc(productRef, {
         stockActual: val,
         updatedAt: serverTimestamp(),
         ownerId,
         userId: user.uid,
       })
+      
       setStockActual(prev => ({ ...prev, [productoId]: val }))
+
+      // Log de auditoría después del update exitoso
+      await logStockAction({
+        ownerId,
+        productId: productoId,
+        productName,
+        action: "stock_update",
+        previousValue,
+        newValue: val,
+        user: {
+          uid: user.uid,
+          email: user.email || 'desconocido@example.com'
+        },
+        source: "pwa"
+      })
+
       return true
     } catch (err) {
       console.error("Error actualizando stock real:", err)

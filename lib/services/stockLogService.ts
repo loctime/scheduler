@@ -44,6 +44,12 @@ export async function logStockAction({
   source = "pwa",
 }: LogStockActionParams) {
   try {
+    // Validar que db esté disponible
+    if (!db) {
+      console.error("Firestore no está disponible para registrar stock log")
+      return
+    }
+
     // Evitar logs innecesarios
     if (
       action === "stock_update" &&
