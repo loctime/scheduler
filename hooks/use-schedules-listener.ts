@@ -127,13 +127,6 @@ export function useSchedulesListener({
   // Función para obtener schedule de una semana específica
   const getWeekSchedule = useMemo(
     () => (weekStartStr: string) => {
-      // � AUDITORÍA: Loguear valores reales
-      console.log("🔍 [getWeekSchedule] AUDITORÍA:", {
-        weekStartStr,
-        tipoWeekStartStr: typeof weekStartStr,
-        schedulesCount: schedules.length
-      })
-      
       const matches = schedules.filter((s) => s.weekStart === weekStartStr)
 
       if (matches.length > 1) {

@@ -1,0 +1,13 @@
+{
+  "name": "limpiar-semanas-completadas",
+  "version": "1.0.0",
+  "description": "Script para limpiar el estado 'completada' de todas las semanas",
+  "main": "limpiar-semanas-completadas.js",
+  "scripts": {
+    "start": "node limpiar-semanas-completadas.js"
+  },
+  "dependencies": {
+    "firebase": "^9.0.0",
+    "firebase-admin": "^11.0.0"
+  }
+}
