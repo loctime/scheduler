@@ -77,7 +77,7 @@ const nextConfig = {
         "img-src 'self' data: blob: " +
           "https://controlfile.onrender.com " +
           "https://lh3.googleusercontent.com; " +
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://cdn.jsdelivr.net blob:; " +
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://cdn.jsdelivr.net https://apis.google.com blob:; " +
         "style-src 'self' 'unsafe-inline'; " +
         "connect-src 'self' data: blob: " +
           "https://controlfile.onrender.com " +
@@ -86,7 +86,7 @@ const nextConfig = {
           "https://securetoken.googleapis.com " +
           "https://*.googleapis.com " +
           "https://cdn.jsdelivr.net; " +
-        "frame-src https://vercel.live; " +
+        "frame-src https://vercel.live https://accounts.google.com; " +
         "worker-src 'self' blob:;"
           },
         ],
