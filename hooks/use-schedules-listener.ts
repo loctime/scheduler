@@ -58,6 +58,21 @@ export function useSchedulesListener({
           ...scheduleDoc.data(),
         })) as Horario[]
 
+        // LOG TEMPORAL - Detectar cambios
+        const changedDocs = snapshot.docChanges().map(change => ({
+          type: change.type,
+          docId: change.doc.id,
+          weekStart: change.doc.data().weekStart,
+          hasAssignments: !!change.doc.data().assignments,
+          assignmentsKeys: change.doc.data().assignments ? Object.keys(change.doc.data().assignments) : []
+        }))
+        
+        console.log('[useSchedulesListener] SNAPSHOT RECIBIDO:', {
+          docsCount: snapshot.docs.length,
+          schedulesCount: schedulesData.length,
+          changedDocs
+        })
+
         setSchedules(schedulesData)
         setLoading(false)
         logger.debug(`[useSchedulesListener] Cargados ${schedulesData.length} schedules`)
@@ -117,8 +132,22 @@ export function useSchedulesListener({
 
       const deterministicId = ownerId ? buildScheduleDocId(ownerId, weekStartStr) : null
       const deterministicMatch = deterministicId ? matches.find((match) => match.id === deterministicId) : null
+      const result = deterministicMatch || matches[0] || null
+      
+      // LOG TEMPORAL - Solo para weekStartStr específico que estamos probando
+      if (weekStartStr === '2026-02-16') {
+        console.log('[getWeekSchedule] RESULTADO CRÍTICO:', {
+          weekStartStr,
+          deterministicId,
+          found: !!result,
+          resultId: result?.id,
+          hasAssignments: !!result?.assignments,
+          assignmentsKeys: result?.assignments ? Object.keys(result.assignments) : [],
+          assignmentsData: result?.assignments
+        })
+      }
 
-      return deterministicMatch || matches[0] || null
+      return result
     },
     [ownerId, schedulesByWeekStart],
   )

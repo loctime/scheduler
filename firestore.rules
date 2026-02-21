@@ -359,7 +359,11 @@ service cloud.firestore {
     
       allow create: if horariosCanActFor(request.resource.data.ownerId);
     
-      allow update, delete: if isAuth();
+      allow update, delete: if horariosCanActFor(
+        resource.data.ownerId != null
+          ? resource.data.ownerId
+          : request.resource.data.ownerId
+      );
     }
     
     /* ===============================

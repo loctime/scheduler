@@ -56,6 +56,18 @@ export function useScheduleUpdates({
       options?: { scheduleId?: string },
     ) => {
       try {
+        // LOG TEMPORAL PARA DEBUG - Calcular weekStartStr como lo hace la UI
+        const { startOfWeek } = await import("date-fns")
+        const weekStartsOn = (config?.semanaInicioDia || 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
+        const computedWeekStartStrUI = startOfWeek(new Date(date), { weekStartsOn })
+        const formattedWeekStartStrUI = computedWeekStartStrUI.toISOString().split('T')[0]
+        
+        console.log('[handleAssignmentUpdate] DEBUG UI:', {
+          dateStr: date,
+          weekStartsOn,
+          computedWeekStartStrUI: formattedWeekStartStrUI
+        })
+
         await scheduleApplication.updateAssignment(
           { date, employeeId, assignments, options },
           actor,
