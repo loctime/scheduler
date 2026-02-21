@@ -1,6 +1,9 @@
 import type { Horario, Empleado, Turno, ShiftAssignment } from "@/lib/types"
-import { format } from "date-fns"
+import { format, startOfWeek } from "date-fns"
+import { doc, serverTimestamp, setDoc } from "firebase/firestore"
 import { scheduleRepository } from "./schedule-repository"
+import { db, COLLECTIONS } from "@/lib/firebase"
+import { buildScheduleDocId } from "@/lib/firestore-helpers"
 import {
   createWeekScheduleData,
   validateAssignmentData,
@@ -20,6 +23,18 @@ export interface ScheduleApplicationService {
 }
 
 class ScheduleApplication implements ScheduleApplicationService {
+  private resolveOwnerId(user: any): string {
+    if (user?.role === "invited" && user?.ownerId) {
+      return user.ownerId
+    }
+    return user?.ownerId || user?.uid || ""
+  }
+
+  private getWeekStartStr(date: string): string {
+    const parsedDate = new Date(date)
+    return format(startOfWeek(parsedDate, { weekStartsOn: 1 }), "yyyy-MM-dd")
+  }
+
   async markWeekComplete(
     weekStartStr: string,
     completed: boolean,
@@ -61,15 +76,50 @@ class ScheduleApplication implements ScheduleApplicationService {
       throw new Error(validation.error)
     }
 
-    // Procesar asignación especial (franco/medio franco)
-    const assignment = assignments[0]
-    if (assignment && (assignment.type === "franco" || assignment.type === "medio_franco")) {
-      await this.handleSpecialAssignment(assignment, date, employeeId, user, config, getWeekSchedule)
-      return
+    if (!db) {
+      throw new Error("Firebase no está configurado")
     }
 
-    // Lógica para asignaciones normales
-    console.log("Updating assignment:", { date, employeeId, assignments })
+    const ownerId = this.resolveOwnerId(user)
+    if (!ownerId) {
+      throw new Error("Owner no válido")
+    }
+
+    const weekStartStr = this.getWeekStartStr(date)
+    const scheduleId = buildScheduleDocId(ownerId, weekStartStr)
+    const scheduleRef = doc(db, COLLECTIONS.SCHEDULES, scheduleId)
+
+    const assignmentType = assignments[0]?.type
+    const patch: Record<string, any> = {
+      ownerId,
+      weekStart: weekStartStr,
+      updatedAt: serverTimestamp(),
+      [`assignments.${date}.${employeeId}`]: assignments,
+    }
+
+    if (assignmentType === "franco" || assignmentType === "medio_franco") {
+      patch[`dayStatus.${date}.${employeeId}`] = assignmentType
+    } else {
+      patch[`dayStatus.${date}.${employeeId}`] = "normal"
+    }
+
+    console.log("🔍 [updateAssignment] Persisting assignment:", {
+      scheduleId,
+      weekStartStr,
+      collectionPath: COLLECTIONS.SCHEDULES,
+      updatedPaths: Object.keys(patch),
+      hasAssignments: assignments.length > 0,
+      options,
+    })
+
+    await setDoc(scheduleRef, patch, { merge: true })
+
+    console.log("✅ [updateAssignment] Assignment persisted", {
+      scheduleId,
+      weekStartStr,
+      date,
+      employeeId,
+    })
   }
 
   private async handleSpecialAssignment(
