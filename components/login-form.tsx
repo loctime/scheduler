@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth"
+import { signInWithRedirect, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, getRedirectResult } from "firebase/auth"
 import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore"
 import { auth, db, COLLECTIONS } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
@@ -215,19 +215,16 @@ export function LoginForm() {
     try {
       setLoading(true)
       const provider = new GoogleAuthProvider()
-      const result = await signInWithPopup(auth, provider)
-      const user = result.user
-
-      // Crear o actualizar el documento del usuario
-      await createOrUpdateUserDoc(user)
+      // Usar redirect en lugar de popup para evitar problemas con COOP
+      await signInWithRedirect(auth, provider)
+      // No necesitamos manejar el resultado aquí, se manejará en page.tsx
     } catch (error: any) {
+      setLoading(false)
       toast({
         title: "Error al iniciar sesión",
         description: error.message || "Ocurrió un error inesperado",
         variant: "destructive",
       })
-    } finally {
-      setLoading(false)
     }
   }
 

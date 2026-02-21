@@ -89,6 +89,10 @@ const nextConfig = {
         "frame-src https://vercel.live https://accounts.google.com; " +
         "worker-src 'self' blob:;"
           },
+    {
+      key: 'Cross-Origin-Opener-Policy',
+      value: 'same-origin-allow-popups',
+    },
         ],
       },
     ]
