@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from "react"
 import { addDays, format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
-import { Calendar, UserCircle, X } from "lucide-react"
+import { Calendar, UserCircle, X, Maximize2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -11,6 +11,7 @@ import { ScheduleGrid } from "@/components/schedule-grid"
 import { PwaTodayScheduleCard } from "@/components/pwa-today-schedule-card"
 import { PwaViewerBadge, notifyViewerChanged, notifyViewerCleared } from "@/components/pwa/PwaViewerBadge"
 import { UserStatusMenu } from "@/components/pwa/UserStatusMenu"
+import { FullscreenScheduleViewer } from "@/components/FullscreenScheduleViewer"
 import { usePublicHorario } from "@/hooks/use-public-horario"
 import { useConfig } from "@/hooks/use-config"
 import { useToast } from "@/hooks/use-toast"
@@ -105,6 +106,9 @@ export default function PublicHorarioPage({ companySlug, ImageWrapper, headerCla
   // Detectar vista móvil
   const [isMobile, setIsMobile] = useState(false)
   const [showFullImage, setShowFullImage] = useState(false)
+  
+  // Estado para controlar el viewer de pantalla completa
+  const [isFullscreenViewerOpen, setIsFullscreenViewerOpen] = useState(false)
 
   useEffect(() => {
     const checkMobile = () => {
@@ -503,8 +507,22 @@ export default function PublicHorarioPage({ companySlug, ImageWrapper, headerCla
             console.log("🔧 [PublicHorarioPage] Image failed, using ScheduleGrid fallback")
           }
           return (
-            <div className="w-full overflow-x-auto overflow-y-auto bg-white border rounded-lg p-4 sm:p-6"
+            <div className="w-full overflow-x-auto overflow-y-auto bg-white border rounded-lg p-4 sm:p-6 relative"
                  style={{ touchAction: 'pan-x pan-y pinch-zoom' }}>
+              {/* Botón de pantalla completa */}
+              <div className="absolute top-2 right-2 z-10">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setIsFullscreenViewerOpen(true)}
+                  className="bg-white/90 hover:bg-white border shadow-sm"
+                  aria-label="Ver en pantalla completa"
+                >
+                  <Maximize2 className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">Pantalla completa</span>
+                </Button>
+              </div>
+              
               {ImageWrapper ? (
                 <ImageWrapper
                   src={imageSrc}
@@ -589,6 +607,27 @@ export default function PublicHorarioPage({ companySlug, ImageWrapper, headerCla
           </Card>
         </div>
       )}
+
+      {/* Viewer de pantalla completa */}
+      {isFullscreenViewerOpen && (() => {
+        const currentWeek = horario?.weeks?.[horario.publishedWeekId]
+        const imageSrc = currentWeek?.publicImageUrl
+        const imageAlt = `Horario ${currentWeek?.weekLabel || 'semanal'}`
+        
+        if (!imageSrc) return null
+        
+        return (
+          <FullscreenScheduleViewer
+            imageSrc={imageSrc}
+            imageAlt={imageAlt}
+            onClose={() => setIsFullscreenViewerOpen(false)}
+            onError={(e) => {
+              console.error("🔧 [PublicHorarioPage] Fullscreen image load error:", e)
+              setIsFullscreenViewerOpen(false)
+            }}
+          />
+        )
+      })()}
     </div>
   )
 }

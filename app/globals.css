@@ -416,3 +416,12 @@ body.zoomable-image-body-lock {
   overflow: hidden;
   touch-action: none;
 }
+
+/* FullscreenScheduleViewer: bloqueo de scroll del body */
+body.fullscreen-schedule-body-lock {
+  overflow: hidden;
+  touch-action: none;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
