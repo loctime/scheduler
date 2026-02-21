@@ -73,6 +73,12 @@ export function useSchedulesListener({
           changedDocs
         })
 
+        console.log("👂 LISTENER UPDATE:", {
+          scheduleIds: schedulesData.map(s => s.id),
+          weeks: schedulesData.map(s => s.weekStart),
+          completadas: schedulesData.map(s => s.completada),
+        })
+
         setSchedules(schedulesData)
         setLoading(false)
         logger.debug(`[useSchedulesListener] Cargados ${schedulesData.length} schedules`)
@@ -134,22 +140,15 @@ export function useSchedulesListener({
       const deterministicMatch = deterministicId ? matches.find((match) => match.id === deterministicId) : null
       const result = deterministicMatch || matches[0] || null
       
-      // LOG TEMPORAL - Solo para weekStartStr específico que estamos probando
-      if (weekStartStr === '2026-02-16') {
-        console.log('[getWeekSchedule] RESULTADO CRÍTICO:', {
-          weekStartStr,
-          deterministicId,
-          found: !!result,
-          resultId: result?.id,
-          hasAssignments: !!result?.assignments,
-          assignmentsKeys: result?.assignments ? Object.keys(result.assignments) : [],
-          assignmentsData: result?.assignments
-        })
-      }
+      console.log("🔎 getWeekSchedule lookup:", {
+        requestedWeekStart: weekStartStr,
+        availableWeekStarts: schedules.map(s => s.weekStart),
+        matched: schedules.find(s => s.weekStart === weekStartStr)?.id
+      })
 
       return result
     },
-    [ownerId, schedulesByWeekStart],
+    [ownerId, schedulesByWeekStart, schedules],
   )
 
   return {

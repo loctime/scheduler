@@ -1,6 +1,6 @@
 import type { Horario, Empleado, Turno } from "@/lib/types"
 import { format, startOfWeek } from "date-fns"
-import { doc, serverTimestamp, setDoc } from "firebase/firestore"
+import { doc, serverTimestamp, setDoc, getDoc } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { buildScheduleDocId } from "@/lib/firestore-helpers"
 import { validateAssignmentData, type AssignmentUpdateData } from "./schedule-domain"
@@ -82,13 +82,43 @@ class ScheduleApplication implements ScheduleApplicationService {
 
     const assignmentType = assignments[0]?.type
 
+    // Leer el documento actual para preservar la estructura existente
+    const currentDoc = await getDoc(scheduleRef)
+    const currentData = currentDoc.exists() ? currentDoc.data() : {}
+    
+    // Construir el objeto assignments completo con estructura anidada correcta
+    const currentAssignments = currentData.assignments || {}
+    const updatedAssignments = {
+      ...currentAssignments,
+      [date]: {
+        ...(currentAssignments[date] || {}),
+        [employeeId]: assignments,
+      },
+    }
+
+    // Construir el objeto dayStatus completo con estructura anidada correcta
+    const currentDayStatus = currentData.dayStatus || {}
+    const updatedDayStatus = {
+      ...currentDayStatus,
+      [date]: {
+        ...(currentDayStatus[date] || {}),
+        [employeeId]: assignmentType === "franco" || assignmentType === "medio_franco" ? assignmentType : "normal",
+      },
+    }
+
     const updateData = {
       ownerId,
       weekStart: weekStartStr,
       updatedAt: serverTimestamp(),
-      [`assignments.${date}.${employeeId}`]: assignments,
-      [`dayStatus.${date}.${employeeId}`]: assignmentType === "franco" || assignmentType === "medio_franco" ? assignmentType : "normal",
+      assignments: updatedAssignments,
+      dayStatus: updatedDayStatus,
     }
+
+    // Preservar campos inmutables si existen
+    if (currentData.createdAt) updateData.createdAt = currentData.createdAt
+    if (currentData.createdBy) updateData.createdBy = currentData.createdBy
+    if (currentData.createdByName) updateData.createdByName = currentData.createdByName
+    if (currentData.completada !== undefined) updateData.completada = currentData.completada
 
     // LOG TEMPORAL - Verificar datos exactos de escritura
     console.log('[updateAssignment] DATOS A ESCRIBIR:', {
@@ -96,7 +126,9 @@ class ScheduleApplication implements ScheduleApplicationService {
       weekStartStr,
       updateData,
       assignmentPath: `assignments.${date}.${employeeId}`,
-      assignmentsValue: assignments
+      assignmentsValue: assignments,
+      hasAssignmentsObject: !!updateData.assignments,
+      assignmentsStructure: Object.keys(updateData.assignments || {})
     })
 
     await setDoc(
@@ -105,13 +137,15 @@ class ScheduleApplication implements ScheduleApplicationService {
       { merge: true },
     )
 
-    // LOG TEMPORAL - Verificar escritura
-    console.log('[updateAssignment] ESCRITURA COMPLETADA:', {
+    const snapshot = await getDoc(scheduleRef)
+    console.log("🔥 POST-WRITE SNAPSHOT:", {
       scheduleId,
-      path: `schedules/${scheduleId}`,
-      assignmentPath: `assignments.${date}.${employeeId}`,
-      assignments,
-      dayStatus: assignmentType === "franco" || assignmentType === "medio_franco" ? assignmentType : "normal"
+      exists: snapshot.exists(),
+      dataKeys: Object.keys(snapshot.data() || {}),
+      assignmentsType: typeof snapshot.data()?.assignments,
+      hasAssignmentsObject: !!snapshot.data()?.assignments,
+      hasLiteralAssignmentField: Object.keys(snapshot.data() || {}).some(k => k.includes("assignments.")),
+      rawData: snapshot.data()
     })
   }
 }
