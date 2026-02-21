@@ -106,7 +106,7 @@ class ScheduleApplication implements ScheduleApplicationService {
       },
     }
 
-    const updateData = {
+    const updateData: Record<string, any> = {
       ownerId,
       weekStart: weekStartStr,
       updatedAt: serverTimestamp(),
