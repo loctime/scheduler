@@ -208,31 +208,7 @@ export function GeneralView({
           const weekKey = weekStartStr
           const isExpanded = expandedWeeks.has(weekKey)
 
-          // Si la semana está completada y tiene snapshot, usar empleados del snapshot
-          // Si no hay empleados activos pero hay snapshot, usar el snapshot
-          const employeesForWeek = (() => {
-            if (weekSchedule?.completada === true && weekSchedule?.empleadosSnapshot && weekSchedule.empleadosSnapshot.length > 0) {
-              // Si hay snapshot, usar empleados del snapshot
-              const snapshotEmployees = weekSchedule.empleadosSnapshot.map((snapshotEmp) => ({
-                id: snapshotEmp.id,
-                name: snapshotEmp.name,
-                email: snapshotEmp.email,
-                phone: snapshotEmp.phone,
-                userId: '', // No disponible en snapshot
-              } as Empleado))
-              
-              // Si hay empleados activos, combinar (priorizar activos)
-              if (employees.length > 0) {
-                const activeEmployeesMap = new Map(employees.map((emp) => [emp.id, emp]))
-                return snapshotEmployees.map((snapshotEmp) => 
-                  activeEmployeesMap.get(snapshotEmp.id) || snapshotEmp
-                )
-              }
-              
-              return snapshotEmployees
-            }
-            return employees
-          })()
+          const employeesForWeek = employees
 
           return (
             <WeekView

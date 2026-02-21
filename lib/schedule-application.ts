@@ -1,47 +1,52 @@
-import type { Horario, Empleado, Turno, ShiftAssignment } from "@/lib/types"
-import { format } from "date-fns"
-import { scheduleRepository } from "./schedule-repository"
-import {
-  createWeekScheduleData,
-  validateAssignmentData,
-  findMedioTurno,
-  createMedioFrancoAssignment,
-  createAssignmentData,
-  createScheduleCreationData,
-  createScheduleUpdateData,
-  createWeekCompletionData,
-  type AssignmentUpdateData,
-  type WeekCompletionData
-} from "./schedule-domain"
+import type { Horario, Empleado, Turno } from "@/lib/types"
+import { format, startOfWeek } from "date-fns"
+import { doc, serverTimestamp, setDoc } from "firebase/firestore"
+import { db, COLLECTIONS } from "@/lib/firebase"
+import { buildScheduleDocId } from "@/lib/firestore-helpers"
+import { validateAssignmentData, type AssignmentUpdateData } from "./schedule-domain"
 
 export interface ScheduleApplicationService {
-  markWeekComplete(weekStartStr: string, completed: boolean, user: any, employees: Empleado[], config: any): Promise<void>
-  updateAssignment(data: AssignmentUpdateData, user: any, employees: Empleado[], shifts: Turno[], config: any, schedules: Horario[], getWeekSchedule: (weekStartStr: string) => Horario | null): Promise<void>
+  markWeekComplete(weekStartStr: string, completed: boolean, user: any): Promise<void>
+  updateAssignment(
+    data: AssignmentUpdateData,
+    user: any,
+    employees: Empleado[],
+    shifts: Turno[],
+    _config: any,
+    _schedules: Horario[],
+    _getWeekSchedule: (weekStartStr: string) => Horario | null,
+  ): Promise<void>
 }
 
 class ScheduleApplication implements ScheduleApplicationService {
-  async markWeekComplete(
-    weekStartStr: string,
-    completed: boolean,
-    user: any,
-    employees: Empleado[],
-    config: any
-  ): Promise<void> {
-    // Implementación lógica de marcado de semana completa
-    const weekScheduleData = {
-      weekStartDate: new Date(weekStartStr),
-      weekStartStr,
-      weekEndStr: format(new Date(weekStartStr), 'yyyy-MM-dd'), // Simplified - should be actual week end
-      userName: user?.displayName || user?.email || 'Unknown',
-      userId: user?.uid || 'unknown',
-      ownerId: user?.uid || 'unknown'
-    }
-    
-    const completionData = createWeekCompletionData(completed, weekScheduleData, employees, config)
-    
-    // Lógica para crear o actualizar el schedule
-    // Esta es una implementación simplificada, la completa requeriría más detalles
-    console.log("Marking week complete:", { weekStartStr, completed })
+  private resolveOwnerId(user: any): string {
+    if (user?.role === "invited" && user?.ownerId) return user.ownerId
+    return user?.ownerId || user?.uid || ""
+  }
+
+  private getWeekStartStr(date: string): string {
+    return format(startOfWeek(new Date(date), { weekStartsOn: 1 }), "yyyy-MM-dd")
+  }
+
+  async markWeekComplete(weekStartStr: string, completed: boolean, user: any): Promise<void> {
+    if (!db) throw new Error("Firebase no está configurado")
+
+    const ownerId = this.resolveOwnerId(user)
+    if (!ownerId) throw new Error("Owner no válido")
+
+    const scheduleId = buildScheduleDocId(ownerId, weekStartStr)
+    const scheduleRef = doc(db, COLLECTIONS.SCHEDULES, scheduleId)
+
+    await setDoc(
+      scheduleRef,
+      {
+        ownerId,
+        weekStart: weekStartStr,
+        updatedAt: serverTimestamp(),
+        completada: completed,
+      },
+      { merge: true },
+    )
   }
 
   async updateAssignment(
@@ -49,50 +54,36 @@ class ScheduleApplication implements ScheduleApplicationService {
     user: any,
     employees: Empleado[],
     shifts: Turno[],
-    config: any,
-    schedules: Horario[],
-    getWeekSchedule: (weekStartStr: string) => Horario | null
+    _config: any,
+    _schedules: Horario[],
+    _getWeekSchedule: (weekStartStr: string) => Horario | null,
   ): Promise<void> {
-    const { date, employeeId, assignments, options } = data
+    const { date, employeeId, assignments } = data
 
-    // Validaciones
     const validation = validateAssignmentData(employees, shifts, true)
-    if (!validation.valid) {
-      throw new Error(validation.error)
-    }
+    if (!validation.valid) throw new Error(validation.error)
+    if (!db) throw new Error("Firebase no está configurado")
 
-    // Procesar asignación especial (franco/medio franco)
-    const assignment = assignments[0]
-    if (assignment && (assignment.type === "franco" || assignment.type === "medio_franco")) {
-      await this.handleSpecialAssignment(assignment, date, employeeId, user, config, getWeekSchedule)
-      return
-    }
+    const ownerId = this.resolveOwnerId(user)
+    if (!ownerId) throw new Error("Owner no válido")
 
-    // Lógica para asignaciones normales
-    console.log("Updating assignment:", { date, employeeId, assignments })
-  }
+    const weekStartStr = this.getWeekStartStr(date)
+    const scheduleId = buildScheduleDocId(ownerId, weekStartStr)
+    const scheduleRef = doc(db, COLLECTIONS.SCHEDULES, scheduleId)
 
-  private async handleSpecialAssignment(
-    assignment: ShiftAssignment,
-    date: string,
-    employeeId: string,
-    user: any,
-    config: any,
-    getWeekSchedule: (weekStartStr: string) => Horario | null
-  ): Promise<void> {
-    const medioTurnos = config?.mediosTurnos || []
-    const { medioTurnoToUse } = findMedioTurno(assignment, medioTurnos, config)
+    const assignmentType = assignments[0]?.type
 
-    if (assignment.type === "medio_franco" && !medioTurnoToUse) {
-      throw new Error("No hay medio turno configurado para asignar medio franco")
-    }
-
-    const medioFrancoAssignment = createMedioFrancoAssignment(assignment, medioTurnoToUse)
-    const otherAssignments: ShiftAssignment[] = [] // Se obtendrían de las asignaciones existentes
-    const assignmentData = createAssignmentData(assignment, medioFrancoAssignment, otherAssignments)
-
-    // Lógica para crear o actualizar schedule con asignación especial
-    console.log("Handling special assignment:", { assignment, assignmentData })
+    await setDoc(
+      scheduleRef,
+      {
+        ownerId,
+        weekStart: weekStartStr,
+        updatedAt: serverTimestamp(),
+        [`assignments.${date}.${employeeId}`]: assignments,
+        [`dayStatus.${date}.${employeeId}`]: assignmentType === "franco" || assignmentType === "medio_franco" ? assignmentType : "normal",
+      },
+      { merge: true },
+    )
   }
 }
 

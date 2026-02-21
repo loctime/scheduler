@@ -109,7 +109,10 @@ export function MonthlyScheduleView({
                 {month.weeks.map((week) => {
                   const weekEmps: Empleado[] = employees.length > 0
                     ? employees
-                    : ((week.schedule as any)?.employeesSnapshot ?? (week.schedule as any)?.empleadosSnapshot ?? [])
+                    : Object.keys(week.schedule?.assignments || {}).flatMap((date) =>
+                        Object.keys(week.schedule?.assignments?.[date] || {})
+                      ).filter((employeeId, index, array) => array.indexOf(employeeId) === index)
+                      .map((employeeId) => ({ id: employeeId, name: `Empleado ${employeeId.slice(0, 8)}` } as Empleado))
                   const weekStats: Record<string, EmployeeMonthlyStats> = {}
                   weekEmps.forEach((emp) => {
                     weekStats[emp.id] = {

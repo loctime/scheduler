@@ -32,7 +32,6 @@ interface FullScheduleData {
   weekEnd: string
   assignments: Record<string, any>
   employeesSnapshot: any[]
-  ordenEmpleadosSnapshot: string[]
   publishedAt: any
   publishedBy: string
   companyName?: string
@@ -150,7 +149,6 @@ export function usePublicMonthlySchedulesV2({
               weekEnd: d.weekEnd || "",
               assignments: d.assignments || {},
               employeesSnapshot: d.employeesSnapshot || [],
-              ordenEmpleadosSnapshot: d.ordenEmpleadosSnapshot || [],
               publishedAt: d.publishedAt,
               publishedBy: publicCompany.ownerId,
               companyName: data.companyName || publicCompany.companyName
