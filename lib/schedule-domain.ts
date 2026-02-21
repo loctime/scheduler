@@ -44,15 +44,6 @@ export interface ScheduleUpdateData {
   modifiedByName: string | null
 }
 
-export interface WeekCompletionData {
-  completada: boolean
-  completadaPor: string | null
-  completadaPorNombre: string | null
-  completadaEn: any
-  empleadosSnapshot: any[] | null
-  ordenEmpleadosSnapshot: string[] | null
-}
-
 // Funciones de dominio puras
 export function createWeekScheduleData(date: Date, weekStartsOn: Day, user: any, userData: any): WeekScheduleData {
   const dateObj = new Date(date)
@@ -211,68 +202,4 @@ export function createScheduleUpdateData(
   }
 }
 
-export function createWeekCompletionData(
-  completed: boolean,
-  weekScheduleData: WeekScheduleData,
-  employees: Empleado[],
-  config: any,
-  weekSchedule?: Horario
-): WeekCompletionData {
-  const { userName, userId } = weekScheduleData
 
-  if (!completed) {
-    return {
-      completada: false,
-      completadaPor: null,
-      completadaPorNombre: null,
-      completadaEn: null,
-      empleadosSnapshot: null,
-      ordenEmpleadosSnapshot: null,
-    }
-  }
-
-  // Guardar snapshot de empleados que estaban visibles cuando se completó
-  const empleadosEnSemana = new Set<string>()
-
-  // Obtener IDs de empleados que tienen asignaciones
-  if (weekSchedule?.assignments) {
-    Object.values(weekSchedule.assignments).forEach((dateAssignments) => {
-      if (dateAssignments && typeof dateAssignments === 'object') {
-        Object.keys(dateAssignments).forEach((employeeId) => {
-          empleadosEnSemana.add(employeeId)
-        })
-      }
-    })
-  }
-
-  // Agregar empleados del orden personalizado (para mantener estructura visual)
-  if (config?.ordenEmpleados) {
-    config.ordenEmpleados.forEach((id: string) => {
-      if (employees.some((emp) => emp.id === id)) {
-        empleadosEnSemana.add(id)
-      }
-    })
-  }
-
-  // Crear snapshot de empleados (solo incluir campos que tienen valor)
-  const empleadosSnapshot = employees
-    .filter((emp) => empleadosEnSemana.has(emp.id))
-    .map((emp) => {
-      const snapshot: any = {
-        id: emp.id,
-        name: emp.name,
-      }
-      if (emp.email) snapshot.email = emp.email
-      if (emp.phone) snapshot.phone = emp.phone
-      return snapshot
-    })
-
-  return {
-    completada: true,
-    completadaPor: userId,
-    completadaPorNombre: userName,
-    completadaEn: null, // Se asignará en el repositorio
-    empleadosSnapshot,
-    ordenEmpleadosSnapshot: config?.ordenEmpleados || [],
-  }
-}

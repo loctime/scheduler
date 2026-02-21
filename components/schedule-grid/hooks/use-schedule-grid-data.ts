@@ -66,15 +66,6 @@ export function useScheduleGridData({
 
   // Filtrar empleados según el estado del schedule
   const filteredEmployees = useMemo(() => {
-    // Si el schedule está completado, usar los empleados guardados en el schedule
-    if (isScheduleCompleted && schedule && !('horarioId' in schedule)) {
-      const completedSchedule = schedule as Horario
-      if (completedSchedule.ordenEmpleadosSnapshot && completedSchedule.ordenEmpleadosSnapshot.length > 0) {
-        const employeeIds = new Set(completedSchedule.ordenEmpleadosSnapshot)
-        return employees.filter((emp) => employeeIds.has(emp.id))
-      }
-    }
-
     // Si no está completado, verificar si es una semana pasada
     if (lastCompletedWeekStart && currentWeekStart && currentWeekStart <= lastCompletedWeekStart) {
       // Esta es una semana pasada (no completada), solo mostrar empleados que tienen asignaciones
