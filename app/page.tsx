@@ -26,6 +26,7 @@ export default function HomePage() {
 
     // Manejar el resultado de la redirección de Google Sign-In
     const handleRedirectResult = async () => {
+      if (!auth) return
       try {
         const result = await getRedirectResult(auth)
         if (result && result.user && db) {
