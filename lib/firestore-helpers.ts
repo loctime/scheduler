@@ -160,23 +160,6 @@ export function preserveScheduleFields(
   if (currentSchedule.completada !== undefined && currentSchedule.completada !== null) {
     preserved.completada = currentSchedule.completada
   }
-  if (currentSchedule.completadaPor !== undefined && currentSchedule.completadaPor !== null) {
-    preserved.completadaPor = currentSchedule.completadaPor
-  }
-  if (currentSchedule.completadaPorNombre !== undefined && currentSchedule.completadaPorNombre !== null) {
-    preserved.completadaPorNombre = currentSchedule.completadaPorNombre
-  }
-  if (currentSchedule.completadaEn !== undefined && currentSchedule.completadaEn !== null) {
-    preserved.completadaEn = currentSchedule.completadaEn
-  }
-
-  // 🔥 Snapshots de empleados - preservar solo si existen y no son null
-  if (currentSchedule.empleadosSnapshot !== undefined && currentSchedule.empleadosSnapshot !== null) {
-    preserved.empleadosSnapshot = currentSchedule.empleadosSnapshot
-  }
-  if (currentSchedule.ordenEmpleadosSnapshot !== undefined && currentSchedule.ordenEmpleadosSnapshot !== null) {
-    preserved.ordenEmpleadosSnapshot = currentSchedule.ordenEmpleadosSnapshot
-  }
 
   // 🔥 NEVER preserve ownerId - debe ser immutable desde creación
   // No incluir ownerId aquí para evitar violar reglas unchanged()

@@ -216,16 +216,6 @@ export interface Horario {
     }
   }
   completada?: boolean
-  completadaPor?: string
-  completadaPorNombre?: string
-  completadaEn?: any
-  empleadosSnapshot?: Array<{
-    id: string
-    name: string
-    email?: string
-    phone?: string
-  }>
-  ordenEmpleadosSnapshot?: string[]
   createdAt?: any
   updatedAt?: any
   createdBy?: string
@@ -259,13 +249,6 @@ export interface HistorialItem {
       [empleadoId: string]: ShiftAssignment[]
     }
   }
-  empleadosSnapshot?: Array<{
-    id: string
-    name: string
-    email?: string
-    phone?: string
-  }>
-  ordenEmpleadosSnapshot?: string[]
   accion?: string
   versionAnterior?: boolean
   createdAt?: any

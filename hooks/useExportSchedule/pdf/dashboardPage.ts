@@ -43,27 +43,7 @@ export const addDashboardPage = (
     employeeMap.set(emp.id, emp)
   })
   
-  // 2. Agregar empleados de snapshots de semanas completadas
-  monthWeeks.forEach((weekDays) => {
-    const weekStartStr = format(weekDays[0], "yyyy-MM-dd")
-    const weekSchedule = getWeekSchedule(weekStartStr)
-    if (weekSchedule?.empleadosSnapshot) {
-      weekSchedule.empleadosSnapshot.forEach((snapshotEmp) => {
-        allEmployeeIds.add(snapshotEmp.id)
-        if (!employeeMap.has(snapshotEmp.id)) {
-          employeeMap.set(snapshotEmp.id, {
-            id: snapshotEmp.id,
-            name: snapshotEmp.name,
-            email: snapshotEmp.email,
-            phone: snapshotEmp.phone,
-            userId: '',
-          } as Empleado)
-        }
-      })
-    }
-  })
-  
-  // 3. Agregar empleados que aparecen en asignaciones (por si acaso no están en lista activa ni en snapshots)
+  // 2. Agregar empleados que aparecen en asignaciones
   monthWeeks.forEach((weekDays) => {
     const weekStartStr = format(weekDays[0], "yyyy-MM-dd")
     const weekSchedule = getWeekSchedule(weekStartStr)

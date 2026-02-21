@@ -27,16 +27,6 @@ import { createEmployeeStatsViewForUI, convertToLegacyStats } from "@/lib/employ
 import { GeneralView } from "@/components/schedule-calendar/general-view"
 import { ExportOverlay } from "@/components/export-overlay"
 import { ScheduleGridCapture } from "@/components/schedule-grid-capture"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 
 interface ScheduleCalendarProps {
   user: any
@@ -117,7 +107,7 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
   )
 
   // Usar hook centralizado para listener de schedules
-  const { schedules, loading: schedulesLoading, getWeekSchedule, getWeekScheduleFromFirestore } = useSchedulesListener({
+  const { schedules, visibleSchedules, loading: schedulesLoading, getWeekSchedule } = useSchedulesListener({
     user: userData,
     monthRange,
     enabled: !!userData,
@@ -182,14 +172,12 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
     [getWeekSchedule, weekStartsOn],
   )
 
-  const { handleAssignmentUpdate, handleMarkWeekComplete, pendingEdit, setPendingEdit } = useScheduleUpdates({
+  const { handleAssignmentUpdate, handleMarkWeekComplete } = useScheduleUpdates({
     user: userData,
     employees,
     shifts,
     schedules,
-    weekStartsOn,
     getWeekSchedule,
-    getWeekScheduleFromFirestore, // 🔥 Pasar nueva función
   })
 
   const goToPreviousMonth = useCallback(() => {
@@ -675,21 +663,6 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
     <>
       <ExportOverlay isExporting={exporting} message="Exportando horario..." />
       <div className="space-y-6">
-        <AlertDialog open={pendingEdit !== null} onOpenChange={(open) => !open && pendingEdit && setPendingEdit(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Semana completada</AlertDialogTitle>
-              <AlertDialogDescription>
-                Esta semana fue completada y marcada como listo. ¿Está seguro que desea editarla?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => pendingEdit?.resolve(false)}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={() => pendingEdit?.resolve(true)}>Sí, editar</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
         <GeneralView
         dataLoading={dataLoading}
         employees={employees}
@@ -711,7 +684,7 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
         user={userData}
         onMarkWeekComplete={handleMarkWeekComplete}
         lastCompletedWeekStart={lastCompletedWeekStart}
-        allSchedules={schedules}
+        allSchedules={visibleSchedules}
         config={config}
         onPublishSchedule={handlePublishPwa}
         isPublishingSchedule={isPublishing || publishingWeekId !== null}

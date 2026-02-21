@@ -122,40 +122,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     ownerId: readonly ? undefined : user?.uid 
   })
 
-  // Combinar empleados actuales con snapshot cuando el horario está completado
-  const employeesToUse = useMemo(() => {
-    // Verificar que es un Horario (no HistorialItem) y tiene snapshot
-    // HistorialItem tiene 'horarioId', Horario no
-    if (isScheduleCompleted && schedule && !('horarioId' in schedule)) {
-      const horarioSchedule = schedule as Horario
-      if (horarioSchedule.empleadosSnapshot) {
-        // Crear un mapa de empleados actuales
-        const currentEmployeesMap = new Map(employees.map((emp) => [emp.id, emp]))
-        const combined: Empleado[] = []
-        
-        // Primero agregar empleados del snapshot (mantener orden y datos históricos)
-        horarioSchedule.empleadosSnapshot.forEach((snapshotEmp) => {
-          const currentEmp = currentEmployeesMap.get(snapshotEmp.id)
-          if (currentEmp) {
-            // Si el empleado existe actualmente, usar datos actuales pero mantener estructura
-            combined.push(currentEmp)
-          } else {
-            // Si el empleado fue eliminado, usar datos del snapshot
-            combined.push({
-              id: snapshotEmp.id,
-              name: snapshotEmp.name,
-              email: snapshotEmp.email,
-              phone: snapshotEmp.phone,
-              userId: '', // No disponible en snapshot, pero necesario para el tipo
-            } as Empleado)
-          }
-        })
-        
-        return combined
-      }
-    }
-    return employees
-  }, [employees, schedule, isScheduleCompleted])
+  const employeesToUse = employees
 
   // Obtener la fecha de inicio de la semana actual
   const currentWeekStart = useMemo(() => {
@@ -185,9 +152,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     employees: employeesToUse,
     shifts,
     separadores: config?.separadores || [],
-    ordenEmpleados: isScheduleCompleted && schedule && !('horarioId' in schedule) && (schedule as Horario).ordenEmpleadosSnapshot
-      ? (schedule as Horario).ordenEmpleadosSnapshot
-      : config?.ordenEmpleados,
+    ordenEmpleados: config?.ordenEmpleados,
     schedule: schedule && !('horarioId' in schedule) ? schedule as Horario : null,
     scheduleId: schedule?.id,
     isScheduleCompleted,

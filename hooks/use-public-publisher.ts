@@ -127,7 +127,7 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
 
       // Snapshot de empleados: del documento o construido desde options.employees + assignments
       let employeesSnapshot: Array<{ id: string; name: string }> =
-        originalSchedule.employeesSnapshot || originalSchedule.empleadosSnapshot || []
+        originalSchedule.employeesSnapshot || []
       if (employeesSnapshot.length === 0 && options.employees?.length) {
         const idsInWeek = new Set<string>()
         const assignments = originalSchedule.assignments || {}
@@ -139,19 +139,7 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
         const empMap = new Map(
           options.employees.map((e: any) => [e.id, { id: e.id, name: e.name || e.displayName || e.id }])
         )
-        const orden = originalSchedule.ordenEmpleadosSnapshot || []
-        const ordered = Array.from(idsInWeek)
-        if (orden.length) {
-          ordered.sort((a, b) => {
-            const i = orden.indexOf(a)
-            const j = orden.indexOf(b)
-            if (i === -1 && j === -1) return 0
-            if (i === -1) return 1
-            if (j === -1) return -1
-            return i - j
-          })
-        }
-        employeesSnapshot = ordered.map((id) => ({
+        employeesSnapshot = Array.from(idsInWeek).map((id) => ({
           id,
           name: empMap.get(id)?.name ?? id,
         }))
@@ -164,7 +152,6 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
         weekEnd,
         assignments: originalSchedule.assignments || {},
         employeesSnapshot,
-        ordenEmpleadosSnapshot: originalSchedule.ordenEmpleadosSnapshot || [],
         publishedAt: serverTimestamp(),
         publishedBy: user?.uid,
         companyName: options.companyName.trim(),
