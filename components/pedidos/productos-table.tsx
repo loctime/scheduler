@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Trash2, Upload, Package, Minus, Plus, GripVertical, PlusCircle, X, Check, AlertTriangle } from "lucide-react"
+import { Trash2, Upload, Package, Minus, Plus, PlusCircle, X, Check, AlertTriangle } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
@@ -292,17 +292,9 @@ interface ProductoRowProps {
   setEditingField: (f: { id: string; field: string } | null) => void
   setInlineValue: (v: string) => void
   inputRef: React.RefObject<HTMLInputElement | null>
-  isDragging: boolean
-  isDragOver: boolean
-  onDragStart: (e: React.DragEvent, id: string) => void
-  onDragEnd: (e: React.DragEvent) => void
-  onDragOver: (e: React.DragEvent, id: string) => void
-  onDragLeave: () => void
-  onDrop: (e: React.DragEvent, id: string) => void
   onUpdateProduct: (productId: string, field: string, value: string) => Promise<boolean>
   onStockChange: (productId: string, value: number) => void
   onDeleteProduct: (productId: string) => void
-  draggable: boolean
   isCritical?: boolean
 }
 
@@ -318,17 +310,9 @@ function ProductoRow({
   setEditingField,
   setInlineValue,
   inputRef,
-  isDragging,
-  isDragOver,
-  onDragStart,
-  onDragEnd,
-  onDragOver,
-  onDragLeave,
-  onDrop,
   onUpdateProduct,
   onStockChange,
   onDeleteProduct,
-  draggable,
   isCritical = false,
 }: ProductoRowProps) {
   const isEditingNombre = editingField?.id === product.id && editingField?.field === "nombre"
@@ -374,25 +358,11 @@ function ProductoRow({
   return (
     <div
       key={product.id}
-      draggable={draggable}
-      onDragStart={(e) => onDragStart(e, product.id)}
-      onDragEnd={onDragEnd}
-      onDragOver={(e) => onDragOver(e, product.id)}
-      onDragLeave={onDragLeave}
-      onDrop={(e) => onDrop(e, product.id)}
       className={cn(
         "rounded-lg border bg-card px-3 py-2 flex flex-col sm:flex-row sm:items-center gap-2 shadow-sm hover:shadow-md transition-all",
-        isDragOver && "ring-2 ring-primary/20",
-        isDragging && "opacity-50",
         isCritical && "border-red-600 border-2 bg-red-50 shadow-md"
       )}
     >
-      {draggable && (
-        <div className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
-          <GripVertical className="h-3.5 w-3.5" />
-        </div>
-      )}
-
       {isCritical && (
         <div className="shrink-0 flex items-center">
           <AlertTriangle className="h-4 w-4 text-red-600" />
@@ -572,18 +542,6 @@ export function ProductosTable({
   const [stockMinimoLocal, setStockMinimoLocal] = useState<Record<string, number>>({})
   const [unidadesPorPackEdit, setUnidadesPorPackEditState] = useState<Record<string, string>>({})
 
-  // Detectar PWA - usar la misma lógica simple que stock-console-content.tsx
-  const [isPWA, setIsPWA] = useState(false)
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setIsPWA(
-        window.matchMedia("(display-mode: standalone)").matches ||
-          (window.navigator as any).standalone === true
-      )
-    }
-  }, [])
-
   // Verificar si hay productos críticos
   const hasCriticalProducts = useMemo(() => {
     return products.some(product => {
@@ -592,10 +550,9 @@ export function ProductosTable({
     })
   }, [products, stockActual])
 
+  // Siempre ordenar por criticidad cuando hay productos críticos
   const productsToRender = useMemo(() => {
-    // Solo ordenar en PWA cuando hay productos críticos
-    // En desktop mantener orden manual siempre
-    if (!isPWA || !hasCriticalProducts) {
+    if (!hasCriticalProducts) {
       return products
     }
     
@@ -612,7 +569,7 @@ export function ProductosTable({
     })
     
     return sorted
-  }, [isPWA, hasCriticalProducts, products, stockActual])
+  }, [hasCriticalProducts, products, stockActual])
 
   useEffect(() => {
     if (isCreatingProduct && newProductInputRef.current) newProductInputRef.current.focus()
@@ -643,45 +600,6 @@ export function ProductosTable({
   const setUnidadesPorPackEdit = useCallback((productId: string, v: string) => {
     setUnidadesPorPackEditState((prev) => ({ ...prev, [productId]: v }))
   }, [])
-
-  const orderedProductIds = products.map((p) => p.id)
-  const [draggedProductId, setDraggedProductId] = useState<string | null>(null)
-  const [dragOverProductId, setDragOverProductId] = useState<string | null>(null)
-
-  const handleDragStart = useCallback((e: React.DragEvent, productId: string) => {
-    if (!onProductsOrderUpdate) return
-    setDraggedProductId(productId)
-    e.dataTransfer.effectAllowed = "move"
-    e.dataTransfer.setData("text/plain", productId)
-    if (e.currentTarget instanceof HTMLElement) e.currentTarget.style.opacity = "0.5"
-  }, [onProductsOrderUpdate])
-
-  const handleDragEnd = useCallback((e: React.DragEvent) => {
-    setDraggedProductId(null)
-    setDragOverProductId(null)
-    if (e.currentTarget instanceof HTMLElement) e.currentTarget.style.opacity = "1"
-  }, [])
-
-  const handleDragOver = useCallback((e: React.DragEvent, productId: string) => {
-    if (!onProductsOrderUpdate || !draggedProductId || draggedProductId === productId) return
-    e.preventDefault()
-    e.dataTransfer.dropEffect = "move"
-    setDragOverProductId(productId)
-  }, [onProductsOrderUpdate, draggedProductId])
-
-  const handleDrop = useCallback(async (e: React.DragEvent, targetId: string) => {
-    if (!onProductsOrderUpdate || !draggedProductId || draggedProductId === targetId) return
-    e.preventDefault()
-    const draggedIndex = orderedProductIds.indexOf(draggedProductId)
-    const targetIndex = orderedProductIds.indexOf(targetId)
-    if (draggedIndex === -1 || targetIndex === -1) return
-    const newOrder = [...orderedProductIds]
-    const [removed] = newOrder.splice(draggedIndex, 1)
-    newOrder.splice(targetIndex, 0, removed)
-    setDraggedProductId(null)
-    setDragOverProductId(null)
-    await onProductsOrderUpdate(newOrder)
-  }, [onProductsOrderUpdate, draggedProductId, orderedProductIds])
 
   const handleCreateProduct = useCallback(async () => {
     if (!onCreateProduct || !newProductNombre.trim()) return
@@ -732,7 +650,7 @@ export function ProductosTable({
           <h3 className="text-sm font-semibold">Productos</h3>
           <p className="text-xs text-muted-foreground">
             {products.length} productos
-            {isPWA && hasCriticalProducts && (
+            {hasCriticalProducts && (
               <span className="ml-2 text-xs text-orange-600">(Ordenado por criticidad)</span>
             )}
           </p>
@@ -770,17 +688,9 @@ export function ProductosTable({
               setEditingField={setEditingField}
               setInlineValue={setInlineValue}
               inputRef={inputRef}
-              isDragging={draggedProductId === product.id}
-              isDragOver={dragOverProductId === product.id}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              onDragOver={handleDragOver}
-              onDragLeave={() => setDragOverProductId(null)}
-              onDrop={handleDrop}
               onUpdateProduct={onUpdateProduct}
               onStockChange={onStockChange}
               onDeleteProduct={onDeleteProduct}
-              draggable={!!onProductsOrderUpdate}
               isCritical={isCritical}
             />
           )
