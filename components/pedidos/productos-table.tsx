@@ -572,50 +572,15 @@ export function ProductosTable({
   const [stockMinimoLocal, setStockMinimoLocal] = useState<Record<string, number>>({})
   const [unidadesPorPackEdit, setUnidadesPorPackEditState] = useState<Record<string, string>>({})
 
-  // Detectar PWA móvil - solo ordenar en PWA o móvil real, nunca en desktop
-  const [isMobileOrPWA, setIsMobileOrPWA] = useState(() => {
-    if (typeof window === "undefined") return false
-    try {
-      const isPWA = window.matchMedia("(display-mode: standalone)").matches || 
-                    (window.navigator as any).standalone === true
-      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-      const isMobileWidth = window.innerWidth < 1024
-      // Solo ordenar si es PWA (cualquier tamaño) o si es móvil real con ancho pequeño
-      return isPWA || (isMobileUA && isMobileWidth)
-    } catch {
-      return false
-    }
-  })
+  // Detectar PWA - usar la misma lógica simple que stock-console-content.tsx
+  const [isPWA, setIsPWA] = useState(false)
 
   useEffect(() => {
-    if (typeof window === "undefined") return
-    
-    const checkMobile = () => {
-      try {
-        const isPWA = window.matchMedia("(display-mode: standalone)").matches || 
-                      (window.navigator as any).standalone === true
-        const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-        const isMobileWidth = window.innerWidth < 1024
-        // Solo ordenar si es PWA (cualquier tamaño) o si es móvil real con ancho pequeño
-        const shouldSort = isPWA || (isMobileUA && isMobileWidth)
-        setIsMobileOrPWA(shouldSort)
-      } catch {
-        setIsMobileOrPWA(false)
-      }
-    }
-    
-    checkMobile()
-    window.addEventListener("resize", checkMobile)
-    // Verificar múltiples veces para asegurar detección en PWA
-    const timeout1 = setTimeout(checkMobile, 100)
-    const timeout2 = setTimeout(checkMobile, 300)
-    const timeout3 = setTimeout(checkMobile, 800)
-    
-    return () => {
-      window.removeEventListener("resize", checkMobile)
-      clearTimeout(timeout1)
-      clearTimeout(timeout2)
-      clearTimeout(timeout3)
+    if (typeof window !== "undefined") {
+      setIsPWA(
+        window.matchMedia("(display-mode: standalone)").matches ||
+          (window.navigator as any).standalone === true
+      )
     }
   }, [])
 
@@ -628,9 +593,9 @@ export function ProductosTable({
   }, [products, stockActual])
 
   const productsToRender = useMemo(() => {
-    // Solo ordenar en móvil/PWA cuando hay productos críticos
+    // Solo ordenar en PWA cuando hay productos críticos
     // En desktop mantener orden manual siempre
-    if (!isMobileOrPWA || !hasCriticalProducts) {
+    if (!isPWA || !hasCriticalProducts) {
       return products
     }
     
@@ -647,7 +612,7 @@ export function ProductosTable({
     })
     
     return sorted
-  }, [isMobileOrPWA, hasCriticalProducts, products, stockActual])
+  }, [isPWA, hasCriticalProducts, products, stockActual])
 
   useEffect(() => {
     if (isCreatingProduct && newProductInputRef.current) newProductInputRef.current.focus()
@@ -767,7 +732,7 @@ export function ProductosTable({
           <h3 className="text-sm font-semibold">Productos</h3>
           <p className="text-xs text-muted-foreground">
             {products.length} productos
-            {isMobileOrPWA && hasCriticalProducts && (
+            {isPWA && hasCriticalProducts && (
               <span className="ml-2 text-xs text-orange-600">(Ordenado por criticidad)</span>
             )}
           </p>
