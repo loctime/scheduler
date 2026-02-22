@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { signInWithRedirect, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, getRedirectResult } from "firebase/auth"
+import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth"
 import { auth, db, COLLECTIONS } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,55 +26,6 @@ function RegistroContent() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
 
-  // Manejar el resultado de la redirección de Google Sign-In
-  useEffect(() => {
-    const handleRedirectResult = async () => {
-      if (!auth || !db) return
-      
-      // Solo procesar si hay un token válido (para registro con invitación)
-      if (!token || !tokenValid) {
-        // Si no hay token, no es una página de registro con invitación, salir
-        return
-      }
-      
-      try {
-        const result = await getRedirectResult(auth)
-        if (result && result.user) {
-          console.log("✅ Usuario autenticado con Google (redirect):", result.user.uid, result.user.email)
-          
-          // Procesar el registro con el token de invitación
-          await procesarRegistroInvitacion(result.user, token)
-
-          toast({
-            title: "Registro exitoso",
-            description: "Tu cuenta ha sido vinculada exitosamente. Redirigiendo...",
-          })
-
-          // Redirigir al dashboard
-          setTimeout(() => {
-            router.push(redirectTo || "/dashboard/pedidos")
-          }, 1000)
-        }
-      } catch (error: any) {
-        console.error("❌ Error al procesar resultado de redirección:", error)
-        // Solo mostrar error si no es un error de "no hay resultado" (normal cuando no hay redirect pendiente)
-        if (error.code !== 'auth/no-auth-event') {
-          toast({
-            title: "Error",
-            description: error.message || "No se pudo completar el registro",
-            variant: "destructive",
-          })
-        }
-      }
-    }
-
-    // Esperar un poco para asegurar que auth esté listo
-    const timer = setTimeout(() => {
-      handleRedirectResult()
-    }, 100)
-
-    return () => clearTimeout(timer)
-  }, [auth, token, tokenValid, redirectTo, router, toast, db])
 
   // Validar token
   useEffect(() => {
@@ -255,14 +206,41 @@ function RegistroContent() {
         prompt: 'select_account'
       })
       
-      // Usar redirect en lugar de popup para evitar problemas en producción
-      await signInWithRedirect(auth, provider)
-      // No necesitamos manejar el resultado aquí, se manejará en el useEffect con getRedirectResult
+      // IMPORTANTE: Usar POPUP, NO redirect
+      // signInWithPopup mantiene el estado y evita problemas con tokens
+      const result = await signInWithPopup(auth, provider)
+      const user = result.user
+      
+      console.log("✅ Usuario autenticado con Google:", user.uid, user.email)
+
+      // Procesar el registro con el token de invitación
+      await procesarRegistro(user)
+
+      toast({
+        title: "Registro exitoso",
+        description: "Tu cuenta ha sido vinculada exitosamente. Redirigiendo...",
+      })
+
+      // Redirigir al dashboard
+      setTimeout(() => {
+        router.push(redirectTo || "/dashboard/pedidos")
+      }, 1000)
     } catch (error: any) {
-      setLoading(false)
       console.error("❌ Error en registro:", error)
       
-      if (error.code === "auth/unauthorized-domain") {
+      if (error.code === "auth/popup-closed-by-user") {
+        toast({
+          title: "Registro cancelado",
+          description: "El registro fue cancelado. Por favor intenta nuevamente.",
+          variant: "destructive",
+        })
+      } else if (error.code === "auth/popup-blocked") {
+        toast({
+          title: "Popup bloqueado",
+          description: "Por favor permite popups para este sitio e intenta nuevamente.",
+          variant: "destructive",
+        })
+      } else if (error.code === "auth/unauthorized-domain") {
         toast({
           title: "Dominio no autorizado",
           description: `El dominio ${typeof window !== 'undefined' ? window.location.hostname : ''} no está autorizado. Agrégalo en Firebase Console → Authentication → Settings → Authorized domains`,
@@ -281,6 +259,8 @@ function RegistroContent() {
           variant: "destructive",
         })
       }
+    } finally {
+      setLoading(false)
     }
   }
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { signInWithRedirect, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, getRedirectResult } from "firebase/auth"
+import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth"
 import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore"
 import { auth, db, COLLECTIONS } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
@@ -215,16 +215,48 @@ export function LoginForm() {
     try {
       setLoading(true)
       const provider = new GoogleAuthProvider()
-      // Usar redirect en lugar de popup para evitar problemas con COOP
-      await signInWithRedirect(auth, provider)
-      // No necesitamos manejar el resultado aquí, se manejará en page.tsx
-    } catch (error: any) {
-      setLoading(false)
-      toast({
-        title: "Error al iniciar sesión",
-        description: error.message || "Ocurrió un error inesperado",
-        variant: "destructive",
+      
+      // Configurar para mostrar selector de cuenta
+      provider.setCustomParameters({
+        prompt: 'select_account'
       })
+      
+      // Usar POPUP, NO redirect
+      const result = await signInWithPopup(auth, provider)
+      const user = result.user
+
+      // Crear o actualizar el documento del usuario en Firestore
+      await createOrUpdateUserDoc(user)
+    } catch (error: any) {
+      console.error("❌ Error al iniciar sesión con Google:", error)
+      
+      if (error.code === "auth/popup-closed-by-user") {
+        toast({
+          title: "Inicio de sesión cancelado",
+          description: "El inicio de sesión fue cancelado. Por favor intenta nuevamente.",
+          variant: "destructive",
+        })
+      } else if (error.code === "auth/popup-blocked") {
+        toast({
+          title: "Popup bloqueado",
+          description: "Por favor permite popups para este sitio e intenta nuevamente.",
+          variant: "destructive",
+        })
+      } else if (error.code === "auth/unauthorized-domain") {
+        toast({
+          title: "Dominio no autorizado",
+          description: `El dominio ${typeof window !== 'undefined' ? window.location.hostname : ''} no está autorizado. Agrégalo en Firebase Console → Authentication → Settings → Authorized domains`,
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Error al iniciar sesión",
+          description: error.message || "Ocurrió un error inesperado",
+          variant: "destructive",
+        })
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
