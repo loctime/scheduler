@@ -384,7 +384,7 @@ function ProductoRow({
         "rounded-lg border bg-card px-3 py-2 flex flex-col sm:flex-row sm:items-center gap-2 shadow-sm hover:shadow-md transition-all",
         isDragOver && "ring-2 ring-primary/20",
         isDragging && "opacity-50",
-        isCritical && "border-red-500 border-2 bg-red-50/50 shadow-md"
+        isCritical && "border-red-600 border-2 bg-red-50 shadow-md"
       )}
     >
       {draggable && (
@@ -572,34 +572,50 @@ export function ProductosTable({
   const [stockMinimoLocal, setStockMinimoLocal] = useState<Record<string, number>>({})
   const [unidadesPorPackEdit, setUnidadesPorPackEditState] = useState<Record<string, string>>({})
 
-  // Detectar PWA móvil para mostrar indicador
-  const [isPWA, setIsPWA] = useState(false)
-  const [isMobileWidth, setIsMobileWidth] = useState(false)
+  // Detectar PWA móvil - solo ordenar en PWA o móvil real, nunca en desktop
+  const [isMobileOrPWA, setIsMobileOrPWA] = useState(() => {
+    if (typeof window === "undefined") return false
+    try {
+      const isPWA = window.matchMedia("(display-mode: standalone)").matches || 
+                    (window.navigator as any).standalone === true
+      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      const isMobileWidth = window.innerWidth < 1024
+      // Solo ordenar si es PWA (cualquier tamaño) o si es móvil real con ancho pequeño
+      return isPWA || (isMobileUA && isMobileWidth)
+    } catch {
+      return false
+    }
+  })
 
   useEffect(() => {
     if (typeof window === "undefined") return
     
-    const checkPWA = () => {
-      const pwa = window.matchMedia("(display-mode: standalone)").matches || 
-                  (window.navigator as any).standalone === true
-      setIsPWA(pwa)
+    const checkMobile = () => {
+      try {
+        const isPWA = window.matchMedia("(display-mode: standalone)").matches || 
+                      (window.navigator as any).standalone === true
+        const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+        const isMobileWidth = window.innerWidth < 1024
+        // Solo ordenar si es PWA (cualquier tamaño) o si es móvil real con ancho pequeño
+        const shouldSort = isPWA || (isMobileUA && isMobileWidth)
+        setIsMobileOrPWA(shouldSort)
+      } catch {
+        setIsMobileOrPWA(false)
+      }
     }
     
-    const checkWidth = () => {
-      setIsMobileWidth(window.innerWidth < 1024)
-    }
-    
-    checkPWA()
-    checkWidth()
-    
-    window.addEventListener("resize", checkWidth)
-    const timeout1 = setTimeout(checkPWA, 100)
-    const timeout2 = setTimeout(checkPWA, 500)
+    checkMobile()
+    window.addEventListener("resize", checkMobile)
+    // Verificar múltiples veces para asegurar detección en PWA
+    const timeout1 = setTimeout(checkMobile, 100)
+    const timeout2 = setTimeout(checkMobile, 300)
+    const timeout3 = setTimeout(checkMobile, 800)
     
     return () => {
-      window.removeEventListener("resize", checkWidth)
+      window.removeEventListener("resize", checkMobile)
       clearTimeout(timeout1)
       clearTimeout(timeout2)
+      clearTimeout(timeout3)
     }
   }, [])
 
@@ -611,13 +627,10 @@ export function ProductosTable({
     })
   }, [products, stockActual])
 
-  // En PWA o móvil, ordenar por criticidad
-  const shouldSortByCriticality = isPWA || isMobileWidth
-
   const productsToRender = useMemo(() => {
-    // Si hay productos críticos, siempre ordenar por criticidad
-    // También ordenar en PWA o móvil aunque no haya críticos
-    if (!hasCriticalProducts && !shouldSortByCriticality) {
+    // Solo ordenar en móvil/PWA cuando hay productos críticos
+    // En desktop mantener orden manual siempre
+    if (!isMobileOrPWA || !hasCriticalProducts) {
       return products
     }
     
@@ -634,7 +647,7 @@ export function ProductosTable({
     })
     
     return sorted
-  }, [hasCriticalProducts, shouldSortByCriticality, products, stockActual])
+  }, [isMobileOrPWA, hasCriticalProducts, products, stockActual])
 
   useEffect(() => {
     if (isCreatingProduct && newProductInputRef.current) newProductInputRef.current.focus()
@@ -754,7 +767,7 @@ export function ProductosTable({
           <h3 className="text-sm font-semibold">Productos</h3>
           <p className="text-xs text-muted-foreground">
             {products.length} productos
-            {hasCriticalProducts && (
+            {isMobileOrPWA && hasCriticalProducts && (
               <span className="ml-2 text-xs text-orange-600">(Ordenado por criticidad)</span>
             )}
           </p>
