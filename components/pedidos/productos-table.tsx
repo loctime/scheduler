@@ -563,6 +563,29 @@ export function ProductosTable({
   const [stockMinimoLocal, setStockMinimoLocal] = useState<Record<string, number>>({})
   const [unidadesPorPackEdit, setUnidadesPorPackEditState] = useState<Record<string, string>>({})
 
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(typeof window !== "undefined" && window.innerWidth < 1024)
+    }
+    checkMobile()
+    window.addEventListener("resize", checkMobile)
+    return () => window.removeEventListener("resize", checkMobile)
+  }, [])
+
+  const productsToRender = isMobile
+    ? [...products].sort((a, b) => {
+        const stockA = stockActual[a.id] ?? 0
+        const stockB = stockActual[b.id] ?? 0
+
+        const criticidadA = a.stockMinimo - stockA
+        const criticidadB = b.stockMinimo - stockB
+
+        return criticidadB - criticidadA
+      })
+    : products
+
   useEffect(() => {
     if (isCreatingProduct && newProductInputRef.current) newProductInputRef.current.focus()
   }, [isCreatingProduct])
@@ -695,7 +718,7 @@ export function ProductosTable({
       </div>
 
       <div className="space-y-1 p-2">
-        {products.map((product) => (
+        {productsToRender.map((product) => (
           <ProductoRow
             key={product.id}
             product={product}
