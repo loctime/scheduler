@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Trash2, Upload, Package, Minus, Plus, PlusCircle, X, Check, AlertTriangle } from "lucide-react"
+import { Trash2, Upload, Package, Minus, Plus, PlusCircle, X, Check, AlertTriangle, Pencil } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
@@ -94,6 +94,11 @@ function CellNombre({
   onCancel: () => void
   inputRef: React.RefObject<HTMLInputElement | null>
 }) {
+  const handleEdit = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onStartEdit()
+  }, [onStartEdit])
   if (isEditing) {
     return (
       <div className="flex items-center gap-1 min-w-0 flex-1">
@@ -116,14 +121,43 @@ function CellNombre({
       </div>
     )
   }
+  const handleEdit = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onStartEdit()
+  }, [onStartEdit])
+
   return (
-    <button
-      type="button"
-      onClick={onStartEdit}
-      className="text-left text-sm font-medium truncate flex-1 min-w-0 hover:bg-muted/50 rounded px-1 -mx-1"
-    >
-      {product.nombre}
-    </button>
+    <div className="flex items-center gap-1 flex-1 min-w-0 relative">
+      <button
+        type="button"
+        onClick={handleEdit}
+        onTouchEnd={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          onStartEdit()
+        }}
+        className="text-left text-sm font-medium truncate flex-1 min-w-0 hover:bg-muted/50 active:bg-muted rounded px-1 -mx-1 touch-manipulation cursor-pointer"
+        style={{ WebkitTapHighlightColor: 'transparent' }}
+      >
+        {product.nombre}
+      </button>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={handleEdit}
+        onTouchEnd={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          onStartEdit()
+        }}
+        className="h-7 w-7 sm:h-6 sm:w-6 shrink-0 text-muted-foreground hover:text-foreground active:bg-muted touch-manipulation cursor-pointer"
+        style={{ WebkitTapHighlightColor: 'transparent' }}
+        title="Editar nombre"
+      >
+        <Pencil className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
+      </Button>
+    </div>
   )
 }
 
