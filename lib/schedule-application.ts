@@ -26,7 +26,10 @@ class ScheduleApplication implements ScheduleApplicationService {
 
   private getWeekStartStr(date: string, config: any): string {
     const weekStartsOn = (config?.semanaInicioDia ?? 1) as 0|1|2|3|4|5|6
-    return format(startOfWeek(new Date(date), { weekStartsOn }), "yyyy-MM-dd")
+    // Parsear la fecha de forma segura usando componentes individuales para evitar problemas de zona horaria
+    const [year, month, day] = date.split('-').map(Number)
+    const dateObj = new Date(year, month - 1, day, 12, 0, 0) // Usar mediodía local
+    return format(startOfWeek(dateObj, { weekStartsOn }), "yyyy-MM-dd")
   }
 
   async markWeekComplete(weekStartStr: string, completed: boolean, user: any): Promise<void> {
@@ -72,12 +75,23 @@ class ScheduleApplication implements ScheduleApplicationService {
     const scheduleId = buildScheduleDocId(ownerId, weekStartStr)
     const scheduleRef = doc(db, COLLECTIONS.SCHEDULES, scheduleId)
 
-    // LOG TEMPORAL PARA DEBUG
+    // LOG TEMPORAL PARA DEBUG - Especial para lunes
+    const dateObj = new Date(date + 'T00:00:00') // Agregar hora para evitar problemas de zona horaria
+    const dayOfWeek = dateObj.getDay() // 0 = domingo, 1 = lunes
+    const isMonday = dayOfWeek === 1
+    const weekStartDateObj = new Date(weekStartStr + 'T00:00:00') // Agregar hora para evitar problemas de zona horaria
+    const weekStartDayOfWeek = weekStartDateObj.getDay()
     console.log('[updateAssignment] DEBUG:', {
       date,
+      dayOfWeek,
+      dayName: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][dayOfWeek],
+      isMonday,
       configSemanaInicioDia: _config?.semanaInicioDia,
       computedWeekStartStr: weekStartStr,
-      scheduleId
+      scheduleId,
+      weekStartDate: weekStartDayOfWeek,
+      weekStartDayName: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][weekStartDayOfWeek],
+      weekStartShouldBeMonday: weekStartDayOfWeek === 1
     })
 
     const assignmentType = assignments[0]?.type
@@ -85,6 +99,17 @@ class ScheduleApplication implements ScheduleApplicationService {
     // Leer el documento actual para preservar la estructura existente
     const currentDoc = await getDoc(scheduleRef)
     const currentData = currentDoc.exists() ? currentDoc.data() : {}
+    
+    // LOG TEMPORAL - Verificar lectura del documento
+    console.log("📖 PRE-WRITE READ:", {
+      scheduleId,
+      exists: currentDoc.exists(),
+      hasAssignments: !!currentData.assignments,
+      assignmentsKeys: currentData.assignments ? Object.keys(currentData.assignments) : [],
+      weekStartInDoc: currentData.weekStart,
+      expectedWeekStart: weekStartStr,
+      weekStartMatch: currentData.weekStart === weekStartStr
+    })
     
     // Construir el objeto assignments completo con estructura anidada correcta
     const currentAssignments = currentData.assignments || {}

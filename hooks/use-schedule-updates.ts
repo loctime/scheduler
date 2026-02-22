@@ -58,15 +58,67 @@ export function useScheduleUpdates({
       try {
         const { startOfWeek, format } = await import("date-fns")
         const weekStartsOn = (config?.semanaInicioDia || 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
-        const computedWeekStartUI = format(
-          startOfWeek(new Date(date), { weekStartsOn }),
-          "yyyy-MM-dd"
-        )
         
-        console.log("📅 UI EDIT:", {
-          dateStr: date,
-          weekStartsOn: config?.semanaInicioDia,
-          computedWeekStartUI: computedWeekStartUI
+        // Parsear la fecha de forma segura usando componentes individuales para evitar problemas de zona horaria
+        const [year, month, day] = date.split('-').map(Number)
+        const dateObj = new Date(year, month - 1, day, 12, 0, 0) // Usar mediodía local para evitar problemas de zona horaria
+        const dayOfWeek = dateObj.getDay()
+        const computedWeekStartDate = startOfWeek(dateObj, { weekStartsOn })
+        const computedWeekStartUI = format(computedWeekStartDate, "yyyy-MM-dd")
+        
+        // Verificar que el cálculo sea correcto
+        const computedWeekStartDayOfWeek = computedWeekStartDate.getDay()
+        const weekStartShouldBeMonday = weekStartsOn === 1 && computedWeekStartDayOfWeek === 1
+        
+        // Buscar el schedule usando el weekStart calculado
+        let foundSchedule = getWeekSchedule(computedWeekStartUI)
+        
+        // FALLBACK: Si no se encuentra y se pasó un scheduleId, buscar ese schedule directamente
+        // Esto maneja el caso donde los schedules existentes tienen weekStart incorrecto
+        if (!foundSchedule && options?.scheduleId) {
+          foundSchedule = schedules.find(s => s.id === options.scheduleId) || null
+          if (foundSchedule) {
+            console.warn("⚠️ Schedule encontrado por ID pero weekStart no coincide:", {
+              scheduleId: options.scheduleId,
+              weekStartEnSchedule: foundSchedule.weekStart,
+              weekStartCalculado: computedWeekStartUI
+            })
+          }
+        }
+        
+        // LOG CONSOLIDADO - Toda la información de diagnóstico
+        console.log("🔍 DIAGNÓSTICO COMPLETO - UPDATE ASSIGNMENT:", {
+          // Información de la fecha clickeada
+          fechaClickeada: date,
+          diaSemana: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][dayOfWeek],
+          esLunes: dayOfWeek === 1,
+          
+          // Configuración
+          semanaInicioDia: config?.semanaInicioDia,
+          weekStartsOn: weekStartsOn,
+          
+          // Cálculo del weekStart
+          weekStartCalculado: computedWeekStartUI,
+          weekStartDiaSemana: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][computedWeekStartDayOfWeek],
+          weekStartEsLunes: computedWeekStartDayOfWeek === 1,
+          weekStartDebeSerLunes: weekStartShouldBeMonday,
+          calculoCorrecto: weekStartShouldBeMonday === (computedWeekStartDayOfWeek === 1),
+          
+          // Schedule encontrado
+          scheduleIdPasado: options?.scheduleId,
+          scheduleEncontrado: foundSchedule ? {
+            id: foundSchedule.id,
+            weekStart: foundSchedule.weekStart,
+            tieneAssignments: !!foundSchedule.assignments,
+            assignmentsKeys: foundSchedule.assignments ? Object.keys(foundSchedule.assignments) : []
+          } : null,
+          scheduleCoincide: foundSchedule?.weekStart === computedWeekStartUI,
+          
+          // Schedules disponibles
+          schedulesDisponibles: schedules.map(s => ({
+            id: s.id,
+            weekStart: s.weekStart
+          }))
         })
 
         await scheduleApplication.updateAssignment(

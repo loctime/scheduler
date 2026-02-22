@@ -6,7 +6,7 @@ import { WeekView } from "@/components/schedule-calendar/week-view"
 import { EmptyStateCard, LoadingStateCard } from "@/components/schedule-calendar/state-card"
 import type { Horario, Empleado, Turno, MedioTurno, ShiftAssignment, ShiftAssignmentValue, Configuracion } from "@/lib/types"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
-import { format } from "date-fns"
+import { format, startOfWeek } from "date-fns"
 import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
 import { calculateAssignmentImpact } from "@/lib/domain/assignment-hours"
 import { normalizeAssignments } from "@/lib/domain/normalize-assignments"
@@ -114,8 +114,11 @@ export function GeneralView({
 
   // Sincronizar el estado cuando cambian las semanas del mes
   const weekKeys = useMemo(
-    () => monthWeeks.map((weekDays) => format(weekDays[0], "yyyy-MM-dd")),
-    [monthWeeks],
+    () => monthWeeks.map((weekDays) => {
+      const weekStartDate = startOfWeek(weekDays[0], { weekStartsOn: config?.semanaInicioDia ?? 1 })
+      return format(weekStartDate, "yyyy-MM-dd")
+    }),
+    [monthWeeks, config?.semanaInicioDia],
   )
 
   // Limpiar semanas que ya no existen cuando cambian las semanas del mes
@@ -168,11 +171,12 @@ export function GeneralView({
   // IMPORTANTE: Este hook debe estar antes de cualquier return condicional
   const hasCompletedWeeks = useMemo(() => {
     return monthWeeks.some((weekDays) => {
-      const weekStartStr = format(weekDays[0], "yyyy-MM-dd")
+      const weekStartDate = startOfWeek(weekDays[0], { weekStartsOn: config?.semanaInicioDia ?? 1 })
+      const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
       const weekSchedule = getWeekSchedule(weekStartStr)
       return weekSchedule?.completada === true
     })
-  }, [monthWeeks, getWeekSchedule])
+  }, [monthWeeks, getWeekSchedule, config?.semanaInicioDia])
 
   if (dataLoading) {
     return <LoadingStateCard />
@@ -202,8 +206,30 @@ export function GeneralView({
 
       <div id="schedule-month-container" className="space-y-6">
         {monthWeeks.map((weekDays, weekIndex) => {
-          const weekStartDate = weekDays[0]
+          // Calcular el weekStart real usando startOfWeek para que coincida con cómo se guarda
+          const weekStartDate = startOfWeek(weekDays[0], { weekStartsOn: config?.semanaInicioDia ?? 1 })
           const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
+          
+          // LOG TEMPORAL - Verificar cálculo del weekStart
+          const firstDayDate = new Date(weekDays[0])
+          firstDayDate.setHours(12, 0, 0, 0) // Usar mediodía para evitar problemas de zona horaria
+          const weekStartDateFixed = new Date(weekStartDate)
+          weekStartDateFixed.setHours(12, 0, 0, 0)
+          console.log("📅 WEEK RENDER:", {
+            weekIndex,
+            firstDayInWeekDays: format(weekDays[0], "yyyy-MM-dd"),
+            firstDayName: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][firstDayDate.getDay()],
+            calculatedWeekStart: weekStartStr,
+            weekStartDayName: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][weekStartDateFixed.getDay()],
+            weekStartsOn: config?.semanaInicioDia ?? 1,
+            allWeekDays: weekDays.map(d => format(d, "yyyy-MM-dd")),
+            allWeekDaysWithDayNames: weekDays.map(d => {
+              const dFixed = new Date(d)
+              dFixed.setHours(12, 0, 0, 0)
+              return `${format(d, "yyyy-MM-dd")} (${['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][dFixed.getDay()]})`
+            })
+          })
+          
           const weekSchedule = getWeekSchedule(weekStartStr)
           const weekKey = weekStartStr
           const isExpanded = expandedWeeks.has(weekKey)
@@ -214,6 +240,7 @@ export function GeneralView({
             <WeekView
               key={weekIndex}
               weekDays={weekDays}
+              weekStartDate={weekStartDate}
               weekIndex={weekIndex}
               weekSchedule={weekSchedule}
               employees={employeesForWeek}

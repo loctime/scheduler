@@ -8,6 +8,7 @@ import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 
 interface WeekViewProps {
   weekDays: Date[]
+  weekStartDate?: Date // weekStart calculado correctamente
   weekIndex: number
   weekSchedule: Horario | null
   employees: Empleado[]
@@ -45,6 +46,7 @@ interface WeekViewProps {
 
 export function WeekView({
   weekDays,
+  weekStartDate: weekStartDateProp,
   weekIndex,
   weekSchedule,
   employees,
@@ -74,7 +76,8 @@ export function WeekView({
   onPasteCopiedWeek,
   isPastingWeek,
 }: WeekViewProps) {
-  const weekStartDate = weekDays[0]
+  // Usar el weekStartDate calculado si se proporciona, sino usar weekDays[0]
+  const weekStartDate = weekStartDateProp || weekDays[0]
 
   // Usar el hook centralizado para calcular estadísticas semanales
   const weekStatsData = useEmployeeWeekStats({
@@ -125,6 +128,7 @@ export function WeekView({
       key={weekIndex}
       ref={(element: HTMLDivElement | null) => onWeekScheduleRef?.(weekStartDate, element)}
       weekDays={weekDays}
+      weekStartDate={weekStartDate}
       weekIndex={weekIndex}
       weekSchedule={weekSchedule}
       employees={employees}

@@ -25,6 +25,7 @@ import { logger } from "@/lib/logger"
 
 interface WeekScheduleProps {
   weekDays: Date[]
+  weekStartDate?: Date // weekStart calculado correctamente
   weekIndex: number
   weekSchedule: Horario | null
   employees: Empleado[]
@@ -68,6 +69,7 @@ interface WeekScheduleProps {
 
 export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
   weekDays,
+  weekStartDate: weekStartDateProp,
   weekIndex,
   weekSchedule,
   employees,
@@ -101,7 +103,8 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
   mobileIndividualOnly = false,
   preferredEmployeeId = null,
 }, ref) => {
-  const weekStartDate = weekDays[0]
+  // Usar el weekStartDate calculado si se proporciona, sino usar weekDays[0]
+  const weekStartDate = weekStartDateProp || weekDays[0]
   const weekEndDate = weekDays[weekDays.length - 1]
   const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
   const headerTitle =

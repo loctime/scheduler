@@ -283,6 +283,8 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
   const handleCellClick = useCallback(
     (date: string, employeeId: string) => {
       if (!readonly && onAssignmentUpdate) {
+        // Log removido - toda la info está en el log consolidado de handleAssignmentUpdate
+        
         // Verificar si hay assignments incompletos antes de permitir edición
         if (hasIncompleteAssignments(employeeId, date)) {
           toast({
@@ -296,7 +298,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
         setSelectedCell({ date, employeeId })
       }
     },
-    [readonly, onAssignmentUpdate, saveCellState, hasIncompleteAssignments, toast]
+    [readonly, onAssignmentUpdate, saveCellState, hasIncompleteAssignments, toast, weekDays]
   )
 
   const handleAssignmentUpdate = useCallback(

@@ -143,7 +143,9 @@ export function useSchedulesListener({
       console.log("🔎 getWeekSchedule lookup:", {
         requestedWeekStart: weekStartStr,
         availableWeekStarts: schedules.map(s => s.weekStart),
-        matched: schedules.find(s => s.weekStart === weekStartStr)?.id
+        matched: schedules.find(s => s.weekStart === weekStartStr)?.id,
+        matchedSchedule: schedules.find(s => s.weekStart === weekStartStr),
+        allSchedules: schedules.map(s => ({ id: s.id, weekStart: s.weekStart, hasAssignments: !!s.assignments }))
       })
 
       return result

@@ -140,6 +140,8 @@ function ScheduleCellComponent({
 
   // Handler para clic en celda con confirmación de pedido de empleado
   const handleCellClickWrapper = (event?: React.MouseEvent) => {
+    // Log removido - toda la info está en el log consolidado de handleAssignmentUpdate
+    
     // Si el evento viene del icono del pedido (ShiftRequestMarker), no mostrar advertencia
     // porque el usuario quiere gestionar el pedido, no modificar el turno
     if (event?.target instanceof Element && event.target.closest('[data-shift-request-marker]')) {
