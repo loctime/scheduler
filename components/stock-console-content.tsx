@@ -108,6 +108,38 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
   const [mode, setMode] = useState<"work" | "control">("work")
 
+  // Función para ordenar productos por criticidad
+  const productosOrdenados = useMemo(() => {
+    if (!productos || productos.length === 0) {
+      return productos || []
+    }
+    
+    // Verificar si hay productos críticos
+    const hasCritical = productos.some(product => {
+      const stock = stockActual[product.id] ?? 0
+      return product.stockMinimo > stock
+    })
+    
+    if (!hasCritical) {
+      return productos
+    }
+    
+    // Crear una copia del array y ordenar por criticidad: mayor criticidad primero
+    return [...productos].sort((a, b) => {
+      const stockA = stockActual[a.id] ?? 0
+      const stockB = stockActual[b.id] ?? 0
+
+      const criticidadA = a.stockMinimo - stockA
+      const criticidadB = b.stockMinimo - stockB
+
+      // Ordenar descendente: mayor criticidad primero
+      if (criticidadB === criticidadA) {
+        return 0
+      }
+      return criticidadB - criticidadA
+    })
+  }, [productos, stockActual])
+
   // visualMode: solo visual, no persiste. Debe ir ANTES de cualquier return (Rules of Hooks)
   const [visualMode, setVisualMode] = useState<Record<string, "unidad" | "pack">>({})
   const getVisualMode = useCallback((productoId: string, producto: { modoCompra?: "unidad" | "pack"; cantidadPorPack?: number }) =>
@@ -253,7 +285,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
         {/* Lista de Productos — cards compactas, número protagonista */}
         {state.selectedPedidoId && productos.length > 0 && (
           <div className="p-3 space-y-2">
-            {productos.map((producto) => {
+            {productosOrdenados.map((producto) => {
               const cantidad = state.cantidades[producto.id] || 0
               const stock = stockActual[producto.id] || 0
               const stockMinimo = producto.stockMinimo || 0
@@ -288,8 +320,10 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                 <div
                   key={producto.id}
                   className={cn(
-                    "relative rounded-2xl border border-gray-200/80 bg-white shadow-sm active:shadow-md transition-all flex overflow-hidden",
-                    isStockBajo && "border-amber-400"
+                    "relative rounded-2xl border-2 shadow-sm active:shadow-md transition-all flex overflow-hidden",
+                    isStockBajo 
+                      ? "border-orange-500 bg-orange-50/50" 
+                      : "border-gray-200/80 bg-white"
                   )}
                 >
                   {/* Capa de fill "como agua" con ondas */}
