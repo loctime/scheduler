@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Trash2, Upload, Package, Minus, Plus, GripVertical, PlusCircle, X, Check } from "lucide-react"
+import { Trash2, Upload, Package, Minus, Plus, GripVertical, PlusCircle, X, Check, AlertTriangle } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
@@ -303,6 +303,7 @@ interface ProductoRowProps {
   onStockChange: (productId: string, value: number) => void
   onDeleteProduct: (productId: string) => void
   draggable: boolean
+  isCritical?: boolean
 }
 
 function ProductoRow({
@@ -328,6 +329,7 @@ function ProductoRow({
   onStockChange,
   onDeleteProduct,
   draggable,
+  isCritical = false,
 }: ProductoRowProps) {
   const isEditingNombre = editingField?.id === product.id && editingField?.field === "nombre"
   const unidadesPorPackInputRef = useRef<HTMLInputElement | null>(null)
@@ -381,12 +383,19 @@ function ProductoRow({
       className={cn(
         "rounded-lg border bg-card px-3 py-2 flex flex-col sm:flex-row sm:items-center gap-2 shadow-sm hover:shadow-md transition-all",
         isDragOver && "ring-2 ring-primary/20",
-        isDragging && "opacity-50"
+        isDragging && "opacity-50",
+        isCritical && "border-red-500 border-2 bg-red-50/50 shadow-md"
       )}
     >
       {draggable && (
         <div className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
           <GripVertical className="h-3.5 w-3.5" />
+        </div>
+      )}
+
+      {isCritical && (
+        <div className="shrink-0 flex items-center">
+          <AlertTriangle className="h-4 w-4 text-red-600" />
         </div>
       )}
 
@@ -567,7 +576,10 @@ export function ProductosTable({
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(typeof window !== "undefined" && window.innerWidth < 1024)
+      if (typeof window === "undefined") return false
+      const isPWA = window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone === true
+      const isMobileWidth = window.innerWidth < 1024
+      setIsMobile(isPWA || isMobileWidth)
     }
     checkMobile()
     window.addEventListener("resize", checkMobile)
@@ -718,33 +730,40 @@ export function ProductosTable({
       </div>
 
       <div className="space-y-1 p-2">
-        {productsToRender.map((product) => (
-          <ProductoRow
-            key={product.id}
-            product={product}
-            stockActualValue={stockActual[product.id] ?? 0}
-            stockMinimoLocal={stockMinimoLocal[product.id] ?? product.stockMinimo}
-            setStockMinimoLocal={setStockMinimoLocalFor}
-            unidadesPorPackEdit={unidadesPorPackEdit[product.id] ?? ""}
-            setUnidadesPorPackEdit={setUnidadesPorPackEdit}
-            editingField={editingField}
-            inlineValue={inlineValue}
-            setEditingField={setEditingField}
-            setInlineValue={setInlineValue}
-            inputRef={inputRef}
-            isDragging={draggedProductId === product.id}
-            isDragOver={dragOverProductId === product.id}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            onDragOver={handleDragOver}
-            onDragLeave={() => setDragOverProductId(null)}
-            onDrop={handleDrop}
-            onUpdateProduct={onUpdateProduct}
-            onStockChange={onStockChange}
-            onDeleteProduct={onDeleteProduct}
-            draggable={!!onProductsOrderUpdate}
-          />
-        ))}
+        {productsToRender.map((product) => {
+          const stockActualValue = stockActual[product.id] ?? 0
+          const criticidad = product.stockMinimo - stockActualValue
+          const isCritical = criticidad > 0
+
+          return (
+            <ProductoRow
+              key={product.id}
+              product={product}
+              stockActualValue={stockActualValue}
+              stockMinimoLocal={stockMinimoLocal[product.id] ?? product.stockMinimo}
+              setStockMinimoLocal={setStockMinimoLocalFor}
+              unidadesPorPackEdit={unidadesPorPackEdit[product.id] ?? ""}
+              setUnidadesPorPackEdit={setUnidadesPorPackEdit}
+              editingField={editingField}
+              inlineValue={inlineValue}
+              setEditingField={setEditingField}
+              setInlineValue={setInlineValue}
+              inputRef={inputRef}
+              isDragging={draggedProductId === product.id}
+              isDragOver={dragOverProductId === product.id}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDragOver={handleDragOver}
+              onDragLeave={() => setDragOverProductId(null)}
+              onDrop={handleDrop}
+              onUpdateProduct={onUpdateProduct}
+              onStockChange={onStockChange}
+              onDeleteProduct={onDeleteProduct}
+              draggable={!!onProductsOrderUpdate}
+              isCritical={isCritical}
+            />
+          )
+        })}
 
         {isCreatingProduct && onCreateProduct && (
           <CreateProductForm

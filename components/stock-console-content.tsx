@@ -475,31 +475,6 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                 <X className={`w-4 h-4 ${isPWA ? "mr-1" : "mr-2"}`} />
                 Limpiar
               </Button>
-              {/* Botón para generar texto del pedido usando cálculo automático */}
-              {state.selectedPedidoId && textoPedidoAutomatico && (
-                <Button
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(textoPedidoAutomatico)
-                      toast({
-                        title: "Texto copiado",
-                        description: "El texto del pedido se ha copiado al portapapeles",
-                      })
-                    } catch {
-                      toast({
-                        title: "Error",
-                        description: "No se pudo copiar el texto",
-                        variant: "destructive",
-                      })
-                    }
-                  }}
-                  disabled={state.loading}
-                  className={`h-10 ${isPWA ? "px-2 text-xs" : "px-4"}`}
-                >
-                  <Package className={`w-4 h-4 ${isPWA ? "mr-1" : "mr-2"}`} />
-                  Copiar Texto
-                </Button>
-              )}
               <div className={`flex items-center ${isPWA ? "gap-0.5" : "gap-1"}`}>
                 <span className={`font-bold text-red-600 ${isPWA ? "text-lg" : "text-2xl"}`}>
                   -{totalEgresos}
