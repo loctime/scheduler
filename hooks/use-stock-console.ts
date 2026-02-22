@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import {
   collection,
   query,
@@ -26,6 +26,7 @@ import type {
 } from "@/src/domain/stock/types"
 import type { Pedido, Producto } from "@/lib/types"
 import { getPedidoUsage, recordPedidoUsage } from "@/lib/stock-console-pedido-uso"
+import { getCache, setCache } from "@/lib/cache/indexeddb-cache"
 
 // Renombrar la función para evitar conflicto
 const confirmarMovimientosService = confirmarMovimientos
@@ -54,7 +55,7 @@ export function useStockConsole(user: any) {
     [user, userData]
   )
 
-  // Cargar pedidos
+  // Cargar pedidos con cache
   const loadPedidos = useCallback(async () => {
     if (!user || !db) return
     
@@ -71,6 +72,15 @@ export function useStockConsole(user: any) {
     try {
       if (!ownerId) return
       
+      const cacheKey = `pedidos-${ownerId}`
+      
+      // 1. Cargar desde cache primero (stale-while-revalidate)
+      const cachedPedidos = await getCache<Pedido[]>(cacheKey)
+      if (cachedPedidos && cachedPedidos.length > 0) {
+        setPedidos(cachedPedidos)
+      }
+      
+      // 2. Cargar desde Firestore
       const pedidosQuery = query(
         collection(db, "apps/horarios/pedidos"),
         where("ownerId", "==", ownerId)
@@ -95,6 +105,9 @@ export function useStockConsole(user: any) {
         return a.nombre.localeCompare(b.nombre)
       })
       setPedidos(pedidosData)
+      
+      // 3. Actualizar cache
+      await setCache(cacheKey, pedidosData)
     } catch (error: any) {
       console.error("Error al cargar pedidos:", error)
       toast({
@@ -105,7 +118,7 @@ export function useStockConsole(user: any) {
     }
   }, [user, ownerId, toast, tienePermisoPedidos])
 
-  // Cargar productos del pedido seleccionado
+  // Cargar productos del pedido seleccionado con cache
   const loadProductos = useCallback(async () => {
     if (!user || !db || !state.selectedPedidoId) {
       setProductos([])
@@ -121,6 +134,16 @@ export function useStockConsole(user: any) {
     try {
       if (!ownerId) return
       
+      const cacheKey = `productos-${ownerId}-${state.selectedPedidoId}`
+      
+      // 1. Cargar desde cache primero (stale-while-revalidate)
+      const cachedData = await getCache<{ productos: Producto[]; stockActual: Record<string, number> }>(cacheKey)
+      if (cachedData) {
+        setProductos(cachedData.productos)
+        setStockActual(cachedData.stockActual)
+      }
+      
+      // 2. Cargar desde Firestore
       const productsQuery = query(
         collection(db, "apps/horarios/products"),
         where("ownerId", "==", ownerId),
@@ -150,6 +173,9 @@ export function useStockConsole(user: any) {
       })
       setStockActual(stockMap)
       
+      // 3. Actualizar cache
+      await setCache(cacheKey, { productos: productosData, stockActual: stockMap })
+      
       // NO resetear cantidades al cambiar de pedido - mantener las cantidades existentes
     } catch (error: any) {
       console.error("Error al cargar productos:", error)
@@ -161,7 +187,7 @@ export function useStockConsole(user: any) {
     }
   }, [user, state.selectedPedidoId, ownerId, toast, tienePermisoPedidos])
 
-  // Listener para stock en tiempo real
+  // Listener para stock en tiempo real con cache
   useEffect(() => {
     if (!state.selectedPedidoId || !db || !user) return
 
@@ -172,6 +198,7 @@ export function useStockConsole(user: any) {
       return
     }
 
+    const cacheKey = `productos-${ownerId}-${state.selectedPedidoId}`
     const productsQuery = query(
       collection(db, "apps/horarios/products"),
       where("ownerId", "==", ownerId),
@@ -180,13 +207,38 @@ export function useStockConsole(user: any) {
 
     const unsubscribe = onSnapshot(
       productsQuery,
-      (snapshot) => {
+      async (snapshot) => {
         const stockMap: Record<string, number> = {}
+        const productosData: Producto[] = []
+        
         snapshot.forEach((doc) => {
           const data = doc.data()
           stockMap[doc.id] = data.stockActual || 0
+          productosData.push({
+            id: doc.id,
+            ...data,
+          } as Producto)
         })
+        
         setStockActual(stockMap)
+        
+        // Actualizar productos también si cambian
+        if (productosData.length > 0) {
+          productosData.sort((a, b) => {
+            const ordenA = a.orden ?? 0
+            const ordenB = b.orden ?? 0
+            if (ordenA !== ordenB) {
+              return ordenA - ordenB
+            }
+            return a.nombre.localeCompare(b.nombre)
+          })
+          setProductos(productosData)
+          
+          // Actualizar cache en background
+          setCache(cacheKey, { productos: productosData, stockActual: stockMap }).catch(() => {
+            // Ignorar errores de cache
+          })
+        }
       },
       (error) => {
         console.error("Error en listener de stock:", error)

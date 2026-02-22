@@ -1,6 +1,7 @@
 // Service Worker único para el sistema PWA unificado
 const APP_VERSION = "2026-02-14-slug-unified"
 const CACHE_NAME = `pwa-shell-${APP_VERSION}`
+const ASSETS_CACHE_NAME = `pwa-assets-${APP_VERSION}`
 
 const SHELL_URLS = [
   "/pwa",
@@ -11,9 +12,30 @@ const SHELL_URLS = [
   "/apple-icon.png",
 ]
 
+// Assets que deben usar stale-while-revalidate
+const ASSET_PATTERNS = [
+  /\.js$/,
+  /\.css$/,
+  /\.woff2?$/,
+  /\.ttf$/,
+  /\.eot$/,
+  /\.png$/,
+  /\.jpg$/,
+  /\.jpeg$/,
+  /\.gif$/,
+  /\.webp$/,
+  /\.svg$/,
+  /\/_next\/static\//,
+]
+
 self.addEventListener("install", (event) => {
   self.skipWaiting()
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS)))
+  event.waitUntil(
+    Promise.all([
+      caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS)),
+      caches.open(ASSETS_CACHE_NAME),
+    ])
+  )
 })
 
 self.addEventListener("activate", (event) => {
@@ -21,7 +43,10 @@ self.addEventListener("activate", (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys.map((key) => {
-          if (key.startsWith("pwa-shell-") && key !== CACHE_NAME) {
+          if (
+            (key.startsWith("pwa-shell-") && key !== CACHE_NAME) ||
+            (key.startsWith("pwa-assets-") && key !== ASSETS_CACHE_NAME)
+          ) {
             return caches.delete(key)
           }
           return undefined
@@ -32,17 +57,68 @@ self.addEventListener("activate", (event) => {
   self.clients.claim()
 })
 
+/**
+ * Estrategia stale-while-revalidate para assets
+ * Devuelve cache inmediatamente y actualiza en background
+ */
+async function staleWhileRevalidate(request) {
+  const cache = await caches.open(ASSETS_CACHE_NAME)
+  const cached = await cache.match(request)
+
+  // Fetch en background para actualizar cache
+  const fetchPromise = fetch(request)
+    .then((response) => {
+      // Solo cachear respuestas exitosas
+      if (response.status === 200) {
+        cache.put(request, response.clone())
+      }
+      return response
+    })
+    .catch(() => {
+      // Ignorar errores de fetch, usar cache si existe
+    })
+
+  // Devolver cache inmediatamente si existe, sino esperar fetch
+  return cached || fetchPromise
+}
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return
 
-  if (event.request.mode === "navigate" && event.request.url.includes("/pwa/")) {
-    event.respondWith(fetch(event.request).catch(() => caches.match("/pwa")))
+  const url = new URL(event.request.url)
+
+  // Navegación: network first con fallback a cache
+  if (event.request.mode === "navigate" && url.pathname.includes("/pwa/")) {
+    event.respondWith(
+      fetch(event.request)
+        .catch(() => caches.match("/pwa"))
+        .catch(() => new Response("Offline", { status: 503 }))
+    )
     return
   }
 
-  if (SHELL_URLS.some((url) => event.request.url.includes(url))) {
-    event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request)))
+  // Shell URLs: cache first
+  if (SHELL_URLS.some((shellUrl) => url.pathname.includes(shellUrl))) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => cached || fetch(event.request))
+    )
+    return
   }
+
+  // Assets estáticos: stale-while-revalidate
+  const isAsset = ASSET_PATTERNS.some((pattern) => pattern.test(url.pathname))
+  if (isAsset) {
+    event.respondWith(staleWhileRevalidate(event.request))
+    return
+  }
+
+  // Por defecto: network first
+  event.respondWith(
+    fetch(event.request).catch(() => {
+      // Fallback a cache si está disponible
+      return caches.match(event.request)
+    })
+  )
 })
 
 self.addEventListener("message", (event) => {

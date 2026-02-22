@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from "firebase/app"
 import { getAuth, type Auth } from "firebase/auth"
-import { getFirestore, type Firestore } from "firebase/firestore"
+import { getFirestore, type Firestore, enableIndexedDbPersistence, enableNetwork, disableNetwork } from "firebase/firestore"
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -27,11 +27,33 @@ export const isFirebaseConfigured = () => {
 let app
 let auth: Auth | undefined
 let db: Firestore | undefined
+let persistenceEnabled = false
 
 if (isFirebaseConfigured()) {
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
   auth = getAuth(app)
   db = getFirestore(app)
+  
+  // Activar Firestore Offline Persistence solo en cliente
+  if (typeof window !== "undefined" && !persistenceEnabled) {
+    enableIndexedDbPersistence(db)
+      .then(() => {
+        persistenceEnabled = true
+        console.log("[Firestore] Offline persistence habilitada")
+      })
+      .catch((err: any) => {
+        // Manejar error de múltiples tabs
+        if (err.code === "failed-precondition") {
+          // Múltiples tabs abiertos, solo uno puede tener persistence
+          console.warn("[Firestore] Persistence no disponible (múltiples tabs detectados)")
+        } else if (err.code === "unimplemented") {
+          // Navegador no soporta persistence
+          console.warn("[Firestore] Persistence no implementada en este navegador")
+        } else {
+          console.error("[Firestore] Error al habilitar persistence:", err)
+        }
+      })
+  }
 }
 
 export { auth, db }

@@ -19,6 +19,7 @@ import { logger } from "@/lib/logger"
 import { Pedido, Group } from "@/lib/types"
 import { useData } from "@/contexts/data-context"
 import { useGroups } from "@/hooks/use-groups"
+import { getCache, setCache } from "@/lib/cache/indexeddb-cache"
 
 export function useFabricaPedidos(user: any) {
   const { toast } = useToast()
@@ -188,6 +189,15 @@ export function useFabricaPedidos(user: any) {
     try {
       setLoading(true)
       
+      // Generar clave de cache única por usuario y grupos
+      const cacheKey = `fabrica-pedidos-${user.uid}-${userIdsDelGrupo.join(",")}`
+      
+      // 1. Cargar desde cache primero (stale-while-revalidate)
+      const cachedPedidos = await getCache<Pedido[]>(cacheKey)
+      if (cachedPedidos && cachedPedidos.length > 0) {
+        setPedidos(cachedPedidos)
+      }
+      
       // Si el usuario es "invited" y tiene userIdsDelGrupo, filtrar por esos userIds
       // Si no, cargar todos los pedidos (para factory/manager)
       let pedidosQuery;
@@ -323,6 +333,9 @@ export function useFabricaPedidos(user: any) {
         const usuarios = await cargarUsuarios(userIdsUnicos)
         setUsuariosMap(usuarios)
       }
+      
+      // 3. Actualizar cache
+      await setCache(cacheKey, pedidosFiltrados)
     } catch (error: any) {
       logger.error("Error al cargar pedidos:", error)
       toast({
@@ -451,6 +464,8 @@ export function useFabricaPedidos(user: any) {
         const usuarios = await cargarUsuarios(userIdsUnicos)
         setUsuariosMap(prev => ({ ...prev, ...usuarios }))
       }
+      
+      return pedidosFiltrados
     }
 
     // Configurar listener en tiempo real para pedidos
@@ -469,6 +484,8 @@ export function useFabricaPedidos(user: any) {
       )
     }
 
+    const cacheKey = `fabrica-pedidos-${user.uid}-${userIdsDelGrupo.join(",")}`
+    
     const unsubscribePedidos = onSnapshot(
       pedidosQuery,
       async (snapshot) => {
@@ -476,7 +493,14 @@ export function useFabricaPedidos(user: any) {
           id: doc.id,
           ...doc.data(),
         })) as Pedido[]
-        await aplicarFiltros(pedidosData)
+        const pedidosFiltrados = await aplicarFiltros(pedidosData)
+        
+        // Actualizar cache cuando lleguen actualizaciones del listener
+        if (pedidosFiltrados) {
+          setCache(cacheKey, pedidosFiltrados).catch(() => {
+            // Ignorar errores de cache
+          })
+        }
       },
       (error) => {
         logger.error("Error en listener de pedidos:", error)

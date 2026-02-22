@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo } from "react"
-import { collection, query, orderBy, onSnapshot, where } from "firebase/firestore"
+import { useEffect, useState, useMemo, useRef } from "react"
+import { collection, query, orderBy, onSnapshot, where, getDocs } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import type { Horario } from "@/lib/types"
 import { format, subMonths, addMonths } from "date-fns"
@@ -7,6 +7,7 @@ import { logger } from "@/lib/logger"
 import { useData } from "@/contexts/data-context"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import { buildScheduleDocId } from "@/lib/firestore-helpers"
+import { getCache, setCache } from "@/lib/cache/indexeddb-cache"
 
 interface UseSchedulesListenerProps {
   user: any
@@ -32,27 +33,48 @@ export function useSchedulesListener({
   const [error, setError] = useState<Error | null>(null)
   const { userData } = useData()
   const ownerId = useMemo(() => getOwnerIdForActor(user, userData), [user, userData])
+  const listenerSetupRef = useRef(false)
 
   useEffect(() => {
     if (!enabled || !user || !db || !ownerId) {
       setSchedules([])
       setLoading(false)
       setError(null)
+      listenerSetupRef.current = false
       return
     }
+
+    // Evitar múltiples listeners
+    if (listenerSetupRef.current) return
+    listenerSetupRef.current = true
 
     setLoading(true)
     setError(null)
 
+    const cacheKey = `schedules-${ownerId}`
     const schedulesQuery = query(
       collection(db, COLLECTIONS.SCHEDULES),
       where("ownerId", "==", ownerId),
       orderBy("weekStart", "desc"),
     )
 
+    // 1. Cargar desde cache primero (stale-while-revalidate)
+    getCache<Horario[]>(cacheKey)
+      .then((cachedSchedules) => {
+        if (cachedSchedules && cachedSchedules.length > 0) {
+          setSchedules(cachedSchedules)
+          setLoading(false)
+          logger.debug(`[useSchedulesListener] Cargados ${cachedSchedules.length} schedules desde cache`)
+        }
+      })
+      .catch(() => {
+        // Ignorar errores de cache
+      })
+
+    // 2. Configurar listener en tiempo real
     const unsubscribe = onSnapshot(
       schedulesQuery,
-      (snapshot) => {
+      async (snapshot) => {
         const schedulesData = snapshot.docs.map((scheduleDoc) => ({
           id: scheduleDoc.id,
           ...scheduleDoc.data(),
@@ -82,15 +104,24 @@ export function useSchedulesListener({
         setSchedules(schedulesData)
         setLoading(false)
         logger.debug(`[useSchedulesListener] Cargados ${schedulesData.length} schedules`)
+
+        // 3. Actualizar cache en background
+        setCache(cacheKey, schedulesData).catch(() => {
+          // Ignorar errores de cache
+        })
       },
       (err) => {
         logger.error("Error en listener de schedules:", err)
         setError(err as Error)
         setLoading(false)
+        listenerSetupRef.current = false
       },
     )
 
-    return () => unsubscribe()
+    return () => {
+      unsubscribe()
+      listenerSetupRef.current = false
+    }
   }, [enabled, ownerId, user])
 
   const visibleSchedules = useMemo(() => {
