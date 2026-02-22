@@ -115,7 +115,8 @@ export function GeneralView({
   // Sincronizar el estado cuando cambian las semanas del mes
   const weekKeys = useMemo(
     () => monthWeeks.map((weekDays) => {
-      const weekStartDate = startOfWeek(weekDays[0], { weekStartsOn: config?.semanaInicioDia ?? 1 })
+      const weekStartsOn = (config?.semanaInicioDia ?? 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
+      const weekStartDate = startOfWeek(weekDays[0], { weekStartsOn })
       return format(weekStartDate, "yyyy-MM-dd")
     }),
     [monthWeeks, config?.semanaInicioDia],
@@ -171,7 +172,8 @@ export function GeneralView({
   // IMPORTANTE: Este hook debe estar antes de cualquier return condicional
   const hasCompletedWeeks = useMemo(() => {
     return monthWeeks.some((weekDays) => {
-      const weekStartDate = startOfWeek(weekDays[0], { weekStartsOn: config?.semanaInicioDia ?? 1 })
+      const weekStartsOn = (config?.semanaInicioDia ?? 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
+      const weekStartDate = startOfWeek(weekDays[0], { weekStartsOn })
       const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
       const weekSchedule = getWeekSchedule(weekStartStr)
       return weekSchedule?.completada === true
@@ -207,7 +209,8 @@ export function GeneralView({
       <div id="schedule-month-container" className="space-y-6">
         {monthWeeks.map((weekDays, weekIndex) => {
           // Calcular el weekStart real usando startOfWeek para que coincida con cómo se guarda
-          const weekStartDate = startOfWeek(weekDays[0], { weekStartsOn: config?.semanaInicioDia ?? 1 })
+          const weekStartsOn = (config?.semanaInicioDia ?? 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6
+          const weekStartDate = startOfWeek(weekDays[0], { weekStartsOn })
           const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
           
           // LOG TEMPORAL - Verificar cálculo del weekStart
