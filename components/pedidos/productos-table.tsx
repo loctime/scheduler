@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useCallback, useEffect, useRef, useState } from "react"
+import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Trash2, Upload, Package, Minus, Plus, GripVertical, PlusCircle, X, Check, AlertTriangle } from "lucide-react"
@@ -572,31 +572,69 @@ export function ProductosTable({
   const [stockMinimoLocal, setStockMinimoLocal] = useState<Record<string, number>>({})
   const [unidadesPorPackEdit, setUnidadesPorPackEditState] = useState<Record<string, string>>({})
 
-  const [isMobile, setIsMobile] = useState(false)
+  // Detectar móvil/PWA desde el inicio
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false
+    try {
+      const isPWA = window.matchMedia("(display-mode: standalone)").matches || 
+                    (window.navigator as any).standalone === true ||
+                    window.matchMedia("(display-mode: fullscreen)").matches ||
+                    window.matchMedia("(display-mode: minimal-ui)").matches
+      const isMobileWidth = window.innerWidth < 1024
+      // En PWA, siempre ordenar por criticidad (sin importar el tamaño de ventana)
+      // También ordenar si el ancho es pequeño
+      return isPWA || isMobileWidth
+    } catch {
+      // Fallback: solo verificar ancho si hay error
+      return window.innerWidth < 1024
+    }
+  })
 
   useEffect(() => {
     const checkMobile = () => {
-      if (typeof window === "undefined") return false
-      const isPWA = window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone === true
-      const isMobileWidth = window.innerWidth < 1024
-      setIsMobile(isPWA || isMobileWidth)
+      if (typeof window === "undefined") return
+      try {
+        const isPWA = window.matchMedia("(display-mode: standalone)").matches || 
+                      (window.navigator as any).standalone === true ||
+                      window.matchMedia("(display-mode: fullscreen)").matches ||
+                      window.matchMedia("(display-mode: minimal-ui)").matches
+        const isMobileWidth = window.innerWidth < 1024
+        
+        // En PWA standalone, siempre ordenar por criticidad (sin importar el tamaño)
+        // También en navegador móvil o si el ancho es pequeño
+        const shouldSort = isPWA || isMobileWidth
+        setIsMobile(shouldSort)
+      } catch {
+        // Fallback: solo verificar ancho si hay error
+        setIsMobile(window.innerWidth < 1024)
+      }
     }
+    // Verificar inmediatamente y también en resize
     checkMobile()
     window.addEventListener("resize", checkMobile)
-    return () => window.removeEventListener("resize", checkMobile)
+    // También verificar después de un pequeño delay para asegurar que PWA se detecte
+    const timeoutId = setTimeout(checkMobile, 100)
+    const timeoutId2 = setTimeout(checkMobile, 500)
+    return () => {
+      window.removeEventListener("resize", checkMobile)
+      clearTimeout(timeoutId)
+      clearTimeout(timeoutId2)
+    }
   }, [])
 
-  const productsToRender = isMobile
-    ? [...products].sort((a, b) => {
-        const stockA = stockActual[a.id] ?? 0
-        const stockB = stockActual[b.id] ?? 0
+  const productsToRender = useMemo(() => {
+    if (!isMobile) return products
+    
+    return [...products].sort((a, b) => {
+      const stockA = stockActual[a.id] ?? 0
+      const stockB = stockActual[b.id] ?? 0
 
-        const criticidadA = a.stockMinimo - stockA
-        const criticidadB = b.stockMinimo - stockB
+      const criticidadA = a.stockMinimo - stockA
+      const criticidadB = b.stockMinimo - stockB
 
-        return criticidadB - criticidadA
-      })
-    : products
+      return criticidadB - criticidadA
+    })
+  }, [isMobile, products, stockActual])
 
   useEffect(() => {
     if (isCreatingProduct && newProductInputRef.current) newProductInputRef.current.focus()
