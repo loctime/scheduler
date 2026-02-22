@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth"
+import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth"
 import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore"
 import { auth, db, COLLECTIONS } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar, Loader2, Eye, EyeOff } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Calendar, Loader2, Eye, EyeOff, Mail } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 export function LoginForm() {
@@ -18,6 +19,9 @@ export function LoginForm() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [activeTab, setActiveTab] = useState("login")
+  const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false)
+  const [resetEmail, setResetEmail] = useState("")
+  const [sendingReset, setSendingReset] = useState(false)
   const { toast } = useToast()
 
   const createOrUpdateUserDoc = async (user: any) => {
@@ -202,6 +206,57 @@ export function LoginForm() {
     }
   }
 
+  const handlePasswordReset = async () => {
+    if (!auth) {
+      toast({
+        title: "Error de configuración",
+        description: "Firebase no está configurado correctamente",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!resetEmail || !resetEmail.includes("@")) {
+      toast({
+        title: "Email requerido",
+        description: "Por favor ingresa un email válido",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setSendingReset(true)
+      await sendPasswordResetEmail(auth, resetEmail)
+      
+      toast({
+        title: "Email enviado",
+        description: "Se ha enviado un enlace de recuperación a tu correo electrónico",
+      })
+      
+      setResetPasswordDialogOpen(false)
+      setResetEmail("")
+    } catch (error: any) {
+      let errorMessage = "No se pudo enviar el email de recuperación"
+      
+      if (error.code === "auth/user-not-found") {
+        errorMessage = "No existe una cuenta con este email"
+      } else if (error.code === "auth/invalid-email") {
+        errorMessage = "El email no es válido"
+      } else if (error.code === "auth/too-many-requests") {
+        errorMessage = "Demasiados intentos. Por favor intenta más tarde"
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setSendingReset(false)
+    }
+  }
+
   const handleGoogleSignIn = async () => {
     if (!auth || !db) {
       toast({
@@ -295,7 +350,67 @@ export function LoginForm() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="login-password">Contraseña</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="login-password">Contraseña</Label>
+                  <Dialog open={resetPasswordDialogOpen} onOpenChange={setResetPasswordDialogOpen}>
+                    <DialogTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground hover:text-foreground underline"
+                        disabled={loading}
+                      >
+                        ¿Olvidaste tu contraseña?
+                      </button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Recuperar Contraseña</DialogTitle>
+                        <DialogDescription>
+                          Ingresa tu email y te enviaremos un enlace para restablecer tu contraseña
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="reset-email">Email</Label>
+                          <Input
+                            id="reset-email"
+                            type="email"
+                            placeholder="tu@email.com"
+                            value={resetEmail}
+                            onChange={(e) => setResetEmail(e.target.value)}
+                            disabled={sendingReset}
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setResetPasswordDialogOpen(false)
+                            setResetEmail("")
+                          }}
+                          disabled={sendingReset}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button onClick={handlePasswordReset} disabled={sendingReset}>
+                          {sendingReset ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Enviando...
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="mr-2 h-4 w-4" />
+                              Enviar enlace
+                            </>
+                          )}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
                 <div className="relative">
                   <Input
                     id="login-password"
