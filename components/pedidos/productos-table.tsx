@@ -572,69 +572,69 @@ export function ProductosTable({
   const [stockMinimoLocal, setStockMinimoLocal] = useState<Record<string, number>>({})
   const [unidadesPorPackEdit, setUnidadesPorPackEditState] = useState<Record<string, string>>({})
 
-  // Detectar móvil/PWA desde el inicio
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window === "undefined") return false
-    try {
-      const isPWA = window.matchMedia("(display-mode: standalone)").matches || 
-                    (window.navigator as any).standalone === true ||
-                    window.matchMedia("(display-mode: fullscreen)").matches ||
-                    window.matchMedia("(display-mode: minimal-ui)").matches
-      const isMobileWidth = window.innerWidth < 1024
-      // En PWA, siempre ordenar por criticidad (sin importar el tamaño de ventana)
-      // También ordenar si el ancho es pequeño
-      return isPWA || isMobileWidth
-    } catch {
-      // Fallback: solo verificar ancho si hay error
-      return window.innerWidth < 1024
-    }
-  })
+  // Detectar PWA móvil para mostrar indicador
+  const [isPWA, setIsPWA] = useState(false)
+  const [isMobileWidth, setIsMobileWidth] = useState(false)
 
   useEffect(() => {
-    const checkMobile = () => {
-      if (typeof window === "undefined") return
-      try {
-        const isPWA = window.matchMedia("(display-mode: standalone)").matches || 
-                      (window.navigator as any).standalone === true ||
-                      window.matchMedia("(display-mode: fullscreen)").matches ||
-                      window.matchMedia("(display-mode: minimal-ui)").matches
-        const isMobileWidth = window.innerWidth < 1024
-        
-        // En PWA standalone, siempre ordenar por criticidad (sin importar el tamaño)
-        // También en navegador móvil o si el ancho es pequeño
-        const shouldSort = isPWA || isMobileWidth
-        setIsMobile(shouldSort)
-      } catch {
-        // Fallback: solo verificar ancho si hay error
-        setIsMobile(window.innerWidth < 1024)
-      }
+    if (typeof window === "undefined") return
+    
+    const checkPWA = () => {
+      const pwa = window.matchMedia("(display-mode: standalone)").matches || 
+                  (window.navigator as any).standalone === true
+      setIsPWA(pwa)
     }
-    // Verificar inmediatamente y también en resize
-    checkMobile()
-    window.addEventListener("resize", checkMobile)
-    // También verificar después de un pequeño delay para asegurar que PWA se detecte
-    const timeoutId = setTimeout(checkMobile, 100)
-    const timeoutId2 = setTimeout(checkMobile, 500)
+    
+    const checkWidth = () => {
+      setIsMobileWidth(window.innerWidth < 1024)
+    }
+    
+    checkPWA()
+    checkWidth()
+    
+    window.addEventListener("resize", checkWidth)
+    const timeout1 = setTimeout(checkPWA, 100)
+    const timeout2 = setTimeout(checkPWA, 500)
+    
     return () => {
-      window.removeEventListener("resize", checkMobile)
-      clearTimeout(timeoutId)
-      clearTimeout(timeoutId2)
+      window.removeEventListener("resize", checkWidth)
+      clearTimeout(timeout1)
+      clearTimeout(timeout2)
     }
   }, [])
 
+  // Verificar si hay productos críticos
+  const hasCriticalProducts = useMemo(() => {
+    return products.some(product => {
+      const stock = stockActual[product.id] ?? 0
+      return product.stockMinimo > stock
+    })
+  }, [products, stockActual])
+
+  // En PWA o móvil, ordenar por criticidad
+  const shouldSortByCriticality = isPWA || isMobileWidth
+
   const productsToRender = useMemo(() => {
-    if (!isMobile) return products
+    // Si hay productos críticos, siempre ordenar por criticidad
+    // También ordenar en PWA o móvil aunque no haya críticos
+    if (!hasCriticalProducts && !shouldSortByCriticality) {
+      return products
+    }
     
-    return [...products].sort((a, b) => {
+    // Ordenar por criticidad: mayor criticidad primero
+    const sorted = [...products].sort((a, b) => {
       const stockA = stockActual[a.id] ?? 0
       const stockB = stockActual[b.id] ?? 0
 
       const criticidadA = a.stockMinimo - stockA
       const criticidadB = b.stockMinimo - stockB
 
+      // Ordenar descendente: mayor criticidad primero
       return criticidadB - criticidadA
     })
-  }, [isMobile, products, stockActual])
+    
+    return sorted
+  }, [hasCriticalProducts, shouldSortByCriticality, products, stockActual])
 
   useEffect(() => {
     if (isCreatingProduct && newProductInputRef.current) newProductInputRef.current.focus()
@@ -752,7 +752,12 @@ export function ProductosTable({
       <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold">Productos</h3>
-          <p className="text-xs text-muted-foreground">{products.length} productos</p>
+          <p className="text-xs text-muted-foreground">
+            {products.length} productos
+            {hasCriticalProducts && (
+              <span className="ml-2 text-xs text-orange-600">(Ordenado por criticidad)</span>
+            )}
+          </p>
         </div>
         {onCreateProduct && (
           <Button
