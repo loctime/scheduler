@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useMemo } from "react"
+import { useEffect, useState, useCallback, useMemo, useRef } from "react"
 import Link from "next/link"
 import { useData } from "@/contexts/data-context"
 import { useStockConsole } from "@/hooks/use-stock-console"
@@ -107,6 +107,91 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
   }, [state.selectedPedidoId, pedidos, productos, stockActual])
 
   const [mode, setMode] = useState<"work" | "control">("work")
+
+  // Estado local temporal para stock en modo control (optimización de performance)
+  const [localStockControl, setLocalStockControl] = useState<Record<string, number>>({})
+  const debounceTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({})
+
+  // Inicializar localStockControl desde stockActual solo si no hay cambios pendientes
+  useEffect(() => {
+    // Solo actualizar localStockControl si no hay timeouts pendientes (sin cambios locales)
+    const hasPendingChanges = Object.keys(debounceTimeoutRef.current).length > 0
+    
+    if (!hasPendingChanges) {
+      setLocalStockControl(stockActual)
+    } else {
+      // Si hay cambios pendientes, solo sincronizar los productos que no tienen cambios locales
+      setLocalStockControl((prev) => {
+        const next = { ...prev }
+        Object.keys(stockActual).forEach((productId) => {
+          // Solo actualizar si no hay timeout pendiente para este producto
+          if (!debounceTimeoutRef.current[productId]) {
+            next[productId] = stockActual[productId]
+          }
+        })
+        return next
+      })
+    }
+  }, [stockActual])
+
+  // Debounce para persistir cambios de stock en modo control (500ms)
+  useEffect(() => {
+    // Solo aplicar debounce cuando estamos en modo control
+    if (mode !== "control") {
+      // Si cambiamos de modo, limpiar todos los timeouts pendientes
+      Object.values(debounceTimeoutRef.current).forEach((timeout) => {
+        clearTimeout(timeout)
+      })
+      debounceTimeoutRef.current = {}
+      return
+    }
+
+    // Obtener todas las claves únicas de ambos objetos
+    const allProductIds = new Set([
+      ...Object.keys(localStockControl),
+      ...Object.keys(stockActual),
+    ])
+
+    allProductIds.forEach((productId) => {
+      const localValue = localStockControl[productId] ?? stockActual[productId] ?? 0
+      const actualValue = stockActual[productId] ?? 0
+
+      // Solo persistir si el valor cambió respecto a stockActual
+      if (localValue !== actualValue) {
+        // Limpiar timeout anterior si existe
+        if (debounceTimeoutRef.current[productId]) {
+          clearTimeout(debounceTimeoutRef.current[productId])
+        }
+
+        // Crear nuevo timeout
+        debounceTimeoutRef.current[productId] = setTimeout(() => {
+          setStockReal(productId, localValue)
+          delete debounceTimeoutRef.current[productId]
+        }, 500)
+      } else {
+        // Si los valores coinciden, limpiar timeout pendiente si existe
+        if (debounceTimeoutRef.current[productId]) {
+          clearTimeout(debounceTimeoutRef.current[productId])
+          delete debounceTimeoutRef.current[productId]
+        }
+      }
+    })
+
+    // Cleanup: limpiar timeouts al desmontar o cuando cambie localStockControl
+    return () => {
+      Object.values(debounceTimeoutRef.current).forEach((timeout) => {
+        clearTimeout(timeout)
+      })
+    }
+  }, [localStockControl, stockActual, setStockReal, mode])
+
+  // Función para actualizar stock local en modo control (sin debounce inmediato)
+  const handleLocalStockChange = useCallback((productoId: string, value: number) => {
+    setLocalStockControl((prev) => ({
+      ...prev,
+      [productoId]: Math.max(0, value),
+    }))
+  }, [])
 
   // Función para ordenar productos por criticidad
   const productosOrdenados = useMemo(() => {
@@ -287,7 +372,11 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
           <div className="p-3 space-y-2">
             {productosOrdenados.map((producto) => {
               const cantidad = state.cantidades[producto.id] || 0
-              const stock = stockActual[producto.id] || 0
+              // En modo control, usar localStockControl si existe, sino stockActual (para UI inmediata)
+              const stockRaw = mode === "control" 
+                ? (localStockControl[producto.id] ?? stockActual[producto.id] ?? 0)
+                : (stockActual[producto.id] || 0)
+              const stock = stockRaw
               const stockMinimo = producto.stockMinimo || 0
               const isStockBajo = stock < stockMinimo
               const stockDisponible = stock
@@ -405,7 +494,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                           variant="outline"
                           size="icon"
                           className="h-11 w-11 rounded-full transition-transform active:scale-95 border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 hover:border-violet-400"
-                          onClick={() => setStockReal(producto.id, Math.max(0, stock - delta))}
+                          onClick={() => handleLocalStockChange(producto.id, Math.max(0, stock - delta))}
                           disabled={stock <= 0 || state.loading}
                         >
                           <Minus className="h-5 w-5" strokeWidth={2.5} />
@@ -419,7 +508,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                             const raw = parseInt(e.target.value, 10)
                             if (isNaN(raw) || raw < 0) return
                             const unidades = vm === "pack" ? packsSignedToUnidades(producto, raw) : raw
-                            setStockReal(producto.id, unidades)
+                            handleLocalStockChange(producto.id, unidades)
                           }}
                           className="h-11 w-12 text-center text-xl font-bold tabular-nums border border-gray-200/80 rounded-lg bg-gray-50/50 focus-visible:ring-2 focus-visible:ring-gray-300/50 p-0"
                           placeholder="0"
@@ -430,7 +519,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                           variant="outline"
                           size="icon"
                           className="h-11 w-11 rounded-full transition-transform active:scale-95 border-sky-400 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:border-sky-500"
-                          onClick={() => setStockReal(producto.id, stock + delta)}
+                          onClick={() => handleLocalStockChange(producto.id, stock + delta)}
                           disabled={state.loading}
                         >
                           <Plus className="h-5 w-5" strokeWidth={2.5} />
