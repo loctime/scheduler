@@ -199,6 +199,12 @@ function RegistroContent() {
     try {
       setLoading(true)
       const provider = new GoogleAuthProvider()
+      
+      // Configurar para mostrar selector de cuenta
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      })
+      
       const result = await signInWithPopup(auth, provider)
       const user = result.user
 
@@ -216,6 +222,8 @@ function RegistroContent() {
       }, 1000)
     } catch (error: any) {
       console.error("❌ Error en registro:", error)
+      console.error("❌ Código de error:", error.code)
+      console.error("❌ Mensaje:", error.message)
       
       if (error.code === "auth/popup-closed-by-user") {
         toast({
@@ -223,10 +231,28 @@ function RegistroContent() {
           description: "El registro fue cancelado. Por favor intenta nuevamente.",
           variant: "destructive",
         })
+      } else if (error.code === "auth/popup-blocked") {
+        toast({
+          title: "Popup bloqueado",
+          description: "Por favor permite popups para este sitio e intenta nuevamente.",
+          variant: "destructive",
+        })
+      } else if (error.code === "auth/unauthorized-domain") {
+        toast({
+          title: "Dominio no autorizado",
+          description: "Este dominio no está autorizado. Contacta al administrador.",
+          variant: "destructive",
+        })
       } else if (error.code === "auth/account-exists-with-different-credential") {
         toast({
           title: "Cuenta existente",
           description: "Ya existe una cuenta con este email usando otro método de autenticación.",
+          variant: "destructive",
+        })
+      } else if (error.message?.includes("404") || error.code === "auth/network-request-failed") {
+        toast({
+          title: "Error de conexión",
+          description: `No se pudo conectar con el servidor de autenticación. Verifica que el dominio ${typeof window !== 'undefined' ? window.location.hostname : ''} esté autorizado en Firebase Console.`,
           variant: "destructive",
         })
       } else {
