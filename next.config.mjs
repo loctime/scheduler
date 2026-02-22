@@ -86,7 +86,7 @@ const nextConfig = {
           "https://securetoken.googleapis.com " +
           "https://*.googleapis.com " +
           "https://cdn.jsdelivr.net; " +
-        "frame-src https://vercel.live https://accounts.google.com https://*.firebaseapp.com; " +
+        "frame-src 'self' https://vercel.live https://accounts.google.com https://*.firebaseapp.com https://*.googleapis.com; " +
         "worker-src 'self' blob:;"
           },
     {

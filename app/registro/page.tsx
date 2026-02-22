@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { signInWithRedirect, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, getRedirectResult } from "firebase/auth"
+import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth"
 import { auth, db, COLLECTIONS } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -25,42 +25,6 @@ function RegistroContent() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-
-  // Manejar el resultado de la redirección de Google Sign-In
-  useEffect(() => {
-    const handleRedirectResult = async () => {
-      if (!auth || !token || !tokenValid || !db) return
-      
-      try {
-        const result = await getRedirectResult(auth)
-        if (result && result.user) {
-          console.log("✅ Usuario autenticado con Google (redirect):", result.user.uid, result.user.email)
-          
-          // Procesar el registro con el token de invitación
-          await procesarRegistroInvitacion(result.user, token)
-
-          toast({
-            title: "Registro exitoso",
-            description: "Tu cuenta ha sido vinculada exitosamente. Redirigiendo...",
-          })
-
-          // Redirigir al dashboard
-          setTimeout(() => {
-            router.push(redirectTo || "/dashboard/pedidos")
-          }, 1000)
-        }
-      } catch (error: any) {
-        console.error("❌ Error al procesar resultado de redirección:", error)
-        toast({
-          title: "Error",
-          description: error.message || "No se pudo completar el registro",
-          variant: "destructive",
-        })
-      }
-    }
-
-    handleRedirectResult()
-  }, [auth, token, tokenValid, redirectTo, router, toast, db])
 
   // Validar token
   useEffect(() => {
@@ -235,13 +199,31 @@ function RegistroContent() {
     try {
       setLoading(true)
       const provider = new GoogleAuthProvider()
-      // Usar redirect en lugar de popup para evitar problemas con CSP
-      await signInWithRedirect(auth, provider)
-      // No necesitamos manejar el resultado aquí, se manejará en el useEffect con getRedirectResult
+      const result = await signInWithPopup(auth, provider)
+      const user = result.user
+
+      // Procesar el registro con el token de invitación
+      await procesarRegistro(user)
+
+      toast({
+        title: "Registro exitoso",
+        description: "Tu cuenta ha sido vinculada exitosamente. Redirigiendo...",
+      })
+
+      // Redirigir al dashboard
+      setTimeout(() => {
+        router.push(redirectTo || "/dashboard/pedidos")
+      }, 1000)
     } catch (error: any) {
-      setLoading(false)
       console.error("❌ Error en registro:", error)
-      if (error.code === "auth/account-exists-with-different-credential") {
+      
+      if (error.code === "auth/popup-closed-by-user") {
+        toast({
+          title: "Registro cancelado",
+          description: "El registro fue cancelado. Por favor intenta nuevamente.",
+          variant: "destructive",
+        })
+      } else if (error.code === "auth/account-exists-with-different-credential") {
         toast({
           title: "Cuenta existente",
           description: "Ya existe una cuenta con este email usando otro método de autenticación.",
@@ -254,6 +236,8 @@ function RegistroContent() {
           variant: "destructive",
         })
       }
+    } finally {
+      setLoading(false)
     }
   }
 
