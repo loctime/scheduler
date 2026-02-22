@@ -21,7 +21,7 @@ function isPack(p: Producto): boolean {
   return p.modoCompra === "pack" && getUnidadesPorPack(p) > 1
 }
 
-// --- Props de la tabla (sin modos ni lógica de pedido) ---
+// --- .Props de la tabla (sin modos ni lógica de pedido) ---
 
 interface ProductosTableProps {
   products: Producto[]
@@ -121,11 +121,6 @@ function CellNombre({
       </div>
     )
   }
-  const handleEdit = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    onStartEdit()
-  }, [onStartEdit])
 
   return (
     <div className="flex items-center gap-1 flex-1 min-w-0 relative">
@@ -327,12 +322,12 @@ interface ProductoRowProps {
   setInlineValue: (v: string) => void
   inputRef: React.RefObject<HTMLInputElement | null>
   onUpdateProduct: (productId: string, field: string, value: string) => Promise<boolean>
-  onStockChange: (productId: string, value: number) => void
+  onLocalStockChange: (productId: string, value: number) => void
   onDeleteProduct: (productId: string) => void
   isCritical?: boolean
 }
 
-function ProductoRow({
+const ProductoRow = React.memo(function ProductoRow({
   product,
   stockActualValue,
   stockMinimoLocal,
@@ -345,7 +340,7 @@ function ProductoRow({
   setInlineValue,
   inputRef,
   onUpdateProduct,
-  onStockChange,
+  onLocalStockChange,
   onDeleteProduct,
   isCritical = false,
 }: ProductoRowProps) {
@@ -451,14 +446,14 @@ function ProductoRow({
 
         <div className="flex items-center gap-1 shrink-0">
           <span className="text-[10px] text-muted-foreground">Stock</span>
-          <CellStockActual value={stockActualValue} onChange={(v) => onStockChange(product.id, v)} />
+          <CellStockActual value={stockActualValue} onChange={(v) => onLocalStockChange(product.id, v)} />
         </div>
 
         <CellDelete onDelete={() => onDeleteProduct(product.id)} />
       </div>
     </div>
   )
-}
+})
 
 // --- Formulario de creación inline ---
 
@@ -575,23 +570,30 @@ export function ProductosTable({
 
   const [stockMinimoLocal, setStockMinimoLocal] = useState<Record<string, number>>({})
   const [unidadesPorPackEdit, setUnidadesPorPackEditState] = useState<Record<string, string>>({})
+  const [productsToRender, setProductsToRender] = useState<Producto[]>([])
 
-  // Verificar si hay productos críticos
-  const hasCriticalProducts = useMemo(() => {
-    return products.some(product => {
+  // Estado local temporal para stock (optimización de performance)
+  const [localStock, setLocalStock] = useState<Record<string, number>>({})
+  const debounceTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({})
+
+  // Función para ordenar productos por criticidad
+  const sortProductsByCriticality = useCallback((productsList: Producto[]) => {
+    if (!productsList || productsList.length === 0) {
+      return productsList || []
+    }
+    
+    // Verificar si hay productos críticos
+    const hasCritical = productsList.some(product => {
       const stock = stockActual[product.id] ?? 0
       return product.stockMinimo > stock
     })
-  }, [products, stockActual])
-
-  // Siempre ordenar por criticidad cuando hay productos críticos
-  const productsToRender = useMemo(() => {
-    if (!hasCriticalProducts) {
-      return products
+    
+    if (!hasCritical) {
+      return productsList
     }
     
-    // Ordenar por criticidad: mayor criticidad primero
-    const sorted = [...products].sort((a, b) => {
+    // Crear una copia del array y ordenar por criticidad: mayor criticidad primero
+    return [...productsList].sort((a, b) => {
       const stockA = stockActual[a.id] ?? 0
       const stockB = stockActual[b.id] ?? 0
 
@@ -599,11 +601,89 @@ export function ProductosTable({
       const criticidadB = b.stockMinimo - stockB
 
       // Ordenar descendente: mayor criticidad primero
+      if (criticidadB === criticidadA) {
+        return 0
+      }
       return criticidadB - criticidadA
     })
+  }, [stockActual])
+
+  // Inicializar localStock desde stockActual solo si no hay cambios pendientes
+  useEffect(() => {
+    // Solo actualizar localStock si no hay timeouts pendientes (sin cambios locales)
+    const hasPendingChanges = Object.keys(debounceTimeoutRef.current).length > 0
     
-    return sorted
-  }, [hasCriticalProducts, products, stockActual])
+    if (!hasPendingChanges) {
+      setLocalStock(stockActual)
+    } else {
+      // Si hay cambios pendientes, solo sincronizar los productos que no tienen cambios locales
+      setLocalStock((prev) => {
+        const next = { ...prev }
+        Object.keys(stockActual).forEach((productId) => {
+          // Solo actualizar si no hay timeout pendiente para este producto
+          if (!debounceTimeoutRef.current[productId]) {
+            next[productId] = stockActual[productId]
+          }
+        })
+        return next
+      })
+    }
+  }, [stockActual])
+
+  // Debounce para persistir cambios de stock (500ms)
+  useEffect(() => {
+    // Obtener todas las claves únicas de ambos objetos
+    const allProductIds = new Set([
+      ...Object.keys(localStock),
+      ...Object.keys(stockActual),
+    ])
+
+    allProductIds.forEach((productId) => {
+      const localValue = localStock[productId] ?? stockActual[productId] ?? 0
+      const actualValue = stockActual[productId] ?? 0
+
+      // Solo persistir si el valor cambió respecto a stockActual
+      if (localValue !== actualValue) {
+        // Limpiar timeout anterior si existe
+        if (debounceTimeoutRef.current[productId]) {
+          clearTimeout(debounceTimeoutRef.current[productId])
+        }
+
+        // Crear nuevo timeout
+        debounceTimeoutRef.current[productId] = setTimeout(() => {
+          onStockChange(productId, localValue)
+          delete debounceTimeoutRef.current[productId]
+        }, 500)
+      } else {
+        // Si los valores coinciden, limpiar timeout pendiente si existe
+        if (debounceTimeoutRef.current[productId]) {
+          clearTimeout(debounceTimeoutRef.current[productId])
+          delete debounceTimeoutRef.current[productId]
+        }
+      }
+    })
+
+    // Cleanup: limpiar timeouts al desmontar o cuando cambie localStock
+    return () => {
+      Object.values(debounceTimeoutRef.current).forEach((timeout) => {
+        clearTimeout(timeout)
+      })
+    }
+  }, [localStock, stockActual, onStockChange])
+
+  // Actualizar el ordenamiento cuando cambian los productos o el stock
+  useEffect(() => {
+    const sorted = sortProductsByCriticality(products)
+    setProductsToRender(sorted)
+  }, [products, stockActual, sortProductsByCriticality])
+
+  // Verificar si hay productos críticos para el indicador
+  const hasCriticalProducts = useMemo(() => {
+    return products.some(product => {
+      const stock = stockActual[product.id] ?? 0
+      return product.stockMinimo > stock
+    })
+  }, [products, stockActual])
 
   useEffect(() => {
     if (isCreatingProduct && newProductInputRef.current) newProductInputRef.current.focus()
@@ -633,6 +713,14 @@ export function ProductosTable({
 
   const setUnidadesPorPackEdit = useCallback((productId: string, v: string) => {
     setUnidadesPorPackEditState((prev) => ({ ...prev, [productId]: v }))
+  }, [])
+
+  // Función para actualizar stock local (sin debounce inmediato)
+  const handleLocalStockChange = useCallback((productId: string, value: number) => {
+    setLocalStock((prev) => ({
+      ...prev,
+      [productId]: value,
+    }))
   }, [])
 
   const handleCreateProduct = useCallback(async () => {
@@ -703,32 +791,53 @@ export function ProductosTable({
       </div>
 
       <div className="space-y-1 p-2">
-        {productsToRender.map((product) => {
-          const stockActualValue = stockActual[product.id] ?? 0
-          const criticidad = product.stockMinimo - stockActualValue
-          const isCritical = criticidad > 0
+        {useMemo(
+          () =>
+            productsToRender.map((product) => {
+              // Usar localStock si existe, sino stockActual (para UI inmediata)
+              const stockActualValue = localStock[product.id] ?? stockActual[product.id] ?? 0
+              const criticidad = product.stockMinimo - stockActualValue
+              const isCritical = criticidad > 0
 
-          return (
-            <ProductoRow
-              key={product.id}
-              product={product}
-              stockActualValue={stockActualValue}
-              stockMinimoLocal={stockMinimoLocal[product.id] ?? product.stockMinimo}
-              setStockMinimoLocal={setStockMinimoLocalFor}
-              unidadesPorPackEdit={unidadesPorPackEdit[product.id] ?? ""}
-              setUnidadesPorPackEdit={setUnidadesPorPackEdit}
-              editingField={editingField}
-              inlineValue={inlineValue}
-              setEditingField={setEditingField}
-              setInlineValue={setInlineValue}
-              inputRef={inputRef}
-              onUpdateProduct={onUpdateProduct}
-              onStockChange={onStockChange}
-              onDeleteProduct={onDeleteProduct}
-              isCritical={isCritical}
-            />
-          )
-        })}
+              return (
+                <ProductoRow
+                  key={product.id}
+                  product={product}
+                  stockActualValue={stockActualValue}
+                  stockMinimoLocal={stockMinimoLocal[product.id] ?? product.stockMinimo}
+                  setStockMinimoLocal={setStockMinimoLocalFor}
+                  unidadesPorPackEdit={unidadesPorPackEdit[product.id] ?? ""}
+                  setUnidadesPorPackEdit={setUnidadesPorPackEdit}
+                  editingField={editingField}
+                  inlineValue={inlineValue}
+                  setEditingField={setEditingField}
+                  setInlineValue={setInlineValue}
+                  inputRef={inputRef}
+                  onUpdateProduct={onUpdateProduct}
+                  onLocalStockChange={handleLocalStockChange}
+                  onDeleteProduct={onDeleteProduct}
+                  isCritical={isCritical}
+                />
+              )
+            }),
+          [
+            productsToRender,
+            localStock,
+            stockActual,
+            stockMinimoLocal,
+            unidadesPorPackEdit,
+            editingField,
+            inlineValue,
+            setStockMinimoLocalFor,
+            setUnidadesPorPackEdit,
+            setEditingField,
+            setInlineValue,
+            inputRef,
+            onUpdateProduct,
+            handleLocalStockChange,
+            onDeleteProduct,
+          ]
+        )}
 
         {isCreatingProduct && onCreateProduct && (
           <CreateProductForm
