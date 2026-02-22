@@ -6,6 +6,7 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import { Empleado, Turno } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
+import { compareArraysByIds } from "@/lib/cache/cache-utils"
 
 interface UserData {
   uid: string
@@ -128,11 +129,11 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
 
       // Intentar cargar desde cache primero
       const cached = loadFromCache(CACHE_KEY_EMPLOYEES)
-      if (cached) {
+      if (cached && cached.length > 0) {
         setEmployees(cached)
       }
 
-      // Cargar desde Firestore
+      // Cargar desde Firestore en background
       const employeesQuery = query(
         collection(db, COLLECTIONS.EMPLOYEES),
         where("ownerId", "==", ownerId),
@@ -144,7 +145,13 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
         ...doc.data(),
       })) as Empleado[]
 
-      setEmployees(employeesData)
+      // Solo actualizar si hay cambios
+      setEmployees((prev) => {
+        if (compareArraysByIds(prev, employeesData)) {
+          return prev
+        }
+        return employeesData
+      })
       saveToCache(CACHE_KEY_EMPLOYEES, employeesData)
       setError(null)
     } catch (err: any) {
@@ -167,11 +174,11 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
 
       // Intentar cargar desde cache primero
       const cached = loadFromCache(CACHE_KEY_SHIFTS)
-      if (cached) {
+      if (cached && cached.length > 0) {
         setShifts(cached)
       }
 
-      // Cargar desde Firestore
+      // Cargar desde Firestore en background
       const shiftsQuery = query(
         collection(db, COLLECTIONS.SHIFTS),
         where("ownerId", "==", ownerId),
@@ -183,7 +190,13 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
         ...doc.data(),
       })) as Turno[]
 
-      setShifts(shiftsData)
+      // Solo actualizar si hay cambios
+      setShifts((prev) => {
+        if (compareArraysByIds(prev, shiftsData)) {
+          return prev
+        }
+        return shiftsData
+      })
       saveToCache(CACHE_KEY_SHIFTS, shiftsData)
       setError(null)
     } catch (err: any) {
@@ -244,14 +257,21 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
       return
     }
 
-    setLoading(true)
-
     const ownerId = getOwnerIdForActor(user, userData)
     if (!ownerId) {
       setEmployees([])
       setShifts([])
       setLoading(false)
       return
+    }
+
+    // Verificar si hay cache disponible antes de mostrar loading
+    const cachedEmployees = loadFromCache(CACHE_KEY_EMPLOYEES)
+    const cachedShifts = loadFromCache(CACHE_KEY_SHIFTS)
+    
+    // Solo mostrar loading si no hay cache
+    if (!cachedEmployees || !cachedShifts) {
+      setLoading(true)
     }
 
     // Cargar datos iniciales
@@ -279,7 +299,14 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
           id: doc.id,
           ...doc.data(),
         })) as Empleado[]
-        setEmployees(employeesData)
+        
+        // Solo actualizar si hay cambios
+        setEmployees((prev) => {
+          if (compareArraysByIds(prev, employeesData)) {
+            return prev
+          }
+          return employeesData
+        })
         saveToCache(CACHE_KEY_EMPLOYEES, employeesData)
       },
       (error) => {
@@ -295,7 +322,14 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
           id: doc.id,
           ...doc.data(),
         })) as Turno[]
-        setShifts(shiftsData)
+        
+        // Solo actualizar si hay cambios
+        setShifts((prev) => {
+          if (compareArraysByIds(prev, shiftsData)) {
+            return prev
+          }
+          return shiftsData
+        })
         saveToCache(CACHE_KEY_SHIFTS, shiftsData)
       },
       (error) => {

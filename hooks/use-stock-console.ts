@@ -27,6 +27,7 @@ import type {
 import type { Pedido, Producto } from "@/lib/types"
 import { getPedidoUsage, recordPedidoUsage } from "@/lib/stock-console-pedido-uso"
 import { getCache, setCache } from "@/lib/cache/indexeddb-cache"
+import { compareArraysByIds, compareRecords } from "@/lib/cache/cache-utils"
 
 // Renombrar la función para evitar conflicto
 const confirmarMovimientosService = confirmarMovimientos
@@ -77,10 +78,23 @@ export function useStockConsole(user: any) {
       // 1. Cargar desde cache primero (stale-while-revalidate)
       const cachedPedidos = await getCache<Pedido[]>(cacheKey)
       if (cachedPedidos && cachedPedidos.length > 0) {
-        setPedidos(cachedPedidos)
+        // Ordenar por uso del usuario antes de setear
+        const usage = getPedidoUsage(ownerId)
+        const sortedCached = [...cachedPedidos].sort((a, b) => {
+          const ua = usage[a.id]
+          const ub = usage[b.id]
+          if (ua && ub) {
+            if (ua.count !== ub.count) return ub.count - ua.count
+            if (ua.lastUsed !== ub.lastUsed) return ub.lastUsed - ua.lastUsed
+          }
+          if (ua && !ub) return -1
+          if (!ua && ub) return 1
+          return a.nombre.localeCompare(b.nombre)
+        })
+        setPedidos(sortedCached)
       }
       
-      // 2. Cargar desde Firestore
+      // 2. Cargar desde Firestore en background
       const pedidosQuery = query(
         collection(db, "apps/horarios/pedidos"),
         where("ownerId", "==", ownerId)
@@ -104,7 +118,14 @@ export function useStockConsole(user: any) {
         if (!ua && ub) return 1
         return a.nombre.localeCompare(b.nombre)
       })
-      setPedidos(pedidosData)
+      
+      // Solo actualizar si hay cambios
+      setPedidos((prev) => {
+        if (compareArraysByIds(prev, pedidosData)) {
+          return prev
+        }
+        return pedidosData
+      })
       
       // 3. Actualizar cache
       await setCache(cacheKey, pedidosData)
@@ -138,12 +159,12 @@ export function useStockConsole(user: any) {
       
       // 1. Cargar desde cache primero (stale-while-revalidate)
       const cachedData = await getCache<{ productos: Producto[]; stockActual: Record<string, number> }>(cacheKey)
-      if (cachedData) {
+      if (cachedData && cachedData.productos && cachedData.productos.length > 0) {
         setProductos(cachedData.productos)
         setStockActual(cachedData.stockActual)
       }
       
-      // 2. Cargar desde Firestore
+      // 2. Cargar desde Firestore en background
       const productsQuery = query(
         collection(db, "apps/horarios/products"),
         where("ownerId", "==", ownerId),
@@ -164,14 +185,26 @@ export function useStockConsole(user: any) {
         return a.nombre.localeCompare(b.nombre)
       })
       
-      setProductos(productosData)
-      
       // Cargar stock actual
       const stockMap: Record<string, number> = {}
       productosData.forEach(producto => {
         stockMap[producto.id] = (producto as any).stockActual || 0
       })
-      setStockActual(stockMap)
+      
+      // Solo actualizar si hay cambios
+      setProductos((prev) => {
+        if (compareArraysByIds(prev, productosData)) {
+          return prev
+        }
+        return productosData
+      })
+      
+      setStockActual((prev) => {
+        if (compareRecords(prev, stockMap)) {
+          return prev
+        }
+        return stockMap
+      })
       
       // 3. Actualizar cache
       await setCache(cacheKey, { productos: productosData, stockActual: stockMap })
@@ -220,21 +253,32 @@ export function useStockConsole(user: any) {
           } as Producto)
         })
         
-        setStockActual(stockMap)
+        productosData.sort((a, b) => {
+          const ordenA = a.orden ?? 0
+          const ordenB = b.orden ?? 0
+          if (ordenA !== ordenB) {
+            return ordenA - ordenB
+          }
+          return a.nombre.localeCompare(b.nombre)
+        })
         
-        // Actualizar productos también si cambian
+        // Solo actualizar si hay cambios reales
+        setProductos((prev) => {
+          if (compareArraysByIds(prev, productosData)) {
+            return prev
+          }
+          return productosData
+        })
+        
+        setStockActual((prev) => {
+          if (compareRecords(prev, stockMap)) {
+            return prev
+          }
+          return stockMap
+        })
+        
+        // Actualizar cache en background
         if (productosData.length > 0) {
-          productosData.sort((a, b) => {
-            const ordenA = a.orden ?? 0
-            const ordenB = b.orden ?? 0
-            if (ordenA !== ordenB) {
-              return ordenA - ordenB
-            }
-            return a.nombre.localeCompare(b.nombre)
-          })
-          setProductos(productosData)
-          
-          // Actualizar cache en background
           setCache(cacheKey, { productos: productosData, stockActual: stockMap }).catch(() => {
             // Ignorar errores de cache
           })

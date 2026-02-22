@@ -20,6 +20,7 @@ import { Pedido, Group } from "@/lib/types"
 import { useData } from "@/contexts/data-context"
 import { useGroups } from "@/hooks/use-groups"
 import { getCache, setCache } from "@/lib/cache/indexeddb-cache"
+import { compareArraysByIds } from "@/lib/cache/cache-utils"
 
 export function useFabricaPedidos(user: any) {
   const { toast } = useToast()
@@ -187,8 +188,6 @@ export function useFabricaPedidos(user: any) {
     if (!db || !user) return
 
     try {
-      setLoading(true)
-      
       // Generar clave de cache única por usuario y grupos
       const cacheKey = `fabrica-pedidos-${user.uid}-${userIdsDelGrupo.join(",")}`
       
@@ -196,6 +195,9 @@ export function useFabricaPedidos(user: any) {
       const cachedPedidos = await getCache<Pedido[]>(cacheKey)
       if (cachedPedidos && cachedPedidos.length > 0) {
         setPedidos(cachedPedidos)
+        // No mostrar loading si hay cache
+      } else {
+        setLoading(true)
       }
       
       // Si el usuario es "invited" y tiene userIdsDelGrupo, filtrar por esos userIds
@@ -495,8 +497,16 @@ export function useFabricaPedidos(user: any) {
         })) as Pedido[]
         const pedidosFiltrados = await aplicarFiltros(pedidosData)
         
-        // Actualizar cache cuando lleguen actualizaciones del listener
+        // Solo actualizar si hay cambios
         if (pedidosFiltrados) {
+          setPedidos((prev) => {
+            if (compareArraysByIds(prev, pedidosFiltrados)) {
+              return prev
+            }
+            return pedidosFiltrados
+          })
+          
+          // Actualizar cache cuando lleguen actualizaciones del listener
           setCache(cacheKey, pedidosFiltrados).catch(() => {
             // Ignorar errores de cache
           })

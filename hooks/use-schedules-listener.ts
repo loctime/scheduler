@@ -8,6 +8,7 @@ import { useData } from "@/contexts/data-context"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import { buildScheduleDocId } from "@/lib/firestore-helpers"
 import { getCache, setCache } from "@/lib/cache/indexeddb-cache"
+import { compareArraysByIds } from "@/lib/cache/cache-utils"
 
 interface UseSchedulesListenerProps {
   user: any
@@ -48,9 +49,6 @@ export function useSchedulesListener({
     if (listenerSetupRef.current) return
     listenerSetupRef.current = true
 
-    setLoading(true)
-    setError(null)
-
     const cacheKey = `schedules-${ownerId}`
     const schedulesQuery = query(
       collection(db, COLLECTIONS.SCHEDULES),
@@ -58,17 +56,25 @@ export function useSchedulesListener({
       orderBy("weekStart", "desc"),
     )
 
+    let hasCachedData = false
+
     // 1. Cargar desde cache primero (stale-while-revalidate)
     getCache<Horario[]>(cacheKey)
       .then((cachedSchedules) => {
         if (cachedSchedules && cachedSchedules.length > 0) {
+          hasCachedData = true
           setSchedules(cachedSchedules)
           setLoading(false)
+          setError(null)
           logger.debug(`[useSchedulesListener] Cargados ${cachedSchedules.length} schedules desde cache`)
+        } else {
+          // Solo mostrar loading si no hay cache
+          setLoading(true)
         }
       })
       .catch(() => {
-        // Ignorar errores de cache
+        // Si falla el cache, mostrar loading
+        setLoading(true)
       })
 
     // 2. Configurar listener en tiempo real
@@ -80,30 +86,20 @@ export function useSchedulesListener({
           ...scheduleDoc.data(),
         })) as Horario[]
 
-        // LOG TEMPORAL - Detectar cambios
-        const changedDocs = snapshot.docChanges().map(change => ({
-          type: change.type,
-          docId: change.doc.id,
-          weekStart: change.doc.data().weekStart,
-          hasAssignments: !!change.doc.data().assignments,
-          assignmentsKeys: change.doc.data().assignments ? Object.keys(change.doc.data().assignments) : []
-        }))
+        // Comparar con datos actuales para evitar re-renders innecesarios
+        setSchedules((prevSchedules) => {
+          if (compareArraysByIds(prevSchedules, schedulesData)) {
+            // No hay cambios, mantener datos anteriores
+            return prevSchedules
+          }
+
+          // Hay cambios, actualizar
+          logger.debug(`[useSchedulesListener] Cargados ${schedulesData.length} schedules desde Firestore`)
+          return schedulesData
+        })
         
-        console.log('[useSchedulesListener] SNAPSHOT RECIBIDO:', {
-          docsCount: snapshot.docs.length,
-          schedulesCount: schedulesData.length,
-          changedDocs
-        })
-
-        console.log("👂 LISTENER UPDATE:", {
-          scheduleIds: schedulesData.map(s => s.id),
-          weeks: schedulesData.map(s => s.weekStart),
-          completadas: schedulesData.map(s => s.completada),
-        })
-
-        setSchedules(schedulesData)
         setLoading(false)
-        logger.debug(`[useSchedulesListener] Cargados ${schedulesData.length} schedules`)
+        setError(null)
 
         // 3. Actualizar cache en background
         setCache(cacheKey, schedulesData).catch(() => {
