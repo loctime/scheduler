@@ -29,7 +29,13 @@ function RegistroContent() {
   // Manejar el resultado de la redirección de Google Sign-In
   useEffect(() => {
     const handleRedirectResult = async () => {
-      if (!auth || !token || !tokenValid || !db) return
+      if (!auth || !db) return
+      
+      // Solo procesar si hay un token válido (para registro con invitación)
+      if (!token || !tokenValid) {
+        // Si no hay token, no es una página de registro con invitación, salir
+        return
+      }
       
       try {
         const result = await getRedirectResult(auth)
@@ -51,15 +57,23 @@ function RegistroContent() {
         }
       } catch (error: any) {
         console.error("❌ Error al procesar resultado de redirección:", error)
-        toast({
-          title: "Error",
-          description: error.message || "No se pudo completar el registro",
-          variant: "destructive",
-        })
+        // Solo mostrar error si no es un error de "no hay resultado" (normal cuando no hay redirect pendiente)
+        if (error.code !== 'auth/no-auth-event') {
+          toast({
+            title: "Error",
+            description: error.message || "No se pudo completar el registro",
+            variant: "destructive",
+          })
+        }
       }
     }
 
-    handleRedirectResult()
+    // Esperar un poco para asegurar que auth esté listo
+    const timer = setTimeout(() => {
+      handleRedirectResult()
+    }, 100)
+
+    return () => clearTimeout(timer)
   }, [auth, token, tokenValid, redirectTo, router, toast, db])
 
   // Validar token
