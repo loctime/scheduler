@@ -13,6 +13,7 @@ export default function PwaHorarioPublicPage() {
       companySlug={companySlug}
       ImageWrapper={ZoomableImage}
       headerClassName="bg-violet-100"
+      mode="pwa"
     />
   )
 }

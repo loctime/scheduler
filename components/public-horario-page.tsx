@@ -25,6 +25,8 @@ interface PublicHorarioPageProps {
   ImageWrapper?: React.ComponentType<ZoomableImageProps>
   /** Clase opcional para el header (ej. tema PWA: bg-violet-100). */
   headerClassName?: string
+  /** Modo PWA: muestra solo la imagen en pantalla completa sin header/footer. */
+  mode?: "pwa" | "normal"
 }
 
 const buildFallbackEmployees = (ownerId: string, days?: Record<string, any>) => {
@@ -95,7 +97,8 @@ const getWeekStartDate = (weekId?: string, days?: Record<string, any>) => {
   return null
 }
 
-function PublicHorarioPageComponent({ companySlug, ImageWrapper, headerClassName }: PublicHorarioPageProps) {
+function PublicHorarioPageComponent({ companySlug, ImageWrapper, headerClassName, mode = "normal" }: PublicHorarioPageProps) {
+  const isPwaMode = mode === "pwa"
   const { horario, isLoading, error } = usePublicHorario(companySlug)
   const { config } = useConfig()
   const [showIndividualView, setShowIndividualView] = useState(false)
@@ -427,9 +430,71 @@ function PublicHorarioPageComponent({ companySlug, ImageWrapper, headerClassName
     scheduleName: schedule?.nombre,
     weekDaysCount: weekDays.length,
     employeesCount: employees.length,
-    shiftsCount: shifts.length
+    shiftsCount: shifts.length,
+    isPwaMode: isPwaMode
   })
 
+  // Modo PWA: solo imagen fullscreen sin header/footer
+  if (isPwaMode) {
+    const currentWeek = horario?.weeks?.[horario.publishedWeekId]
+    const imageSrc = currentWeek?.publicImageUrl
+    const imageAlt = `Horario ${currentWeek?.weekLabel || 'semanal'}`
+
+    if (!imageSrc) {
+      return (
+        <div className="w-screen h-screen overflow-hidden bg-black flex items-center justify-center">
+          <div className="text-white text-center p-4">
+            <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <h1 className="text-lg font-semibold mb-2">No hay horario publicado</h1>
+            <p className="text-sm opacity-75">No hay imagen disponible para mostrar.</p>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <>
+        <div 
+          className="w-screen h-screen overflow-hidden bg-black flex items-center justify-center cursor-pointer"
+          onClick={() => setIsFullscreenViewerOpen(true)}
+          style={{ touchAction: 'manipulation' }}
+        >
+          <img
+            src={imageSrc}
+            alt={imageAlt}
+            loading="eager"
+            decoding="async"
+            className="w-full h-full object-contain"
+            style={{
+              maxWidth: '100vw',
+              maxHeight: '100vh',
+              pointerEvents: 'none',
+              userSelect: 'none',
+            }}
+            draggable={false}
+            onError={(e) => {
+              console.error("🔧 [PublicHorarioPage] PWA image load error:", e)
+            }}
+          />
+        </div>
+
+        {/* Viewer de pantalla completa */}
+        {isFullscreenViewerOpen && (
+          <FullscreenScheduleViewer
+            imageSrc={imageSrc}
+            imageAlt={imageAlt}
+            onClose={() => setIsFullscreenViewerOpen(false)}
+            onError={(e) => {
+              console.error("🔧 [PublicHorarioPage] Fullscreen image load error:", e)
+              setIsFullscreenViewerOpen(false)
+            }}
+          />
+        )}
+      </>
+    )
+  }
+
+  // Modo normal: layout completo con header, footer, etc.
   return (
     <div className="min-h-screen bg-background">
       {/* Header Horario Semanal (mobile-first) */}

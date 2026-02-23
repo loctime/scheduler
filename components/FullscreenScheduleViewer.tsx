@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState, useRef } from "react"
 import { X } from "lucide-react"
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch"
 import { Button } from "@/components/ui/button"
@@ -34,6 +34,9 @@ export function FullscreenScheduleViewer({
   onClose,
   onError,
 }: FullscreenScheduleViewerProps) {
+  const [currentScale, setCurrentScale] = useState(1)
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
   // Bloquear scroll del body cuando el viewer está activo
   useEffect(() => {
     if (typeof document === "undefined") return
@@ -59,9 +62,44 @@ export function FullscreenScheduleViewer({
     }
   }, [onClose])
 
+  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Cerrar solo si no hay zoom activo (escala <= 1.1)
+    // Esto permite que el usuario haga pan cuando hay zoom sin cerrar accidentalmente
+    if (currentScale <= 1.1) {
+      // Pequeño delay para permitir que el doble click funcione primero
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current)
+      }
+      clickTimeoutRef.current = setTimeout(() => {
+        onClose()
+      }, 200)
+    }
+  }
+
+  const handleTransformClick = (e: React.MouseEvent) => {
+    // Permitir que el click en el TransformComponent también cierre cuando no hay zoom
+    if (currentScale <= 1.1) {
+      e.stopPropagation()
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current)
+      }
+      clickTimeoutRef.current = setTimeout(() => {
+        onClose()
+      }, 200)
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current)
+      }
+    }
+  }, [])
+
   return (
     <div
-      className="fixed inset-0 z-[9999] bg-black"
+      className="fixed inset-0 z-[9999] bg-black cursor-pointer fullscreen-overlay-background"
       style={{
         position: "fixed",
         top: 0,
@@ -69,6 +107,13 @@ export function FullscreenScheduleViewer({
         width: "100vw",
         height: "100vh",
         overflow: "hidden",
+      }}
+      onClick={handleOverlayClick}
+      onTouchEnd={(e) => {
+        // Cerrar al hacer tap cuando no hay zoom activo
+        if (currentScale <= 1.1) {
+          onClose()
+        }
       }}
     >
       {/* Botón de cerrar */}
@@ -95,6 +140,9 @@ export function FullscreenScheduleViewer({
         wheel={{ step: 0.15 }}
         panning={{ velocityDisabled: true }}
         pinch={{ step: 5 }}
+        onTransformed={(_ref, state) => {
+          setCurrentScale(state.scale || 1)
+        }}
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
@@ -129,37 +177,39 @@ export function FullscreenScheduleViewer({
               </Button>
             </div>
 
-            <TransformComponent
-              wrapperStyle={{
-                width: "100%",
-                height: "100%",
-                cursor: "grab",
-              }}
-              contentStyle={{
-                width: "100%",
-                height: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <img
-                src={imageSrc}
-                alt={imageAlt}
-                onError={onError}
-                style={{
-                  maxWidth: "100vw",
-                  maxHeight: "100vh",
-                  width: "auto",
-                  height: "auto",
-                  objectFit: "contain",
-                  pointerEvents: "none",
-                  userSelect: "none",
-                  display: "block",
+            <div onClick={handleTransformClick} style={{ width: "100%", height: "100%" }}>
+              <TransformComponent
+                wrapperStyle={{
+                  width: "100%",
+                  height: "100%",
+                  cursor: currentScale > 1.1 ? "grab" : "pointer",
                 }}
-                draggable={false}
-              />
-            </TransformComponent>
+                contentStyle={{
+                  width: "100%",
+                  height: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <img
+                  src={imageSrc}
+                  alt={imageAlt}
+                  onError={onError}
+                  style={{
+                    maxWidth: "100vw",
+                    maxHeight: "100vh",
+                    width: "auto",
+                    height: "auto",
+                    objectFit: "contain",
+                    pointerEvents: "none",
+                    userSelect: "none",
+                    display: "block",
+                  }}
+                  draggable={false}
+                />
+              </TransformComponent>
+            </div>
           </>
         )}
       </TransformWrapper>
