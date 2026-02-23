@@ -148,13 +148,6 @@ export default function PwaHomePage() {
             href={`/pwa/${companySlug}/stock-console`}
             borderClassName={PWA_THEMES.stock.border}
           />
-          <ActionCard
-            icon={<CheckSquare className="h-8 w-8 text-primary shrink-0" />}
-            title="Tareas"
-            description="Ver tareas asignadas"
-            href={`/pwa/${companySlug}/tareas`}
-            borderClassName="border-l-4 border-l-purple-500"
-          />
         </div>
       </div>
 
@@ -203,8 +196,11 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
   // Estado de acciones completadas
   const { completedIds, toggleCompleted } = useDailyActionStatus(ownerId || "")
   
-  // Estado para acciones expandidas
+  // Estado para expandir/ocultar realizadas
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set())
+  
+  // Estado para expandir/ocultar el panel de acciones principales
+  const [expanded, setExpanded] = useState(false)
   
   const toggleExpanded = (actionId: string) => {
     const newExpanded = new Set(expandedActions)
@@ -269,96 +265,88 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
       
       {/* Bloque 2 - Acciones del Día */}
       {dailyActions.length > 0 && (
-        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-400 rounded-xl p-3 mt-2">
+        <div className="bg-green-50 dark:bg-green-950/40 border border-green-400 rounded-xl p-3 mt-2 cursor-pointer transition-all"
+          onClick={() => setExpanded(!expanded)}
+        >
           <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600" />
-            <span className="font-semibold text-sm text-amber-800 dark:text-amber-200">
-              Pendientes del dia
+            <AlertTriangle className="w-4 h-4 text-green-600" />
+            <span className="font-semibold text-sm text-green-800 dark:text-green-200">
+              Pendientes del día
             </span>
           </div>
-          <div className="space-y-2">
-            {dailyActions.map((action: DailyAction, index: number) => {
-              const isCompleted = completedIds.includes(action.id)
-              const isExpanded = expandedActions.has(action.id)
-              
-              return (
-                <div key={action.id} className="space-y-1">
-                  {index > 0 && <div className="border-t border-amber-200 dark:border-amber-800" />}
-                  
-                  {/* Acción NO completada - mostrar normal */}
-                  {!isCompleted ? (
-                    <div className="space-y-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1">
-                          <div className="font-medium text-sm text-amber-900 dark:text-amber-100">
-                            {action.title}
-                          </div>
-                          {action.description && (
-                            <div className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                              {action.description}
+          {expanded && (
+            <div className="space-y-2">
+              {dailyActions.map((action: DailyAction, index: number) => {
+                const isCompleted = completedIds.includes(action.id)
+                
+                return (
+                  <div key={action.id} className="space-y-1">
+                    {/* Acción NO completada - mostrar normal */}
+                    {!isCompleted ? (
+                      <div className="space-y-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <div className="font-medium text-sm text-amber-900 dark:text-amber-100">
+                              {action.title}
                             </div>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => toggleCompleted(action.id)}
-                          className="shrink-0 p-1 rounded hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors"
-                          title="Marcar como realizada"
-                        >
-                          <Check className="w-4 h-4 text-amber-600" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    /* Acción completada - mostrar compactada */
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <Check className="w-4 h-4 text-green-600" />
-                          <span className="font-medium text-sm text-green-800 dark:text-green-200 opacity-75">
-                            {action.title}
-                          </span>
-                          <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs rounded-full">
-                            Completada
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => toggleExpanded(action.id)}
-                          className="shrink-0 p-1 rounded hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors"
-                          title={isExpanded ? "Contraer" : "Expandir"}
-                        >
-                          {isExpanded ? (
-                            <ChevronUp className="w-4 h-4 text-amber-600" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4 text-amber-600" />
-                          )}
-                        </button>
-                      </div>
-                      
-                      {/* Expandido - mostrar detalles */}
-                      {isExpanded && (
-                        <div className="pl-6 space-y-1">
-                          {action.description && (
-                            <div className="text-xs text-amber-700 dark:text-amber-300">
-                              {action.description}
-                            </div>
-                          )}
-                          <div className="text-xs text-green-700 dark:text-green-300">
-                            Completada por {viewer?.employeeName || 'Empleado'}
+                            {action.description && (
+                              <div className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                                {action.description}
+                              </div>
+                            )}
                           </div>
                           <button
                             onClick={() => toggleCompleted(action.id)}
-                            className="text-xs text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-200 underline"
+                            className="shrink-0 p-1 rounded hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors"
+                            title="Marcar como realizada"
                           >
-                            Desmarcar como completada
+                            <Check className="w-4 h-4 text-amber-600" />
                           </button>
                         </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+
+                        {/* Expandir/Ocultar detalles */}
+                        <button
+                          onClick={() => toggleExpanded(action.id)}
+                          className="w-full text-left text-xs text-amber-600 hover:text-amber-800 dark:text-amber-200 dark:hover:text-amber-400 underline mt-2 transition-colors"
+                        >
+                          {expandedActions.has(action.id) ? 'Contraer' : 'Expandir'} detalles
+                        </button>
+
+                        {/* Detalles expandidos */}
+                        {expandedActions.has(action.id) && action.description && (
+                          <div className="pl-6 border-t border-amber-200 dark:border-amber-800 pt-2 mt-2">
+                            <div className="text-xs text-amber-700 dark:text-amber-300">
+                              {action.description}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* Acción completada - mostrar compactada */
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Check className="w-4 h-4 text-green-600" />
+                          <span className="font-medium text-sm text-green-800 dark:text-green-200 line-through opacity-70">
+                            {action.title}
+                          </span>
+                          <div className="text-xs text-green-700 dark:text-green-300">
+                            Completada por {viewer?.employeeName || 'Desconocido'}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => toggleCompleted(action.id)}
+                          className="shrink-0 p-1 rounded hover:bg-green-200 dark:hover:bg-green-800 transition-colors"
+                          title="Desmarcar como realizada"
+                        >
+                          <Check className="w-4 h-4 text-green-600" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -38,6 +38,9 @@ export default function TareasPage() {
     return { pendientes, realizadas }
   }, [tasks, completedMap])
 
+  // Estado para expandir/ocultar realizadas
+  const [expanded, setExpanded] = useState(false)
+
   if (ownerIdLoading || employeesLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-4">
@@ -94,19 +97,16 @@ export default function TareasPage() {
       </div>
 
       <div className="max-w-4xl mx-auto p-4 space-y-6">
-        {/* Tareas del día */}
-        {todayTasks.length > 0 && (
+        {/* Tareas pendientes */}
+        {pendientes.length > 0 && (
           <div>
             <div className="flex items-center space-x-2 mb-4">
-              <div className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">
-                Hoy
-              </div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Tareas del día
-              </h2>
+              <CheckSquare className="h-5 w-5 text-yellow-600" />
+              <h2 className="text-lg font-medium text-yellow-700">Pendientes del día</h2>
+              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">{pendientes.length}</Badge>
             </div>
             <div className="space-y-3">
-              {todayTasks.map((task) => (
+              {pendientes.map((task) => (
                 <TaskCard
                   key={task.id}
                   task={task}
@@ -125,58 +125,36 @@ export default function TareasPage() {
           </div>
         )}
 
-        {/* Tareas pendientes */}
-        {pendientes.length > 0 && (
-          <div>
-            <div className="flex items-center space-x-2 mb-4">
-              <CheckSquare className="h-5 w-5 text-gray-600" />
-              <h2 className="text-lg font-medium text-gray-900">Tareas Pendientes</h2>
-              <Badge variant="secondary">{pendientes.length}</Badge>
-            </div>
-            <div className="space-y-3">
-              {pendientes.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  employees={employees}
-                  onClick={() => router.push(`/pwa/${companySlug}/tareas/${task.id}`)}
-                  isToday={false}
-                  companySlug={companySlug}
-                  router={router}
-                  isCompleted={!!completedMap[task.id]}
-                  completedBy={completedMap[task.id]?.employeeId}
-                  onToggle={() => toggleTask(task.id)}
-                  viewer={viewer}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Tareas realizadas */}
         {realizadas.length > 0 && (
           <div>
-            <div className="flex items-center space-x-2 mb-4">
-              <CheckSquare className="h-5 w-5 text-green-600" />
-              <h2 className="text-lg font-medium text-gray-900">Tareas Realizadas</h2>
-              <Badge variant="default" className="bg-green-100 text-green-800">{realizadas.length}</Badge>
-            </div>
-            <div className="space-y-3">
-              {realizadas.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  employees={employees}
-                  onClick={() => router.push(`/pwa/${companySlug}/tareas/${task.id}`)}
-                  isToday={false}
-                  companySlug={companySlug}
-                  router={router}
-                  isCompleted={!!completedMap[task.id]}
-                  completedBy={completedMap[task.id]?.employeeId}
-                  onToggle={() => toggleTask(task.id)}
-                  viewer={viewer}
-                />
-              ))}
+            <div 
+              onClick={() => setExpanded(!expanded)}
+              className="bg-green-50 dark:bg-green-950/40 border border-green-400 rounded-xl p-3 mt-2 cursor-pointer transition-all"
+            >
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-semibold text-green-700 dark:text-green-300">
+                  ✔ Pendientes al día
+                </span>
+                <span className="text-xs text-green-600">
+                  {expanded ? "Ocultar" : "Ver realizadas"}
+                </span>
+              </div>
+
+              {expanded && (
+                <div className="mt-3 space-y-2 border-t border-green-300 pt-2">
+                  {realizadas.map((task) => (
+                    <div key={task.id} className="text-sm">
+                      <div className="font-medium line-through opacity-70">
+                        {task.title}
+                      </div>
+                      <div className="text-muted-foreground">
+                        Realizada por {employees.find(emp => emp.id === completedMap[task.id]?.employeeId)?.name || 'Desconocido'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
