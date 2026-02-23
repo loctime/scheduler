@@ -16,6 +16,8 @@ import { useToast } from "@/hooks/use-toast"
 import { DayCellContent } from "@/components/schedule-grid/components/day-cell-content"
 import { useTodayScheduleCellData } from "@/hooks/use-today-schedule-cell-data"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useDailyActions, DailyAction } from "@/hooks/use-daily-actions"
+import { AlertTriangle } from "lucide-react"
 
 // Constantes para mensajes informativos
 const MENSAJES_DEL_DIA = [
@@ -175,6 +177,9 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
     isLoading,
     error,
   } = useTodayScheduleCellData({ companySlug, employeeId })
+  
+  // Acciones diarias para este empleado
+  const { actions: dailyActions } = useDailyActions(companySlug, employeeId)
 
   // Memoizar props para DayCellContent
   const dayCellContentProps = useMemo(
@@ -226,6 +231,33 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
       <div className="bg-muted/40 rounded-lg py-2 px-2 text-xs text-center mt-2">
         {mensajeFijo}
       </div>
+      
+      {/* Bloque 2 - Acciones del Día */}
+      {dailyActions.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-400 rounded-xl p-3 mt-2">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
+            <span className="font-semibold text-sm text-amber-800 dark:text-amber-200">
+              Acciones de hoy
+            </span>
+          </div>
+          <div className="space-y-2">
+            {dailyActions.map((action: DailyAction, index: number) => (
+              <div key={action.id} className="space-y-1">
+                {index > 0 && <div className="border-t border-amber-200 dark:border-amber-800" />}
+                <div className="font-medium text-sm text-amber-900 dark:text-amber-100">
+                  {action.title}
+                </div>
+                {action.description && (
+                  <div className="text-xs text-amber-700 dark:text-amber-300">
+                    {action.description}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
