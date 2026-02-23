@@ -3,13 +3,49 @@
 import React, { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Trash2, Upload, Package, Minus, Plus, PlusCircle, X, Check, AlertTriangle, Pencil } from "lucide-react"
+import { Trash2, Upload, Package, Minus, Plus, PlusCircle, X, Check, AlertTriangle, Pencil, GripVertical } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { Producto } from "@/lib/types"
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 
 const btnIcon = "h-7 w-7 rounded-full transition-transform active:scale-95 shrink-0"
+
+/** Hook para detectar si estamos en desktop (lg+) */
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(false)
+
+  useEffect(() => {
+    const checkIsDesktop = () => {
+      setIsDesktop(window.matchMedia("(min-width: 1024px)").matches)
+    }
+    
+    checkIsDesktop()
+    const mediaQuery = window.matchMedia("(min-width: 1024px)")
+    mediaQuery.addEventListener("change", checkIsDesktop)
+    
+    return () => mediaQuery.removeEventListener("change", checkIsDesktop)
+  }, [])
+
+  return isDesktop
+}
 
 /** Unidades por pack: 1 si es unidad, cantidadPorPack si es pack. */
 function getUnidadesPorPack(p: Producto): number {
@@ -325,6 +361,8 @@ interface ProductoRowProps {
   onLocalStockChange: (productId: string, value: number) => void
   onDeleteProduct: (productId: string) => void
   isCritical?: boolean
+  dragHandleProps?: any
+  isDragging?: boolean
 }
 
 const ProductoRow = React.memo(function ProductoRow({
@@ -343,6 +381,8 @@ const ProductoRow = React.memo(function ProductoRow({
   onLocalStockChange,
   onDeleteProduct,
   isCritical = false,
+  dragHandleProps,
+  isDragging = false,
 }: ProductoRowProps) {
   const isEditingNombre = editingField?.id === product.id && editingField?.field === "nombre"
   const unidadesPorPackInputRef = useRef<HTMLInputElement | null>(null)
@@ -389,9 +429,19 @@ const ProductoRow = React.memo(function ProductoRow({
       key={product.id}
       className={cn(
         "rounded-lg border bg-card px-3 py-2 flex flex-col sm:flex-row sm:items-center gap-2 shadow-sm hover:shadow-md transition-all",
-        isCritical && "border-red-600 border-2 bg-red-50 shadow-md"
+        isCritical && "border-red-600 border-2 bg-red-50 shadow-md",
+        isDragging && "opacity-50"
       )}
     >
+      {dragHandleProps && (
+        <div
+          {...dragHandleProps}
+          className="shrink-0 flex items-center cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground lg:flex hidden"
+        >
+          <GripVertical className="h-4 w-4" />
+        </div>
+      )}
+      
       {isCritical && (
         <div className="shrink-0 flex items-center">
           <AlertTriangle className="h-4 w-4 text-red-600" />
@@ -454,6 +504,41 @@ const ProductoRow = React.memo(function ProductoRow({
     </div>
   )
 })
+
+// --- Componente Sortable para drag & drop ---
+
+interface SortableProductoRowProps extends Omit<ProductoRowProps, "dragHandleProps" | "isDragging"> {
+  id: string
+}
+
+function SortableProductoRow({
+  id,
+  ...props
+}: SortableProductoRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <ProductoRow
+        {...props}
+        dragHandleProps={{ ...attributes, ...listeners }}
+        isDragging={isDragging}
+      />
+    </div>
+  )
+}
 
 // --- Formulario de creación inline ---
 
@@ -565,6 +650,7 @@ export function ProductosTable({
     }
   }, [])
   
+  const isDesktop = useIsDesktop()
   const [editingField, setEditingField] = useState<{ id: string; field: string } | null>(null)
   const [inlineValue, setInlineValue] = useState("")
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -583,8 +669,19 @@ export function ProductosTable({
   // Estado local temporal para stock (optimización de performance)
   const [localStock, setLocalStock] = useState<Record<string, number>>({})
   const debounceTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({})
+  
+  // Referencia para evitar que el efecto sobrescriba cambios de orden optimistas
+  const isReorderingRef = useRef(false)
 
-  // Función para ordenar productos por criticidad
+  // Sensores para drag & drop
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  // Función para ordenar productos por criticidad (solo mobile)
   const sortProductsByCriticality = useCallback((productsList: Producto[]) => {
     if (!productsList || productsList.length === 0) {
       return productsList || []
@@ -615,6 +712,20 @@ export function ProductosTable({
       return criticidadB - criticidadA
     })
   }, [stockActual])
+
+  // Función para ordenar productos por orden manual (desktop)
+  const sortProductsByOrder = useCallback((productsList: Producto[]) => {
+    if (!productsList || productsList.length === 0) {
+      return productsList || []
+    }
+    
+    // Crear una copia del array y ordenar por campo `orden`
+    return [...productsList].sort((a, b) => {
+      const ordenA = a.orden ?? 0
+      const ordenB = b.orden ?? 0
+      return ordenA - ordenB
+    })
+  }, [])
 
   // Inicializar localStock desde stockActual solo si no hay cambios pendientes
   useEffect(() => {
@@ -679,11 +790,69 @@ export function ProductosTable({
     }
   }, [localStock, stockActual, onStockChange])
 
-  // Actualizar el ordenamiento cuando cambian los productos o el stock
+  // Actualizar el ordenamiento cuando cambian los productos, el stock o el tamaño de pantalla
   useEffect(() => {
-    const sorted = sortProductsByCriticality(products)
-    setProductsToRender(sorted)
-  }, [products, stockActual, sortProductsByCriticality])
+    // No sobrescribir si estamos en medio de un reordenamiento optimista
+    if (isReorderingRef.current) {
+      return
+    }
+    
+    if (isDesktop) {
+      // En desktop: usar orden manual
+      const sorted = sortProductsByOrder(products)
+      setProductsToRender(sorted)
+    } else {
+      // En mobile: usar orden por criticidad
+      const sorted = sortProductsByCriticality(products)
+      setProductsToRender(sorted)
+    }
+  }, [products, stockActual, isDesktop, sortProductsByCriticality, sortProductsByOrder])
+
+  // Manejar el final del drag & drop
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id) {
+      return
+    }
+
+    const oldIndex = productsToRender.findIndex((p) => p.id === active.id)
+    const newIndex = productsToRender.findIndex((p) => p.id === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) {
+      return
+    }
+
+    // Marcar que estamos reordenando para evitar que el efecto sobrescriba
+    isReorderingRef.current = true
+
+    // Guardar el orden anterior para poder revertir si falla
+    const previousOrder = productsToRender
+
+    // Actualizar el orden localmente inmediatamente (optimistic update)
+    const newOrder = arrayMove(productsToRender, oldIndex, newIndex)
+    setProductsToRender(newOrder)
+
+    // Persistir el nuevo orden en segundo plano sin bloquear la UI
+    if (onProductsOrderUpdate) {
+      const newOrderIds = newOrder.map((p: Producto) => p.id)
+      // No usar await para no bloquear la UI
+      onProductsOrderUpdate(newOrderIds)
+        .then(() => {
+          // Cuando se complete exitosamente, permitir que el efecto actualice si es necesario
+          isReorderingRef.current = false
+        })
+        .catch((error) => {
+          console.error("Error al actualizar orden:", error)
+          // Si falla, revertir al orden anterior
+          isReorderingRef.current = false
+          setProductsToRender(previousOrder)
+        })
+    } else {
+      // Si no hay función de actualización, solo permitir que el efecto actualice
+      isReorderingRef.current = false
+    }
+  }, [productsToRender, onProductsOrderUpdate])
 
   // Verificar si hay productos críticos para el indicador
   const hasCriticalProducts = useMemo(() => {
@@ -752,6 +921,66 @@ export function ProductosTable({
     }
   }, [onCreateProduct, newProductNombre, newProductStockMinimo, newProductTipoCompra, newProductUnidadesPorPack, stockMinimoDefault])
 
+  // Renderizar productos - siempre usar useMemo fuera de cualquier condición
+  const renderedProducts = useMemo(
+    () =>
+      productsToRender.map((product) => {
+        // Usar localStock si existe, sino stockActual (para UI inmediata)
+        const stockActualValue = localStock[product.id] ?? stockActual[product.id] ?? 0
+        const criticidad = product.stockMinimo - stockActualValue
+        const isCritical = criticidad > 0
+
+        const productRowProps = {
+          product,
+          stockActualValue,
+          stockMinimoLocal: stockMinimoLocal[product.id] ?? product.stockMinimo,
+          setStockMinimoLocal: setStockMinimoLocalFor,
+          unidadesPorPackEdit: unidadesPorPackEdit[product.id] ?? "",
+          setUnidadesPorPackEdit,
+          editingField,
+          inlineValue,
+          setEditingField,
+          setInlineValue,
+          inputRef,
+          onUpdateProduct,
+          onLocalStockChange: handleLocalStockChange,
+          onDeleteProduct,
+          isCritical,
+        }
+
+        return isDesktop ? (
+          <SortableProductoRow
+            key={product.id}
+            id={product.id}
+            {...productRowProps}
+          />
+        ) : (
+          <ProductoRow
+            key={product.id}
+            {...productRowProps}
+          />
+        )
+      }),
+    [
+      productsToRender,
+      localStock,
+      stockActual,
+      stockMinimoLocal,
+      unidadesPorPackEdit,
+      editingField,
+      inlineValue,
+      setStockMinimoLocalFor,
+      setUnidadesPorPackEdit,
+      setEditingField,
+      setInlineValue,
+      inputRef,
+      onUpdateProduct,
+      handleLocalStockChange,
+      onDeleteProduct,
+      isDesktop,
+    ]
+  )
+
   if (products.length === 0) {
     return (
       <div className="rounded-lg border border-border bg-card p-1.5">
@@ -780,9 +1009,11 @@ export function ProductosTable({
           <h3 className="text-sm font-semibold">Productos</h3>
           <p className="text-xs text-muted-foreground">
             {products.length} productos
-            {hasCriticalProducts && (
+            {isDesktop ? (
+              <span className="ml-2 text-xs text-muted-foreground">(Orden manual - arrastra para reordenar)</span>
+            ) : hasCriticalProducts ? (
               <span className="ml-2 text-xs text-orange-600">(Ordenado por criticidad)</span>
-            )}
+            ) : null}
           </p>
         </div>
         {onCreateProduct && (
@@ -799,52 +1030,21 @@ export function ProductosTable({
       </div>
 
       <div className="space-y-1 p-2">
-        {useMemo(
-          () =>
-            productsToRender.map((product) => {
-              // Usar localStock si existe, sino stockActual (para UI inmediata)
-              const stockActualValue = localStock[product.id] ?? stockActual[product.id] ?? 0
-              const criticidad = product.stockMinimo - stockActualValue
-              const isCritical = criticidad > 0
-
-              return (
-                <ProductoRow
-                  key={product.id}
-                  product={product}
-                  stockActualValue={stockActualValue}
-                  stockMinimoLocal={stockMinimoLocal[product.id] ?? product.stockMinimo}
-                  setStockMinimoLocal={setStockMinimoLocalFor}
-                  unidadesPorPackEdit={unidadesPorPackEdit[product.id] ?? ""}
-                  setUnidadesPorPackEdit={setUnidadesPorPackEdit}
-                  editingField={editingField}
-                  inlineValue={inlineValue}
-                  setEditingField={setEditingField}
-                  setInlineValue={setInlineValue}
-                  inputRef={inputRef}
-                  onUpdateProduct={onUpdateProduct}
-                  onLocalStockChange={handleLocalStockChange}
-                  onDeleteProduct={onDeleteProduct}
-                  isCritical={isCritical}
-                />
-              )
-            }),
-          [
-            productsToRender,
-            localStock,
-            stockActual,
-            stockMinimoLocal,
-            unidadesPorPackEdit,
-            editingField,
-            inlineValue,
-            setStockMinimoLocalFor,
-            setUnidadesPorPackEdit,
-            setEditingField,
-            setInlineValue,
-            inputRef,
-            onUpdateProduct,
-            handleLocalStockChange,
-            onDeleteProduct,
-          ]
+        {isDesktop ? (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={productsToRender.map((p) => p.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {renderedProducts}
+            </SortableContext>
+          </DndContext>
+        ) : (
+          renderedProducts
         )}
 
         {isCreatingProduct && onCreateProduct && (
