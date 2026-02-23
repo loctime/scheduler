@@ -43,8 +43,12 @@ export function DayCellContent({
 
   return (
     <div 
-      className={`flex flex-col gap-1.5 relative ${incompleteClass}`}
-      style={backgroundStyle}
+      className={`flex flex-col gap-1.5 relative px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 md:py-2 rounded min-h-[80px] w-full ${incompleteClass}`}
+      style={{
+        ...backgroundStyle,
+        // Asegurar que el fondo sea visible incluso si el estilo tiene baja opacidad
+        minHeight: '80px',
+      }}
     >
       <CellAssignments 
         assignments={assignments} 

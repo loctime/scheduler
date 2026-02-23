@@ -5,7 +5,7 @@ import { format } from "date-fns"
 import { usePublicHorario } from "@/hooks/use-public-horario"
 import { ShiftAssignment, Turno, MedioTurno } from "@/lib/types"
 import type { CSSProperties } from "react"
-import { hexToRgba } from "@/components/schedule-grid/utils/schedule-grid-utils"
+import { getDayBackgroundStyle } from "@/components/schedule-grid/utils/get-day-background-style"
 
 interface UseTodayScheduleCellDataProps {
   companySlug: string
@@ -67,22 +67,99 @@ export function useTodayScheduleCellData({
     return dayStatusData[employeeId] || "normal"
   }, [employeeId, dayStatusData])
 
-  // Obtener shifts de la semana
+  // Obtener shifts de la semana (usando la misma lógica que PwaTodayScheduleCard)
   const shifts = useMemo(() => {
-    if (!currentWeek?.shifts || !Array.isArray(currentWeek.shifts)) return []
-    const ownerId = horario?.ownerId ?? ""
-    return currentWeek.shifts.map((s: any) => ({
-      id: s.id,
-      name: s.name || `Turno ${s.id}`,
-      color: s.color?.trim() || "#9ca3af",
-      ownerId,
-      userId: ownerId,
-      startTime: s.startTime,
-      endTime: s.endTime,
-      startTime2: s.startTime2,
-      endTime2: s.endTime2,
-    })) as Turno[]
-  }, [currentWeek?.shifts, horario?.ownerId])
+    if (!horario || !currentWeek) return []
+    const ownerId = horario.ownerId ?? ""
+    
+    // Intentar obtener desde snapshot primero
+    if (currentWeek.shifts && Array.isArray(currentWeek.shifts) && currentWeek.shifts.length > 0) {
+      return currentWeek.shifts.map((s: any) => ({
+        id: s.id,
+        name: s.name || `Turno ${s.id}`,
+        color: s.color?.trim() || "#9ca3af",
+        ownerId,
+        userId: ownerId,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        startTime2: s.startTime2,
+        endTime2: s.endTime2,
+        colorPrimeraFranja: s.colorPrimeraFranja,
+        colorSegundaFranja: s.colorSegundaFranja,
+      })) as Turno[]
+    }
+    
+    // Fallback: construir shifts desde assignments (como hace PwaTodayScheduleCard)
+    if (currentWeek.days) {
+      const shiftMap = new Map<string, { shiftId: string; startTime?: string; endTime?: string }>()
+      
+      // Recopilar información de los assignments para inferir colores
+      Object.values(currentWeek.days).forEach((dayAssignments: any) => {
+        if (dayAssignments && typeof dayAssignments === "object") {
+          Object.values(dayAssignments).forEach((assignments: any) => {
+            if (!Array.isArray(assignments)) return
+            assignments.forEach((assignment: any) => {
+              if (typeof assignment === "string") {
+                // Assignment antiguo formato string (solo ID)
+                if (!shiftMap.has(assignment)) {
+                  shiftMap.set(assignment, { shiftId: assignment })
+                }
+                return
+              }
+              if (assignment && typeof assignment === "object" && "shiftId" in assignment && assignment.shiftId) {
+                const shiftId = assignment.shiftId
+                // Guardar información del horario para inferir color
+                if (!shiftMap.has(shiftId) || !shiftMap.get(shiftId)?.startTime) {
+                  shiftMap.set(shiftId, {
+                    shiftId,
+                    startTime: assignment.startTime,
+                    endTime: assignment.endTime,
+                  })
+                }
+              }
+            })
+          })
+        }
+      })
+      
+      // Crear turnos básicos desde los IDs encontrados, inferiendo color por horario
+      return Array.from(shiftMap.values()).map(({ shiftId, startTime, endTime }) => {
+        // Inferir color basándose en el horario de inicio
+        let color = "#9ca3af" // Gris por defecto
+        
+        if (startTime) {
+          // Turnos que empiezan a las 15:30 -> naranja
+          if (startTime.startsWith("15:30") || startTime.startsWith("15:")) {
+            color = "#f97316" // orange-500
+          }
+          // Turnos que empiezan a las 11:00 -> azul
+          else if (startTime.startsWith("11:") || startTime.startsWith("10:") || startTime.startsWith("09:")) {
+            color = "#3b82f6" // blue-500
+          }
+          // Otros horarios de mañana -> azul claro
+          else if (startTime.startsWith("08:") || startTime.startsWith("07:") || startTime.startsWith("06:")) {
+            color = "#60a5fa" // blue-400
+          }
+          // Horarios de tarde/noche -> otros colores
+          else if (startTime.startsWith("20:") || startTime.startsWith("21:") || startTime.startsWith("22:")) {
+            color = "#8b5cf6" // violet-500
+          }
+        }
+        
+        return {
+          id: shiftId,
+          name: `Turno ${shiftId}`,
+          color,
+          ownerId,
+          userId: ownerId,
+          startTime,
+          endTime,
+        } as Turno
+      })
+    }
+    
+    return []
+  }, [horario, currentWeek])
 
   // Crear función getShiftInfo
   const getShiftInfo = useMemo(() => {
@@ -107,35 +184,16 @@ export function useTodayScheduleCellData({
     })
   }, [assignments])
 
-  // Calcular backgroundStyle (simplificado, solo para franco y turnos básicos)
+  // Calcular backgroundStyle usando la misma lógica que ScheduleCell
   const backgroundStyle = useMemo((): CSSProperties | undefined => {
-    if (assignments.length === 0) {
-      if (dayStatus === "franco") {
-        return { backgroundColor: "rgba(34, 197, 94, 0.35)" }
-      }
-      return undefined
-    }
-
-    // Color verde para franco
-    const defaultGreenColor = "rgba(34, 197, 94, 0.35)"
-
-    if (assignments.some((a) => a.type === "franco") || dayStatus === "franco") {
-      return { backgroundColor: defaultGreenColor }
-    }
-
-    // Buscar turnos normales
-    const shiftAssignments = assignments.filter((a) => a.type === "shift" && a.shiftId)
-    
-    if (shiftAssignments.length > 0) {
-      const firstAssignment = shiftAssignments[0]
-      const firstShift = getShiftInfo(firstAssignment.shiftId || "")
-      if (firstShift && firstShift.color) {
-        return { backgroundColor: hexToRgba(firstShift.color, 0.35) }
-      }
-    }
-
-    return undefined
-  }, [assignments, dayStatus, getShiftInfo])
+    return getDayBackgroundStyle({
+      assignments,
+      dayStatus,
+      getShiftInfo,
+      shifts,
+      mediosTurnos,
+    })
+  }, [assignments, dayStatus, getShiftInfo, shifts, mediosTurnos])
 
   return {
     assignments,
