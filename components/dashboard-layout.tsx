@@ -40,6 +40,7 @@ const navItems = [
   { href: "/dashboard/pedidos", label: "Pedidos", icon: ShoppingCart },
   { href: "/dashboard/stock-console", label: "Stock Rápido", icon: Package, permission: "pedidos" },
   { href: "/mensajeria", label: "Mensajería", icon: MessageSquare },
+  { href: "/dashboard/daily-actions", label: "Acciones Diarias", icon: AlertTriangle },
   { href: "/dashboard/dias-especiales", label: "Días Especiales", icon: AlertTriangle, role: "admin" },
   { href: "/dashboard/fabrica", label: "Fábrica", icon: Factory, role: "factory" },
   { href: "/dashboard/gerente", label: "Gerente", icon: UserCog, role: "manager" },

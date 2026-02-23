@@ -8,7 +8,7 @@ export interface DailyAction {
   id: string
   title: string
   description?: string
-  dayOfWeek: number // 0-6 (domingo-sábado)
+  daysOfWeek: number[] // Array de días 0-6 (domingo-sábado)
   employeeIds?: string[] // opcional
   active: boolean
   createdAt: any
@@ -30,55 +30,44 @@ export function useDailyActions(ownerId: string, employeeId?: string): DailyActi
   const [error, setError] = useState<Error | undefined>()
 
   useEffect(() => {
-    if (!ownerId) {
-      setIsLoading(false)
-      return
-    }
-
-    setIsLoading(true)
-    setError(undefined)
+    if (!ownerId) return
 
     const unsubscribe = onSnapshot(
-      doc(db!, "dailyActions", ownerId),
+      doc(db!, "apps", "horarios", "dailyActions", ownerId),
       (docSnapshot) => {
         try {
           if (docSnapshot.exists()) {
             const data = docSnapshot.data()
             const allActions = data?.actions || []
+            const today = new Date().getDay()
             
-            // Filtrar acciones
-            const today = new Date().getDay() // 0 = domingo, 6 = sábado
-            const filteredActions = allActions.filter((action: any) => {
-              // Solo acciones activas
-              if (!action.active) return false
+            // Filtrar acciones que estén activas, incluyan el día actual y sean para el empleado correcto
+            const filteredActions = allActions.filter((action: DailyAction) => {
+              // Verificar que esté activa y que el día actual esté en el array de días
+              const isActiveAndToday = action.active && action.daysOfWeek.includes(today)
               
-              // Solo del día de hoy
-              if (action.dayOfWeek !== today) return false
+              // Si no hay employeeIds, es para todos los empleados
+              // Si hay employeeIds, verificar que el empleado actual esté incluido
+              const isForEmployee = !action.employeeIds || action.employeeIds.includes(employeeId!)
               
-              // Si tiene employeeIds, verificar que incluya al empleado actual
-              if (action.employeeIds && Array.isArray(action.employeeIds) && employeeId) {
-                return action.employeeIds.includes(employeeId)
-              }
-              
-              // Si no tiene employeeIds, es visible para todos
-              return true
+              return isActiveAndToday && isForEmployee
             })
-
+            
             setActions(filteredActions)
           } else {
             setActions([])
           }
+          setIsLoading(false)
         } catch (err) {
           console.error("Error processing daily actions:", err)
           setError(err instanceof Error ? err : new Error("Unknown error"))
           setActions([])
-        } finally {
           setIsLoading(false)
         }
       },
       (err) => {
         console.error("Error fetching daily actions:", err)
-        setError(err)
+        setError(err instanceof Error ? err : new Error("Unknown error"))
         setActions([])
         setIsLoading(false)
       }

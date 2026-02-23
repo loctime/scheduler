@@ -17,6 +17,8 @@ import { Trash2, Edit, Plus, AlertTriangle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useOwnerIdFromSlug, useEmployeesByOwnerId } from "@/hooks/use-owner-data"
 import { DailyAction } from "@/hooks/use-daily-actions"
+import { DataContext } from "@/contexts/data-context"
+import { useContext } from "react"
 
 const DAYS_OF_WEEK = [
   { value: 0, label: "Domingo" },
@@ -32,7 +34,7 @@ interface DailyActionFormData {
   id?: string
   title: string
   description: string
-  dayOfWeek: number
+  daysOfWeek: number[]
   employeeIds: string[]
   active: boolean
 }
@@ -42,8 +44,11 @@ export default function DailyActionsPage() {
   const router = useRouter()
   const companySlug = params.companySlug as string
   const { toast } = useToast()
-  const { ownerId } = useOwnerIdFromSlug(companySlug)
-  const { employees } = useEmployeesByOwnerId(ownerId || "")
+  // Usar useData para obtener el usuario autenticado
+  const dataContext = useContext(DataContext)
+  const user = dataContext?.user
+  const ownerId = user?.uid || ""
+  const { employees } = useEmployeesByOwnerId(ownerId)
   
   const [actions, setActions] = useState<DailyAction[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -52,7 +57,7 @@ export default function DailyActionsPage() {
   const [formData, setFormData] = useState<DailyActionFormData>({
     title: "",
     description: "",
-    dayOfWeek: new Date().getDay(),
+    daysOfWeek: [new Date().getDay()],
     employeeIds: [],
     active: true,
   })
@@ -62,7 +67,7 @@ export default function DailyActionsPage() {
     if (!ownerId) return
 
     const unsubscribe = onSnapshot(
-      doc(db!, "dailyActions", ownerId),
+      doc(db!, "apps", "horarios", "dailyActions", ownerId),
       (docSnapshot) => {
         if (docSnapshot.exists()) {
           const data = docSnapshot.data()
@@ -92,12 +97,12 @@ export default function DailyActionsPage() {
     if (!ownerId || !formData.title.trim()) return
 
     try {
-      const docRef = doc(db!, "dailyActions", ownerId)
+      const docRef = doc(db!, "apps", "horarios", "dailyActions", ownerId)
       const newAction: DailyAction = {
         id: editingAction?.id || Date.now().toString(),
         title: formData.title.trim(),
         description: formData.description.trim() || undefined,
-        dayOfWeek: formData.dayOfWeek,
+        daysOfWeek: formData.daysOfWeek,
         employeeIds: formData.employeeIds.length > 0 ? formData.employeeIds : undefined,
         active: formData.active,
         createdAt: new Date(),
@@ -135,7 +140,7 @@ export default function DailyActionsPage() {
     if (!ownerId) return
 
     try {
-      const docRef = doc(db!, "dailyActions", ownerId)
+      const docRef = doc(db!, "apps", "horarios", "dailyActions", ownerId)
       const updatedActions = actions.filter(a => a.id !== actionId)
       await updateDoc(docRef, { actions: updatedActions })
       toast({ title: "Acción eliminada", description: "La acción se eliminó correctamente" })
@@ -153,7 +158,7 @@ export default function DailyActionsPage() {
     if (!ownerId) return
 
     try {
-      const docRef = doc(db!, "dailyActions", ownerId)
+      const docRef = doc(db!, "apps", "horarios", "dailyActions", ownerId)
       const updatedActions = actions.map(a => 
         a.id === actionId ? { ...a, active } : a
       )
@@ -173,7 +178,7 @@ export default function DailyActionsPage() {
       id: action.id,
       title: action.title,
       description: action.description || "",
-      dayOfWeek: action.dayOfWeek,
+      daysOfWeek: action.daysOfWeek,
       employeeIds: action.employeeIds || [],
       active: action.active,
     }
@@ -188,7 +193,7 @@ export default function DailyActionsPage() {
     setFormData({
       title: "",
       description: "",
-      dayOfWeek: new Date().getDay(),
+      daysOfWeek: [new Date().getDay()],
       employeeIds: [],
       active: true,
     })
@@ -248,22 +253,33 @@ export default function DailyActionsPage() {
               </div>
               
               <div>
-                <Label htmlFor="dayOfWeek">Día de la semana</Label>
-                <Select
-                  value={formData.dayOfWeek.toString()}
-                  onValueChange={(value) => setFormData({ ...formData, dayOfWeek: parseInt(value) })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DAYS_OF_WEEK.map((day) => (
-                      <SelectItem key={day.value} value={day.value.toString()}>
+                <Label>Días de la semana</Label>
+                <div className="space-y-2">
+                  {DAYS_OF_WEEK.map((day) => (
+                    <div key={day.value} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`day-${day.value}`}
+                        checked={formData.daysOfWeek.includes(day.value)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setFormData({ 
+                              ...formData, 
+                              daysOfWeek: [...formData.daysOfWeek, day.value] 
+                            })
+                          } else {
+                            setFormData({ 
+                              ...formData, 
+                              daysOfWeek: formData.daysOfWeek.filter(d => d !== day.value) 
+                            })
+                          }
+                        }}
+                      />
+                      <Label htmlFor={`day-${day.value}`} className="text-sm">
                         {day.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      </Label>
+                    </div>
+                  ))}
+                </div>
               </div>
               
               <div>
@@ -371,8 +387,8 @@ export default function DailyActionsPage() {
               <CardContent className="pt-0">
                 <div className="flex items-center justify-between text-sm">
                   <div>
-                    <span className="font-medium">Día: </span>
-                    {DAYS_OF_WEEK.find(d => d.value === action.dayOfWeek)?.label}
+                    <span className="font-medium">Días: </span>
+                    {action.daysOfWeek.map(day => DAYS_OF_WEEK.find(d => d.value === day)?.label).join(', ')}
                   </div>
                   <div className="flex items-center space-x-2">
                     <span>Activa:</span>

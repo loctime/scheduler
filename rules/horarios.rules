@@ -75,11 +75,12 @@ match /apps/horarios/products/{docId} {
   allow read: if true;
 
   allow create: if horariosCanActFor(request.resource.data.ownerId);
-  allow update, delete: if horariosCanActFor(
+  allow update: if horariosCanActFor(
     resource.data.ownerId != null
       ? resource.data.ownerId
       : request.resource.data.ownerId
   );
+  allow delete: if horariosCanActFor(resource.data.ownerId);
 }
 
 /* ===============================
@@ -90,22 +91,24 @@ match /apps/horarios/pedidos/{docId} {
   allow read: if true;
 
   allow create: if horariosCanActFor(request.resource.data.ownerId);
-  allow update, delete: if horariosCanActFor(
+  allow update: if horariosCanActFor(
     resource.data.ownerId != null
       ? resource.data.ownerId
       : request.resource.data.ownerId
   );
+  allow delete: if horariosCanActFor(resource.data.ownerId);
 }
 
 match /apps/horarios/pedidos/{docId}/{sub=**} {
   allow read: if true;
 
   allow create: if horariosCanActFor(request.resource.data.ownerId);
-  allow update, delete: if horariosCanActFor(
+  allow update: if horariosCanActFor(
     resource.data.ownerId != null
       ? resource.data.ownerId
       : request.resource.data.ownerId
   );
+  allow delete: if horariosCanActFor(resource.data.ownerId);
 }
 
 /* ===============================
@@ -116,11 +119,12 @@ match /apps/horarios/stock_actual/{docId} {
   allow read: if true;
 
   allow create: if horariosCanActFor(request.resource.data.ownerId);
-  allow update, delete: if horariosCanActFor(
+  allow update: if horariosCanActFor(
     resource.data.ownerId != null
       ? resource.data.ownerId
       : request.resource.data.ownerId
   );
+  allow delete: if horariosCanActFor(resource.data.ownerId);
 }
 
 /* ===============================
@@ -131,11 +135,12 @@ match /apps/horarios/stock_movimientos/{docId} {
   allow read: if true;
 
   allow create: if horariosCanActFor(request.resource.data.ownerId);
-  allow update, delete: if horariosCanActFor(
+  allow update: if horariosCanActFor(
     resource.data.ownerId != null
       ? resource.data.ownerId
       : request.resource.data.ownerId
   );
+  allow delete: if horariosCanActFor(resource.data.ownerId);
 }
 
 /* ===============================
@@ -227,11 +232,12 @@ match /apps/horarios/shifts/{docId} {
   allow read: if true;
 
   allow create: if horariosCanActFor(request.resource.data.ownerId);
-  allow update, delete: if horariosCanActFor(
+  allow update: if horariosCanActFor(
     resource.data.ownerId != null
       ? resource.data.ownerId
       : request.resource.data.ownerId
   );
+  allow delete: if horariosCanActFor(resource.data.ownerId);
 }
 
 /* ===============================
@@ -294,6 +300,20 @@ match /apps/horarios/employee_fixed_rules/{ruleId} {
   );
 }
 
+
+/* ===============================
+   DAILY ACTIONS
+   =============================== */
+
+match /apps/horarios/dailyActions/{ownerId} {
+  allow read: if true;
+
+  allow create: if horariosCanActFor(ownerId);
+
+  allow update: if horariosCanActFor(ownerId);
+
+  allow delete: if horariosCanActFor(ownerId);
+}
 
 /* ===============================
    ENLACES PUBLICOS
