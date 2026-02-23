@@ -328,6 +328,22 @@ match /apps/horarios/enlaces_publicos/{ownerId} {
 }
 
 /* ===============================
+   TASKS
+   =============================== */
+
+match /apps/horarios/tasks/{taskId} {
+  allow read: if true;
+
+  allow create: if horariosCanActFor(request.resource.data.ownerId);
+
+  allow update, delete: if horariosCanActFor(
+    resource.data.ownerId != null
+      ? resource.data.ownerId
+      : request.resource.data.ownerId
+  );
+}
+
+/* ===============================
    CONFIG
    =============================== */
 

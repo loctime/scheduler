@@ -4,7 +4,7 @@ import { useState, useMemo } from "react"
 import { useParams } from "next/navigation"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import { Calendar, FileText, Users, UserCircle } from "lucide-react"
+import { Calendar, FileText, Users, UserCircle, CheckSquare } from "lucide-react"
 import { PwaTodayScheduleCard } from "@/components/pwa-today-schedule-card"
 import { UserStatusMenu } from "@/components/pwa/UserStatusMenu"
 import { PwaViewerBadge, useViewer, notifyViewerChanged } from "@/components/pwa/PwaViewerBadge"
@@ -146,6 +146,13 @@ export default function PwaHomePage() {
             description="Gestión de stock"
             href={`/pwa/${companySlug}/stock-console`}
             borderClassName={PWA_THEMES.stock.border}
+          />
+          <ActionCard
+            icon={<CheckSquare className="h-8 w-8 text-primary shrink-0" />}
+            title="Tareas"
+            description="Ver tareas asignadas"
+            href={`/pwa/${companySlug}/tareas`}
+            borderClassName="border-l-4 border-l-purple-500"
           />
         </div>
       </div>
