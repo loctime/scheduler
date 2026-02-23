@@ -263,7 +263,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
   return (
     <>
 
-      <div className={`min-h-screen bg-gray-100 ${isPWA ? "pb-20" : "pb-24"}`}>
+      <div className={`min-h-screen bg-gray-100 ${isPWA ? "pb-16" : "pb-20"}`}>
         {/* Header simple — tema rojo en PWA */}
         <div className={`p-2 sm:p-3 shadow-lg flex items-center gap-2 sm:gap-3 ${isPWA ? "bg-red-100 text-red-900 border-b border-red-200" : "bg-blue-500 text-white"}`}>
           {companySlug ? (
@@ -345,24 +345,22 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
         {/* Selector de Pedido (compacto) — siempre visible con sticky */}
         <div className="sticky top-0 z-10 bg-white border-b shadow-sm">
-          <div className="p-2 sm:p-2.5">
-            <div className="overflow-x-auto overflow-y-hidden max-h-[3.5rem] sm:max-h-[4rem]">
-              <div className="flex flex-wrap gap-1.5 sm:gap-2 w-max min-w-full max-h-[3.5rem] sm:max-h-[4rem]">
-                
-                {pedidos.map((pedido) => (
-                  <button
-                    key={pedido.id}
-                    onClick={() => setSelectedPedidoId(pedido.id)}
-                    className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 ${
-                      state.selectedPedidoId === pedido.id
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-200 text-gray-700"
-                    }`}
-                  >
-                    {pedido.nombre}
-                  </button>
-                ))}
-              </div>
+          <div className="overflow-x-auto overflow-y-hidden max-h-[3.5rem] sm:max-h-[4rem]">
+            <div className="flex flex-wrap gap-1.5 sm:gap-2 w-max min-w-full max-h-[3.5rem] sm:max-h-[4rem] px-2 sm:px-2.5 py-1.5 sm:py-2">
+              
+              {pedidos.map((pedido) => (
+                <button
+                  key={pedido.id}
+                  onClick={() => setSelectedPedidoId(pedido.id)}
+                  className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 ${
+                    state.selectedPedidoId === pedido.id
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200 text-gray-700"
+                  }`}
+                >
+                  {pedido.nombre}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -587,30 +585,30 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
         {/* Panel de resumen y acciones — solo en modo work */}
         {mode === "work" && (
-          <div className={`fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-3 z-50 ${isPWA ? "p-2" : "p-3"}`}>
+          <div className={`fixed bottom-0 left-0 right-0 border-t shadow-lg z-50 ${isPWA ? "bg-red-100 p-2" : "bg-blue-500 p-3"}`}>
             <div className={`max-w-md mx-auto flex items-center justify-between ${isPWA ? "gap-1" : ""}`}>
               <Button
                 variant="outline"
                 onClick={limpiarCantidades}
                 disabled={state.loading}
-                className={`h-10 ${isPWA ? "px-2 text-xs" : "px-4"}`}
+                className={`h-10 ${isPWA ? "px-2 text-xs bg-white border-red-300 text-red-900 hover:bg-red-50" : "px-4 bg-white/20 border-white/30 text-white hover:bg-white/30"}`}
               >
                 <X className={`w-4 h-4 ${isPWA ? "mr-1" : "mr-2"}`} />
                 Limpiar
               </Button>
               <div className={`flex items-center ${isPWA ? "gap-0.5" : "gap-1"}`}>
-                <span className={`font-bold text-red-600 ${isPWA ? "text-lg" : "text-2xl"}`}>
+                <span className={`font-bold ${isPWA ? "text-red-800 text-lg" : "text-white text-2xl"}`}>
                   -{totalEgresos}
                 </span>
-                <span className={`text-gray-500 ${isPWA ? "text-sm" : "text-xl"}`}>|</span>
-                <span className={`font-bold text-green-600 ${isPWA ? "text-lg" : "text-2xl"}`}>
+                <span className={`${isPWA ? "text-red-600 text-sm" : "text-white/70 text-xl"}`}>|</span>
+                <span className={`font-bold ${isPWA ? "text-green-700 text-lg" : "text-white text-2xl"}`}>
                   +{totalIngresos}
                 </span>
               </div>
               <Button
                 onClick={confirmarMovimientos}
                 disabled={state.loading || movimientosPendientes.length === 0}
-                className={`h-10 bg-blue-600 hover:bg-blue-700 ${isPWA ? "px-2 text-xs" : "px-4"}`}
+                className={`h-10 ${isPWA ? "px-2 text-xs bg-green-600 hover:bg-green-700 text-white" : "px-4 bg-white text-blue-600 hover:bg-white/90"}`}
               >
                 <Check className={`w-4 h-4 ${isPWA ? "mr-1" : "mr-2"}`} />
                 {state.loading ? "Procesando..." : "Confirmar"}
