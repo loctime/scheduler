@@ -434,8 +434,8 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                 : (vm === "pack" ? unidadesSignedToPacksFloor(producto, cantidad) : cantidad)
               const packsDisplay = isPackProduct ? unidadesSignedToPacksFloor(producto, Math.abs(isControl ? stock : cantidad)) : 0
               const equivalenciaText = isControl
-                ? (vm === "pack" ? `${displayValue} pack${Math.abs(displayValue) !== 1 ? "s" : ""} (${stock} ${unidadLabel})` : isPackProduct ? `${stock} ${unidadLabel} (${packsDisplay} pack${packsDisplay !== 1 ? "s" : ""})` : `${stock} ${unidadLabel}`)
-                : (vm === "pack" ? `${displayValue} pack${Math.abs(displayValue) !== 1 ? "s" : ""} (${cantidad} ${unidadLabel})` : isPackProduct ? `${cantidad} ${unidadLabel} (${packsDisplay} pack${packsDisplay !== 1 ? "s" : ""})` : `${cantidad} ${unidadLabel}`)
+                ? (vm === "pack" ? `${displayValue} pack${Math.abs(displayValue) !== 1 ? "s" : ""} (${stock} u)` : isPackProduct ? `${stock} u (${packsDisplay} pack${packsDisplay !== 1 ? "s" : ""})` : `${stock} u`)
+                : (vm === "pack" ? `${displayValue} pack${Math.abs(displayValue) !== 1 ? "s" : ""} (${cantidad} u)` : isPackProduct ? `${cantidad} u (${packsDisplay} pack${packsDisplay !== 1 ? "s" : ""})` : `${cantidad} u`)
 
               // Efecto "llenado de agua" solo en modo work
               const maxFillRef = 15
