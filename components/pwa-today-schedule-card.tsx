@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import React, { useState, useEffect, useMemo, useRef } from "react"
 import { format } from "date-fns"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -8,6 +8,7 @@ import { Calendar, Clock, Coffee } from "lucide-react"
 import { usePublicHorario } from "@/hooks/use-public-horario"
 import { getTodayScheduleInfo } from "@/lib/pwa-today-schedule-utils"
 import type { Turno } from "@/lib/types"
+import { getCache, setCache } from "@/lib/cache/indexeddb-cache"
 
 const buildShiftsFromAssignments = (ownerId: string, days?: Record<string, any>) => {
   const shiftIds = new Set<string>()
@@ -69,13 +70,15 @@ interface PwaTodayScheduleCardProps {
  * - Medio franco (warning)
  * - Franco completo (muted)
  */
-export function PwaTodayScheduleCard({ companySlug, horario: horarioProp, shifts: shiftsProp, variant = "card" }: PwaTodayScheduleCardProps) {
+function PwaTodayScheduleCardComponent({ companySlug, horario: horarioProp, shifts: shiftsProp, variant = "card" }: PwaTodayScheduleCardProps) {
   const { horario: horarioFromHook, isLoading } = usePublicHorario(companySlug)
   const horario = horarioProp ?? horarioFromHook
   const [currentViewer, setCurrentViewer] = useState<{
     employeeId: string
     employeeName: string
   } | null>(null)
+  const scheduleInfoCacheRef = useRef<ReturnType<typeof getTodayScheduleInfo> | null>(null)
+  const lastCacheKeyRef = useRef<string>("")
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -109,7 +112,51 @@ export function PwaTodayScheduleCard({ companySlug, horario: horarioProp, shifts
   const todayAssignments = dayData?.[currentViewer.employeeId]
 
   const isLoadingState = !horarioProp && (isLoading || !horario?.publishedWeekId)
-  const scheduleInfo = getTodayScheduleInfo(todayAssignments, shifts)
+  
+  // Cache del scheduleInfo para evitar recálculos innecesarios
+  const defaultScheduleInfo = getTodayScheduleInfo(undefined, [])
+  const [scheduleInfo, setScheduleInfo] = useState<ReturnType<typeof getTodayScheduleInfo>>(defaultScheduleInfo)
+  
+  useEffect(() => {
+    if (!currentViewer || !horario || isLoadingState) {
+      const defaultInfo = getTodayScheduleInfo(undefined, [])
+      setScheduleInfo(defaultInfo)
+      scheduleInfoCacheRef.current = defaultInfo
+      return
+    }
+    
+    const cacheKey = `schedule-info-${companySlug}-${currentViewer.employeeId}-${todayStr}-${horario.publishedWeekId}`
+    
+    // Si es el mismo día y mismo horario, usar cache en memoria
+    if (cacheKey === lastCacheKeyRef.current && scheduleInfoCacheRef.current) {
+      setScheduleInfo(scheduleInfoCacheRef.current)
+      return
+    }
+    
+    // 1. Intentar cargar desde cache IndexedDB primero
+    getCache<ReturnType<typeof getTodayScheduleInfo>>(cacheKey)
+      .then((cachedInfo) => {
+        if (cachedInfo) {
+          scheduleInfoCacheRef.current = cachedInfo
+          lastCacheKeyRef.current = cacheKey
+          setScheduleInfo(cachedInfo)
+        }
+      })
+      .catch(() => {
+        // Ignorar errores de cache
+      })
+    
+    // 2. Calcular scheduleInfo
+    const info = getTodayScheduleInfo(todayAssignments, shifts)
+    scheduleInfoCacheRef.current = info
+    lastCacheKeyRef.current = cacheKey
+    setScheduleInfo(info)
+    
+    // 3. Cachear en IndexedDB en background
+    setCache(cacheKey, info).catch(() => {
+      // Ignorar errores de cache
+    })
+  }, [currentViewer, horario, isLoadingState, companySlug, todayStr, todayAssignments, shifts])
 
   if (variant === "inline") {
     if (isLoadingState) {
@@ -125,10 +172,10 @@ export function PwaTodayScheduleCard({ companySlug, horario: horarioProp, shifts
         ? "Franco"
         : status === "medio_franco"
           ? timeBlocks.length > 0
-            ? timeBlocks.map((b) => `${b.startTime}–${b.endTime}`).join(", ")
+            ? timeBlocks.map((b: { startTime: string; endTime: string }) => `${b.startTime}–${b.endTime}`).join(", ")
             : "Medio franco"
           : timeBlocks.length > 0
-            ? timeBlocks.map((b) => `${b.startTime}–${b.endTime}`).join(", ")
+            ? timeBlocks.map((b: { startTime: string; endTime: string }) => `${b.startTime}–${b.endTime}`).join(", ")
             : "—"
     return (
       <p className="text-sm text-muted-foreground">
@@ -163,6 +210,17 @@ interface PwaTodayScheduleCardContentProps {
   employeeName: string
   scheduleInfo: ReturnType<typeof getTodayScheduleInfo>
 }
+
+// Memoizar el componente principal para evitar re-renders innecesarios
+export const PwaTodayScheduleCard = React.memo(PwaTodayScheduleCardComponent, (prevProps, nextProps) => {
+  // Solo re-renderizar si cambian props críticas
+  return (
+    prevProps.companySlug === nextProps.companySlug &&
+    prevProps.variant === nextProps.variant &&
+    prevProps.horario?.publishedWeekId === nextProps.horario?.publishedWeekId &&
+    prevProps.shifts?.length === nextProps.shifts?.length
+  )
+})
 
 function PwaTodayScheduleCardContent({ employeeName, scheduleInfo }: PwaTodayScheduleCardContentProps) {
   const { status, timeBlocks } = scheduleInfo

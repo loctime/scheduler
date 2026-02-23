@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { resolvePublicCompany } from "@/lib/public-companies"
 import { sanitizePublicHorarioData, isValidPublicHorarioData, createGenericPublicError, logPublicAccess } from "@/lib/public-data-sanitizer"
+import { getCache, setCache } from "@/lib/cache/indexeddb-cache"
 
 export interface UsePublicHorarioReturn {
   horario: any // SanitizedPublicHorarioData pero sin tipado estricto para compatibilidad
@@ -23,13 +24,36 @@ export function usePublicHorario(companySlug: string): UsePublicHorarioReturn {
   const [horario, setHorario] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const fetchingRef = useRef(false)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   const loadPublicHorario = async () => {
+    if (!companySlug || fetchingRef.current) return
+    
+    fetchingRef.current = true
+    
     try {
-      // Resetear estado
-      setIsLoading(true)
+      const cacheKey = `public-horario-${companySlug}`
+      
+      // 1. Cargar desde cache primero (stale-while-revalidate)
+      const cachedHorario = await getCache<any>(cacheKey)
+      if (cachedHorario && mountedRef.current) {
+        setHorario(cachedHorario)
+        setIsLoading(false)
+        setError(null)
+        // Continuar con fetch en background
+      } else if (mountedRef.current) {
+        setIsLoading(true)
+      }
+      
       setError(null)
-      setHorario(null)
 
       // Validaciones básicas
       if (!db) {
@@ -121,9 +145,19 @@ export function usePublicHorario(companySlug: string): UsePublicHorarioReturn {
       // Actualizar log de acceso exitoso
       logPublicAccess(companySlug, navigator.userAgent, 'success')
 
-      setHorario(sanitizedData)
+      // 2. Actualizar estado solo si el componente sigue montado
+      if (mountedRef.current) {
+        setHorario(sanitizedData)
+        setIsLoading(false)
+        setError(null)
+        
+        // 3. Actualizar cache en background
+        await setCache(cacheKey, sanitizedData)
+      }
     } catch (err) {
       console.error('❌ [usePublicHorario] Error cargando horario público:', err)
+      
+      if (!mountedRef.current) return
       
       // Error genérico para no revelar información sensible
       const errorMessage = err instanceof Error ? err.message : "Error al cargar horario"
@@ -134,8 +168,9 @@ export function usePublicHorario(companySlug: string): UsePublicHorarioReturn {
       } else {
         setError("Error al cargar horario")
       }
-    } finally {
       setIsLoading(false)
+    } finally {
+      fetchingRef.current = false
     }
   }
 
