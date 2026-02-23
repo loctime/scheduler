@@ -24,6 +24,12 @@ export default function TareasPage() {
   const { ownerId, loading: ownerIdLoading } = useOwnerIdFromSlug(companySlug)
   const { employees, loading: employeesLoading } = useEmployeesByOwnerId(ownerId)
   
+  // Debug temporal
+  console.log("🔍 Debug PWA Tareas:")
+  console.log("  companySlug:", companySlug)
+  console.log("  ownerId:", ownerId)
+  console.log("  viewer employeeId:", viewer?.employeeId)
+  
   const { tasks, todayTasks, isLoading, error } = useTasks(viewer?.employeeId, ownerId)
 
   const today = new Date()

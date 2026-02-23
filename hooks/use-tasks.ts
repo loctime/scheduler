@@ -10,13 +10,17 @@ export function useTasks(employeeId?: string, ownerId?: string | null) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    console.log("🔍 useTasks - Iniciando con:", { employeeId, ownerId })
+    
     if (!db) {
+      console.log("🔍 useTasks - No db")
       setIsLoading(false)
       return
     }
 
     // Si no se proporciona ownerId, no podemos continuar
     if (!ownerId) {
+      console.log("🔍 useTasks - No ownerId")
       setIsLoading(false)
       setError("No se proporcionó ownerId")
       return
@@ -32,9 +36,12 @@ export function useTasks(employeeId?: string, ownerId?: string | null) {
       orderBy("createdAt", "desc")
     )
 
+    console.log("🔍 useTasks - Query creada para ownerId:", ownerId)
+
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
+        console.log("🔍 useTasks - Snapshot recibido, docs:", snapshot.size)
         const tasksData: Task[] = []
         
         snapshot.forEach((doc) => {
@@ -53,6 +60,9 @@ export function useTasks(employeeId?: string, ownerId?: string | null) {
           })
         })
 
+        console.log("🔍 useTasks - Tareas procesadas:", tasksData.length)
+        console.log("🔍 useTasks - Títulos:", tasksData.map(t => t.title))
+        
         setTasks(tasksData)
 
         // Calcular tareas del día
@@ -62,11 +72,13 @@ export function useTasks(employeeId?: string, ownerId?: string | null) {
           return isToday
         })
 
+        console.log("🔍 useTasks - Tareas de hoy:", todayTasksData.length)
+
         setTodayTasks(todayTasksData)
         setIsLoading(false)
       },
       (err) => {
-        console.error("Error loading tasks:", err)
+        console.error("🔍 useTasks - Error:", err)
         setError("Error al cargar las tareas")
         setIsLoading(false)
       }
