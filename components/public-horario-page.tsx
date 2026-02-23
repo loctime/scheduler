@@ -272,10 +272,12 @@ function PublicHorarioPageComponent({ companySlug, ImageWrapper, headerClassName
   }, [horario?.ownerId])
 
   // Pre-cargar imagen en cache del navegador cuando cambia
-  const currentWeek = horario?.weeks?.[horario?.publishedWeekId]
-  const imageSrc = currentWeek?.publicImageUrl
+  // Calcular imageSrc de manera estable
+  const currentWeekForImage = horario?.weeks?.[horario?.publishedWeekId]
+  const imageSrc = currentWeekForImage?.publicImageUrl ?? null
   
   useEffect(() => {
+    // Siempre ejecutar el hook, pero manejar el caso cuando imageSrc es null
     if (!imageSrc) {
       setImageLoaded(false)
       return
