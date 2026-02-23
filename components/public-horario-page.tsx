@@ -540,33 +540,8 @@ function PublicHorarioPageComponent({ companySlug, ImageWrapper, headerClassName
           const imageSrc = currentWeek.publicImageUrl
           const imageAlt = `Horario ${currentWeek.weekLabel || 'semanal'}`
           
-          // Pre-cargar imagen en cache del navegador si cambió la URL
-          useEffect(() => {
-            if (!imageSrc) {
-              setImageLoaded(false)
-              return
-            }
-            
-            // Si es la misma URL, usar cache
-            if (imageSrc === imageCacheRef.current.url) {
-              setImageLoaded(true)
-              return
-            }
-            
-            setImageLoaded(false)
-            
-            // Pre-cargar imagen para cache del navegador
-            const img = new Image()
-            img.onload = () => {
-              imageCacheRef.current = { url: imageSrc, element: img }
-              setImageLoaded(true)
-            }
-            img.onerror = () => {
-              console.error("🔧 [PublicHorarioPage] Image preload error")
-              setImageLoaded(true) // Permitir renderizar igual
-            }
-            img.src = imageSrc
-          }, [imageSrc])
+          // NOTA: El useEffect para pre-cargar la imagen ya está en la parte superior del componente
+          // No debe estar aquí dentro del bloque condicional para evitar el error #310 de React
           
           const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
             console.error("🔧 [PublicHorarioPage] Image load error:", e)
@@ -640,7 +615,29 @@ function PublicHorarioPageComponent({ companySlug, ImageWrapper, headerClassName
               {(() => {
                 const currentWeek = horario.weeks?.[horario.publishedWeekId]
                 const publishedAt = currentWeek?.publishedAt
-                return publishedAt ? new Date(publishedAt.toDate()).toLocaleDateString("es-AR") : "Desconocido"
+                if (!publishedAt) return "Desconocido"
+                
+                // Manejar tanto Timestamp de Firestore como objetos planos del cache
+                let date: Date
+                if (publishedAt && typeof publishedAt.toDate === 'function') {
+                  // Es un Timestamp de Firestore
+                  date = publishedAt.toDate()
+                } else if (publishedAt instanceof Date) {
+                  // Ya es un Date
+                  date = publishedAt
+                } else if (typeof publishedAt === 'string' || typeof publishedAt === 'number') {
+                  // Es un string o número (timestamp)
+                  date = new Date(publishedAt)
+                } else if (publishedAt.seconds || publishedAt._seconds) {
+                  // Es un objeto plano con seconds (del cache)
+                  const seconds = publishedAt.seconds || publishedAt._seconds || 0
+                  const nanoseconds = publishedAt.nanoseconds || publishedAt._nanoseconds || 0
+                  date = new Date(seconds * 1000 + nanoseconds / 1000000)
+                } else {
+                  return "Desconocido"
+                }
+                
+                return date.toLocaleDateString("es-AR")
               })()}
             </div>
             <div>Este horario es de solo lectura</div>

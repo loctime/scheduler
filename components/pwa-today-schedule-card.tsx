@@ -103,20 +103,20 @@ function PwaTodayScheduleCardComponent({ companySlug, horario: horarioProp, shif
     return buildShiftsFromAssignments(ownerId, currentWeek?.days)
   }, [horario, shiftsProp])
 
-  if (!currentViewer) return null
-
   const today = new Date()
   const todayStr = format(today, "yyyy-MM-dd")
   const currentWeek = horario?.weeks?.[horario?.publishedWeekId]
   const dayData = currentWeek?.days?.[todayStr] as Record<string, any> | undefined
-  const todayAssignments = dayData?.[currentViewer.employeeId]
+  const todayAssignments = currentViewer && currentViewer.employeeId ? dayData?.[currentViewer.employeeId] : undefined
 
   const isLoadingState = !horarioProp && (isLoading || !horario?.publishedWeekId)
   
   // Cache del scheduleInfo para evitar recálculos innecesarios
+  // IMPORTANTE: Este hook debe ejecutarse siempre, antes de cualquier early return
   const defaultScheduleInfo = getTodayScheduleInfo(undefined, [])
   const [scheduleInfo, setScheduleInfo] = useState<ReturnType<typeof getTodayScheduleInfo>>(defaultScheduleInfo)
   
+  // IMPORTANTE: Este useEffect debe ejecutarse siempre, antes de cualquier early return
   useEffect(() => {
     if (!currentViewer || !horario || isLoadingState) {
       const defaultInfo = getTodayScheduleInfo(undefined, [])
@@ -157,6 +157,8 @@ function PwaTodayScheduleCardComponent({ companySlug, horario: horarioProp, shif
       // Ignorar errores de cache
     })
   }, [currentViewer, horario, isLoadingState, companySlug, todayStr, todayAssignments, shifts])
+
+  if (!currentViewer) return null
 
   if (variant === "inline") {
     if (isLoadingState) {
