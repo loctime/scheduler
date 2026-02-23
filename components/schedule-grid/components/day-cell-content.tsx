@@ -4,6 +4,7 @@ import React from "react"
 import type { CSSProperties } from "react"
 import { ShiftAssignment, Turno, MedioTurno } from "@/lib/types"
 import { CellAssignments } from "./cell-assignments"
+import { CellAssignmentsHome } from "./cell-assignments-home"
 
 interface DayCellContentProps {
   assignments: ShiftAssignment[]
@@ -12,6 +13,8 @@ interface DayCellContentProps {
   getShiftInfo: (shiftId: string) => Turno | undefined
   mediosTurnos?: MedioTurno[]
   hasIncompleteAssignments?: boolean
+  /** Modo Home: tipografía más grande y padding reducido */
+  homeMode?: boolean
 }
 
 /**
@@ -38,25 +41,39 @@ export function DayCellContent({
   getShiftInfo,
   mediosTurnos = [],
   hasIncompleteAssignments = false,
+  homeMode = false,
 }: DayCellContentProps) {
   const incompleteClass = hasIncompleteAssignments ? "ring-2 ring-destructive/50 opacity-75" : ""
 
+  // Estilos diferentes para modo Home vs calendario
+  const containerClasses = homeMode
+    ? `flex flex-col gap-2 relative px-3 sm:px-4 md:px-5 py-2 sm:py-3 md:py-4 rounded w-full ${incompleteClass}`
+    : `flex flex-col gap-1.5 relative px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 md:py-2 rounded min-h-[80px] w-full ${incompleteClass}`
+
+  const francoClasses = homeMode
+    ? "text-center text-xl sm:text-2xl md:text-3xl font-bold block bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-3 py-2 rounded"
+    : "text-center text-xs sm:text-sm md:text-base font-bold block bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded"
+
   return (
     <div 
-      className={`flex flex-col gap-1.5 relative px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 md:py-2 rounded min-h-[80px] w-full ${incompleteClass}`}
-      style={{
-        ...backgroundStyle,
-        // Asegurar que el fondo sea visible incluso si el estilo tiene baja opacidad
-        minHeight: '80px',
-      }}
+      className={containerClasses}
+      style={backgroundStyle}
     >
-      <CellAssignments 
-        assignments={assignments} 
-        getShiftInfo={getShiftInfo} 
-        mediosTurnos={mediosTurnos} 
-      />
+      {homeMode ? (
+        <CellAssignmentsHome 
+          assignments={assignments} 
+          getShiftInfo={getShiftInfo} 
+          mediosTurnos={mediosTurnos} 
+        />
+      ) : (
+        <CellAssignments 
+          assignments={assignments} 
+          getShiftInfo={getShiftInfo} 
+          mediosTurnos={mediosTurnos} 
+        />
+      )}
       {dayStatus === "franco" && (
-        <span className="text-center text-xs sm:text-sm md:text-base font-bold block bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
+        <span className={francoClasses}>
           FRANCO
         </span>
       )}

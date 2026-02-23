@@ -59,7 +59,7 @@ export default function PwaHomePage() {
       {/* Dos columnas debajo del header */}
       <div className="grid grid-cols-2 flex-1 min-h-0 w-full">
         {/* Columna izquierda (50%): celda del día de hoy */}
-        <div className="flex flex-col p-4 lg:p-8 border-r border-border/50 min-w-0 overflow-auto items-center justify-center bg-transparent">
+        <div className="flex flex-col p-4 lg:p-8 border-r border-border/50 min-w-0 overflow-auto items-center justify-start bg-transparent">
           {viewer?.employeeId ? (
             <TodayScheduleCell companySlug={companySlug} employeeId={viewer.employeeId} />
           ) : (
@@ -162,8 +162,8 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
   }
 
   return (
-    <div className="w-full max-w-md min-h-[120px] flex items-center justify-center">
-      <DayCellContent {...dayCellContentProps} />
+    <div className="w-full max-w-md">
+      <DayCellContent {...dayCellContentProps} homeMode={true} />
     </div>
   )
 }
