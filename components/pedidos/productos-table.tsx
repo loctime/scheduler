@@ -557,6 +557,14 @@ export function ProductosTable({
   onProductsOrderUpdate,
   stockMinimoDefault = 0,
 }: ProductosTableProps) {
+  // Validación: confirmar que el componente no se desmonta al cambiar de tab
+  useEffect(() => {
+    console.log("[ProductosTable] Componente montado")
+    return () => {
+      console.log("[ProductosTable] Componente desmontado - ⚠️ ESTO NO DEBE PASAR al cambiar de tab")
+    }
+  }, [])
+  
   const [editingField, setEditingField] = useState<{ id: string; field: string } | null>(null)
   const [inlineValue, setInlineValue] = useState("")
   const inputRef = useRef<HTMLInputElement | null>(null)

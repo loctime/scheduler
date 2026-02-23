@@ -619,7 +619,7 @@ export default function EmpleadosPage() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="empleados" className="space-y-6 mt-6">
+          <TabsContent value="empleados" className="space-y-6 mt-6" forceMount>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <h3 className="text-lg font-semibold text-foreground">Lista de Empleados</h3>
@@ -786,7 +786,7 @@ export default function EmpleadosPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="turnos" className="space-y-6 mt-6">
+          <TabsContent value="turnos" className="space-y-6 mt-6" forceMount>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <h3 className="text-lg font-semibold text-foreground">Turnos de Trabajo</h3>

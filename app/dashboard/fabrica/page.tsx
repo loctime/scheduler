@@ -32,6 +32,14 @@ interface PedidoExpandido {
 }
 
 export default function FabricaPage() {
+  // Validación: confirmar que el componente no se desmonta al cambiar de tab
+  useEffect(() => {
+    console.log("[FabricaPage] Componente montado")
+    return () => {
+      console.log("[FabricaPage] Componente desmontado")
+    }
+  }, [])
+  
   const { user } = useData()
   const router = useRouter()
   const { pedidos, loading, obtenerUsuarioAsignado, usuariosMap, tieneGrupos, userIdsDelGrupo, sucursalesDelGrupo, aceptarPedido } = useFabricaPedidos(user)
@@ -382,8 +390,10 @@ export default function FabricaPage() {
             </div>
           </div>
 
-          <TabsContent value={filtroEstado} className="mt-1 sm:mt-2">
-            {pedidosFiltrados.length === 0 ? (
+          {/* Keep all tabs mounted for instant switching */}
+          <TabsContent value="todos" className="mt-1 sm:mt-2" forceMount>
+            <div className={filtroEstado === "todos" ? "block" : "hidden"}>
+              {(filtroEstado === "todos" ? pedidos : filtroEstado === "pendientes" ? pedidos.filter(p => p.estado === "creado" || !p.estado) : pedidos.filter(p => p.estado === "processing")).length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-8 sm:py-12 px-4">
                   <Package className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-3 sm:mb-4" />
@@ -399,7 +409,7 @@ export default function FabricaPage() {
                   ) : (
                     <>
                       <p className="text-sm sm:text-base text-muted-foreground text-center">
-                        No hay pedidos {filtroEstado === "pendientes" ? "pendientes" : filtroEstado === "en-proceso" ? "en proceso" : ""}
+                        No hay pedidos
                       </p>
                       {userIdsDelGrupo.length === 0 && (
                         <p className="text-xs sm:text-sm text-muted-foreground text-center mt-2">
@@ -555,6 +565,349 @@ export default function FabricaPage() {
                 })}
               </div>
             )}
+            </div>
+          </TabsContent>
+          <TabsContent value="pendientes" className="mt-1 sm:mt-2" forceMount>
+            <div className={filtroEstado === "pendientes" ? "block" : "hidden"}>
+              {pedidos.filter(p => p.estado === "creado" || !p.estado).length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-8 sm:py-12 px-4">
+                    <Package className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-3 sm:mb-4" />
+                    {!tieneGrupos ? (
+                      <>
+                        <p className="text-sm sm:text-base text-muted-foreground text-center font-medium mb-2">
+                          No tienes grupos asignados
+                        </p>
+                        <p className="text-xs sm:text-sm text-muted-foreground text-center">
+                          Contacta al administrador para que te asigne a un grupo con sucursales.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm sm:text-base text-muted-foreground text-center">
+                          No hay pedidos pendientes
+                        </p>
+                        {userIdsDelGrupo.length === 0 && (
+                          <p className="text-xs sm:text-sm text-muted-foreground text-center mt-2">
+                            No hay sucursales en tus grupos asignados.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-2 sm:space-y-3">
+                  {pedidos.filter(p => p.estado === "creado" || !p.estado).map((pedido) => {
+                    const usuarioAsignado = obtenerUsuarioAsignado(pedido)
+                    const nombreSucursal = obtenerNombreSucursal(pedido)
+                    const estaAsignado = !!(pedido.estado === "processing" && pedido.assignedTo)
+                    const esMiPedido = pedido.assignedTo === user?.uid
+                    const puedeGenerarRemito = pedido.estado === "processing" && esMiPedido
+                    const estaExpandido = pedidoExpandido === pedido.id
+                    const datosExpandidos = pedidosExpandidos[pedido.id]
+                    const estaAceptando = aceptandoPedido === pedido.id
+
+                    const cantidadProductos = datosExpandidos?.productos?.length || null
+                    const nombreEmpresaExpandida = datosExpandidos?.nombreEmpresa || nombreSucursal
+
+                    return (
+                      <Card key={pedido.id} className="hover:shadow-md transition-shadow p-0 gap-0">
+                        <CardHeader 
+                          className="pb-2 cursor-pointer px-0 pt-0 gap-0"
+                          onClick={() => togglePedido(pedido)}
+                        >
+                          <div className="flex items-center justify-between gap-2 px-3 sm:px-4 pt-3 sm:pt-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <CardTitle className="text-sm sm:text-base font-semibold truncate">{pedido.nombre}</CardTitle>
+                                {estaExpandido ? (
+                                  <ChevronUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
+                                ) : (
+                                  <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                                <span className="truncate">{nombreEmpresaExpandida}</span>
+                                {cantidadProductos !== null && (
+                                  <>
+                                    <span>•</span>
+                                    <span>{cantidadProductos} {cantidadProductos === 1 ? 'artículo' : 'artículos'}</span>
+                                  </>
+                                )}
+                                {estaAsignado && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="text-primary font-medium">
+                                      {pedido.assignedToNombre || usuarioAsignado?.displayName || "Usuario"}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              <Badge
+                                variant={
+                                  pedido.estado === "processing"
+                                    ? "default"
+                                    : pedido.estado === "creado" || !pedido.estado
+                                    ? "secondary"
+                                    : "outline"
+                                }
+                                className="text-xs"
+                              >
+                                {pedido.estado === "processing"
+                                  ? "En proceso"
+                                  : pedido.estado === "creado" || !pedido.estado
+                                  ? "Pendiente"
+                                  : pedido.estado || "Sin estado"}
+                              </Badge>
+                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <Clock className="h-3 w-3 shrink-0" />
+                                <span>{formatearFecha(pedido.createdAt).split(' ')[0]}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-0 pb-0 px-0">
+                          {estaExpandido && (
+                            <div className="pt-2 border-t space-y-3 px-3 sm:px-4 pb-3 sm:pb-4">
+                              {datosExpandidos?.loading ? (
+                                <div className="flex items-center justify-center py-8">
+                                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                </div>
+                              ) : datosExpandidos ? (
+                                <>
+                                  {estaAsignado && !esMiPedido && (
+                                    <Alert variant="destructive" className="text-sm">
+                                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                                      <AlertTitle className="text-sm">Pedido ya asignado</AlertTitle>
+                                      <AlertDescription className="text-xs sm:text-sm">
+                                        Este pedido ya fue tomado por: <strong>{pedido.assignedToNombre || "otro usuario"}</strong> - Fábrica
+                                      </AlertDescription>
+                                    </Alert>
+                                  )}
+                                  {estaAsignado && esMiPedido && (
+                                    <Alert className="text-sm">
+                                      <CheckCircle2 className="h-4 w-4 shrink-0" />
+                                      <AlertTitle className="text-sm">Pedido en proceso</AlertTitle>
+                                      <AlertDescription className="text-xs sm:text-sm">
+                                        Este pedido está siendo procesado por ti. Puedes generar el remito cuando esté listo.
+                                      </AlertDescription>
+                                    </Alert>
+                                  )}
+                                  <div>
+                                    <h4 className="text-sm font-semibold mb-2">Productos solicitados</h4>
+                                    <FabricaPedidoForm
+                                      productos={datosExpandidos.productos}
+                                      enlacePublico={datosExpandidos.enlacePublico}
+                                      onGenerarRemito={(productosDisponibles) => handleGenerarRemito(pedido, productosDisponibles)}
+                                      pedido={pedido}
+                                      puedeGenerarRemito={puedeGenerarRemito}
+                                    />
+                                  </div>
+                                  {(pedido.estado === "creado" || !pedido.estado) && (
+                                    <Button
+                                      onClick={(e) => handleAceptarPedido(pedido, e)}
+                                      disabled={!!estaAceptando || estaAsignado}
+                                      className="w-full"
+                                      size="lg"
+                                    >
+                                      {estaAceptando ? (
+                                        <>
+                                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                          Aceptando...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                                          Aceptar pedido
+                                        </>
+                                      )}
+                                    </Button>
+                                  )}
+                                </>
+                              ) : null}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+          <TabsContent value="en-proceso" className="mt-1 sm:mt-2" forceMount>
+            <div className={filtroEstado === "en-proceso" ? "block" : "hidden"}>
+              {pedidos.filter(p => p.estado === "processing").length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-8 sm:py-12 px-4">
+                    <Package className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-3 sm:mb-4" />
+                    {!tieneGrupos ? (
+                      <>
+                        <p className="text-sm sm:text-base text-muted-foreground text-center font-medium mb-2">
+                          No tienes grupos asignados
+                        </p>
+                        <p className="text-xs sm:text-sm text-muted-foreground text-center">
+                          Contacta al administrador para que te asigne a un grupo con sucursales.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm sm:text-base text-muted-foreground text-center">
+                          No hay pedidos en proceso
+                        </p>
+                        {userIdsDelGrupo.length === 0 && (
+                          <p className="text-xs sm:text-sm text-muted-foreground text-center mt-2">
+                            No hay sucursales en tus grupos asignados.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-2 sm:space-y-3">
+                  {pedidos.filter(p => p.estado === "processing").map((pedido) => {
+                    const usuarioAsignado = obtenerUsuarioAsignado(pedido)
+                    const nombreSucursal = obtenerNombreSucursal(pedido)
+                    const estaAsignado = !!(pedido.estado === "processing" && pedido.assignedTo)
+                    const esMiPedido = pedido.assignedTo === user?.uid
+                    const puedeGenerarRemito = pedido.estado === "processing" && esMiPedido
+                    const estaExpandido = pedidoExpandido === pedido.id
+                    const datosExpandidos = pedidosExpandidos[pedido.id]
+                    const estaAceptando = aceptandoPedido === pedido.id
+
+                    const cantidadProductos = datosExpandidos?.productos?.length || null
+                    const nombreEmpresaExpandida = datosExpandidos?.nombreEmpresa || nombreSucursal
+
+                    return (
+                      <Card key={pedido.id} className="hover:shadow-md transition-shadow p-0 gap-0">
+                        <CardHeader 
+                          className="pb-2 cursor-pointer px-0 pt-0 gap-0"
+                          onClick={() => togglePedido(pedido)}
+                        >
+                          <div className="flex items-center justify-between gap-2 px-3 sm:px-4 pt-3 sm:pt-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <CardTitle className="text-sm sm:text-base font-semibold truncate">{pedido.nombre}</CardTitle>
+                                {estaExpandido ? (
+                                  <ChevronUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
+                                ) : (
+                                  <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                                <span className="truncate">{nombreEmpresaExpandida}</span>
+                                {cantidadProductos !== null && (
+                                  <>
+                                    <span>•</span>
+                                    <span>{cantidadProductos} {cantidadProductos === 1 ? 'artículo' : 'artículos'}</span>
+                                  </>
+                                )}
+                                {estaAsignado && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="text-primary font-medium">
+                                      {pedido.assignedToNombre || usuarioAsignado?.displayName || "Usuario"}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              <Badge
+                                variant={
+                                  pedido.estado === "processing"
+                                    ? "default"
+                                    : pedido.estado === "creado" || !pedido.estado
+                                    ? "secondary"
+                                    : "outline"
+                                }
+                                className="text-xs"
+                              >
+                                {pedido.estado === "processing"
+                                  ? "En proceso"
+                                  : pedido.estado === "creado" || !pedido.estado
+                                  ? "Pendiente"
+                                  : pedido.estado || "Sin estado"}
+                              </Badge>
+                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <Clock className="h-3 w-3 shrink-0" />
+                                <span>{formatearFecha(pedido.createdAt).split(' ')[0]}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-0 pb-0 px-0">
+                          {estaExpandido && (
+                            <div className="pt-2 border-t space-y-3 px-3 sm:px-4 pb-3 sm:pb-4">
+                              {datosExpandidos?.loading ? (
+                                <div className="flex items-center justify-center py-8">
+                                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                </div>
+                              ) : datosExpandidos ? (
+                                <>
+                                  {estaAsignado && !esMiPedido && (
+                                    <Alert variant="destructive" className="text-sm">
+                                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                                      <AlertTitle className="text-sm">Pedido ya asignado</AlertTitle>
+                                      <AlertDescription className="text-xs sm:text-sm">
+                                        Este pedido ya fue tomado por: <strong>{pedido.assignedToNombre || "otro usuario"}</strong> - Fábrica
+                                      </AlertDescription>
+                                    </Alert>
+                                  )}
+                                  {estaAsignado && esMiPedido && (
+                                    <Alert className="text-sm">
+                                      <CheckCircle2 className="h-4 w-4 shrink-0" />
+                                      <AlertTitle className="text-sm">Pedido en proceso</AlertTitle>
+                                      <AlertDescription className="text-xs sm:text-sm">
+                                        Este pedido está siendo procesado por ti. Puedes generar el remito cuando esté listo.
+                                      </AlertDescription>
+                                    </Alert>
+                                  )}
+                                  <div>
+                                    <h4 className="text-sm font-semibold mb-2">Productos solicitados</h4>
+                                    <FabricaPedidoForm
+                                      productos={datosExpandidos.productos}
+                                      enlacePublico={datosExpandidos.enlacePublico}
+                                      onGenerarRemito={(productosDisponibles) => handleGenerarRemito(pedido, productosDisponibles)}
+                                      pedido={pedido}
+                                      puedeGenerarRemito={puedeGenerarRemito}
+                                    />
+                                  </div>
+                                  {(pedido.estado === "creado" || !pedido.estado) && (
+                                    <Button
+                                      onClick={(e) => handleAceptarPedido(pedido, e)}
+                                      disabled={!!estaAceptando || estaAsignado}
+                                      className="w-full"
+                                      size="lg"
+                                    >
+                                      {estaAceptando ? (
+                                        <>
+                                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                          Aceptando...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                                          Aceptar pedido
+                                        </>
+                                      )}
+                                    </Button>
+                                  )}
+                                </>
+                              ) : null}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </TabsContent>
         </Tabs>
       </div>

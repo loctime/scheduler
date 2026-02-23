@@ -520,7 +520,7 @@ export default function AdminPage() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="usuarios" className="space-y-4">
+          <TabsContent value="usuarios" className="space-y-4" forceMount>
             <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
               <div className="flex flex-col sm:flex-row gap-3 flex-1">
                 <div className="relative flex-1">
@@ -576,7 +576,7 @@ export default function AdminPage() {
             )}
           </TabsContent>
 
-          <TabsContent value="grupos" className="space-y-4">
+          <TabsContent value="grupos" className="space-y-4" forceMount>
             <>
               <div className="flex items-center justify-between">
                 <div className="flex-1">
@@ -680,7 +680,7 @@ export default function AdminPage() {
             </>
           </TabsContent>
 
-          <TabsContent value="buscar" className="space-y-4">
+          <TabsContent value="buscar" className="space-y-4" forceMount>
             <Card>
               <CardHeader>
                 <CardTitle>Buscar Usuario por Email</CardTitle>

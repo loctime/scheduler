@@ -56,6 +56,13 @@ const FORMAT_EXAMPLES = [
 ]
 
 export default function PedidosPage() {
+  // Validación: confirmar que los tabs no se desmontan
+  useEffect(() => {
+    console.log("[PedidosPage] Componente montado")
+    return () => {
+      console.log("[PedidosPage] Componente desmontado")
+    }
+  }, [])
   const { user, userData } = useData()
   const { toast } = useToast()
   const ownerId = useMemo(() => getOwnerIdForActor(user, userData), [user, userData])
@@ -1443,8 +1450,8 @@ export default function PedidosPage() {
                   )}
               </div>
 
-              {/* Contenido de las pestañas */}
-              {activeTab === "productos" ? (
+              {/* Contenido de las pestañas - Keep mounted para cambio fluido */}
+              <div className={activeTab === "productos" ? "block" : "hidden"}>
                 <ProductosTable
                   products={products}
                   stockActual={stockActual}
@@ -1456,7 +1463,8 @@ export default function PedidosPage() {
                   onProductsOrderUpdate={updateProductsOrder}
                   stockMinimoDefault={selectedPedido?.stockMinimoDefault ?? 0}
                 />
-              ) : activeTab === "recepcion" ? (
+              </div>
+              <div className={activeTab === "recepcion" ? "block" : "hidden"}>
                 <div className="space-y-3 md:space-y-4">
                   {loadingRecepcion ? (
                     <div className="flex items-center justify-center h-64 md:h-96">
@@ -1491,7 +1499,8 @@ export default function PedidosPage() {
                     </div>
                   )}
                 </div>
-              ) : (
+              </div>
+              <div className={activeTab === "remitos" ? "block" : "hidden"}>
                 <div className="space-y-4">
                   {/* Timeline y Acciones fusionados */}
                   {selectedPedido && (
@@ -1666,7 +1675,7 @@ export default function PedidosPage() {
                     </div>
                   )}
                 </div>
-              )}
+              </div>
             </>
           )}
         </div>
