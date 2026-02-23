@@ -176,6 +176,30 @@ export function CellAssignmentsHome({ assignments, getShiftInfo, mediosTurnos = 
         const uniqueKey = `${assignment.shiftId}-${idx}-${assignment.startTime || ''}-${assignment.endTime || ''}-${assignment.startTime2 || ''}-${assignment.endTime2 || ''}`
         const displayTimeLines = getShiftDisplayTime(assignment.shiftId || "", shift, assignment)
 
+        // Detectar si es turno cortado (tiene dos franjas)
+        const isCutShift = !!(assignment.startTime && assignment.endTime && assignment.startTime2 && assignment.endTime2)
+
+        // Si es turno cortado, dividir en dos mitades
+        if (isCutShift && displayTimeLines.length >= 2) {
+          return (
+            <div key={uniqueKey} className="w-full h-full flex flex-col absolute inset-0">
+              {/* Primera mitad (arriba) - 50% altura */}
+              <div className="flex-1 flex items-center justify-center">
+                <span className={`text-center text-2xl sm:text-3xl md:text-4xl font-semibold tabular-nums text-foreground`}>
+                  {displayTimeLines[0]}
+                </span>
+              </div>
+              {/* Segunda mitad (abajo) - 50% altura */}
+              <div className="flex-1 flex items-center justify-center">
+                <span className={`text-center text-2xl sm:text-3xl md:text-4xl font-semibold tabular-nums text-foreground`}>
+                  {displayTimeLines[1]}
+                </span>
+              </div>
+            </div>
+          )
+        }
+
+        // Turno normal (una sola franja)
         return (
           <div key={uniqueKey} className="w-full space-y-1">
             {displayTimeLines.map((line, lineIdx) => {
