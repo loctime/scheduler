@@ -265,17 +265,17 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
       <div className={`min-h-screen bg-gray-100 ${isPWA ? "pb-20" : "pb-24"}`}>
         {/* Header simple — tema rojo en PWA */}
-        <div className={`p-4 shadow-lg flex items-center gap-3 ${isPWA ? "bg-red-100 text-red-900 border-b border-red-200" : "bg-blue-500 text-white"}`}>
+        <div className={`p-2 sm:p-3 shadow-lg flex items-center gap-2 sm:gap-3 ${isPWA ? "bg-red-100 text-red-900 border-b border-red-200" : "bg-blue-500 text-white"}`}>
           {companySlug ? (
             <Link
               href={`/pwa/${companySlug}/home`}
-              className="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-white/20 active:bg-white/30 transition-colors shrink-0"
+              className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg hover:bg-white/20 active:bg-white/30 transition-colors shrink-0"
               aria-label="Volver al home"
             >
-              <ArrowLeft className="w-6 h-6" />
+              <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
             </Link>
           ) : null}
-          <h1 className="text-xl font-bold flex-1">{isPWA ? "Stock" : "Stock Rápido"}</h1>
+          <h1 className="text-lg sm:text-xl font-bold flex-1">{isPWA ? "Stock" : "Stock Rápido"}</h1>
           <div className="flex items-center gap-2 shrink-0">
             {/* Botones en header para PWA */}
             {isPWA && state.selectedPedidoId && textoPedidoAutomatico && (
@@ -298,10 +298,10 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                   }}
                   disabled={state.loading}
                   size="sm"
-                  className="h-8 px-2 text-xs bg-red-600 hover:bg-red-700 text-white border-red-700"
+                  className="h-7 sm:h-8 px-1.5 sm:px-2 text-xs bg-red-600 hover:bg-red-700 text-white border-red-700"
                 >
-                  <Package className="w-3 h-3 mr-1" />
-                  Copiar
+                  <Package className="w-3 h-3 sm:mr-1" />
+                  <span className="hidden sm:inline">Copiar</span>
                 </Button>
                 <Button
                   onClick={() => {
@@ -311,10 +311,10 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                   }}
                   disabled={state.loading}
                   size="sm"
-                  className="h-8 px-2 text-xs bg-green-600 hover:bg-green-700 text-white border-green-700"
+                  className="h-7 sm:h-8 px-1.5 sm:px-2 text-xs bg-green-600 hover:bg-green-700 text-white border-green-700"
                 >
-                  <MessageCircle className="w-3 h-3 mr-1" />
-                  WhatsApp
+                  <MessageCircle className="w-3 h-3 sm:mr-1" />
+                  <span className="hidden sm:inline">WhatsApp</span>
                 </Button>
               </>
             )}
@@ -343,17 +343,17 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
           </div>
         </div>
 
-        {/* Selector de Pedido (compacto) — máx. 2 filas + scroll horizontal */}
-        <div className="bg-white border-b">
-          <div className="p-4">
-            <div className="overflow-x-auto overflow-y-hidden max-h-[4.75rem]">
-              <div className="flex flex-wrap gap-2 w-max min-w-full max-h-[4.75rem]">
+        {/* Selector de Pedido (compacto) — siempre visible con sticky */}
+        <div className="sticky top-0 z-10 bg-white border-b shadow-sm">
+          <div className="p-2 sm:p-2.5">
+            <div className="overflow-x-auto overflow-y-hidden max-h-[3.5rem] sm:max-h-[4rem]">
+              <div className="flex flex-wrap gap-1.5 sm:gap-2 w-max min-w-full max-h-[3.5rem] sm:max-h-[4rem]">
                 
                 {pedidos.map((pedido) => (
                   <button
                     key={pedido.id}
                     onClick={() => setSelectedPedidoId(pedido.id)}
-                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors shrink-0 ${
+                    className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 ${
                       state.selectedPedidoId === pedido.id
                         ? "bg-blue-600 text-white"
                         : "bg-gray-200 text-gray-700"

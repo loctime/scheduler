@@ -50,11 +50,21 @@ export function useStockConsole(user: any) {
   const [pedidos, setPedidos] = useState<Pedido[]>([])
   const [productos, setProductos] = useState<Producto[]>([])
   const [stockActual, setStockActual] = useState<Record<string, number>>({})
+  const [pedidosLoading, setPedidosLoading] = useState(true)
+  const [productosLoading, setProductosLoading] = useState(false)
+  const mountedRef = useRef(true)
 
   const ownerId = useMemo(
     () => getOwnerIdForActor(user, userData),
     [user, userData]
   )
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   // Cargar pedidos con cache
   const loadPedidos = useCallback(async () => {
@@ -62,6 +72,9 @@ export function useStockConsole(user: any) {
     
     // Validar permisos antes de cargar datos
     if (!tienePermisoPedidos) {
+      if (mountedRef.current) {
+        setPedidosLoading(false)
+      }
       toast({
         title: "Acceso denegado",
         description: "No tienes permisos para acceder a Stock Console",
@@ -71,13 +84,18 @@ export function useStockConsole(user: any) {
     }
     
     try {
-      if (!ownerId) return
+      if (!ownerId) {
+        if (mountedRef.current) {
+          setPedidosLoading(false)
+        }
+        return
+      }
       
       const cacheKey = `pedidos-${ownerId}`
       
       // 1. Cargar desde cache primero (stale-while-revalidate)
       const cachedPedidos = await getCache<Pedido[]>(cacheKey)
-      if (cachedPedidos && cachedPedidos.length > 0) {
+      if (cachedPedidos && cachedPedidos.length > 0 && mountedRef.current) {
         // Ordenar por uso del usuario antes de setear
         const usage = getPedidoUsage(ownerId)
         const sortedCached = [...cachedPedidos].sort((a, b) => {
@@ -92,6 +110,10 @@ export function useStockConsole(user: any) {
           return a.nombre.localeCompare(b.nombre)
         })
         setPedidos(sortedCached)
+        setPedidosLoading(false) // Marcar como cargado si hay cache
+        // Continuar con fetch en background
+      } else if (mountedRef.current) {
+        setPedidosLoading(true)
       }
       
       // 2. Cargar desde Firestore en background
@@ -119,6 +141,8 @@ export function useStockConsole(user: any) {
         return a.nombre.localeCompare(b.nombre)
       })
       
+      if (!mountedRef.current) return
+      
       // Solo actualizar si hay cambios
       setPedidos((prev) => {
         if (compareArraysByIds(prev, pedidosData)) {
@@ -127,41 +151,63 @@ export function useStockConsole(user: any) {
         return pedidosData
       })
       
-      // 3. Actualizar cache
-      await setCache(cacheKey, pedidosData)
+      setPedidosLoading(false)
+      
+      // 3. Actualizar cache en background
+      setCache(cacheKey, pedidosData).catch(() => {
+        // Ignorar errores de cache
+      })
     } catch (error: any) {
       console.error("Error al cargar pedidos:", error)
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los pedidos",
-        variant: "destructive",
-      })
+      if (mountedRef.current) {
+        setPedidosLoading(false)
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los pedidos",
+          variant: "destructive",
+        })
+      }
     }
   }, [user, ownerId, toast, tienePermisoPedidos])
 
   // Cargar productos del pedido seleccionado con cache
   const loadProductos = useCallback(async () => {
     if (!user || !db || !state.selectedPedidoId) {
-      setProductos([])
-      setStockActual({})
+      if (mountedRef.current) {
+        setProductos([])
+        setStockActual({})
+        setProductosLoading(false)
+      }
       return
     }
     
     // Validar permisos antes de cargar datos
     if (!tienePermisoPedidos) {
+      if (mountedRef.current) {
+        setProductosLoading(false)
+      }
       return
     }
     
     try {
-      if (!ownerId) return
+      if (!ownerId) {
+        if (mountedRef.current) {
+          setProductosLoading(false)
+        }
+        return
+      }
       
       const cacheKey = `productos-${ownerId}-${state.selectedPedidoId}`
       
       // 1. Cargar desde cache primero (stale-while-revalidate)
       const cachedData = await getCache<{ productos: Producto[]; stockActual: Record<string, number> }>(cacheKey)
-      if (cachedData && cachedData.productos && cachedData.productos.length > 0) {
+      if (cachedData && cachedData.productos && cachedData.productos.length > 0 && mountedRef.current) {
         setProductos(cachedData.productos)
         setStockActual(cachedData.stockActual)
+        setProductosLoading(false) // Marcar como cargado si hay cache
+        // Continuar con fetch en background
+      } else if (mountedRef.current) {
+        setProductosLoading(true)
       }
       
       // 2. Cargar desde Firestore en background
@@ -191,6 +237,8 @@ export function useStockConsole(user: any) {
         stockMap[producto.id] = (producto as any).stockActual || 0
       })
       
+      if (!mountedRef.current) return
+      
       // Solo actualizar si hay cambios
       setProductos((prev) => {
         if (compareArraysByIds(prev, productosData)) {
@@ -206,17 +254,24 @@ export function useStockConsole(user: any) {
         return stockMap
       })
       
-      // 3. Actualizar cache
-      await setCache(cacheKey, { productos: productosData, stockActual: stockMap })
+      setProductosLoading(false)
+      
+      // 3. Actualizar cache en background
+      setCache(cacheKey, { productos: productosData, stockActual: stockMap }).catch(() => {
+        // Ignorar errores de cache
+      })
       
       // NO resetear cantidades al cambiar de pedido - mantener las cantidades existentes
     } catch (error: any) {
       console.error("Error al cargar productos:", error)
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los productos",
-        variant: "destructive",
-      })
+      if (mountedRef.current) {
+        setProductosLoading(false)
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los productos",
+          variant: "destructive",
+        })
+      }
     }
   }, [user, state.selectedPedidoId, ownerId, toast, tienePermisoPedidos])
 
