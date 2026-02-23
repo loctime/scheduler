@@ -681,51 +681,51 @@ export function ProductosTable({
     })
   )
 
-  // Función para ordenar productos por criticidad (solo mobile)
-  const sortProductsByCriticality = useCallback((productsList: Producto[]) => {
-    if (!productsList || productsList.length === 0) {
-      return productsList || []
-    }
-    
-    // Verificar si hay productos críticos
-    const hasCritical = productsList.some(product => {
-      const stock = stockActual[product.id] ?? 0
-      return product.stockMinimo > stock
-    })
-    
-    if (!hasCritical) {
-      return productsList
-    }
-    
-    // Crear una copia del array y ordenar por criticidad: mayor criticidad primero
-    return [...productsList].sort((a, b) => {
-      const stockA = stockActual[a.id] ?? 0
-      const stockB = stockActual[b.id] ?? 0
-
-      const criticidadA = a.stockMinimo - stockA
-      const criticidadB = b.stockMinimo - stockB
-
-      // Ordenar descendente: mayor criticidad primero
-      if (criticidadB === criticidadA) {
-        return 0
-      }
-      return criticidadB - criticidadA
-    })
-  }, [stockActual])
-
   // Función para ordenar productos por orden manual (desktop)
   const sortProductsByOrder = useCallback((productsList: Producto[]) => {
     if (!productsList || productsList.length === 0) {
       return productsList || []
     }
-    
-    // Crear una copia del array y ordenar por campo `orden`
     return [...productsList].sort((a, b) => {
       const ordenA = a.orden ?? 0
       const ordenB = b.orden ?? 0
       return ordenA - ordenB
     })
   }, [])
+
+  // Orden final: desktop = orden manual; mobile = críticos por criticidad + no críticos en orden manual
+  const orderedProducts = useMemo(() => {
+    // Desktop → respetar orden manual completo
+    if (isDesktop) {
+      return sortProductsByOrder(products)
+    }
+
+    // Mobile → orden híbrido
+    const productsInOrder = sortProductsByOrder(products)
+    const criticos: Producto[] = []
+    const noCriticos: Producto[] = []
+
+    productsInOrder.forEach((p) => {
+      const stock = stockActual[p.id] ?? 0
+      const criticidad = p.stockMinimo - stock
+
+      if (criticidad > 0) {
+        criticos.push(p)
+      } else {
+        noCriticos.push(p)
+      }
+    })
+
+    // Ordenar SOLO críticos por mayor criticidad
+    criticos.sort((a, b) => {
+      const stockA = stockActual[a.id] ?? 0
+      const stockB = stockActual[b.id] ?? 0
+      return (b.stockMinimo - stockB) - (a.stockMinimo - stockA)
+    })
+
+    // Retornar críticos primero + resto en orden manual
+    return [...criticos, ...noCriticos]
+  }, [products, stockActual, isDesktop, sortProductsByOrder])
 
   // Inicializar localStock desde stockActual solo si no hay cambios pendientes
   useEffect(() => {
@@ -790,23 +790,13 @@ export function ProductosTable({
     }
   }, [localStock, stockActual, onStockChange])
 
-  // Actualizar el ordenamiento cuando cambian los productos, el stock o el tamaño de pantalla
+  // Sincronizar orderedProducts con productsToRender (sin sobrescribir reorden optimista)
   useEffect(() => {
-    // No sobrescribir si estamos en medio de un reordenamiento optimista
     if (isReorderingRef.current) {
       return
     }
-    
-    if (isDesktop) {
-      // En desktop: usar orden manual
-      const sorted = sortProductsByOrder(products)
-      setProductsToRender(sorted)
-    } else {
-      // En mobile: usar orden por criticidad
-      const sorted = sortProductsByCriticality(products)
-      setProductsToRender(sorted)
-    }
-  }, [products, stockActual, isDesktop, sortProductsByCriticality, sortProductsByOrder])
+    setProductsToRender(orderedProducts)
+  }, [orderedProducts])
 
   // Manejar el final del drag & drop
   const handleDragEnd = useCallback((event: DragEndEvent) => {
