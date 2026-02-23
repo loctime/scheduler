@@ -6,7 +6,6 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { CheckSquare, Clock, Calendar, AlertCircle, ArrowLeft } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useOwnerIdFromSlug, useEmployeesByOwnerId } from "@/hooks/use-owner-data"
@@ -110,6 +109,8 @@ export default function TareasPage() {
                   employees={employees}
                   onClick={() => router.push(`/pwa/${companySlug}/tareas/${task.id}`)}
                   isToday={true}
+                  companySlug={companySlug}
+                  router={router}
                 />
               ))}
             </div>
@@ -153,6 +154,8 @@ export default function TareasPage() {
                   employees={employees}
                   onClick={() => router.push(`/pwa/${companySlug}/tareas/${task.id}`)}
                   isToday={false}
+                  companySlug={companySlug}
+                  router={router}
                 />
               ))}
             </div>
@@ -168,9 +171,11 @@ interface TaskCardProps {
   employees: any[]
   onClick: () => void
   isToday: boolean
+  companySlug: string
+  router: any
 }
 
-function TaskCard({ task, employees, onClick, isToday }: TaskCardProps) {
+function TaskCard({ task, employees, onClick, isToday, companySlug, router }: TaskCardProps) {
   const assignedEmployees = task.employeeIds
     ? employees.filter(emp => task.employeeIds!.includes(emp.id))
     : employees
@@ -179,63 +184,67 @@ function TaskCard({ task, employees, onClick, isToday }: TaskCardProps) {
     ? task.daysOfWeek.map(day => DIAS_SEMANA[day]).join(", ")
     : "Sin días específicos"
 
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Navegación directa usando el router pasado como prop
+    router.push(`/pwa/${companySlug}/tareas/${task.id}`)
+  }
+
   return (
-    <Card 
-      className="cursor-pointer hover:shadow-md transition-shadow duration-200"
-      onClick={onClick}
+    <div 
+      className="cursor-pointer hover:shadow-md transition-shadow duration-200 bg-white border rounded-lg p-4"
+      onClick={handleClick}
     >
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <CardTitle className="text-base font-medium text-gray-900 mb-1">
-              {task.title}
-            </CardTitle>
-            {task.description && (
-              <p className="text-sm text-gray-600 line-clamp-2">
-                {task.description}
-              </p>
-            )}
-          </div>
-          {isToday && (
-            <Badge variant="destructive" className="ml-2">
-              Hoy
-            </Badge>
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <h3 className="text-base font-medium text-gray-900 mb-1">
+            {task.title}
+          </h3>
+          {task.description && (
+            <p className="text-sm text-gray-600 line-clamp-2">
+              {task.description}
+            </p>
           )}
         </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <div className="space-y-2">
-          {/* Empleados asignados */}
+        {isToday && (
+          <Badge variant="destructive" className="ml-2">
+            Hoy
+          </Badge>
+        )}
+      </div>
+      <div className="space-y-2">
+        {/* Empleados asignados */}
+        <div className="flex items-center space-x-2">
+          <Users className="h-4 w-4 text-gray-400" />
+          <span className="text-sm text-gray-600">
+            {assignedEmployees.length > 0
+              ? assignedEmployees.map(emp => emp.name).join(", ")
+              : "Todos los empleados"
+            }
+          </span>
+        </div>
+
+        {/* Días configurados */}
+        {task.daysOfWeek && task.daysOfWeek.length > 0 && (
           <div className="flex items-center space-x-2">
-            <Users className="h-4 w-4 text-gray-400" />
+            <Calendar className="h-4 w-4 text-gray-400" />
             <span className="text-sm text-gray-600">
-              {assignedEmployees.length > 0
-                ? assignedEmployees.map(emp => emp.name).join(", ")
-                : "Todos los empleados"
-              }
+              {daysFormatted}
             </span>
           </div>
+        )}
 
-          {/* Días configurados */}
-          {task.daysOfWeek && task.daysOfWeek.length > 0 && (
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-4 w-4 text-gray-400" />
-              <span className="text-sm text-gray-600">
-                {daysFormatted}
-              </span>
-            </div>
-          )}
-
-          {/* Fecha de creación */}
-          <div className="flex items-center space-x-2">
-            <Clock className="h-4 w-4 text-gray-400" />
-            <span className="text-sm text-gray-500">
-              Creada {format(task.createdAt?.toDate?.() || new Date(), "d 'de' MMMM", { locale: es })}
-            </span>
-          </div>
+        {/* Fecha de creación */}
+        <div className="flex items-center space-x-2">
+          <Clock className="h-4 w-4 text-gray-400" />
+          <span className="text-sm text-gray-500">
+            Creada {format(task.createdAt?.toDate?.() || new Date(), "d 'de' MMMM", { locale: es })}
+          </span>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 

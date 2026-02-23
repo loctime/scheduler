@@ -50,17 +50,13 @@ export default function TareaDetallePage() {
             id: docSnapshot.id,
             ...taskData
           })
-          setError(null)
         } else {
-          setTask(null)
           setError("Tarea no encontrada")
         }
         setIsLoading(false)
       },
       (err) => {
-        console.error("Error loading task:", err)
         setError("Error al cargar la tarea")
-        setTask(null)
         setIsLoading(false)
       }
     )
