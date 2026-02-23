@@ -21,18 +21,26 @@ import { AlertTriangle } from "lucide-react"
 
 // Constantes para mensajes informativos
 const MENSAJES_DEL_DIA = [
-  "Tené un excelente día 🙌",
-  "La puntualidad habla bien de vos.",
-  "Cuidá tu sector como si fuera tu casa.",
-  "Trabajo en equipo = mejores resultados.",
-  "Si llegás antes, arrancás mejor.",
-  "Organización primero, velocidad después.",
-  "Todo suma.",
-  "Hoy puede ser un gran día.",
-  "La constancia hace la diferencia.",
-  "Cada detalle importa.",
-  "Responsabilidad y compromiso.",
-  "Orden y limpieza primero."
+   "Hoy también vinimos a trabajar, increíble.",
+  "La puntualidad no muerde. Probala.",
+  "Respirar, pensar… y después actuar.",
+  "Si funciona, no lo toques. Si no funciona, tampoco lo rompas más.",
+  "El café ayuda, pero no hace milagros.",
+  "Ordenar ahora evita llorar después.",
+  "Sí, hay que hacerlo igual.",
+  "El trabajo en equipo empieza por no desaparecer.",
+  "Hoy no es viernes… pero podemos fingir.",
+  "Si no sabés qué hacer, empezá por lo obvio.",
+  "Menos drama, más soluciones.",
+  "Tu sector te está mirando.",
+  "Proactividad: eso que pasa antes de que te lo pidan.",
+  "Hacerlo bien lleva casi lo mismo que hacerlo mal.",
+  "Un problema menos si lo resolvés ahora.",
+  "El futuro vos agradece el esfuerzo de hoy.",
+  "No era tan difícil, ¿viste?",
+  "Que no se note el lunes.",
+  "Respirá… no es tan grave.",
+  "Si sobrevivimos a ayer, hoy también."
 ]
 
 /**
@@ -167,6 +175,8 @@ export default function PwaHomePage() {
  * Memoizado para evitar renders innecesarios cuando las props no cambian.
  */
 function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; employeeId: string }) {
+  const { ownerId } = useOwnerIdFromSlug(companySlug)
+  
   const {
     assignments,
     dayStatus,
@@ -179,7 +189,7 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
   } = useTodayScheduleCellData({ companySlug, employeeId })
   
   // Acciones diarias para este empleado
-  const { actions: dailyActions } = useDailyActions(companySlug, employeeId)
+  const { actions: dailyActions } = useDailyActions(ownerId || "", employeeId)
 
   // Memoizar props para DayCellContent
   const dayCellContentProps = useMemo(
@@ -218,7 +228,7 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
   // Mensaje fijo (cambia si es domingo)
   const mensajeFijo = today.getDay() === 0 
     ? "Revisá el cronograma de la semana."
-    : "Recordá fichar tu ingreso y mantener tu sector en orden."
+    : "Si no llegas a horario, firmá el papel."
 
   return (
     <div className="w-full max-w-md space-y-2">
@@ -238,7 +248,7 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="w-4 h-4 text-amber-600" />
             <span className="font-semibold text-sm text-amber-800 dark:text-amber-200">
-              Acciones de hoy
+              Pendientes del dia
             </span>
           </div>
           <div className="space-y-2">
