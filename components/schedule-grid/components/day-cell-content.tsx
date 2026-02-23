@@ -45,9 +45,19 @@ export function DayCellContent({
 }: DayCellContentProps) {
   const incompleteClass = hasIncompleteAssignments ? "ring-2 ring-destructive/50 opacity-75" : ""
 
+  // Detectar si hay turno cortado (necesita altura mínima para mostrar gradiente)
+  const hasCutShift = assignments.some((a) => 
+    a.type === "shift" && 
+    a.startTime && 
+    a.endTime && 
+    a.startTime2 && 
+    a.endTime2
+  )
+
   // Estilos diferentes para modo Home vs calendario
+  // En modo Home, si hay turno cortado, necesitamos altura mínima para el gradiente
   const containerClasses = homeMode
-    ? `flex flex-col gap-2 relative px-3 sm:px-4 md:px-5 py-2 sm:py-3 md:py-4 rounded w-full ${incompleteClass}`
+    ? `flex flex-col gap-2 relative px-3 sm:px-4 md:px-5 py-2 sm:py-3 md:py-4 rounded w-full ${hasCutShift ? 'min-h-[120px]' : ''} ${incompleteClass}`
     : `flex flex-col gap-1.5 relative px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 md:py-2 rounded min-h-[80px] w-full ${incompleteClass}`
 
   const francoClasses = homeMode
