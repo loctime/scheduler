@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { useParams } from "next/navigation"
+import { format } from "date-fns"
 import { Calendar, FileText, Users, UserCircle } from "lucide-react"
 import { PwaTodayScheduleCard } from "@/components/pwa-today-schedule-card"
 import { UserStatusMenu } from "@/components/pwa/UserStatusMenu"
@@ -161,8 +162,14 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
     )
   }
 
+  const today = new Date()
+  const todayFormatted = format(today, "dd/MM/yy")
+
   return (
-    <div className="w-full max-w-md">
+    <div className="w-full max-w-md space-y-2">
+      <div className="text-center text-lg sm:text-xl md:text-2xl font-semibold text-foreground">
+        hoy: {todayFormatted}
+      </div>
       <DayCellContent {...dayCellContentProps} homeMode={true} />
     </div>
   )
