@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useEffect } from "react"
+import React, { useMemo, useState, useEffect, useRef } from "react"
 import { addDays, format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 import { Calendar, UserCircle, X, Maximize2 } from "lucide-react"
@@ -95,7 +95,7 @@ const getWeekStartDate = (weekId?: string, days?: Record<string, any>) => {
   return null
 }
 
-export default function PublicHorarioPage({ companySlug, ImageWrapper, headerClassName }: PublicHorarioPageProps) {
+function PublicHorarioPageComponent({ companySlug, ImageWrapper, headerClassName }: PublicHorarioPageProps) {
   const { horario, isLoading, error } = usePublicHorario(companySlug)
   const { config } = useConfig()
   const [showIndividualView, setShowIndividualView] = useState(false)
@@ -109,6 +109,10 @@ export default function PublicHorarioPage({ companySlug, ImageWrapper, headerCla
   
   // Estado para controlar el viewer de pantalla completa
   const [isFullscreenViewerOpen, setIsFullscreenViewerOpen] = useState(false)
+  
+  // Cache de la imagen para evitar recargas innecesarias
+  const imageCacheRef = useRef<{ url: string; element: HTMLImageElement | null }>({ url: "", element: null })
+  const [imageLoaded, setImageLoaded] = useState(false)
 
   useEffect(() => {
     const checkMobile = () => {
@@ -266,6 +270,37 @@ export default function PublicHorarioPage({ companySlug, ImageWrapper, headerCla
     if (!horario?.ownerId) return null
     return { uid: horario.ownerId }
   }, [horario?.ownerId])
+
+  // Pre-cargar imagen en cache del navegador cuando cambia
+  const currentWeek = horario?.weeks?.[horario?.publishedWeekId]
+  const imageSrc = currentWeek?.publicImageUrl
+  
+  useEffect(() => {
+    if (!imageSrc) {
+      setImageLoaded(false)
+      return
+    }
+    
+    // Si es la misma URL, usar cache
+    if (imageSrc === imageCacheRef.current.url) {
+      setImageLoaded(true)
+      return
+    }
+    
+    setImageLoaded(false)
+    
+    // Pre-cargar imagen para cache del navegador
+    const img = new Image()
+    img.onload = () => {
+      imageCacheRef.current = { url: imageSrc, element: img }
+      setImageLoaded(true)
+    }
+    img.onerror = () => {
+      console.error("🔧 [PublicHorarioPage] Image preload error")
+      setImageLoaded(true) // Permitir renderizar igual
+    }
+    img.src = imageSrc
+  }, [imageSrc])
 
   // Toggle vista individual
   const handleToggleIndividualView = () => {
@@ -502,10 +537,40 @@ export default function PublicHorarioPage({ companySlug, ImageWrapper, headerCla
           console.log("🔧 [PublicHorarioPage] Rendering published image")
           const imageSrc = currentWeek.publicImageUrl
           const imageAlt = `Horario ${currentWeek.weekLabel || 'semanal'}`
+          
+          // Pre-cargar imagen en cache del navegador si cambió la URL
+          useEffect(() => {
+            if (!imageSrc) {
+              setImageLoaded(false)
+              return
+            }
+            
+            // Si es la misma URL, usar cache
+            if (imageSrc === imageCacheRef.current.url) {
+              setImageLoaded(true)
+              return
+            }
+            
+            setImageLoaded(false)
+            
+            // Pre-cargar imagen para cache del navegador
+            const img = new Image()
+            img.onload = () => {
+              imageCacheRef.current = { url: imageSrc, element: img }
+              setImageLoaded(true)
+            }
+            img.onerror = () => {
+              console.error("🔧 [PublicHorarioPage] Image preload error")
+              setImageLoaded(true) // Permitir renderizar igual
+            }
+            img.src = imageSrc
+          }, [imageSrc])
+          
           const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
             console.error("🔧 [PublicHorarioPage] Image load error:", e)
             console.log("🔧 [PublicHorarioPage] Image failed, using ScheduleGrid fallback")
           }
+          
           return (
             <div className="w-full overflow-x-auto overflow-y-auto bg-white border rounded-lg p-4 sm:p-6 relative"
                  style={{ touchAction: 'pan-x pan-y pinch-zoom' }}>
@@ -533,6 +598,8 @@ export default function PublicHorarioPage({ companySlug, ImageWrapper, headerCla
                 <img
                   src={imageSrc}
                   alt={imageAlt}
+                  loading="eager"
+                  decoding="async"
                   style={{
                     width: '100%',
                     maxWidth: '100%',
@@ -543,6 +610,11 @@ export default function PublicHorarioPage({ companySlug, ImageWrapper, headerCla
                     touchAction: 'pan-x pan-y pinch-zoom'
                   }}
                   onError={handleImageError}
+                  onLoad={() => {
+                    // Marcar como cargada para futuras referencias
+                    imageCacheRef.current = { url: imageSrc, element: null }
+                    setImageLoaded(true)
+                  }}
                 />
               )}
             </div>
@@ -631,3 +703,9 @@ export default function PublicHorarioPage({ companySlug, ImageWrapper, headerCla
     </div>
   )
 }
+
+// Memoizar el componente para evitar re-renders innecesarios
+export default React.memo(PublicHorarioPageComponent, (prevProps, nextProps) => {
+  // Solo re-renderizar si cambia el companySlug
+  return prevProps.companySlug === nextProps.companySlug
+})

@@ -28,6 +28,13 @@ const ASSET_PATTERNS = [
   /\/_next\/static\//,
 ]
 
+// Patrones para imágenes de horarios (data URLs o URLs públicas)
+const HORARIO_IMAGE_PATTERNS = [
+  /data:image\//, // Data URLs (base64)
+  /publicImageUrl/,
+  /pwa.*horario.*image/i,
+]
+
 self.addEventListener("install", (event) => {
   self.skipWaiting()
   event.waitUntil(
@@ -101,6 +108,27 @@ self.addEventListener("fetch", (event) => {
   if (SHELL_URLS.some((shellUrl) => url.pathname.includes(shellUrl))) {
     event.respondWith(
       caches.match(event.request).then((cached) => cached || fetch(event.request))
+    )
+    return
+  }
+
+  // Imágenes de horarios: cache-first (son data URLs o URLs públicas que no cambian frecuentemente)
+  const isHorarioImage = HORARIO_IMAGE_PATTERNS.some((pattern) => 
+    pattern.test(url.pathname) || pattern.test(event.request.url)
+  )
+  if (isHorarioImage) {
+    event.respondWith(
+      caches.open(ASSETS_CACHE_NAME).then(async (cache) => {
+        const cached = await cache.match(event.request)
+        if (cached) {
+          return cached
+        }
+        const response = await fetch(event.request)
+        if (response.status === 200) {
+          cache.put(event.request, response.clone())
+        }
+        return response
+      })
     )
     return
   }
