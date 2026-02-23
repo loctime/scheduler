@@ -4,12 +4,13 @@ import { useState, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import { CheckSquare, Clock, Calendar, AlertCircle, ArrowLeft } from "lucide-react"
+import { CheckSquare, Clock, Calendar, AlertCircle, ArrowLeft, Check } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useOwnerIdFromSlug, useEmployeesByOwnerId } from "@/hooks/use-owner-data"
 import { useTasks } from "@/hooks/use-tasks"
+import { useDailyTaskStatus } from "@/hooks/use-daily-task-status"
 import { PwaViewerBadge, useViewer } from "@/components/pwa/PwaViewerBadge"
 import { Task } from "@/types/task"
 
@@ -24,21 +25,18 @@ export default function TareasPage() {
   const { ownerId, loading: ownerIdLoading } = useOwnerIdFromSlug(companySlug)
   const { employees, loading: employeesLoading } = useEmployeesByOwnerId(ownerId)
   
-  // Debug temporal
-  console.log("🔍 Debug PWA Tareas:")
-  console.log("  companySlug:", companySlug)
-  console.log("  ownerId:", ownerId)
-  console.log("  viewer employeeId:", viewer?.employeeId)
-  
   const { tasks, todayTasks, isLoading, error } = useTasks(viewer?.employeeId, ownerId)
+  const { completedMap, toggleTask } = useDailyTaskStatus(ownerId, viewer)
 
   const today = new Date()
   const todayName = DIAS_SEMANA[today.getDay()]
 
-  // Separar tareas: las del día vs todas las demás
-  const otherTasks = useMemo(() => {
-    return tasks.filter(task => !todayTasks.some(todayTask => todayTask.id === task.id))
-  }, [tasks, todayTasks])
+  // Separar tareas: pendientes vs realizadas
+  const { pendientes, realizadas } = useMemo(() => {
+    const pendientes = tasks.filter(task => !completedMap[task.id])
+    const realizadas = tasks.filter(task => completedMap[task.id])
+    return { pendientes, realizadas }
+  }, [tasks, completedMap])
 
   if (ownerIdLoading || employeesLoading) {
     return (
@@ -117,43 +115,26 @@ export default function TareasPage() {
                   isToday={true}
                   companySlug={companySlug}
                   router={router}
+                  isCompleted={!!completedMap[task.id]}
+                  completedBy={completedMap[task.id]?.employeeId}
+                  onToggle={() => toggleTask(task.id)}
+                  viewer={viewer}
                 />
               ))}
             </div>
           </div>
         )}
 
-        {/* Todas las tareas */}
-        <div>
-          <div className="flex items-center space-x-2 mb-4">
-            <CheckSquare className="h-5 w-5 text-gray-600" />
-            <h2 className="text-lg font-semibold text-gray-900">
-              Todas las tareas
-            </h2>
-            <span className="text-sm text-gray-500">
-              ({otherTasks.length})
-            </span>
-          </div>
-          
-          {otherTasks.length === 0 && todayTasks.length === 0 ? (
-            <div className="text-center py-12">
-              <CheckSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No hay tareas
-              </h3>
-              <p className="text-gray-500">
-                No se encontraron tareas activas
-              </p>
+        {/* Tareas pendientes */}
+        {pendientes.length > 0 && (
+          <div>
+            <div className="flex items-center space-x-2 mb-4">
+              <CheckSquare className="h-5 w-5 text-gray-600" />
+              <h2 className="text-lg font-medium text-gray-900">Tareas Pendientes</h2>
+              <Badge variant="secondary">{pendientes.length}</Badge>
             </div>
-          ) : otherTasks.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">
-                No hay otras tareas además de las del día
-              </p>
-            </div>
-          ) : (
             <div className="space-y-3">
-              {otherTasks.map((task) => (
+              {pendientes.map((task) => (
                 <TaskCard
                   key={task.id}
                   task={task}
@@ -162,11 +143,52 @@ export default function TareasPage() {
                   isToday={false}
                   companySlug={companySlug}
                   router={router}
+                  isCompleted={!!completedMap[task.id]}
+                  completedBy={completedMap[task.id]?.employeeId}
+                  onToggle={() => toggleTask(task.id)}
+                  viewer={viewer}
                 />
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Tareas realizadas */}
+        {realizadas.length > 0 && (
+          <div>
+            <div className="flex items-center space-x-2 mb-4">
+              <CheckSquare className="h-5 w-5 text-green-600" />
+              <h2 className="text-lg font-medium text-gray-900">Tareas Realizadas</h2>
+              <Badge variant="default" className="bg-green-100 text-green-800">{realizadas.length}</Badge>
+            </div>
+            <div className="space-y-3">
+              {realizadas.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  employees={employees}
+                  onClick={() => router.push(`/pwa/${companySlug}/tareas/${task.id}`)}
+                  isToday={false}
+                  companySlug={companySlug}
+                  router={router}
+                  isCompleted={!!completedMap[task.id]}
+                  completedBy={completedMap[task.id]?.employeeId}
+                  onToggle={() => toggleTask(task.id)}
+                  viewer={viewer}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* No hay tareas */}
+        {pendientes.length === 0 && realizadas.length === 0 && (
+          <div className="text-center py-12">
+            <CheckSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No hay tareas para mostrar</h3>
+            <p className="text-gray-600">No se encontraron tareas activas para este día.</p>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -179,9 +201,13 @@ interface TaskCardProps {
   isToday: boolean
   companySlug: string
   router: any
+  isCompleted: boolean
+  completedBy?: string
+  onToggle: () => void
+  viewer: any
 }
 
-function TaskCard({ task, employees, onClick, isToday, companySlug, router }: TaskCardProps) {
+function TaskCard({ task, employees, onClick, isToday, companySlug, router, isCompleted, completedBy, onToggle, viewer }: TaskCardProps) {
   const assignedEmployees = task.employeeIds
     ? employees.filter(emp => task.employeeIds!.includes(emp.id))
     : employees
@@ -189,6 +215,17 @@ function TaskCard({ task, employees, onClick, isToday, companySlug, router }: Ta
   const daysFormatted = task.daysOfWeek
     ? task.daysOfWeek.map(day => DIAS_SEMANA[day]).join(", ")
     : "Sin días específicos"
+
+  const completedByEmployee = completedBy ? employees.find(emp => emp.id === completedBy) : null
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (viewer?.employeeId) {
+      onToggle()
+    }
+  }
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -200,30 +237,53 @@ function TaskCard({ task, employees, onClick, isToday, companySlug, router }: Ta
 
   return (
     <div 
-      className="cursor-pointer hover:shadow-md transition-shadow duration-200 bg-white border rounded-lg p-4"
+      className={`cursor-pointer hover:shadow-md transition-shadow duration-200 border rounded-lg p-4 ${
+        isCompleted ? 'bg-gray-50 opacity-75' : 'bg-white'
+      }`}
       onClick={handleClick}
     >
       <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <h3 className="text-base font-medium text-gray-900 mb-1">
-            {task.title}
-          </h3>
-          {task.description && (
-            <p className="text-sm text-gray-600 line-clamp-2">
-              {task.description}
-            </p>
-          )}
+        <div className="flex items-start space-x-3 flex-1">
+          {/* Checkbox */}
+          <button
+            onClick={handleToggle}
+            className={`mt-1 flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+              isCompleted 
+                ? 'bg-green-500 border-green-500 text-white' 
+                : 'border-gray-300 hover:border-gray-400 text-transparent'
+            }`}
+            disabled={!viewer?.employeeId}
+          >
+            {isCompleted && <Check className="w-3 h-3" />}
+          </button>
+
+          <div className="flex-1">
+            <h3 className={`text-base font-medium mb-1 ${
+              isCompleted ? 'text-gray-500 line-through' : 'text-gray-900'
+            }`}>
+              {task.title}
+            </h3>
+            {task.description && (
+              <p className={`text-sm line-clamp-2 ${
+                isCompleted ? 'text-gray-400' : 'text-gray-600'
+              }`}>
+                {task.description}
+              </p>
+            )}
+          </div>
         </div>
+
         {isToday && (
           <Badge variant="destructive" className="ml-2">
             Hoy
           </Badge>
         )}
       </div>
-      <div className="space-y-2">
+
+      <div className="space-y-2 mt-3">
         {/* Empleados asignados */}
         <div className="flex items-center space-x-2">
-          <Users className="h-4 w-4 text-gray-400" />
+          <Clock className="h-4 w-4 text-gray-400" />
           <span className="text-sm text-gray-600">
             {assignedEmployees.length > 0
               ? assignedEmployees.map(emp => emp.name).join(", ")
@@ -249,6 +309,16 @@ function TaskCard({ task, employees, onClick, isToday, companySlug, router }: Ta
             Creada {format(task.createdAt?.toDate?.() || new Date(), "d 'de' MMMM", { locale: es })}
           </span>
         </div>
+
+        {/* Completado por */}
+        {isCompleted && completedByEmployee && (
+          <div className="flex items-center space-x-2 text-green-600">
+            <Check className="h-4 w-4" />
+            <span className="text-sm font-medium">
+              Realizado por {completedByEmployee.name}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   )
