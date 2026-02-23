@@ -29,6 +29,7 @@ import { ShiftRequestMarker } from "@/components/shift-request-marker"
 import { ShiftAssignment, Turno, MedioTurno, Configuracion } from "@/lib/types"
 import { CellAssignments } from "./cell-assignments"
 import { QuickShiftSelector } from "./quick-shift-selector"
+import { DayCellContent } from "./day-cell-content"
 import { getDay, parseISO } from "date-fns"
 import type { PatternSuggestion } from "@/lib/pattern-learning"
 import { validateCellAssignments } from "@/lib/assignment-validators"
@@ -534,14 +535,14 @@ function ScheduleCellComponent({
               updateEmployeeRequestCache={updateEmployeeRequestCache}
             />
           ) : (
-            <>
-              <CellAssignments assignments={assignments} getShiftInfo={getShiftInfo} mediosTurnos={mediosTurnos} />
-              {dayStatus === "franco" && (
-                <span className="text-center text-xs sm:text-sm md:text-base font-bold block bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
-                  FRANCO
-                </span>
-              )}
-            </>
+            <DayCellContent
+              assignments={assignments}
+              dayStatus={dayStatus}
+              backgroundStyle={undefined}
+              getShiftInfo={getShiftInfo}
+              mediosTurnos={mediosTurnos}
+              hasIncompleteAssignments={hasIncompleteAssignments}
+            />
           )}
         </div>
         {/* Marcador visual único abajo al centro */}

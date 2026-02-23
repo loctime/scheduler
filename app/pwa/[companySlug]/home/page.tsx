@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useParams } from "next/navigation"
 import { Calendar, FileText, Users, UserCircle } from "lucide-react"
 import { PwaTodayScheduleCard } from "@/components/pwa-today-schedule-card"
@@ -11,6 +11,9 @@ import { ActionCard } from "@/components/pwa/ActionCard"
 import { PWA_THEMES } from "@/lib/pwa-themes"
 import { useOwnerIdFromSlug, useEmployeesByOwnerId } from "@/hooks/use-owner-data"
 import { useToast } from "@/hooks/use-toast"
+import { DayCellContent } from "@/components/schedule-grid/components/day-cell-content"
+import { useTodayScheduleCellData } from "@/hooks/use-today-schedule-cell-data"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export default function PwaHomePage() {
   const params = useParams()
@@ -55,8 +58,16 @@ export default function PwaHomePage() {
 
       {/* Dos columnas debajo del header */}
       <div className="grid grid-cols-2 flex-1 min-h-0 w-full">
-        {/* Columna izquierda (50%): espacio para más información después */}
-        <div className="flex flex-col p-4 lg:p-8 border-r border-border/50 min-w-0 overflow-auto" />
+        {/* Columna izquierda (50%): celda del día de hoy */}
+        <div className="flex flex-col p-4 lg:p-8 border-r border-border/50 min-w-0 overflow-auto items-center justify-center">
+          {viewer?.employeeId ? (
+            <TodayScheduleCell companySlug={companySlug} employeeId={viewer.employeeId} />
+          ) : (
+            <div className="text-center text-muted-foreground">
+              <p className="text-sm">Selecciona un empleado para ver tu horario de hoy</p>
+            </div>
+          )}
+        </div>
 
         {/* Columna derecha (50%): solo los 3 botones, alineados arriba */}
         <div className="flex flex-col gap-3 p-4 lg:p-8 justify-start min-w-0">
@@ -98,6 +109,61 @@ export default function PwaHomePage() {
           setShowEmployeeSelector(false)
         }}
       />
+    </div>
+  )
+}
+
+/**
+ * Componente que renderiza la celda del día de hoy usando el mismo diseño que el calendario semanal.
+ * Usa DayCellContent para mantener consistencia visual.
+ * 
+ * Memoizado para evitar renders innecesarios cuando las props no cambian.
+ */
+function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; employeeId: string }) {
+  const {
+    assignments,
+    dayStatus,
+    backgroundStyle,
+    getShiftInfo,
+    mediosTurnos,
+    hasIncompleteAssignments,
+    isLoading,
+    error,
+  } = useTodayScheduleCellData({ companySlug, employeeId })
+
+  // Memoizar props para DayCellContent
+  const dayCellContentProps = useMemo(
+    () => ({
+      assignments,
+      dayStatus,
+      backgroundStyle,
+      getShiftInfo,
+      mediosTurnos,
+      hasIncompleteAssignments,
+    }),
+    [assignments, dayStatus, backgroundStyle, getShiftInfo, mediosTurnos, hasIncompleteAssignments]
+  )
+
+  if (isLoading) {
+    return (
+      <div className="w-full max-w-md space-y-2">
+        <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-16 w-full" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="text-center text-muted-foreground">
+        <p className="text-sm text-destructive">{error}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="w-full max-w-md">
+      <DayCellContent {...dayCellContentProps} />
     </div>
   )
 }

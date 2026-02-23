@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react"
+import { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import { collection, query, orderBy, onSnapshot, where } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { Horario } from "@/lib/types"
@@ -9,6 +9,8 @@ import {
   type WeekGroup,
 } from "@/lib/monthly-utils"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
+import { getCache, setCache } from "@/lib/cache/indexeddb-cache"
+import { compareArraysByIds } from "@/lib/cache/cache-utils"
 
 export type { MonthGroup, WeekGroup }
 
@@ -45,9 +47,18 @@ export function useMonthlySchedules({
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refetchTrigger, setRefetchTrigger] = useState(0)
+  const listenerSetupRef = useRef(false)
+  const mountedRef = useRef(true)
 
   const refetch = useCallback(() => {
     setRefetchTrigger(prev => prev + 1)
+  }, [])
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
   }, [])
 
   useEffect(() => {
@@ -57,7 +68,30 @@ export function useMonthlySchedules({
       return
     }
 
-    setIsLoading(true)
+    // Limpiar listener anterior si existe
+    listenerSetupRef.current = false
+
+    const cacheKey = `monthly-schedules-${ownerId}`
+    
+    // 1. Cargar desde cache primero (stale-while-revalidate)
+    getCache<Horario[]>(cacheKey)
+      .then((cachedSchedules) => {
+        if (cachedSchedules && cachedSchedules.length > 0 && mountedRef.current) {
+          setSchedules(cachedSchedules)
+          setIsLoading(false)
+          setError(null)
+          // Continuar con listener en background
+        } else if (mountedRef.current) {
+          setIsLoading(true)
+        }
+      })
+      .catch(() => {
+        // Ignorar errores de cache, continuar con carga normal
+        if (mountedRef.current) {
+          setIsLoading(true)
+        }
+      })
+
     setError(null)
 
     const schedulesQuery = query(
@@ -69,29 +103,53 @@ export function useMonthlySchedules({
     const unsubscribeSchedules = onSnapshot(
       schedulesQuery,
       (snapshot) => {
+        if (!mountedRef.current) return
+        
         try {
           const schedulesData = snapshot.docs.map((doc) => ({
             id: doc.id,
             ...doc.data(),
           })) as Horario[]
-          setSchedules(schedulesData)
+          
+          // Solo actualizar si los datos cambiaron (evitar re-renders innecesarios)
+          setSchedules((prevSchedules) => {
+            if (compareArraysByIds(prevSchedules, schedulesData)) {
+              return prevSchedules // No cambiar si son iguales
+            }
+            return schedulesData
+          })
+          
           setError(null)
+          
+          // Actualizar cache en background
+          setCache(cacheKey, schedulesData).catch(() => {
+            // Ignorar errores de cache
+          })
         } catch (err) {
           console.error("Error processing schedules data:", err)
-          setError("Error al procesar los datos de horarios")
+          if (mountedRef.current) {
+            setError("Error al procesar los datos de horarios")
+          }
         } finally {
-          setIsLoading(false)
+          if (mountedRef.current) {
+            setIsLoading(false)
+          }
         }
       },
       (error) => {
         console.error("Error loading schedules:", error)
-        setError("No se pudieron cargar los horarios")
-        setIsLoading(false)
+        if (mountedRef.current) {
+          setError("No se pudieron cargar los horarios")
+          setIsLoading(false)
+        }
       }
     )
 
+    listenerSetupRef.current = true
+
     return () => {
       unsubscribeSchedules()
+      listenerSetupRef.current = false
     }
   }, [ownerId, refetchTrigger])
 

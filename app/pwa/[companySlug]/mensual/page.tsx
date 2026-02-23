@@ -32,7 +32,7 @@ export default function PwaMensualPage() {
   const [showEmployeeSelector, setShowEmployeeSelector] = useState(false)
   const { toast } = useToast()
 
-  const { ownerId } = useOwnerIdFromSlug(companySlug)
+  const { ownerId, loading: ownerIdLoading } = useOwnerIdFromSlug(companySlug)
   const { employees, loading: employeesLoading } = useEmployeesByOwnerId(ownerId)
   const { shifts, loading: shiftsLoading } = useShiftsByOwnerId(ownerId)
   const { config, loading: configLoading } = useConfigByOwnerId(ownerId)
@@ -54,7 +54,10 @@ export default function PwaMensualPage() {
     weekStartsOn,
   })
 
-  const isLoading = employeesLoading || shiftsLoading || configLoading || schedulesLoading
+  const isLoading = ownerIdLoading || employeesLoading || shiftsLoading || configLoading || schedulesLoading
+  
+  // No mostrar error si todavía estamos cargando el ownerId (es normal que falle temporalmente)
+  const shouldShowError = error && !ownerIdLoading && ownerId
 
   const monthGroups = useMemo<MonthGroup[]>(() => {
     if (year == null && month == null) return allMonthGroups
@@ -100,7 +103,7 @@ export default function PwaMensualPage() {
     )
   }
 
-  if (error) {
+  if (shouldShowError) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="max-w-md w-full mx-4">
