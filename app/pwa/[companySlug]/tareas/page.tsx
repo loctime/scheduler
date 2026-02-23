@@ -208,16 +208,6 @@ interface TaskCardProps {
 }
 
 function TaskCard({ task, employees, onClick, isToday, companySlug, router, isCompleted, completedBy, onToggle, viewer }: TaskCardProps) {
-  const assignedEmployees = task.employeeIds
-    ? employees.filter(emp => task.employeeIds!.includes(emp.id))
-    : employees
-
-  const daysFormatted = task.daysOfWeek
-    ? task.daysOfWeek.map(day => DIAS_SEMANA[day]).join(", ")
-    : "Sin días específicos"
-
-  const completedByEmployee = completedBy ? employees.find(emp => emp.id === completedBy) : null
-
   const handleToggle = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -227,98 +217,69 @@ function TaskCard({ task, employees, onClick, isToday, companySlug, router, isCo
     }
   }
 
-  const handleClick = (e: React.MouseEvent) => {
+  const goToDetail = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    
-    // Navegación directa usando el router pasado como prop
     router.push(`/pwa/${companySlug}/tareas/${task.id}`)
   }
 
   return (
     <div 
-      className={`cursor-pointer hover:shadow-md transition-shadow duration-200 border rounded-lg p-4 ${
-        isCompleted ? 'bg-gray-50 opacity-75' : 'bg-white'
+      className={`rounded-xl border p-4 space-y-3 cursor-pointer transition-all ${
+        isCompleted 
+          ? 'opacity-60 bg-green-50 border-green-200' 
+          : 'hover:shadow-md bg-white'
       }`}
-      onClick={handleClick}
+      onClick={goToDetail}
     >
+      {/* Header con título y checkbox */}
       <div className="flex items-start justify-between">
-        <div className="flex items-start space-x-3 flex-1">
-          {/* Checkbox */}
-          <button
-            onClick={handleToggle}
-            className={`mt-1 flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-              isCompleted 
-                ? 'bg-green-500 border-green-500 text-white' 
-                : 'border-gray-300 hover:border-gray-400 text-transparent'
-            }`}
-            disabled={!viewer?.employeeId}
-          >
-            {isCompleted && <Check className="w-3 h-3" />}
-          </button>
+        {/* Título */}
+        <div className={`text-2xl font-semibold ${
+          isCompleted ? 'line-through text-green-700' : ''
+        }`}>
+          {task.title}
+        </div>
 
-          <div className="flex-1">
-            <h3 className={`text-base font-medium mb-1 ${
-              isCompleted ? 'text-gray-500 line-through' : 'text-gray-900'
-            }`}>
-              {task.title}
-            </h3>
-            {task.description && (
-              <p className={`text-sm line-clamp-2 ${
-                isCompleted ? 'text-gray-400' : 'text-gray-600'
-              }`}>
-                {task.description}
-              </p>
+        {/* Checkbox */}
+        <button
+          onClick={handleToggle}
+          className={`flex items-center space-x-2 text-sm font-medium px-3 py-1 rounded-md border transition-colors ${
+            isCompleted 
+              ? 'bg-green-500 text-white border-green-500 hover:bg-green-600' 
+              : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+          }`}
+          disabled={!viewer?.employeeId}
+        >
+          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+            isCompleted 
+              ? 'bg-white border-white' 
+              : 'border-gray-400'
+          }`}>
+            {isCompleted && (
+              <svg className="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010-1.414l-8 8a1 1 0 01-1.414 1.414L8.586 7H4a1 1 0 00-1 1v8a1 1 0 001 1h12a1 1 0 001-1v-8a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
             )}
           </div>
-        </div>
-
-        {isToday && (
-          <Badge variant="destructive" className="ml-2">
-            Hoy
-          </Badge>
-        )}
+          {isCompleted ? "Desmarcar" : "Realizado"}
+        </button>
       </div>
 
-      <div className="space-y-2 mt-3">
-        {/* Empleados asignados */}
-        <div className="flex items-center space-x-2">
-          <Clock className="h-4 w-4 text-gray-400" />
-          <span className="text-sm text-gray-600">
-            {assignedEmployees.length > 0
-              ? assignedEmployees.map(emp => emp.name).join(", ")
-              : "Todos los empleados"
-            }
-          </span>
-        </div>
-
-        {/* Días configurados */}
-        {task.daysOfWeek && task.daysOfWeek.length > 0 && (
-          <div className="flex items-center space-x-2">
-            <Calendar className="h-4 w-4 text-gray-400" />
-            <span className="text-sm text-gray-600">
-              {daysFormatted}
-            </span>
+      {/* Descripción y botón */}
+      <div className="flex items-start justify-between">
+        {task.description && (
+          <div className="text-sm text-muted-foreground">
+            {task.description}
           </div>
         )}
-
-        {/* Fecha de creación */}
-        <div className="flex items-center space-x-2">
-          <Clock className="h-4 w-4 text-gray-400" />
-          <span className="text-sm text-gray-500">
-            Creada {format(task.createdAt?.toDate?.() || new Date(), "d 'de' MMMM", { locale: es })}
-          </span>
-        </div>
-
-        {/* Completado por */}
-        {isCompleted && completedByEmployee && (
-          <div className="flex items-center space-x-2 text-green-600">
-            <Check className="h-4 w-4" />
-            <span className="text-sm font-medium">
-              Realizado por {completedByEmployee.name}
-            </span>
-          </div>
-        )}
+        
+        <button 
+          onClick={goToDetail}
+          className="text-blue-600 hover:text-blue-800 underline text-sm"
+        >
+          Ver más detalles
+        </button>
       </div>
     </div>
   )
