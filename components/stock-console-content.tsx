@@ -15,6 +15,16 @@ import { PwaViewerBadge } from "@/components/pwa/PwaViewerBadge"
 import { esModoPack, getCantidadPorPack, unidadesSignedToPacksFloor, packsSignedToUnidades } from "@/lib/unidades-utils"
 import { ejecutarPedidoEngine } from "@/lib/pedido-engine"
 import { buildPedidoOficial } from "@/lib/build-pedido-oficial"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 /** Abrevia el nombre para vista móvil si supera 15 caracteres; si no, lo deja igual. */
 function abbreviateProductName(nombre: string): string {
@@ -228,6 +238,116 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
   // Estado para trackear productos que cambiaron de criticidad
   const [productosRecientes, setProductosRecientes] = useState<Set<string>>(new Set())
   
+  // Estado para trackear cambios pendientes
+  const tieneCambiosPendientes = useMemo(() => {
+    return movimientosPendientes.length > 0
+  }, [movimientosPendientes])
+  
+  // Estado para el modal de confirmación
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null)
+  const [confirmTitle, setConfirmTitle] = useState("")
+  const [confirmMessage, setConfirmMessage] = useState("")
+  
+  // Función de confirmación para salir con cambios pendientes
+  const confirmarSalida = useCallback((callback: () => void, title = "Salir sin guardar", message = "Tienes cambios sin confirmar. ¿Estás seguro de que quieres salir? Se perderán todos los cambios no guardados.") => {
+    if (!tieneCambiosPendientes) {
+      callback()
+      return
+    }
+    
+    setConfirmTitle(title)
+    setConfirmMessage(message)
+    setPendingAction(() => callback)
+    setShowConfirmDialog(true)
+  }, [tieneCambiosPendientes])
+  
+  // Manejar confirmación del diálogo
+  const handleConfirmAction = useCallback(() => {
+    if (pendingAction) {
+      pendingAction()
+    }
+    setShowConfirmDialog(false)
+    setPendingAction(null)
+  }, [pendingAction])
+  
+  // Manejar cancelación del diálogo
+  const handleCancelAction = useCallback(() => {
+    setShowConfirmDialog(false)
+    setPendingAction(null)
+  }, [])
+  
+  // Prevenir refresh/recarga con cambios pendientes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (tieneCambiosPendientes) {
+        e.preventDefault()
+        e.returnValue = 'Tienes cambios sin confirmar. ¿Estás seguro de que quieres salir?'
+        return 'Tienes cambios sin confirmar. ¿Estás seguro de que quieres salir?'
+      }
+    }
+    
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [tieneCambiosPendientes])
+  
+  // Prevenir navegación hacia atrás con cambios pendientes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const handleNavigation = (e: PopStateEvent) => {
+        if (tieneCambiosPendientes) {
+          e.preventDefault()
+          confirmarSalida(() => {
+            window.history.back()
+          }, "Navegación hacia atrás", "Tienes cambios sin confirmar. ¿Estás seguro de que quieres navegar hacia atrás? Se perderán todos los cambios no guardados.")
+        }
+      }
+      
+      window.addEventListener('popstate', handleNavigation)
+      
+      // Prevenir el swipe-to-refresh en móvil
+      let startY = 0
+      let isPulling = false
+      
+      const handleTouchStart = (e: TouchEvent) => {
+        if (window.scrollY === 0) {
+          startY = e.touches[0].clientY
+          isPulling = true
+        }
+      }
+      
+      const handleTouchMove = (e: TouchEvent) => {
+        if (!isPulling || !tieneCambiosPendientes) return
+        
+        const currentY = e.touches[0].clientY
+        const pullDistance = currentY - startY
+        
+        if (pullDistance > 100) { // 100px de pull
+          e.preventDefault()
+          confirmarSalida(() => {
+            window.location.reload()
+          }, "Recargar página", "Tienes cambios sin confirmar. ¿Estás seguro de que quieres recargar la página? Se perderán todos los cambios no guardados.")
+          isPulling = false
+        }
+      }
+      
+      const handleTouchEnd = () => {
+        isPulling = false
+      }
+      
+      window.addEventListener('touchstart', handleTouchStart, { passive: true })
+      window.addEventListener('touchmove', handleTouchMove, { passive: false })
+      window.addEventListener('touchend', handleTouchEnd, { passive: true })
+      
+      return () => {
+        window.removeEventListener('popstate', handleNavigation)
+        window.removeEventListener('touchstart', handleTouchStart)
+        window.removeEventListener('touchmove', handleTouchMove)
+        window.removeEventListener('touchend', handleTouchEnd)
+      }
+    }
+  }, [tieneCambiosPendientes, confirmarSalida])
+  
   // Detectar cambios de criticidad y agregar animación
   useEffect(() => {
     const nuevosCriticos = new Set<string>()
@@ -314,6 +434,12 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
               href={`/pwa/${companySlug}/home`}
               className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg hover:bg-white/20 active:bg-white/30 transition-colors shrink-0"
               aria-label="Volver al home"
+              onClick={(e) => {
+                e.preventDefault()
+                confirmarSalida(() => {
+                  window.location.href = `/pwa/${companySlug}/home`
+                }, "Volver al inicio", "Tienes cambios sin confirmar. ¿Estás seguro de que quieres volver al inicio? Se perderán todos los cambios no guardados.")
+              }}
             >
               <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
             </Link>
@@ -672,6 +798,37 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
           </div>
         )}
       </div>
+      
+      {/* Modal de Confirmación Profesional */}
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent className="max-w-md mx-4">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-lg">
+              <Package className="w-5 h-5 text-orange-500" />
+              {confirmTitle}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-600">
+              {confirmMessage}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel 
+              onClick={handleCancelAction}
+              className="w-full sm:w-auto"
+            >
+              <X className="w-4 h-4 mr-2" />
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmAction}
+              className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Check className="w-4 h-4 mr-2" />
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }
