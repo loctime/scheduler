@@ -14,6 +14,7 @@ const ROUTE_TO_PAGE_ID: Record<string, string> = {
   "/dashboard": "horarios",
   "/dashboard/horarios": "horarios",
   "/dashboard/horarios-mensuales": "horarios", // Vista mensual también mapea a "horarios"
+  "/dashboard/tareas": "tareas",
   "/dashboard/pedidos": "pedidos",
   "/dashboard/stock-console": "pedidos",
   "/dashboard/fabrica": "fabrica",

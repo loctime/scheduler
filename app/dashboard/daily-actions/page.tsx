@@ -19,6 +19,7 @@ import { useOwnerIdFromSlug, useEmployeesByOwnerId } from "@/hooks/use-owner-dat
 import { DailyAction } from "@/hooks/use-daily-actions"
 import { DataContext } from "@/contexts/data-context"
 import { useContext } from "react"
+import { DashboardLayout } from "@/components/dashboard-layout"
 
 const DAYS_OF_WEEK = [
   { value: 0, label: "Domingo" },
@@ -40,6 +41,17 @@ interface DailyActionFormData {
 }
 
 export default function DailyActionsPage() {
+  const dataContext = useContext(DataContext)
+  const user = dataContext?.user
+  
+  return (
+    <DashboardLayout user={user}>
+      <DailyActionsContent />
+    </DashboardLayout>
+  )
+}
+
+function DailyActionsContent() {
   const params = useParams()
   const router = useRouter()
   const companySlug = params.companySlug as string

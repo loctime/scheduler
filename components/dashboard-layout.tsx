@@ -21,7 +21,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Factory, Shield, UserCog, MessageSquare, AlertTriangle, Package } from "lucide-react"
+import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Factory, Shield, UserCog, MessageSquare, AlertTriangle, Package, CheckSquare } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -37,6 +37,7 @@ const navItems = [
   { href: "/dashboard", label: "Horarios", icon: Calendar },
   { href: "/dashboard/horarios-mensuales", label: "Vista Mensual", icon: CalendarDays },
   { href: "/dashboard/empleados", label: "Empleados", icon: Users },
+  { href: "/dashboard/tareas", label: "Tareas", icon: CheckSquare },
   { href: "/dashboard/pedidos", label: "Pedidos", icon: ShoppingCart },
   { href: "/dashboard/stock-console", label: "Stock Rápido", icon: Package, permission: "pedidos" },
   { href: "/mensajeria", label: "Mensajería", icon: MessageSquare },
@@ -74,6 +75,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     "/dashboard": "horarios",
     "/dashboard/horarios": "horarios",
     "/dashboard/horarios-mensuales": "horarios",
+    "/dashboard/tareas": "tareas",
     "/dashboard/pedidos": "pedidos",
     "/dashboard/stock-console": "pedidos",
     "/dashboard/fabrica": "fabrica",

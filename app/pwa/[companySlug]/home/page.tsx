@@ -17,7 +17,8 @@ import { DayCellContent } from "@/components/schedule-grid/components/day-cell-c
 import { useTodayScheduleCellData } from "@/hooks/use-today-schedule-cell-data"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useDailyActions, DailyAction } from "@/hooks/use-daily-actions"
-import { AlertTriangle } from "lucide-react"
+import { useDailyActionStatus } from "@/hooks/use-daily-action-status"
+import { AlertTriangle, Check, ChevronDown, ChevronUp } from "lucide-react"
 
 // Constantes para mensajes informativos
 const MENSAJES_DEL_DIA = [
@@ -183,6 +184,7 @@ export default function PwaHomePage() {
  */
 function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; employeeId: string }) {
   const { ownerId } = useOwnerIdFromSlug(companySlug)
+  const viewer = useViewer()
   
   const {
     assignments,
@@ -197,6 +199,22 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
   
   // Acciones diarias para este empleado
   const { actions: dailyActions } = useDailyActions(ownerId || "", employeeId)
+  
+  // Estado de acciones completadas
+  const { completedIds, toggleCompleted } = useDailyActionStatus(ownerId || "")
+  
+  // Estado para acciones expandidas
+  const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set())
+  
+  const toggleExpanded = (actionId: string) => {
+    const newExpanded = new Set(expandedActions)
+    if (newExpanded.has(actionId)) {
+      newExpanded.delete(actionId)
+    } else {
+      newExpanded.add(actionId)
+    }
+    setExpandedActions(newExpanded)
+  }
 
   // Memoizar props para DayCellContent
   const dayCellContentProps = useMemo(
@@ -259,19 +277,87 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
             </span>
           </div>
           <div className="space-y-2">
-            {dailyActions.map((action: DailyAction, index: number) => (
-              <div key={action.id} className="space-y-1">
-                {index > 0 && <div className="border-t border-amber-200 dark:border-amber-800" />}
-                <div className="font-medium text-sm text-amber-900 dark:text-amber-100">
-                  {action.title}
+            {dailyActions.map((action: DailyAction, index: number) => {
+              const isCompleted = completedIds.includes(action.id)
+              const isExpanded = expandedActions.has(action.id)
+              
+              return (
+                <div key={action.id} className="space-y-1">
+                  {index > 0 && <div className="border-t border-amber-200 dark:border-amber-800" />}
+                  
+                  {/* Acción NO completada - mostrar normal */}
+                  {!isCompleted ? (
+                    <div className="space-y-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <div className="font-medium text-sm text-amber-900 dark:text-amber-100">
+                            {action.title}
+                          </div>
+                          {action.description && (
+                            <div className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                              {action.description}
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => toggleCompleted(action.id)}
+                          className="shrink-0 p-1 rounded hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors"
+                          title="Marcar como realizada"
+                        >
+                          <Check className="w-4 h-4 text-amber-600" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Acción completada - mostrar compactada */
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Check className="w-4 h-4 text-green-600" />
+                          <span className="font-medium text-sm text-green-800 dark:text-green-200 opacity-75">
+                            {action.title}
+                          </span>
+                          <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs rounded-full">
+                            Completada
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => toggleExpanded(action.id)}
+                          className="shrink-0 p-1 rounded hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors"
+                          title={isExpanded ? "Contraer" : "Expandir"}
+                        >
+                          {isExpanded ? (
+                            <ChevronUp className="w-4 h-4 text-amber-600" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-amber-600" />
+                          )}
+                        </button>
+                      </div>
+                      
+                      {/* Expandido - mostrar detalles */}
+                      {isExpanded && (
+                        <div className="pl-6 space-y-1">
+                          {action.description && (
+                            <div className="text-xs text-amber-700 dark:text-amber-300">
+                              {action.description}
+                            </div>
+                          )}
+                          <div className="text-xs text-green-700 dark:text-green-300">
+                            Completada por {viewer?.employeeName || 'Empleado'}
+                          </div>
+                          <button
+                            onClick={() => toggleCompleted(action.id)}
+                            className="text-xs text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-200 underline"
+                          >
+                            Desmarcar como completada
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                {action.description && (
-                  <div className="text-xs text-amber-700 dark:text-amber-300">
-                    {action.description}
-                  </div>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
