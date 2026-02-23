@@ -344,7 +344,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
         </div>
 
         {/* Selector de Pedido (compacto) — siempre visible con sticky */}
-        <div className="fixed top-14 sm:top-16 left-0 right-0 z-30 bg-white border-b-2 border-gray-300 shadow-md">
+        <div className="fixed top-12 sm:top-14 left-0 right-0 z-30 bg-white border-b-2 border-gray-300 shadow-md">
           <div className="overflow-x-auto overflow-y-hidden max-h-[3.5rem] sm:max-h-[4rem]">
             <div className="flex flex-wrap gap-1.5 sm:gap-2 w-max min-w-full max-h-[3.5rem] sm:max-h-[4rem] px-2 sm:px-2.5 py-1.5 sm:py-2">
               
@@ -367,7 +367,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
         {/* Lista de Productos — cards compactas, número protagonista */}
         {state.selectedPedidoId && productos.length > 0 && (
-          <div className="pt-20 sm:pt-24 p-3 space-y-2">
+          <div className="pt-16 sm:pt-20 p-3 space-y-2">
             {productosOrdenados.map((producto) => {
               const cantidad = state.cantidades[producto.id] || 0
               // En modo control, usar localStockControl si existe, sino stockActual (para UI inmediata)
@@ -445,7 +445,12 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
                     {/* Fila 2: Stock (izq) y Unidad/Pack solo si el producto tiene pack */}
                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-gray-700">Stock: {stock}</span>
+                      <span className={cn(
+                        "text-sm font-medium",
+                        isStockBajo ? "text-red-600 font-bold" : "text-gray-700"
+                      )}>
+                        Stock: {stock}
+                      </span>
                       {isPackProduct ? (
                         <div className="flex items-center gap-1.5 shrink-0">
                           <button
@@ -476,8 +481,13 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                     </div>
 
                     {/* Fila 3: Min y equivalencia (1 pack (12u) / 12 u (1 pack)) en la misma línea */}
-                    <div className="flex items-center gap-2 flex-wrap text-sm text-gray-700">
-                      <span className="font-medium">Mín: {stockMinimo}</span>
+                    <div className="flex items-center gap-2 flex-wrap text-sm">
+                      <span className={cn(
+                        "font-medium",
+                        isStockBajo ? "text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded" : "text-gray-700"
+                      )}>
+                        Mín: {stockMinimo}
+                      </span>
                       {(isControl ? stock !== 0 : cantidad !== 0) && (
                         <span className="text-gray-600">{equivalenciaText}</span>
                       )}
@@ -570,7 +580,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
         {/* Estado vacío */}
         {(!state.selectedPedidoId || productos.length === 0) && (
-          <div className="pt-20 sm:pt-24 p-8 text-center">
+          <div className="pt-16 sm:pt-20 p-8 text-center">
             <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
               {state.selectedPedidoId ? "No hay productos" : "Selecciona un pedido"}
