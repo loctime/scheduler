@@ -265,7 +265,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
       <div className={`min-h-screen bg-gray-100 ${isPWA ? "pb-16" : "pb-20"}`}>
         {/* Header simple — tema rojo en PWA */}
-        <div className={`p-2 sm:p-3 shadow-lg flex items-center gap-2 sm:gap-3 ${isPWA ? "bg-red-100 text-red-900 border-b border-red-200" : "bg-blue-500 text-white"}`}>
+        <div className={`fixed top-0 left-0 right-0 z-20 p-2 sm:p-3 shadow-lg flex items-center gap-2 sm:gap-3 ${isPWA ? "bg-red-100 text-red-900 border-b border-red-200" : "bg-blue-500 text-white"}`}>
           {companySlug ? (
             <Link
               href={`/pwa/${companySlug}/home`}
@@ -298,7 +298,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                   }}
                   disabled={state.loading}
                   size="sm"
-                  className="h-7 sm:h-8 px-1.5 sm:px-2 text-xs bg-red-600 hover:bg-red-700 text-white border-red-700"
+                  className="h-9 sm:h-10 px-4 sm:px-5 text-xs bg-red-600 hover:bg-red-700 text-white border-red-700"
                 >
                   <Package className="w-3 h-3 sm:mr-1" />
                   <span className="hidden sm:inline">Copiar</span>
@@ -311,7 +311,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                   }}
                   disabled={state.loading}
                   size="sm"
-                  className="h-7 sm:h-8 px-1.5 sm:px-2 text-xs bg-green-600 hover:bg-green-700 text-white border-green-700"
+                  className="h-9 sm:h-10 px-4 sm:px-5 text-xs bg-green-600 hover:bg-green-700 text-white border-green-700"
                 >
                   <MessageCircle className="w-3 h-3 sm:mr-1" />
                   <span className="hidden sm:inline">WhatsApp</span>
@@ -344,7 +344,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
         </div>
 
         {/* Selector de Pedido (compacto) — siempre visible con sticky */}
-        <div className="sticky top-0 z-10 bg-white border-b shadow-sm">
+        <div className="fixed top-14 sm:top-16 left-0 right-0 z-30 bg-white border-b-2 border-gray-300 shadow-md">
           <div className="overflow-x-auto overflow-y-hidden max-h-[3.5rem] sm:max-h-[4rem]">
             <div className="flex flex-wrap gap-1.5 sm:gap-2 w-max min-w-full max-h-[3.5rem] sm:max-h-[4rem] px-2 sm:px-2.5 py-1.5 sm:py-2">
               
@@ -367,7 +367,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
         {/* Lista de Productos — cards compactas, número protagonista */}
         {state.selectedPedidoId && productos.length > 0 && (
-          <div className="p-3 space-y-2">
+          <div className="pt-20 sm:pt-24 p-3 space-y-2">
             {productosOrdenados.map((producto) => {
               const cantidad = state.cantidades[producto.id] || 0
               // En modo control, usar localStockControl si existe, sino stockActual (para UI inmediata)
@@ -570,7 +570,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
         {/* Estado vacío */}
         {(!state.selectedPedidoId || productos.length === 0) && (
-          <div className="p-8 text-center">
+          <div className="pt-20 sm:pt-24 p-8 text-center">
             <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
               {state.selectedPedidoId ? "No hay productos" : "Selecciona un pedido"}
