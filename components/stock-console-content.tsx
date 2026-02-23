@@ -225,6 +225,49 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
     })
   }, [productos, stockActual])
 
+  // Estado para trackear productos que cambiaron de criticidad
+  const [productosRecientes, setProductosRecientes] = useState<Set<string>>(new Set())
+  
+  // Detectar cambios de criticidad y agregar animación
+  useEffect(() => {
+    const nuevosCriticos = new Set<string>()
+    const productosQueDejaronDeSerCriticos = new Set<string>()
+    
+    productos.forEach(producto => {
+      const stock = stockActual[producto.id] ?? 0
+      const isCritico = producto.stockMinimo > stock
+      
+      if (isCritico) {
+        nuevosCriticos.add(producto.id)
+      } else if (productosRecientes.has(producto.id)) {
+        productosQueDejaronDeSerCriticos.add(producto.id)
+      }
+    })
+    
+    // Solo actualizar si hay cambios
+    const hasChanges = 
+      nuevosCriticos.size !== productosRecientes.size ||
+      Array.from(nuevosCriticos).some(id => !productosRecientes.has(id))
+    
+    if (hasChanges) {
+      // Actualizar estado de productos críticos
+      setProductosRecientes(nuevosCriticos)
+      
+      // Limpiar productos que dejaron de ser críticos después de un tiempo
+      if (productosQueDejaronDeSerCriticos.size > 0) {
+        const timer = setTimeout(() => {
+          setProductosRecientes(prev => {
+            const next = new Set(prev)
+            productosQueDejaronDeSerCriticos.forEach(id => next.delete(id))
+            return next
+          })
+        }, 2000) // 2 segundos de animación
+        
+        return () => clearTimeout(timer)
+      }
+    }
+  }, [productos, stockActual]) // Removido productosRecientes de las dependencias
+
   // visualMode: solo visual, no persiste. Debe ir ANTES de cualquier return (Rules of Hooks)
   const [visualMode, setVisualMode] = useState<Record<string, "unidad" | "pack">>({})
   const getVisualMode = useCallback((productoId: string, producto: { modoCompra?: "unidad" | "pack"; cantidadPorPack?: number }) =>
@@ -367,7 +410,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
         {/* Lista de Productos — cards compactas, número protagonista */}
         {state.selectedPedidoId && productos.length > 0 && (
-          <div className="pt-16 sm:pt-20 p-3 space-y-2">
+          <div className="pt-20 sm:pt-24 p-3 space-y-2">
             {productosOrdenados.map((producto) => {
               const cantidad = state.cantidades[producto.id] || 0
               // En modo control, usar localStockControl si existe, sino stockActual (para UI inmediata)
@@ -407,10 +450,12 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                 <div
                   key={producto.id}
                   className={cn(
-                    "relative rounded-2xl border-2 shadow-sm active:shadow-md transition-all flex overflow-hidden",
+                    "relative rounded-2xl border-2 shadow-sm active:shadow-md transition-all duration-500 ease-out flex overflow-hidden",
                     isStockBajo 
                       ? "border-orange-500 bg-orange-50/50" 
-                      : "border-gray-200/80 bg-white"
+                      : "border-gray-200/80 bg-white",
+                    // Animación sutil cuando deja de ser crítico
+                    !isStockBajo && productosRecientes.has(producto.id) && "animate-pulse bg-green-50/30 border-green-300"
                   )}
                 >
                   {/* Capa de fill "como agua" con ondas */}
@@ -580,7 +625,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
         {/* Estado vacío */}
         {(!state.selectedPedidoId || productos.length === 0) && (
-          <div className="pt-16 sm:pt-20 p-8 text-center">
+          <div className="pt-20 sm:pt-24 p-8 text-center">
             <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
               {state.selectedPedidoId ? "No hay productos" : "Selecciona un pedido"}
