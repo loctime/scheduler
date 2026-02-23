@@ -2,25 +2,23 @@ import { useEffect, useState } from "react"
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Task } from "@/types/task"
-import { useData } from "@/contexts/data-context"
-import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
-export function useTasks(employeeId?: string) {
+export function useTasks(employeeId?: string, ownerId?: string | null) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [todayTasks, setTodayTasks] = useState<Task[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { user, userData } = useData()
 
   useEffect(() => {
-    if (!user || !db) {
+    if (!db) {
       setIsLoading(false)
       return
     }
 
-    const ownerId = getOwnerIdForActor(user, userData)
+    // Si no se proporciona ownerId, no podemos continuar
     if (!ownerId) {
       setIsLoading(false)
+      setError("No se proporcionó ownerId")
       return
     }
 
@@ -75,7 +73,7 @@ export function useTasks(employeeId?: string) {
     )
 
     return () => unsubscribe()
-  }, [user, userData, employeeId])
+  }, [ownerId, employeeId])
 
   return {
     tasks,

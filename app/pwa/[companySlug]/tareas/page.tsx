@@ -25,7 +25,7 @@ export default function TareasPage() {
   const { ownerId, loading: ownerIdLoading } = useOwnerIdFromSlug(companySlug)
   const { employees, loading: employeesLoading } = useEmployeesByOwnerId(ownerId)
   
-  const { tasks, todayTasks, isLoading, error } = useTasks(viewer?.employeeId)
+  const { tasks, todayTasks, isLoading, error } = useTasks(viewer?.employeeId, ownerId)
 
   const today = new Date()
   const todayName = DIAS_SEMANA[today.getDay()]

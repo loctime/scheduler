@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname, useParams } from "next/navigation"
 import { onAuthStateChanged } from "firebase/auth"
-import { Package, Loader2, Calendar, CalendarDays, Home } from "lucide-react"
+import { Package, Loader2, Calendar, CalendarDays, Home, CheckSquare } from "lucide-react"
 import { auth, isFirebaseConfigured } from "@/lib/firebase"
 import { DataProvider } from "@/contexts/data-context"
 import { savePwaLastSlug } from "@/components/pwa/pwa-company-selector"
@@ -51,6 +51,7 @@ function PwaTabs() {
           { href: `/pwa/${companySlug}/horario`, label: "Horario", icon: Calendar, pathMatch: null as string | null },
           { href: `/pwa/${companySlug}/mensual`, label: "Mensual", icon: CalendarDays, pathMatch: null as string | null },
           { href: `/pwa/${companySlug}/home`, label: "Panel", icon: Home, pathMatch: null as string | null },
+          { href: `/pwa/${companySlug}/tareas`, label: "Tareas", icon: CheckSquare, pathMatch: null as string | null },
           { href: `/pwa/${companySlug}/stock-console`, label: "Stock", icon: Package, pathMatch: null as string | null }
         ].map((item) => {
           const Icon = item.icon

@@ -13,8 +13,8 @@ function isPublicPwaPath(pathname: string): boolean {
   if (pathname === "/pwa/stock-console" || pathname.startsWith("/pwa/stock-console/")) return true
   // /pwa/horario/xxx (redirect a /pwa/xxx/horario)
   if (pathname.startsWith("/pwa/horario/")) return true
-  // /pwa/[slug], /pwa/[slug]/horario, /pwa/[slug]/home, /pwa/[slug]/mensual, /pwa/[slug]/stock-console
-  return /^\/pwa\/([^/]+)(?:\/(horario|mensual|home|stock-console))?\/?$/.test(pathname)
+  // /pwa/[slug], /pwa/[slug]/horario, /pwa/[slug]/home, /pwa/[slug]/mensual, /pwa/[slug]/stock-console, /pwa/[slug]/tareas
+  return /^\/pwa\/([^/]+)(?:\/(horario|mensual|home|stock-console|tareas))?\/?$/.test(pathname)
 }
 
 function decodeJwtPayload(token: string): any | null {

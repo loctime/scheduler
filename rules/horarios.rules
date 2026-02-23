@@ -316,6 +316,18 @@ match /apps/horarios/dailyActions/{ownerId} {
 }
 
 /* ===============================
+   DAILY ACTION STATUS
+   =============================== */
+
+match /apps/horarios/dailyActionStatus/{docId} {
+  allow read: if true;
+
+  allow create, update: if true;
+
+  allow delete: if false;
+}
+
+/* ===============================
    ENLACES PUBLICOS
    =============================== */
 
