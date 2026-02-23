@@ -36,25 +36,30 @@ export default function PwaHomePage() {
               Horarios y Stock
             </p>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={() => setShowEmployeeSelector(true)}
-              className="shrink-0 rounded-full p-0 inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-              aria-label="Cambiar empleado"
-            >
-              {viewer ? (
-                <PwaViewerBadge companySlug={undefined} />
-              ) : (
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
-                  <UserCircle className="h-5 w-5" />
-                </span>
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            <div className="flex items-center gap-2">
+              {viewer?.employeeName && (
+                <p className="text-muted-foreground font-medium">{viewer.employeeName}</p>
               )}
-            </button>
-            <UserStatusMenu />
+              <button
+                type="button"
+                onClick={() => setShowEmployeeSelector(true)}
+                className="shrink-0 rounded-full p-0 inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                aria-label="Cambiar empleado"
+              >
+                {viewer ? (
+                  <PwaViewerBadge companySlug={undefined} />
+                ) : (
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
+                    <UserCircle className="h-5 w-5" />
+                  </span>
+                )}
+              </button>
+              <UserStatusMenu />
+            </div>
+            <PwaTodayScheduleCard companySlug={companySlug} variant="inline" />
           </div>
         </div>
-        <PwaTodayScheduleCard companySlug={companySlug} variant="inline" />
       </div>
 
       {/* Dos columnas debajo del header */}

@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useMemo, useRef } from "react"
-import { format } from "date-fns"
+import { format, addDays } from "date-fns"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Calendar, Clock, Coffee } from "lucide-react"
@@ -105,9 +105,13 @@ function PwaTodayScheduleCardComponent({ companySlug, horario: horarioProp, shif
 
   const today = new Date()
   const todayStr = format(today, "yyyy-MM-dd")
+  const tomorrow = addDays(today, 1)
+  const tomorrowStr = format(tomorrow, "yyyy-MM-dd")
   const currentWeek = horario?.weeks?.[horario?.publishedWeekId]
   const dayData = currentWeek?.days?.[todayStr] as Record<string, any> | undefined
   const todayAssignments = currentViewer && currentViewer.employeeId ? dayData?.[currentViewer.employeeId] : undefined
+  const tomorrowData = currentWeek?.days?.[tomorrowStr] as Record<string, any> | undefined
+  const tomorrowAssignments = currentViewer && currentViewer.employeeId ? tomorrowData?.[currentViewer.employeeId] : undefined
 
   const isLoadingState = !horarioProp && (isLoading || !horario?.publishedWeekId)
   
@@ -125,7 +129,9 @@ function PwaTodayScheduleCardComponent({ companySlug, horario: horarioProp, shif
       return
     }
     
-    const cacheKey = `schedule-info-${companySlug}-${currentViewer.employeeId}-${todayStr}-${horario.publishedWeekId}`
+    // Si es variant inline, usar fecha de mañana para el cache key
+    const dateStrForCache = variant === "inline" ? tomorrowStr : todayStr
+    const cacheKey = `schedule-info-${companySlug}-${currentViewer.employeeId}-${dateStrForCache}-${horario.publishedWeekId}`
     
     // Si es el mismo día y mismo horario, usar cache en memoria
     if (cacheKey === lastCacheKeyRef.current && scheduleInfoCacheRef.current) {
@@ -147,7 +153,9 @@ function PwaTodayScheduleCardComponent({ companySlug, horario: horarioProp, shif
       })
     
     // 2. Calcular scheduleInfo
-    const info = getTodayScheduleInfo(todayAssignments, shifts)
+    // Si es variant inline, usar horario de mañana, sino usar hoy
+    const assignmentsToUse = variant === "inline" ? tomorrowAssignments : todayAssignments
+    const info = getTodayScheduleInfo(assignmentsToUse, shifts)
     scheduleInfoCacheRef.current = info
     lastCacheKeyRef.current = cacheKey
     setScheduleInfo(info)
@@ -156,7 +164,7 @@ function PwaTodayScheduleCardComponent({ companySlug, horario: horarioProp, shif
     setCache(cacheKey, info).catch(() => {
       // Ignorar errores de cache
     })
-  }, [currentViewer, horario, isLoadingState, companySlug, todayStr, todayAssignments, shifts])
+  }, [currentViewer, horario, isLoadingState, companySlug, todayStr, tomorrowStr, todayAssignments, tomorrowAssignments, shifts, variant])
 
   if (!currentViewer) return null
 
@@ -164,24 +172,41 @@ function PwaTodayScheduleCardComponent({ companySlug, horario: horarioProp, shif
     if (isLoadingState) {
       return (
         <p className="text-sm text-muted-foreground">
-          Hoy: <span className="inline-block h-4 w-24 align-middle bg-muted rounded animate-pulse" />
+          mañana: <span className="inline-block h-4 w-24 align-middle bg-muted rounded animate-pulse" />
         </p>
       )
     }
     const { status, timeBlocks } = scheduleInfo
+    
+    // Función helper para formatear tiempo (quitar :00 si está presente)
+    const formatTime = (time: string): string => {
+      if (!time) return time
+      if (time.endsWith(":00")) {
+        return time.slice(0, -3)
+      }
+      return time
+    }
+    
+    // Función helper para formatear rango de tiempo
+    const formatTimeRange = (start: string, end: string): string => {
+      const formattedStart = formatTime(start)
+      const formattedEnd = formatTime(end)
+      return `${formattedStart} a ${formattedEnd}`
+    }
+    
     const text =
       status === "franco"
         ? "Franco"
         : status === "medio_franco"
           ? timeBlocks.length > 0
-            ? timeBlocks.map((b: { startTime: string; endTime: string }) => `${b.startTime}–${b.endTime}`).join(", ")
+            ? timeBlocks.map((b: { startTime: string; endTime: string }) => formatTimeRange(b.startTime, b.endTime)).join(", ")
             : "Medio franco"
           : timeBlocks.length > 0
-            ? timeBlocks.map((b: { startTime: string; endTime: string }) => `${b.startTime}–${b.endTime}`).join(", ")
+            ? timeBlocks.map((b: { startTime: string; endTime: string }) => formatTimeRange(b.startTime, b.endTime)).join(", ")
             : "—"
     return (
       <p className="text-sm text-muted-foreground">
-        Hoy: <span className="font-medium text-foreground tabular-nums">{text} 👈 ⏰ {currentViewer.employeeName}</span>
+        mañana: <span className="font-medium text-foreground tabular-nums">{text}</span>
       </p>
     )
   }
