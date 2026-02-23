@@ -17,6 +17,34 @@ import { DayCellContent } from "@/components/schedule-grid/components/day-cell-c
 import { useTodayScheduleCellData } from "@/hooks/use-today-schedule-cell-data"
 import { Skeleton } from "@/components/ui/skeleton"
 
+// Constantes para mensajes informativos
+const MENSAJES_DEL_DIA = [
+  "Tené un excelente día 🙌",
+  "La puntualidad habla bien de vos.",
+  "Cuidá tu sector como si fuera tu casa.",
+  "Trabajo en equipo = mejores resultados.",
+  "Si llegás antes, arrancás mejor.",
+  "Organización primero, velocidad después.",
+  "Todo suma.",
+  "Hoy puede ser un gran día.",
+  "La constancia hace la diferencia.",
+  "Cada detalle importa.",
+  "Responsabilidad y compromiso.",
+  "Orden y limpieza primero."
+]
+
+/**
+ * Obtiene el mensaje del día basado en la fecha actual.
+ * Usa el día del año para seleccionar un mensaje constante durante todo el día.
+ */
+function getMensajeDelDia(): string {
+  const today = new Date()
+  const startOfYear = new Date(today.getFullYear(), 0, 0)
+  const dayOfYear = Math.floor((today.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24))
+  const index = dayOfYear % MENSAJES_DEL_DIA.length
+  return MENSAJES_DEL_DIA[index]
+}
+
 export default function PwaHomePage() {
   const params = useParams()
   const companySlug = params.companySlug as string
@@ -25,6 +53,9 @@ export default function PwaHomePage() {
   const { toast } = useToast()
   const { ownerId } = useOwnerIdFromSlug(companySlug)
   const { employees } = useEmployeesByOwnerId(ownerId)
+  
+  // Mensaje del día (memoizado para recalcular solo cuando cambia la fecha)
+  const mensajeDelDia = useMemo(() => getMensajeDelDia(), [])
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -64,16 +95,23 @@ export default function PwaHomePage() {
       </div>
 
       {/* Dos columnas debajo del header */}
-      <div className="grid grid-cols-2 flex-1 min-h-0 w-full">
+      <div className="grid grid-cols-2 flex-1 min-h-0 w-full pb-20">
         {/* Columna izquierda (50%): celda del día de hoy */}
-        <div className="flex flex-col p-4 lg:p-8 border-r border-border/50 min-w-0 overflow-auto items-center justify-start bg-transparent">
-          {viewer?.employeeId ? (
-            <TodayScheduleCell companySlug={companySlug} employeeId={viewer.employeeId} />
-          ) : (
-            <div className="text-center text-muted-foreground">
-              <p className="text-sm">Selecciona un empleado para ver tu horario de hoy</p>
-            </div>
-          )}
+        <div className="flex flex-col p-4 lg:p-8 border-r border-border/50 min-w-0 items-center justify-start bg-transparent">
+          <div className="flex-1 overflow-auto w-full">
+            {viewer?.employeeId ? (
+              <TodayScheduleCell companySlug={companySlug} employeeId={viewer.employeeId} />
+            ) : (
+              <div className="text-center text-muted-foreground">
+                <p className="text-sm">Selecciona un empleado para ver tu horario de hoy</p>
+              </div>
+            )}
+          </div>
+          
+          {/* Mensaje del Día (Dinámico) - Pegado al footer */}
+          <div className="bg-primary/5 rounded-lg border py-3 px-3 text-xs sm:text-sm text-center w-full mt-4">
+            {mensajeDelDia}
+          </div>
         </div>
 
         {/* Columna derecha (50%): solo los 3 botones, alineados arriba */}
@@ -171,6 +209,11 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
   const today = new Date()
   const todayFormatted = format(today, "dd/MM/yy")
   const dayOfWeek = format(today, "EEEE", { locale: es })
+  
+  // Mensaje fijo (cambia si es domingo)
+  const mensajeFijo = today.getDay() === 0 
+    ? "Revisá el cronograma de la semana."
+    : "Recordá fichar tu ingreso y mantener tu sector en orden."
 
   return (
     <div className="w-full max-w-md space-y-2">
@@ -178,6 +221,11 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
       {dayOfWeek} {todayFormatted}
       </div>
       <DayCellContent {...dayCellContentProps} homeMode={true} />
+      
+      {/* Bloque 1 - Mensaje Fijo */}
+      <div className="bg-muted/40 rounded-lg py-2 px-2 text-xs text-center mt-2">
+        {mensajeFijo}
+      </div>
     </div>
   )
 }
