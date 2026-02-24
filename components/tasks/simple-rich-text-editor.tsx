@@ -22,6 +22,22 @@ export function RichTextEditor({
     setContent(value || "")
   }, [value])
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Tab") {
+      event.preventDefault()
+      const { selectionStart, selectionEnd } = event.currentTarget
+      const newContent = content.substring(0, selectionStart) + "    " + content.substring(selectionEnd)
+      setContent(newContent)
+      onChange(newContent)
+      // Move cursor after the inserted spaces
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = textareaRef.current.selectionEnd = selectionStart + 4
+        }
+      }, 0)
+    }
+  }
+
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value
     setContent(newContent)
@@ -194,6 +210,7 @@ export function RichTextEditor({
         ref={textareaRef}
         value={content}
         onChange={handleChange}
+        onKeyDown={handleKeyDown}
         disabled={disabled}
         placeholder={placeholder}
         className="w-full p-3 min-h-[200px] max-h-[500px] resize-y focus:outline-none"
@@ -209,6 +226,12 @@ export function RichTextEditor({
         <div className="text-xs text-gray-500 mb-2">Vista previa:</div>
         <div 
           className="prose prose-sm max-w-none"
+          style={{ 
+            whiteSpace: 'pre-wrap',
+            fontFamily: 'monospace',
+            fontSize: '14px',
+            lineHeight: '1.5'
+          }}
           dangerouslySetInnerHTML={{ 
             __html: content
               .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
