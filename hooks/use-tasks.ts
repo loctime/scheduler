@@ -17,10 +17,13 @@ export function useTasks(employeeId?: string, ownerId?: string | null) {
 
     // Si no se proporciona ownerId, no podemos continuar
     if (!ownerId) {
+      console.log("useTasks: ownerId no proporcionado, ownerId:", ownerId)
       setIsLoading(false)
       setError("No se proporcionó ownerId")
       return
     }
+
+    console.log("useTasks: ownerId recibido:", ownerId)
 
     setIsLoading(true)
     setError(null)

@@ -38,9 +38,12 @@ function TareasContent() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
 
-  const { tasks, isLoading: tasksLoading } = useTasks()
+  const { employees, user, userData } = useData()
+  console.log("User desde useData:", user)
+  console.log("UserData desde useData:", userData)
+  console.log("UserData ownerId:", userData?.ownerId)
+  const { tasks, isLoading: tasksLoading } = useTasks(undefined, userData?.ownerId)
   const { createTask, updateTask, deleteTask, toggleTaskActive, isLoading: managementLoading } = useTaskManagement()
-  const { employees, user } = useData()
   const { toast } = useToast()
 
   const handleCreateTask = async (data: TaskFormData) => {

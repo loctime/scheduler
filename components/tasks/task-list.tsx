@@ -54,6 +54,11 @@ export function TaskList({
     showInactive ? true : task.active
   )
 
+  // Auditoría: Loggear tareas recibidas
+  console.log("Tasks recibidas:", tasks)
+  console.log("Filtered tasks:", filteredTasks)
+  console.log("Show inactive:", showInactive)
+
   const getAssignedEmployees = (task: Task) => {
     if (!task.employeeIds || task.employeeIds.length === 0) {
       return "Todos los empleados"
