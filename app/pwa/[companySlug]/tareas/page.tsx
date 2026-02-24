@@ -26,7 +26,7 @@ export default function TareasPage() {
   const { employees, loading: employeesLoading } = useEmployeesByOwnerId(ownerId)
   
   const { tasks, todayTasks, isLoading, error } = useTasks(viewer?.employeeId, ownerId)
-  const { completedMap, toggleTask } = useDailyTaskStatus(ownerId, viewer)
+  const { completed, toggleTask } = useDailyTaskStatus(ownerId)
 
   const today = new Date()
   const todayName = DIAS_SEMANA[today.getDay()]
@@ -63,15 +63,15 @@ export default function TareasPage() {
   // Paso 3: Dentro de tareasDelDia separar pendientes y completadas
   const { pendientes, completadas } = useMemo(() => {
     const pendientes = tareasDelDia.filter(
-      t => !completedMap[t.id]
+      t => !completed[t.id]
     )
     
     const completadas = tareasDelDia.filter(
-      t => completedMap[t.id]
+      t => completed[t.id]
     )
     
     return { pendientes, completadas }
-  }, [tareasDelDia, completedMap])
+  }, [tareasDelDia, completed])
 
   // Orden final: pendientes primero, luego completadas
   const tareasOrdenadasHoy = useMemo(() => {
@@ -164,8 +164,8 @@ export default function TareasPage() {
                     isToday={true}
                     companySlug={companySlug}
                     router={router}
-                    isCompleted={!!completedMap[task.id]}
-                    completedBy={completedMap[task.id]?.employeeId}
+                    isCompleted={!!completed[task.id]}
+                    completedBy={completed[task.id]?.employeeId}
                     onToggle={() => toggleTask(task.id)}
                     viewer={viewer}
                   />
@@ -201,8 +201,8 @@ export default function TareasPage() {
                     isToday={false}
                     companySlug={companySlug}
                     router={router}
-                    isCompleted={!!completedMap[task.id]}
-                    completedBy={completedMap[task.id]?.employeeId}
+                    isCompleted={!!completed[task.id]}
+                    completedBy={completed[task.id]?.employeeId}
                     onToggle={() => toggleTask(task.id)}
                     viewer={viewer}
                   />

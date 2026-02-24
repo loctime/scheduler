@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge"
 import { Trash2, Edit, Plus, AlertTriangle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useOwnerIdFromSlug, useEmployeesByOwnerId } from "@/hooks/use-owner-data"
-import { DailyAction } from "@/hooks/use-daily-actions"
+import { Task } from "@/types/task"
 import { DataContext } from "@/contexts/data-context"
 import { useContext } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
@@ -31,7 +31,7 @@ const DAYS_OF_WEEK = [
   { value: 6, label: "Sábado" },
 ]
 
-interface DailyActionFormData {
+interface TaskFormData {
   id?: string
   title: string
   description: string
@@ -40,18 +40,18 @@ interface DailyActionFormData {
   active: boolean
 }
 
-export default function DailyActionsPage() {
+export default function TasksPage() {
   const dataContext = useContext(DataContext)
   const user = dataContext?.user
   
   return (
     <DashboardLayout user={user}>
-      <DailyActionsContent />
+      <TasksContent />
     </DashboardLayout>
   )
 }
 
-function DailyActionsContent() {
+function TasksContent() {
   const params = useParams()
   const router = useRouter()
   const companySlug = params.companySlug as string
@@ -62,11 +62,11 @@ function DailyActionsContent() {
   const ownerId = user?.uid || ""
   const { employees } = useEmployeesByOwnerId(ownerId)
   
-  const [actions, setActions] = useState<DailyAction[]>([])
+  const [actions, setActions] = useState<Task[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showDialog, setShowDialog] = useState(false)
-  const [editingAction, setEditingAction] = useState<DailyActionFormData | null>(null)
-  const [formData, setFormData] = useState<DailyActionFormData>({
+  const [editingAction, setEditingAction] = useState<TaskFormData | null>(null)
+  const [formData, setFormData] = useState<TaskFormData>({
     title: "",
     description: "",
     daysOfWeek: [new Date().getDay()],
@@ -110,8 +110,9 @@ function DailyActionsContent() {
 
     try {
       const docRef = doc(db!, "apps", "horarios", "dailyActions", ownerId)
-      const newAction: DailyAction = {
+      const newTask: Task = {
         id: editingAction?.id || Date.now().toString(),
+        ownerId: ownerId,
         title: formData.title.trim(),
         description: formData.description.trim() || undefined,
         daysOfWeek: formData.daysOfWeek,
@@ -120,19 +121,19 @@ function DailyActionsContent() {
         createdAt: new Date(),
       }
 
-      const currentData = actions.find(a => a.id === newAction.id)
+      const currentData = actions.find(a => a.id === newTask.id)
       
       if (currentData) {
         // Actualizar acción existente
         const updatedActions = actions.map(a => 
-          a.id === newAction.id ? newAction : a
+          a.id === newTask.id ? newTask : a
         )
         await updateDoc(docRef, { actions: updatedActions })
         toast({ title: "Acción actualizada", description: "La acción se actualizó correctamente" })
       } else {
         // Agregar nueva acción
         await setDoc(docRef, { 
-          actions: [...actions, newAction] 
+          actions: [...actions, newTask] 
         }, { merge: true })
         toast({ title: "Acción creada", description: "La acción se creó correctamente" })
       }
@@ -185,12 +186,12 @@ function DailyActionsContent() {
     }
   }
 
-  const handleEdit = (action: DailyAction) => {
-    const formDataForEdit: DailyActionFormData = {
+  const handleEdit = (action: Task) => {
+    const formDataForEdit: TaskFormData = {
       id: action.id,
       title: action.title,
       description: action.description || "",
-      daysOfWeek: action.daysOfWeek,
+      daysOfWeek: action.daysOfWeek || [],
       employeeIds: action.employeeIds || [],
       active: action.active,
     }
@@ -400,7 +401,7 @@ function DailyActionsContent() {
                 <div className="flex items-center justify-between text-sm">
                   <div>
                     <span className="font-medium">Días: </span>
-                    {action.daysOfWeek.map(day => DAYS_OF_WEEK.find(d => d.value === day)?.label).join(', ')}
+                    {(action.daysOfWeek || []).map(day => DAYS_OF_WEEK.find(d => d.value === day)?.label).join(', ')}
                   </div>
                   <div className="flex items-center space-x-2">
                     <span>Activa:</span>

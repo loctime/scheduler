@@ -16,8 +16,8 @@ import { useToast } from "@/hooks/use-toast"
 import { DayCellContent } from "@/components/schedule-grid/components/day-cell-content"
 import { useTodayScheduleCellData } from "@/hooks/use-today-schedule-cell-data"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useDailyActions, DailyAction } from "@/hooks/use-daily-actions"
-import { useDailyActionStatus } from "@/hooks/use-daily-action-status"
+import { useTasks } from "@/hooks/use-tasks"
+import { useDailyTaskStatus } from "@/hooks/use-daily-task-status"
 import { AlertTriangle, Check, ChevronDown, ChevronUp } from "lucide-react"
 
 // Constantes para mensajes informativos
@@ -190,17 +190,23 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
     error,
   } = useTodayScheduleCellData({ companySlug, employeeId })
   
-  // Acciones diarias para este empleado
-  const { actions: dailyActions } = useDailyActions(ownerId || "", employeeId)
+  // Tareas para este empleado
+  const { tasks } = useTasks(viewer?.employeeId, ownerId)
   
-  // Estado de acciones completadas
-  const { completedIds, toggleCompleted } = useDailyActionStatus(ownerId || "")
+  // Estado de tareas completadas (sistema unificado)
+  const { completed, toggleTask } = useDailyTaskStatus(ownerId)
+  
+  // Filtrar tareas del día
+  const todayDate = new Date()
+  const todayTasks = tasks.filter(t => 
+    t.daysOfWeek?.includes(todayDate.getDay())
+  )
   
   // Separar pendientes y realizadas
-  const pendientes = dailyActions.filter(a => !completedIds.includes(a.id))
-  const realizadas = dailyActions.filter(a => completedIds.includes(a.id))
+  const pendientes = todayTasks.filter(t => !completed[t.id])
+  const realizadas = todayTasks.filter(t => completed[t.id])
   const hasPendientes = pendientes.length > 0
-  const allCompleted = realizadas.length === dailyActions.length && dailyActions.length > 0
+  const allCompleted = realizadas.length === todayTasks.length && todayTasks.length > 0
   
   // Estado para expandir/ocultar el panel de acciones principales
   const [expanded, setExpanded] = useState(hasPendientes)
@@ -215,10 +221,10 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
     }
   }, [hasPendientes, allCompleted])
   
-  // Auditoría: Loggear completedIds para renderizado
+  // Auditoría: Loggear completed para renderizado
   console.log("🔍 AUDITORÍA RENDER:")
-  console.log("  - completedIds:", completedIds)
-  console.log("  - dailyActions:", dailyActions.map(a => ({ id: a.id, title: a.title })))
+  console.log("  - completed:", completed)
+  console.log("  - todayTasks:", todayTasks.map(t => ({ id: t.id, title: t.title })))
   console.log("  - expanded (panel principal):", expanded)
   
   
@@ -276,8 +282,8 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
         </div>
       </div>
       
-      {/* Bloque 2 - Acciones del Día */}
-      {dailyActions.length > 0 && (
+      {/* Bloque 2 - Tareas del Día */}
+      {todayTasks.length > 0 && (
         <div className={`${hasPendientes 
           ? "bg-amber-50 dark:bg-amber-950/40 border-amber-400" 
           : "bg-green-50 dark:bg-green-950/40 border-green-400"
@@ -298,33 +304,33 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
           </div>
           {expanded && (
             <div className="space-y-2">
-              {dailyActions.map((action: DailyAction, index: number) => {
-                const isCompleted = completedIds.includes(action.id)
+              {todayTasks.map((task: any, index: number) => {
+                const isCompleted = completed[task.id]
                 
-                console.log("🔍 AUDITORÍA RENDER ACCIÓN:")
-                console.log("  - action.id:", action.id)
-                console.log("  - action.title:", action.title)
-                console.log("  - completedIds:", completedIds)
+                console.log("🔍 AUDITORÍA RENDER TAREA:")
+                console.log("  - task.id:", task.id)
+                console.log("  - task.title:", task.title)
+                console.log("  - completed:", completed)
                 console.log("  - isCompleted:", isCompleted)
                 
                 return (
-                  <div key={action.id} className="space-y-1">
-                    {/* Acción NO completada - mostrar normal */}
+                  <div key={task.id} className="space-y-1">
+                    {/* Tarea NO completada - mostrar normal */}
                     {!isCompleted ? (
                       <div className="border border-amber-200 dark:border-amber-700 rounded-lg p-2 space-y-1 bg-amber-50/50 dark:bg-amber-950/30">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1">
                             <div className="font-medium text-sm text-amber-900 dark:text-amber-100">
-                              {action.title}
+                              {task.title}
                             </div>
-                            {action.description && (
+                            {task.description && (
                               <div className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                                {action.description}
+                                {task.description}
                               </div>
                             )}
                           </div>
                           <button
-                            onClick={() => toggleCompleted(action.id)}
+                            onClick={() => toggleTask(task.id)}
                             className="shrink-0 p-1 rounded border border-amber-300 bg-amber-100 hover:bg-amber-200 dark:border-amber-600 dark:bg-amber-900/50 dark:hover:bg-amber-800 transition-colors"
                             title="Marcar como realizada"
                           >
@@ -333,14 +339,14 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
                         </div>
                       </div>
                     ) : (
-                      /* Acción completada - mostrar compactada */
+                      /* Tarea completada - mostrar compactada */
                       <div className="border border-green-200 dark:border-green-700 rounded-lg p-2 bg-green-50/50 dark:bg-green-950/30">
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2">
                               <Check className="w-4 h-4 text-green-600" />
                               <span className="font-medium text-sm text-green-800 dark:text-green-200 line-through opacity-70">
-                                {action.title}
+                                {task.title}
                               </span>
                             </div>
                             <div className="text-xs text-green-700 dark:text-green-300 pl-6">
@@ -348,7 +354,7 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
                             </div>
                           </div>
                           <button
-                            onClick={() => toggleCompleted(action.id)}
+                            onClick={() => toggleTask(task.id)}
                             className="shrink-0 p-1 rounded border border-green-300 bg-green-100 hover:bg-green-200 dark:border-green-600 dark:bg-green-900/50 dark:hover:bg-green-800 transition-colors"
                             title="Desmarcar como realizada"
                           >
