@@ -200,6 +200,7 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
   const pendientes = dailyActions.filter(a => !completedIds.includes(a.id))
   const realizadas = dailyActions.filter(a => completedIds.includes(a.id))
   const hasPendientes = pendientes.length > 0
+  const allCompleted = realizadas.length === dailyActions.length && dailyActions.length > 0
   
   // Estado para expandir/ocultar el panel de acciones principales
   const [expanded, setExpanded] = useState(hasPendientes)
@@ -208,10 +209,11 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
   useEffect(() => {
     if (hasPendientes) {
       setExpanded(true)
-    } else {
+    } else if (allCompleted) {
+      // Solo contraer si todas están completadas y no hay tareas pendientes
       setExpanded(false)
     }
-  }, [hasPendientes])
+  }, [hasPendientes, allCompleted])
   
   // Auditoría: Loggear completedIds para renderizado
   console.log("🔍 AUDITORÍA RENDER:")
