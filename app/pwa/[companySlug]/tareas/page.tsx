@@ -4,7 +4,7 @@ import { useState, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import { CheckSquare, Clock, Calendar, AlertCircle, ArrowLeft, Check } from "lucide-react"
+import { CheckSquare, Clock, Calendar, AlertCircle, ArrowLeft, Check, ChevronDown, ChevronRight } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -78,6 +78,10 @@ export default function TareasPage() {
     return [...pendientes, ...completadas]
   }, [pendientes, completadas])
 
+  // Estado para controlar expansión de secciones
+  const [expandedHoy, setExpandedHoy] = useState(true)
+  const [expandedTareas, setExpandedTareas] = useState(true)
+
   if (ownerIdLoading || employeesLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-4">
@@ -137,54 +141,74 @@ export default function TareasPage() {
         {/* Sección 1: Pendientes del día */}
         {tareasOrdenadasHoy.length > 0 && (
           <div>
-            <div className="flex items-center space-x-2 mb-4">
+            <div 
+              className="flex items-center space-x-2 mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+              onClick={() => setExpandedHoy(!expandedHoy)}
+            >
+              {expandedHoy ? (
+                <ChevronDown className="h-5 w-5 text-yellow-600" />
+              ) : (
+                <ChevronRight className="h-5 w-5 text-yellow-600" />
+              )}
               <CheckSquare className="h-5 w-5 text-yellow-600" />
               <h2 className="text-lg font-medium text-yellow-700">Pendientes del día ({tareasOrdenadasHoy.length})</h2>
             </div>
-            <div className="space-y-3">
-              {tareasOrdenadasHoy.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  employees={employees}
-                  onClick={() => router.push(`/pwa/${companySlug}/tareas/${task.id}`)}
-                  isToday={true}
-                  companySlug={companySlug}
-                  router={router}
-                  isCompleted={!!completedMap[task.id]}
-                  completedBy={completedMap[task.id]?.employeeId}
-                  onToggle={() => toggleTask(task.id)}
-                  viewer={viewer}
-                />
-              ))}
-            </div>
+            {expandedHoy && (
+              <div className="space-y-3">
+                {tareasOrdenadasHoy.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    employees={employees}
+                    onClick={() => router.push(`/pwa/${companySlug}/tareas/${task.id}`)}
+                    isToday={true}
+                    companySlug={companySlug}
+                    router={router}
+                    isCompleted={!!completedMap[task.id]}
+                    completedBy={completedMap[task.id]?.employeeId}
+                    onToggle={() => toggleTask(task.id)}
+                    viewer={viewer}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {/* Sección 2: Tareas (no del día) */}
         {tareasNoDelDia.length > 0 && (
           <div>
-            <div className="flex items-center space-x-2 mb-4">
+            <div 
+              className="flex items-center space-x-2 mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+              onClick={() => setExpandedTareas(!expandedTareas)}
+            >
+              {expandedTareas ? (
+                <ChevronDown className="h-5 w-5 text-blue-600" />
+              ) : (
+                <ChevronRight className="h-5 w-5 text-blue-600" />
+              )}
               <Calendar className="h-5 w-5 text-blue-600" />
               <h2 className="text-lg font-medium text-blue-700">Tareas ({tareasNoDelDia.length})</h2>
             </div>
-            <div className="space-y-3">
-              {tareasNoDelDia.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  employees={employees}
-                  onClick={() => router.push(`/pwa/${companySlug}/tareas/${task.id}`)}
-                  isToday={false}
-                  companySlug={companySlug}
-                  router={router}
-                  isCompleted={!!completedMap[task.id]}
-                  completedBy={completedMap[task.id]?.employeeId}
-                  onToggle={() => toggleTask(task.id)}
-                  viewer={viewer}
-                />
-              ))}
-            </div>
+            {expandedTareas && (
+              <div className="space-y-3">
+                {tareasNoDelDia.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    employees={employees}
+                    onClick={() => router.push(`/pwa/${companySlug}/tareas/${task.id}`)}
+                    isToday={false}
+                    companySlug={companySlug}
+                    router={router}
+                    isCompleted={!!completedMap[task.id]}
+                    completedBy={completedMap[task.id]?.employeeId}
+                    onToggle={() => toggleTask(task.id)}
+                    viewer={viewer}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
