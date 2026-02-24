@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useParams } from "next/navigation"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -196,11 +196,31 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
   // Estado de acciones completadas
   const { completedIds, toggleCompleted } = useDailyActionStatus(ownerId || "")
   
-  // Estado para expandir/ocultar realizadas
-  const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set())
+  // Separar pendientes y realizadas
+  const pendientes = dailyActions.filter(a => !completedIds.includes(a.id))
+  const realizadas = dailyActions.filter(a => completedIds.includes(a.id))
+  const hasPendientes = pendientes.length > 0
   
   // Estado para expandir/ocultar el panel de acciones principales
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(hasPendientes)
+  
+  // Efecto para sincronizar estado expandido cuando cambian los datos
+  useEffect(() => {
+    if (hasPendientes) {
+      setExpanded(true)
+    } else {
+      setExpanded(false)
+    }
+  }, [hasPendientes])
+  
+  // Auditoría: Loggear completedIds para renderizado
+  console.log("🔍 AUDITORÍA RENDER:")
+  console.log("  - completedIds:", completedIds)
+  console.log("  - dailyActions:", dailyActions.map(a => ({ id: a.id, title: a.title })))
+  console.log("  - expanded (panel principal):", expanded)
+  
+  // Estado para expandir/ocultar realizadas
+  const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set())
   
   const toggleExpanded = (actionId: string) => {
     const newExpanded = new Set(expandedActions)
@@ -268,12 +288,21 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
       
       {/* Bloque 2 - Acciones del Día */}
       {dailyActions.length > 0 && (
-        <div className="bg-green-50 dark:bg-green-950/40 border border-green-400 rounded-xl p-3 mt-2 cursor-pointer transition-all"
-          onClick={() => setExpanded(!expanded)}
+        <div className={`${hasPendientes 
+          ? "bg-amber-50 dark:bg-amber-950/40 border-amber-400" 
+          : "bg-green-50 dark:bg-green-950/40 border-green-400"
+        } border rounded-xl p-3 mt-2 cursor-pointer transition-all`}
+          onClick={() => {
+            console.log("🔍 AUDITORÍA PANEL: Toggle expanded", !expanded)
+            setExpanded(!expanded)
+          }}
         >
           <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="w-4 h-4 text-green-600" />
-            <span className="font-semibold text-sm text-green-800 dark:text-green-200">
+            <AlertTriangle className={`w-4 h-4 ${hasPendientes ? "text-amber-600" : "text-green-600"}`} />
+            <span className={`font-semibold text-sm ${hasPendientes 
+              ? "text-amber-800 dark:text-amber-200" 
+              : "text-green-800 dark:text-green-200"
+            }`}>
               Pendientes del día
             </span>
           </div>
@@ -281,6 +310,12 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
             <div className="space-y-2">
               {dailyActions.map((action: DailyAction, index: number) => {
                 const isCompleted = completedIds.includes(action.id)
+                
+                console.log("🔍 AUDITORÍA RENDER ACCIÓN:")
+                console.log("  - action.id:", action.id)
+                console.log("  - action.title:", action.title)
+                console.log("  - completedIds:", completedIds)
+                console.log("  - isCompleted:", isCompleted)
                 
                 return (
                   <div key={action.id} className="space-y-1">
