@@ -50,21 +50,23 @@ function PwaTabs() {
         {companySlug ? [
           { href: `/pwa/${companySlug}/horario`, label: "Horario", icon: Calendar, pathMatch: null as string | null },
           { href: `/pwa/${companySlug}/mensual`, label: "Mensual", icon: CalendarDays, pathMatch: null as string | null },
-          { href: `/pwa/${companySlug}/home`, label: "Panel", icon: Home, pathMatch: null as string | null },
+          { href: `/pwa/${companySlug}/home`, label: "Panel", icon: Home, pathMatch: null as string | null, isHome: true },
           { href: `/pwa/${companySlug}/tareas`, label: "Tareas", icon: CheckSquare, pathMatch: null as string | null },
           { href: `/pwa/${companySlug}/stock-console`, label: "Stock", icon: Package, pathMatch: null as string | null }
         ].map((item) => {
           const Icon = item.icon
           const isActive = pathname === item.href
+          const isHome = item.isHome || false
           return (
             <Link key={item.href} href={item.href} className="flex-1">
               <div
                 className={cn(
                   "flex flex-col items-center justify-center gap-1 rounded-md py-2 text-xs font-medium transition",
-                  isActive ? "text-primary" : "text-muted-foreground"
+                  isActive ? "text-primary" : "text-muted-foreground",
+                  isHome && "font-bold text-primary"
                 )}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className={cn("h-5 w-5", isHome && "h-6 w-6")} />
                 <span>{item.label}</span>
               </div>
             </Link>
