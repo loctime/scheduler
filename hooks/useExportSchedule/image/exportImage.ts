@@ -1,8 +1,6 @@
 import { useCallback } from "react"
 import { useToast } from "@/hooks/use-toast"
-import { prepareElementForCapture } from "../dom/prepareElementForCapture"
-import { restoreElementAfterCapture } from "../dom/restoreElementAfterCapture"
-import { disablePseudoElements, enablePseudoElements } from "../dom/pseudoElements"
+import { exportScheduleAsImage } from "@/lib/export-schedule-image"
 
 export const useExportImage = () => {
   const { toast } = useToast()
@@ -41,54 +39,10 @@ export const useExportImage = () => {
       }
       return
     }
-    
-    // Esperar un frame para que el overlay se renderice
-    await new Promise((resolve) => requestAnimationFrame(resolve))
-    
-    const htmlElement = element as HTMLElement
 
     try {
-      disablePseudoElements()
-      
-      const snapshot = prepareElementForCapture(htmlElement, config)
-
-      const domtoimage = await import("dom-to-image-more")
-
-      // Aumentar la escala para una imagen más grande y de mayor resolución
-      const scale = 4 // Aumentar a 4x para mejor calidad y tamaño más grande
-      
-      // Usar el ancho real de la tabla, no del contenedor, más los márgenes
-      const table = htmlElement.querySelector("table")
-      const actualWidth = table ? table.scrollWidth : element.scrollWidth
-      const actualHeight = table ? table.scrollHeight : element.scrollHeight
-      
-      const dataUrl = await domtoimage.toPng(htmlElement, {
-        quality: 1.0,
-        bgcolor: "#ffffff",
-        width: (actualWidth + 20) * scale,
-        height: (actualHeight + 20) * scale,
-        style: {
-          transform: `scale(${scale})`,
-          transformOrigin: 'top left',
-        },
-      })
-
-      restoreElementAfterCapture(htmlElement, snapshot)
-
-      const shouldDownload = config?.download !== false
-      if (shouldDownload) {
-        const link = document.createElement("a")
-        link.download = filename
-        link.href = dataUrl
-        link.click()
-      }
-
-      const needsBlob = Boolean(config?.onImageReady)
-      const blob = needsBlob ? await (await fetch(dataUrl)).blob() : null
-
-      if (config?.onImageReady && blob) {
-        await config.onImageReady(blob, dataUrl)
-      }
+      // Usar el nuevo exportador profesional basado en clonación
+      await exportScheduleAsImage(element as HTMLElement, filename)
 
       if (config?.showToast !== false) {
         toast({
@@ -105,8 +59,6 @@ export const useExportImage = () => {
           variant: "destructive",
         })
       }
-    } finally {
-      enablePseudoElements()
     }
   }, [toast])
 

@@ -76,7 +76,7 @@ export function useExportSchedule() {
     ) => {
       setExporting(true)
       try {
-        await exportMonthPDF(monthWeeks, getWeekSchedule, employees, shifts, filename, config)
+        await exportMonthPDF(monthWeeks, getWeekSchedule, employees, shifts, config)
       } finally {
         setExporting(false)
       }

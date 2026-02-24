@@ -2,10 +2,8 @@ import { useCallback } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { toJpeg } from "html-to-image"
 import type { Empleado, Turno, Horario, MedioTurno } from "@/lib/types"
-import { prepareElementForCapture } from "../dom/prepareElementForCapture"
-import { restoreElementAfterCapture } from "../dom/restoreElementAfterCapture"
-import { disablePseudoElements, enablePseudoElements } from "../dom/pseudoElements"
 import { addHeader, addFooter } from "./pdfHeaderFooter"
 import { addDashboardPage } from "./dashboardPage"
 
@@ -14,26 +12,20 @@ export const useExportMonthPDF = () => {
 
   const exportMonthPDF = useCallback(async (
     monthWeeks: Date[][],
-    getWeekSchedule: (weekStartStr: string) => Horario | null, // 🔥 Cambio: string en lugar de Date
+    getWeekSchedule: (weekStartStr: string) => Horario | null,
     employees: Empleado[],
     shifts: Turno[],
-    filename: string,
-    config?: { 
-      nombreEmpresa?: string; 
-      colorEmpresa?: string;
-      monthRange?: { startDate: Date; endDate: Date };
-      mediosTurnos?: MedioTurno[];
-      employeeMonthlyStats?: Record<string, any>;
+    config?: {
+      nombreEmpresa?: string
+      colorEmpresa?: string
+      monthRange?: { startDate: Date; endDate: Date }
+      employeeMonthlyStats?: Record<string, any>
       minutosDescanso?: number;
       horasMinimasParaDescanso?: number;
     }
   ) => {
     try {
-      // Desactivar pseudo-elementos UNA SOLA VEZ al inicio
-      disablePseudoElements()
-      
-      const [domtoimage, jsPDF] = await Promise.all([
-        import("dom-to-image-more"),
+      const [jsPDF] = await Promise.all([
         import("jspdf").then(m => m.default),
       ])
 
@@ -49,7 +41,7 @@ export const useExportMonthPDF = () => {
 
       const totalWeeks = monthWeeks.length
 
-      // Agregar página de dashboard como PRIMERA página (antes de las semanas)
+      // Agregar página de dashboard como PRIMERA página
       const monthRange = config?.monthRange || { startDate: monthWeeks[0][0], endDate: monthWeeks[monthWeeks.length - 1][6] }
       addDashboardPage(
         pdf,
@@ -66,7 +58,7 @@ export const useExportMonthPDF = () => {
         }
       )
 
-      // Iterar sobre cada semana (empezar desde página 2, ya que la 1 es el dashboard)
+      // Iterar sobre cada semana (empezar desde página 2)
       for (let weekIndex = 0; weekIndex < monthWeeks.length; weekIndex++) {
         const weekDays = monthWeeks[weekIndex]
         const weekStartDate = weekDays[0]
@@ -74,117 +66,79 @@ export const useExportMonthPDF = () => {
         const weekStartStr = format(weekStartDate, "yyyy-MM-dd")
         const weekId = `schedule-week-${weekStartStr}`
         
-        // Feedback de progreso NO intrusivo
-        if (weekIndex > 0) {
-          toast({
-            title: "Procesando...",
-            description: `Semana ${weekIndex + 1} de ${monthWeeks.length}`,
-          })
-        }
-        
-        // Esperar a que el elemento esté disponible
-        await new Promise((resolve) => setTimeout(resolve, 100))
-        
+        // Usar el nuevo sistema de clonación para capturar la semana
         const weekElement = document.getElementById(weekId)
-        if (!weekElement) {
-          console.warn(`No se encontró el elemento de la semana ${weekId}`)
-          continue
-        }
+        if (!weekElement) continue
 
-        // Expandir la semana si está colapsada
-        const collapsible = weekElement.closest('[data-slot="collapsible"]')
-        if (collapsible) {
-          const isClosed = collapsible.getAttribute('data-state') === 'closed'
-          if (isClosed) {
-            const trigger = collapsible.querySelector('[data-slot="collapsible-trigger"]') as HTMLElement
-            if (trigger) {
-              trigger.click()
-              // Esperar a que se expanda (animación + renderizado)
-              await new Promise((resolve) => setTimeout(resolve, 600))
-              // Esperar múltiples frames para asegurar que todos los estilos se hayan aplicado
-              await new Promise((resolve) => requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                  requestAnimationFrame(resolve)
-                })
-              }))
-            }
-          }
-        }
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const clone = weekElement.cloneNode(true) as HTMLElement
 
-        // Usar el elemento completo del CollapsibleContent (igual que exportPDF individual)
-        // El weekElement es el CollapsibleContent que contiene el ScheduleGrid
-        const htmlElement = weekElement as HTMLElement
+          const wrapper = document.createElement("div")
+          wrapper.style.position = "fixed"
+          wrapper.style.top = "-99999px"
+          wrapper.style.left = "-99999px"
+          wrapper.style.background = "#ffffff"
+          wrapper.style.padding = "0"
+          wrapper.style.margin = "0"
+          wrapper.style.pointerEvents = "none"
 
-        // Verificar que el elemento esté visible y tenga contenido
-        const table = htmlElement.querySelector("table")
-        if (!table) {
-          console.warn(`No se encontró la tabla en la semana ${weekId}`)
-          continue
-        }
+          wrapper.appendChild(clone)
+          document.body.appendChild(wrapper)
 
-        // Preparar el elemento para exportación usando el helper
-        const snapshot = prepareElementForCapture(htmlElement, config)
+          const realWidth = weekElement.scrollWidth
+          clone.style.width = realWidth + "px"
+          clone.style.maxWidth = realWidth + "px"
+          clone.style.overflow = "visible"
 
-        const scale = 2
-        // Usar el ancho real de la tabla, no del contenedor, más los márgenes
-        const actualWidth = table ? table.scrollWidth : htmlElement.scrollWidth
-        const actualHeight = table ? table.scrollHeight : htmlElement.scrollHeight
-
-        // Capturar como imagen JPEG con compresión para reducir tamaño
-        const dataUrl = await domtoimage.toJpeg(htmlElement, {
-          quality: 0.8,
-          bgcolor: "#ffffff",
-          width: (actualWidth + 20) * scale,
-          height: (actualHeight + 20) * scale,
-          style: {
-            transform: `scale(${scale})`,
-            transformOrigin: 'top left',
-          },
+          requestAnimationFrame(() => {
+            toJpeg(clone, {
+              cacheBust: true,
+              pixelRatio: 2,
+              backgroundColor: "#ffffff"
+            }).then(resolve).catch(reject).finally(() => {
+              document.body.removeChild(wrapper)
+            })
+          })
         })
 
-        // Restaurar el elemento usando el helper
-        restoreElementAfterCapture(htmlElement, snapshot)
-
-        // Agregar nueva página para cada semana (el dashboard está en la página 1)
-        pdf.addPage()
-
-        // Agregar header
-        addHeader(pdf, weekIndex + 1, totalWeeks, weekStartDate, weekEndDate, config?.nombreEmpresa)
-
-        // Calcular dimensiones de la imagen para que quepa en la página
-        const img = new Image()
-        img.src = dataUrl
-        await new Promise(res => (img.onload = res))
-
-        const imgAspectRatio = img.width / img.height
-        const availableWidth = pdfWidth - (margin * 2)
-        const availableHeight = contentHeight - (margin * 2)
-
-        let imgWidth = availableWidth
-        let imgHeight = imgWidth / imgAspectRatio
-
-        // Si la imagen es muy alta, ajustar por altura
-        if (imgHeight > availableHeight) {
-          imgHeight = availableHeight
-          imgWidth = imgHeight * imgAspectRatio
+        // Agregar nueva página para esta semana (excepto la primera que ya es dashboard)
+        if (weekIndex > 0) {
+          pdf.addPage()
         }
 
-        // Centrar la imagen
-        const x = (pdfWidth - imgWidth) / 2
-        const y = headerHeight + margin
+        // Agregar header
+        addHeader(pdf, weekIndex + 2, totalWeeks + 1, weekStartDate, weekEndDate, config?.nombreEmpresa)
 
-        // Agregar imagen al PDF (usar JPEG para menor tamaño)
-        pdf.addImage(dataUrl, "JPEG", x, y, imgWidth, imgHeight)
+        // Agregar imagen de la semana
+        const img = new Image()
+        img.src = dataUrl
+        
+        await new Promise((resolve, reject) => {
+          img.onload = resolve
+          img.onerror = reject
+        })
+
+        const imgWidth = pdfWidth - 2 * margin
+        const imgHeight = (img.height / img.width) * imgWidth
+        
+        // Calcular escala para que quepa en la página
+        const maxHeight = contentHeight - 10
+        const finalWidth = imgWidth
+        const finalHeight = Math.min(imgHeight, maxHeight)
+        
+        pdf.addImage(img, 'JPEG', margin, headerHeight + 5, finalWidth, finalHeight)
 
         // Agregar footer
-        addFooter(pdf, weekIndex + 1, totalWeeks)
+        addFooter(pdf, weekIndex + 2, totalWeeks + 1)
       }
 
-      pdf.save(filename)
+      // Guardar PDF
+      const monthName = format(monthWeeks[0][0], "MMMM 'de' yyyy", { locale: es })
+      pdf.save(`horario-mensual-${monthName}.pdf`)
 
       toast({
-        title: "PDF exportado",
-        description: `Se generó correctamente con ${totalWeeks} ${totalWeeks === 1 ? 'página' : 'páginas'}.`,
+        title: "OK",
+        description: "PDF mensual exportado correctamente.",
       })
     } catch (e) {
       console.error(e)
@@ -193,9 +147,6 @@ export const useExportMonthPDF = () => {
         description: "No se pudo exportar el PDF mensual.",
         variant: "destructive",
       })
-    } finally {
-      // Restaurar pseudo-elementos UNA SOLA VEZ al final
-      enablePseudoElements()
     }
   }, [toast])
 

@@ -1,8 +1,6 @@
 import { useCallback } from "react"
 import { useToast } from "@/hooks/use-toast"
-import { prepareElementForCapture } from "../dom/prepareElementForCapture"
-import { restoreElementAfterCapture } from "../dom/restoreElementAfterCapture"
-import { disablePseudoElements, enablePseudoElements } from "../dom/pseudoElements"
+import { toPng } from "html-to-image"
 
 export const useExportWeekPDF = () => {
   const { toast } = useToast()
@@ -15,56 +13,62 @@ export const useExportWeekPDF = () => {
     const element = document.getElementById(elementId)
     if (!element) return
 
-    // Esperar un frame para que el overlay se renderice
-    await new Promise((resolve) => requestAnimationFrame(resolve))
-
-    const htmlElement = element as HTMLElement
-
     try {
-      disablePseudoElements()
-      
-      const snapshot = prepareElementForCapture(htmlElement, config)
+      // Usar el nuevo exportador profesional basado en clonación
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const clone = element.cloneNode(true) as HTMLElement
 
-      const [domtoimage, jsPDF] = await Promise.all([
-        import("dom-to-image-more"),
+        const wrapper = document.createElement("div")
+        wrapper.style.position = "fixed"
+        wrapper.style.top = "-99999px"
+        wrapper.style.left = "-99999px"
+        wrapper.style.background = "#ffffff"
+        wrapper.style.padding = "0"
+        wrapper.style.margin = "0"
+        wrapper.style.pointerEvents = "none"
+
+        wrapper.appendChild(clone)
+        document.body.appendChild(wrapper)
+
+        const realWidth = element.scrollWidth
+        clone.style.width = realWidth + "px"
+        clone.style.maxWidth = realWidth + "px"
+        clone.style.overflow = "visible"
+
+        requestAnimationFrame(() => {
+          toPng(clone, {
+            cacheBust: true,
+            pixelRatio: 2,
+            backgroundColor: "#ffffff"
+          }).then(resolve).catch(reject).finally(() => {
+            document.body.removeChild(wrapper)
+          })
+        })
+      })
+
+      // Convertir a PDF
+      const [jsPDF] = await Promise.all([
         import("jspdf").then(m => m.default),
       ])
 
-      // Aumentar la escala para una imagen más grande y de mayor resolución
-      const scale = 4 // Aumentar a 4x para mejor calidad y tamaño más grande
-      
-      // Usar el ancho real de la tabla, no del contenedor, más los márgenes
-      const table = htmlElement.querySelector("table")
-      const actualWidth = table ? table.scrollWidth : element.scrollWidth
-      const actualHeight = table ? table.scrollHeight : element.scrollHeight
-      
-      const dataUrl = await domtoimage.toPng(htmlElement, {
-        quality: 1.0,
-        bgcolor: "#ffffff",
-        width: (actualWidth + 20) * scale,
-        height: (actualHeight + 20) * scale,
-        style: {
-          transform: `scale(${scale})`,
-          transformOrigin: 'top left',
-        },
-      })
-
-      restoreElementAfterCapture(htmlElement, snapshot)
-
-      const pdf = new jsPDF("l", "mm", "a4")
-      const pdfWidth = pdf.internal.pageSize.getWidth()
-
+      const pdf = new jsPDF()
       const img = new Image()
       img.src = dataUrl
-      await new Promise(res => (img.onload = res))
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+      })
 
-      const pdfHeight = (img.height * pdfWidth) / img.width
-      pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight)
-      pdf.save(filename)
+      const imgWidth = pdf.internal.pageSize.getWidth()
+      const imgHeight = (img.height / img.width) * imgWidth
+      
+      pdf.addImage(img, 'PNG', 0, 0, imgWidth, imgHeight)
+      pdf.save(filename.replace('.png', '.pdf'))
 
       toast({
-        title: "PDF exportado",
-        description: "Se generó correctamente.",
+        title: "OK",
+        description: "PDF exportado correctamente.",
       })
     } catch (e) {
       console.error(e)
@@ -73,8 +77,6 @@ export const useExportWeekPDF = () => {
         description: "No se pudo exportar el PDF.",
         variant: "destructive",
       })
-    } finally {
-      enablePseudoElements()
     }
   }, [toast])
 
