@@ -17,8 +17,7 @@ interface DailyTaskStatus {
 }
 
 /**
- * Hook unificado para manejar el estado diario de completado de tareas.
- * Reemplaza a useDailyActionStatus y useDailyTaskStatus.
+ * Hook para manejar el estado diario de completado de tareas.
  * 
  * Usa un único documento por día: apps/horarios/dailyTaskStatus/{ownerId}_{YYYYMMDD}
  * El estado es global del día, no por empleado.
