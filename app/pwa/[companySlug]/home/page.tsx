@@ -253,14 +253,17 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
 
   return (
     <div className="w-full max-w-md space-y-2">
-      <div className="text-center text-lg sm:text-xl md:text-2xl font-semibold text-foreground">
-      {dayOfWeek} {todayFormatted}
-      </div>
-      <DayCellContent {...dayCellContentProps} homeMode={true} />
-      
-      {/* Bloque 1 - Mensaje Fijo */}
-      <div className="bg-muted/40 rounded-lg py-2 px-2 text-xs text-center mt-2">
-        {mensajeFijo}
+      {/* Recuadro único que contiene día, horario y mensaje */}
+      <div className="border border-border rounded-lg p-3 space-y-2 bg-card">
+        <div className="text-center text-lg sm:text-xl md:text-2xl font-semibold text-foreground">
+        {dayOfWeek} {todayFormatted}
+        </div>
+        <DayCellContent {...dayCellContentProps} homeMode={true} />
+        
+        {/* Mensaje Fijo */}
+        <div className="bg-muted/40 rounded-lg py-2 px-2 text-xs text-center">
+          {mensajeFijo}
+        </div>
       </div>
       
       {/* Bloque 2 - Acciones del Día */}
