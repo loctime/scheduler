@@ -215,6 +215,8 @@ interface TaskCardProps {
 }
 
 function TaskCard({ task, employees, onClick, isToday, companySlug, router, isCompleted, completedBy, onToggle, viewer }: TaskCardProps) {
+  const [expanded, setExpanded] = useState(false)
+
   const handleToggle = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -230,6 +232,12 @@ function TaskCard({ task, employees, onClick, isToday, companySlug, router, isCo
     router.push(`/pwa/${companySlug}/tareas/${task.id}`)
   }
 
+  const toggleExpanded = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setExpanded(!expanded)
+  }
+
   return (
     <div 
       className={`rounded-xl border p-4 space-y-3 cursor-pointer transition-all ${
@@ -237,7 +245,7 @@ function TaskCard({ task, employees, onClick, isToday, companySlug, router, isCo
           ? 'opacity-60 bg-green-50 border-green-200' 
           : 'hover:shadow-md bg-white'
       }`}
-      onClick={goToDetail}
+      onClick={toggleExpanded}
     >
       {/* Header con título y checkbox */}
       <div className="flex items-start justify-between">
@@ -273,21 +281,88 @@ function TaskCard({ task, employees, onClick, isToday, companySlug, router, isCo
         </button>
       </div>
 
-      {/* Descripción y botón */}
+      {/* Descripción y botones */}
       <div className="flex items-start justify-between">
         {task.description && (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-sm text-muted-foreground flex-1 mr-4">
             {task.description}
           </div>
         )}
         
-        <button 
-          onClick={goToDetail}
-          className="text-blue-600 hover:text-blue-800 underline text-sm"
-        >
-          Ver más detalles
-        </button>
+        <div className="flex items-center space-x-2">
+          <button 
+            onClick={toggleExpanded}
+            className="text-blue-600 hover:text-blue-800 underline text-sm"
+          >
+            {expanded ? "Ocultar detalles" : "Expandir"}
+          </button>
+        </div>
       </div>
+
+      {/* Sección expandible de detalles */}
+      {expanded && (
+        <div className="border-t pt-3 mt-3 space-y-3">
+          {/* Contenido detallado */}
+          {task.detailedContent && (
+            <div>
+              <h4 className="font-medium text-sm text-gray-700 mb-1">Detalles:</h4>
+              <div className="text-sm text-gray-600 whitespace-pre-wrap">
+                {task.detailedContent}
+              </div>
+            </div>
+          )}
+
+          {/* Instrucciones */}
+          {task.instructions && (
+            <div>
+              <h4 className="font-medium text-sm text-gray-700 mb-1">Instrucciones:</h4>
+              <div className="text-sm text-gray-600 whitespace-pre-wrap">
+                {task.instructions}
+              </div>
+            </div>
+          )}
+
+          {/* Días de la semana */}
+          {task.daysOfWeek && task.daysOfWeek.length > 0 && (
+            <div>
+              <h4 className="font-medium text-sm text-gray-700 mb-1">Días programados:</h4>
+              <div className="flex flex-wrap gap-1">
+                {task.daysOfWeek.map(dayNum => (
+                  <span 
+                    key={dayNum}
+                    className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded"
+                  >
+                    {DIAS_SEMANA[dayNum]}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Asignados */}
+          {task.employeeIds && task.employeeIds.length > 0 && (
+            <div>
+              <h4 className="font-medium text-sm text-gray-700 mb-1">Asignado a:</h4>
+              <div className="text-sm text-gray-600">
+                {task.employeeIds.map(empId => {
+                  const employee = employees.find(emp => emp.id === empId)
+                  return employee ? employee.name : 'Desconocido'
+                }).join(', ')}
+              </div>
+            </div>
+          )}
+
+          {/* Botón para ir a página completa */}
+          <div className="pt-2">
+            <button 
+              onClick={goToDetail}
+              className="w-full text-center bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
+            >
+              Ver página de detalles
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
