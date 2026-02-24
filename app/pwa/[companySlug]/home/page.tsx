@@ -118,11 +118,6 @@ export default function PwaHomePage() {
               </div>
             )}
           </div>
-          
-          {/* Mensaje del Día (Dinámico) - Pegado al footer */}
-          <div className="bg-primary/5 rounded-lg border py-3 px-3 text-xs sm:text-sm text-center w-full mt-4">
-            {mensajeDelDia}
-          </div>
         </div>
 
         {/* Columna derecha (50%): solo los 3 botones, alineados arriba */}
@@ -148,6 +143,11 @@ export default function PwaHomePage() {
             href={`/pwa/${companySlug}/stock-console`}
             borderClassName={PWA_THEMES.stock.border}
           />
+          
+          {/* Mensaje del Día (Dinámico) - Debajo de la card de Stock */}
+          <div className="bg-primary/5 rounded-lg border py-3 px-3 text-xs sm:text-sm text-center w-full">
+            {mensajeDelDia}
+          </div>
         </div>
       </div>
 
