@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import React, { useEffect, useRef, useState } from "react"
 import type { CSSProperties } from "react"
 import { ShiftAssignment, Turno, MedioTurno } from "@/lib/types"
 import { CellAssignments } from "./cell-assignments"
@@ -61,25 +61,7 @@ const leftPaddingForNote = noteAssignments.length > 0 ? "pl-[12px]" : ""
 
       {/* 🔹 Nota lateral */}
       {noteAssignments.length > 0 && (
-        <div
-          className="absolute left-0 top-0 h-full flex flex-col items-start pt-[2px]"
-        >
-          {noteAssignments.map((assignment, idx) => (
-            <div
-              key={`nota-${idx}`}
-              className="text-[7px] font-medium italic text-muted-foreground bg-white/90 dark:bg-gray-800/90 px-[2px] py-0 leading-none border-r border-border/40"
-              title={assignment.texto || "Nota"}
-            >
-              {(assignment.texto || "Nota")
-                .split("")
-                .map((letter, letterIdx) => (
-                  <div key={letterIdx} className="leading-none">
-                    {letter}
-                  </div>
-                ))}
-            </div>
-          ))}
-        </div>
+        <VerticalNote texto={noteAssignments[0].texto || "Nota"} />
       )}
 
       {/* 🔹 Contenido principal */}
@@ -104,6 +86,87 @@ const leftPaddingForNote = noteAssignments.length > 0 ? "pl-[12px]" : ""
           </span>
         )}
       </div>
+    </div>
+  )
+}
+
+function VerticalNote({ texto }: { texto: string }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [columns, setColumns] = useState<string[][]>([])
+  const [fontSize, setFontSize] = useState(12)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    const containerHeight = containerRef.current.parentElement?.clientHeight || 0
+    const words = texto.trim().split(/\s+/) // Dividir por espacios, múltiples palabras
+    
+    // Si es una sola palabra, ajustar tamaño de letra para que quepa
+    if (words.length === 1) {
+      const word = words[0]
+      const maxLetterSize = Math.floor(containerHeight / word.length)
+      
+      // Limitar entre 8px y 16px para legibilidad
+      const optimalSize = Math.max(8, Math.min(16, maxLetterSize))
+      setFontSize(optimalSize)
+      
+      // Una sola columna para la palabra completa
+      setColumns([word.split("")])
+    } else {
+      // Múltiples palabras: usar tamaño estándar y múltiples columnas
+      setFontSize(12)
+      
+      const letterHeight = fontSize + 2 // Pequeño margen entre letras
+      const maxLettersPerColumn = Math.floor(containerHeight / letterHeight)
+      
+      const cols: string[][] = []
+      let currentColumn: string[] = []
+      
+      words.forEach((word, wordIndex) => {
+        // Si la palabra cabe en la columna actual
+        if (currentColumn.length + word.length + 1 <= maxLettersPerColumn) {
+          // Agregar espacio si no es la primera palabra
+          if (currentColumn.length > 0) {
+            currentColumn.push(" ")
+          }
+          currentColumn.push(...word.split(""))
+        } else {
+          // Nueva columna para esta palabra
+          if (currentColumn.length > 0) {
+            cols.push(currentColumn)
+          }
+          currentColumn = word.split("")
+        }
+        
+        // Última palabra: agregar la columna
+        if (wordIndex === words.length - 1 && currentColumn.length > 0) {
+          cols.push(currentColumn)
+        }
+      })
+      
+      setColumns(cols)
+    }
+  }, [texto, fontSize])
+
+  return (
+    <div
+      ref={containerRef}
+      className="absolute left-0 top-0 h-full flex"
+      style={{ width: "20px" }}
+    >
+      {columns.map((col, colIndex) => (
+        <div key={colIndex} className="flex flex-col">
+          {col.map((letter, i) => (
+            <span
+              key={i}
+              className="font-medium italic text-muted-foreground leading-none text-center w-[20px]"
+              style={{ fontSize: `${fontSize}px` }}
+            >
+              {letter}
+            </span>
+          ))}
+        </div>
+      ))}
     </div>
   )
 }
