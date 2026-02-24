@@ -486,7 +486,7 @@ function ScheduleCellComponent({
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <td
-            className={`border-r-2 border-black px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 md:py-2 last:border-r-0 relative group ${
+            className={`border-r-2 border-black px-1 py-1 sm:py-1.5 md:py-2 last:border-r-0 relative group ${
               isClickable ? `cursor-pointer transition-all ${hoverClass} active:brightness-90 touch-manipulation` : ""
             } ${selectedClass} ${incompleteClass} ${
               isSelected && isClickable && onQuickAssignments ? "min-h-[140px] py-2 sm:py-2.5 md:py-3" : ""

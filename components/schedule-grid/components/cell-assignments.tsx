@@ -66,7 +66,7 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
   }, [assignments])
 
   if (assignments.length === 0) {
-    return <span className="text-center text-sm sm:text-base md:text-lg text-muted-foreground font-medium">-</span>
+    return <span className="text-center text-lg sm:text-xl md:text-2xl text-muted-foreground font-medium">-</span>
   }
 
   const hasShifts = assignments.some((a) => a.type === "shift" && a.shiftId)
@@ -76,7 +76,7 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
       {orderedAssignments.map((assignment, idx) => {
         if (assignment.type === "nota") {
           return (
-            <span key={`nota-${idx}`} className="text-center text-xs sm:text-sm md:text-base font-medium italic text-muted-foreground block">
+            <span key={`nota-${idx}`} className="text-center text-base sm:text-lg md:text-xl font-medium italic text-muted-foreground block">
               {assignment.texto || "Nota"}
             </span>
           )
@@ -84,7 +84,7 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
 
         if (assignment.type === "franco") {
           return (
-            <span key={`franco-${idx}`} className="text-center text-xs sm:text-sm md:text-base font-bold block bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
+            <span key={`franco-${idx}`} className="text-center text-base sm:text-lg md:text-xl font-bold block bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
               FRANCO
             </span>
           )
@@ -107,13 +107,13 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
               <div key={`medio-franco-${idx}`} className="w-full space-y-0.5">
                 {/* Medio turno con su color */}
                 <div 
-                  className="text-center text-xs sm:text-sm md:text-base font-semibold text-white px-1 py-0.5 rounded"
+                  className="text-center text-base sm:text-lg md:text-xl lg:text-2xl font-semibold text-white px-1 py-0.5 rounded flex items-center justify-center"
                   style={{ backgroundColor: medioTurnoColor }}
                 >
                   {timeText}
                 </div>
                 {/* 1/2 FRANCO con fondo verde */}
-                <span className="block text-center text-xs sm:text-sm md:text-base font-bold bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
+                <span className="block text-center text-base sm:text-lg md:text-xl lg:text-2xl font-bold bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded flex items-center justify-center">
                   1/2 FRANCO
                 </span>
               </div>
@@ -123,7 +123,7 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
             return (
               <span 
                 key={`medio-franco-${idx}`} 
-                className="block text-center text-xs sm:text-sm md:text-base font-bold bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded"
+                className="block text-center text-base sm:text-lg md:text-xl lg:text-2xl font-bold bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded flex items-center justify-center"
               >
                 1/2 FRANCO
               </span>
@@ -143,7 +143,7 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
             return (
               <span 
                 key={`licencia-embarazo-${idx}`} 
-                className="block text-center text-xs sm:text-sm md:text-base font-semibold mb-0.5"
+                className="block text-center text-base sm:text-lg md:text-xl lg:text-2xl font-semibold mb-0.5"
               >
                 <span className="text-amber-600 dark:text-amber-400 font-bold text-[10px] sm:text-xs mr-1">Lic.</span>
                 <span className="text-foreground mx-1">·</span>
@@ -153,7 +153,7 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
           } else {
             // Sin horario, mostrar solo texto simple
             return (
-              <span key={`licencia-embarazo-${idx}`} className="block text-center text-xs sm:text-sm md:text-base font-bold text-amber-600 dark:text-amber-400 mb-0.5">
+              <span key={`licencia-embarazo-${idx}`} className="block text-center text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-amber-600 dark:text-amber-400 mb-0.5">
                 LICENCIA EMBARAZO
               </span>
             )
@@ -176,7 +176,7 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
           }
 
           return (
-            <div key={`horario-especial-${idx}`} className="text-center text-xs sm:text-sm md:text-base">
+            <div key={`horario-especial-${idx}`} className="text-center text-base sm:text-lg md:text-xl lg:text-2xl">
               {timeDisplay.map((line, lineIdx) => (
                 <span key={lineIdx} className="block font-semibold text-primary">
                   {line}
@@ -197,6 +197,29 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
         // getShiftDisplayTime ya maneja el caso de horario incompleto
         const displayTimeLines = getShiftDisplayTime(assignment.shiftId || "", shift, assignment)
 
+        // Detectar si es turno cortado (tiene dos franjas)
+        const isCutShift = !!(assignment.startTime && assignment.endTime && assignment.startTime2 && assignment.endTime2)
+
+        // Si es turno cortado, dividir en dos mitades
+        if (isCutShift && displayTimeLines.length >= 2) {
+          return (
+            <div key={uniqueKey} className="w-full h-full flex flex-col absolute inset-0">
+              {/* Primera mitad (arriba) - 50% altura */}
+              <div className="flex-1 flex items-center justify-center">
+                <span className={`text-center text-base sm:text-lg md:text-xl lg:text-2xl font-semibold tabular-nums text-foreground`}>
+                  {displayTimeLines[0]}
+                </span>
+              </div>
+              {/* Segunda mitad (abajo) - 50% altura */}
+              <div className="flex-1 flex items-center justify-center">
+                <span className={`text-center text-base sm:text-lg md:text-xl lg:text-2xl font-semibold tabular-nums text-foreground`}>
+                  {displayTimeLines[1]}
+                </span>
+              </div>
+            </div>
+          )
+        }
+
         // Renderizar horarios desde el assignment (puede incluir "Horario incompleto")
         return (
           <div key={uniqueKey} className="w-full space-y-0.5">
@@ -206,7 +229,7 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
               return (
                 <span 
                   key={lineIdx} 
-                  className={`block text-center text-xs sm:text-sm md:text-base font-semibold mb-0.5 ${
+                  className={`block text-center text-base sm:text-lg md:text-xl lg:text-2xl font-semibold tabular-nums mb-0.5 flex items-center justify-center ${
                     isIncomplete 
                       ? "text-amber-600 dark:text-amber-400 italic" 
                       : "text-foreground"
