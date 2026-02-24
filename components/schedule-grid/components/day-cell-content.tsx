@@ -106,26 +106,29 @@ function VerticalNote({ texto }: { texto: string }) {
       const word = words[0]
       const maxLetterSize = Math.floor(containerHeight / word.length)
       
-      // Limitar entre 8px y 16px para legibilidad
-      const optimalSize = Math.max(8, Math.min(16, maxLetterSize))
+      // Limitar entre 14px y 24px para legibilidad (DEBUG)
+      const optimalSize = Math.max(14, Math.min(24, maxLetterSize))
       setFontSize(optimalSize)
       
       // Una sola columna para la palabra completa
       setColumns([word.split("")])
     } else {
       // Múltiples palabras: usar tamaño estándar y múltiples columnas
-      setFontSize(12)
+      setFontSize(24) // DEBUG: Super grande
       
-      const letterHeight = fontSize + 2 // Pequeño margen entre letras
+      const letterHeight = 24 + 2 // Ajustado para fontSize 24px
       const maxLettersPerColumn = Math.floor(containerHeight / letterHeight)
       
       const cols: string[][] = []
       let currentColumn: string[] = []
       
       words.forEach((word, wordIndex) => {
+        // Calcular espacio necesario (palabra + espacio si no es primera)
+        const spaceNeeded = word.length + (currentColumn.length > 0 ? 1 : 0)
+        
         // Si la palabra cabe en la columna actual
-        if (currentColumn.length + word.length + 1 <= maxLettersPerColumn) {
-          // Agregar espacio si no es la primera palabra
+        if (currentColumn.length + spaceNeeded <= maxLettersPerColumn) {
+          // Agregar espacio si no es la primera palabra en la columna
           if (currentColumn.length > 0) {
             currentColumn.push(" ")
           }
@@ -138,7 +141,7 @@ function VerticalNote({ texto }: { texto: string }) {
           currentColumn = word.split("")
         }
         
-        // Última palabra: agregar la columna
+        // Última palabra: agregar la columna final
         if (wordIndex === words.length - 1 && currentColumn.length > 0) {
           cols.push(currentColumn)
         }
@@ -159,8 +162,7 @@ function VerticalNote({ texto }: { texto: string }) {
           {col.map((letter, i) => (
             <span
               key={i}
-              className="font-medium italic text-muted-foreground leading-none text-center w-[20px]"
-              style={{ fontSize: `${fontSize}px` }}
+              className="font-bold font-medium italic text-foreground leading-none text-center w-[20px] !text-[16px]"
             >
               {letter}
             </span>
