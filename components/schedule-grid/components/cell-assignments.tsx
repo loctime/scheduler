@@ -15,19 +15,25 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
   const orderedAssignments = useMemo(() => {
     if (assignments.length === 0) return []
 
-    // Ordenar asignaciones por horario:
+    // Ordenar asignaciones por tipo y horario:
     // 1. Turnos (shifts) ordenados por hora de inicio
     // 2. Licencia embarazo
     // 3. Medio franco
-    // 4. Otros (francos, notas)
+    // 4. Francos
+    // 5. Otros (horarios especiales)
+    // 6. Notas (siempre al final)
 
     const hasMedioFranco = assignments.some((a) => a.type === "medio_franco")
     const hasShifts = assignments.some((a) => a.type === "shift" && a.shiftId)
     const hasLicencia = assignments.some((a) => a.type === "licencia")
 
-    // Si hay licencia y turnos, ordenar por horario
+    // Si hay licencia y turnos, ordenar por horario (excepto notas)
     if (hasLicencia && hasShifts) {
       return [...assignments].sort((a, b) => {
+        // Las notas siempre van al final
+        if (a.type === "nota" && b.type !== "nota") return 1
+        if (b.type === "nota" && a.type !== "nota") return -1
+        
         const getStartTime = (assignment: ShiftAssignment): number => {
           if (assignment.startTime) return timeToMinutes(assignment.startTime)
           if (assignment.startTime2) return timeToMinutes(assignment.startTime2)
@@ -37,32 +43,23 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
         const aStart = getStartTime(a)
         const bStart = getStartTime(b)
 
-        // Si ambos tienen horario, ordenar por hora de inicio
-        if (aStart !== Infinity && bStart !== Infinity) {
-          return aStart - bStart
-        }
+        if (aStart === Infinity && bStart === Infinity) return 0
+        if (aStart === Infinity) return 1
+        if (bStart === Infinity) return -1
 
-        // Mantener orden relativo si no tienen horario
-        return 0
+        return aStart - bStart
       })
     }
 
-    // Lógica original para medio franco
-    if (hasMedioFranco && hasShifts) {
-      return [...assignments].sort((a, b) => {
-        if (a.type === "medio_franco" && b.type !== "medio_franco") {
-          const isEarly = a.startTime ? timeToMinutes(a.startTime) < 14 * 60 : true
-          return isEarly ? 1 : -1
-        }
-        if (b.type === "medio_franco" && a.type !== "medio_franco") {
-          const isEarly = b.startTime ? timeToMinutes(b.startTime) < 14 * 60 : true
-          return isEarly ? -1 : 1
-        }
-        return 0
-      })
-    }
-
-    return assignments
+    // Ordenamiento por defecto (notas al final)
+    return [...assignments].sort((a, b) => {
+      // Las notas siempre van al final
+      if (a.type === "nota" && b.type !== "nota") return 1
+      if (b.type === "nota" && a.type !== "nota") return -1
+      
+      // Para los demás tipos, mantener orden existente
+      return 0
+    })
   }, [assignments])
 
   if (assignments.length === 0) {
@@ -76,9 +73,11 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
       {orderedAssignments.map((assignment, idx) => {
         if (assignment.type === "nota") {
           return (
-            <span key={`nota-${idx}`} className="text-center text-base sm:text-lg md:text-xl font-medium italic text-muted-foreground block">
-              {assignment.texto || "Nota"}
-            </span>
+            <div key={`nota-${idx}`} className="w-full flex items-center justify-center">
+              <span className="text-center text-base sm:text-lg md:text-xl font-medium italic text-muted-foreground block">
+                {assignment.texto || "Nota"}
+              </span>
+            </div>
           )
         }
 
