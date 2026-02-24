@@ -142,11 +142,11 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
             return (
               <span 
                 key={`licencia-embarazo-${idx}`} 
-                className="block text-center text-base sm:text-lg md:text-xl lg:text-2xl font-semibold mb-0.5"
+                className="block text-center text-sm sm:text-base md:text-lg font-semibold mb-0.5"
               >
                 <span className="text-amber-600 dark:text-amber-400 font-bold text-[10px] sm:text-xs mr-1">Lic.</span>
                 <span className="text-foreground mx-1">·</span>
-                <span className="text-foreground font-semibold">{timeText}</span>
+                <span className="text-foreground font-semibold text-sm sm:text-base md:text-lg">{timeText}</span>
               </span>
             )
           } else {
