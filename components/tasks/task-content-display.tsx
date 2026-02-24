@@ -24,6 +24,12 @@ export function TaskContentDisplay({ task }: TaskContentDisplayProps) {
     return (
       <div 
         className="rich-text-content prose prose-sm max-w-none"
+        style={{ 
+          whiteSpace: 'pre-wrap',
+          fontFamily: 'monospace',
+          fontSize: '14px',
+          lineHeight: '1.5'
+        }}
         dangerouslySetInnerHTML={{ __html: sanitizedContent }}
       />
     )

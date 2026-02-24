@@ -16,6 +16,40 @@ import { Task } from "@/types/task"
 
 const DIAS_SEMANA = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
 
+// Función para convertir markdown a HTML de forma robusta
+const markdownToHTML = (text: string) => {
+  if (!text) return ""
+  
+  return text
+    // Bold: **texto** -> <strong>texto</strong>
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    // Italic: *texto* -> <em>texto</em>
+    .replace(/(?<!\*)\*(?!\*)(.*?)\*(?!\*)/g, '<em>$1</em>')
+    // Underline: __texto__ -> <u>texto</u>
+    .replace(/__(.*?)__/g, '<u>$1</u>')
+    // Strikethrough: ~~texto~~ -> <s>texto</s>
+    .replace(/~~(.*?)~~/g, '<s>$1</s>')
+    // Headers: # Título -> <h1>Título</h1>
+    .replace(/^#{1,6}\s+(.*)$/gm, (match, text) => {
+      const level = match.match(/^#+/)?.[0]?.length || 1
+      return `<h${Math.min(level, 6)}>${text}</h${Math.min(level, 6)}>`
+    })
+    // Ordered lists: 1. item -> <li>item</li>
+    .replace(/^\d+\.\s+(.*)$/gm, '<li>$1</li>')
+    // Unordered lists: - item -> <li>item</li>
+    .replace(/^-\s+(.*)$/gm, '<li>$1</li>')
+    // Blockquotes: > texto -> <blockquote>texto</blockquote>
+    .replace(/^>\s+(.*)$/gm, '<blockquote>$1</blockquote>')
+    // Inline code: `codigo` -> <code>codigo</code>
+    .replace(/(?<!`)`(?<!`)(.*?)`/g, '<code>$1</code>')
+    // Code blocks: ```codigo``` -> <pre><code>codigo</code></pre>
+    .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+    // Links: [texto](url) -> <a href="url">texto</a>
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+    // Line breaks: \n -> <br>
+    .replace(/\n/g, '<br>')
+}
+
 export default function TareasPage() {
   const params = useParams()
   const router = useRouter()
@@ -330,9 +364,18 @@ function TaskCard({ task, employees, onClick, isToday, companySlug, router, isCo
           {task.detailedContent && (
             <div>
               <h4 className="font-medium text-sm text-gray-700 mb-1">Detalles:</h4>
-              <div className="text-sm text-gray-600 whitespace-pre-wrap">
-                {task.detailedContent}
-              </div>
+              <div 
+                className="text-sm text-gray-900 p-3 bg-gray-50 rounded border"
+                style={{ 
+                  whiteSpace: 'pre-wrap',
+                  fontFamily: 'monospace',
+                  fontSize: '14px',
+                  lineHeight: '1.5'
+                }}
+                dangerouslySetInnerHTML={{ 
+                  __html: markdownToHTML(task.detailedContent)
+                }}
+              />
             </div>
           )}
 
@@ -340,9 +383,18 @@ function TaskCard({ task, employees, onClick, isToday, companySlug, router, isCo
           {task.instructions && (
             <div>
               <h4 className="font-medium text-sm text-gray-700 mb-1">Instrucciones:</h4>
-              <div className="text-sm text-gray-600 whitespace-pre-wrap">
-                {task.instructions}
-              </div>
+              <div 
+                className="text-sm text-gray-900 p-3 bg-yellow-50 rounded border border-yellow-200"
+                style={{ 
+                  whiteSpace: 'pre-wrap',
+                  fontFamily: 'monospace',
+                  fontSize: '14px',
+                  lineHeight: '1.5'
+                }}
+                dangerouslySetInnerHTML={{ 
+                  __html: markdownToHTML(task.instructions)
+                }}
+              />
             </div>
           )}
 
