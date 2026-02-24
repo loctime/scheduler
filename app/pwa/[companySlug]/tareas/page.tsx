@@ -30,16 +30,53 @@ export default function TareasPage() {
 
   const today = new Date()
   const todayName = DIAS_SEMANA[today.getDay()]
+  const todayDayNumber = today.getDay()
 
-  // Separar tareas: pendientes vs realizadas
-  const { pendientes, realizadas } = useMemo(() => {
-    const pendientes = tasks.filter(task => !completedMap[task.id])
-    const realizadas = tasks.filter(task => completedMap[task.id])
-    return { pendientes, realizadas }
-  }, [tasks, completedMap])
+  // Paso 1: Filtrado correcto por empleado
+  const filteredTasks = useMemo(() => {
+    if (!ownerId) return []
+    
+    return tasks.filter(task => {
+      if (!task.active) return false
+      if (task.ownerId !== ownerId) return false
 
-  // Estado para expandir/ocultar realizadas
-  const [expanded, setExpanded] = useState(false)
+      // Si no tiene employeeIds → es para todos
+      if (!task.employeeIds || task.employeeIds.length === 0) return true
+
+      return task.employeeIds.includes(viewer?.employeeId || '')
+    })
+  }, [tasks, ownerId, viewer?.employeeId])
+
+  // Paso 2: Separar tareas del día vs no del día
+  const { tareasDelDia, tareasNoDelDia } = useMemo(() => {
+    const tareasDelDia = filteredTasks.filter(task =>
+      task.daysOfWeek?.includes(todayDayNumber)
+    )
+    
+    const tareasNoDelDia = filteredTasks.filter(task =>
+      !task.daysOfWeek?.includes(todayDayNumber)
+    )
+    
+    return { tareasDelDia, tareasNoDelDia }
+  }, [filteredTasks, todayDayNumber])
+
+  // Paso 3: Dentro de tareasDelDia separar pendientes y completadas
+  const { pendientes, completadas } = useMemo(() => {
+    const pendientes = tareasDelDia.filter(
+      t => !completedMap[t.id]
+    )
+    
+    const completadas = tareasDelDia.filter(
+      t => completedMap[t.id]
+    )
+    
+    return { pendientes, completadas }
+  }, [tareasDelDia, completedMap])
+
+  // Orden final: pendientes primero, luego completadas
+  const tareasOrdenadasHoy = useMemo(() => {
+    return [...pendientes, ...completadas]
+  }, [pendientes, completadas])
 
   if (ownerIdLoading || employeesLoading) {
     return (
@@ -97,16 +134,15 @@ export default function TareasPage() {
       </div>
 
       <div className="max-w-4xl mx-auto p-4 space-y-6">
-        {/* Tareas pendientes */}
-        {pendientes.length > 0 && (
+        {/* Sección 1: Pendientes del día */}
+        {tareasOrdenadasHoy.length > 0 && (
           <div>
             <div className="flex items-center space-x-2 mb-4">
               <CheckSquare className="h-5 w-5 text-yellow-600" />
-              <h2 className="text-lg font-medium text-yellow-700">Pendientes del día</h2>
-              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">{pendientes.length}</Badge>
+              <h2 className="text-lg font-medium text-yellow-700">Pendientes del día ({tareasOrdenadasHoy.length})</h2>
             </div>
             <div className="space-y-3">
-              {pendientes.map((task) => (
+              {tareasOrdenadasHoy.map((task) => (
                 <TaskCard
                   key={task.id}
                   task={task}
@@ -125,42 +161,35 @@ export default function TareasPage() {
           </div>
         )}
 
-        {/* Tareas realizadas */}
-        {realizadas.length > 0 && (
+        {/* Sección 2: Tareas (no del día) */}
+        {tareasNoDelDia.length > 0 && (
           <div>
-            <div 
-              onClick={() => setExpanded(!expanded)}
-              className="bg-green-50 dark:bg-green-950/40 border border-green-400 rounded-xl p-3 mt-2 cursor-pointer transition-all"
-            >
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-semibold text-green-700 dark:text-green-300">
-                  ✔ Pendientes al día
-                </span>
-                <span className="text-xs text-green-600">
-                  {expanded ? "Ocultar" : "Ver realizadas"}
-                </span>
-              </div>
-
-              {expanded && (
-                <div className="mt-3 space-y-2 border-t border-green-300 pt-2">
-                  {realizadas.map((task) => (
-                    <div key={task.id} className="text-sm">
-                      <div className="font-medium line-through opacity-70">
-                        {task.title}
-                      </div>
-                      <div className="text-muted-foreground">
-                        Realizada por {employees.find(emp => emp.id === completedMap[task.id]?.employeeId)?.name || 'Desconocido'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <div className="flex items-center space-x-2 mb-4">
+              <Calendar className="h-5 w-5 text-blue-600" />
+              <h2 className="text-lg font-medium text-blue-700">Tareas ({tareasNoDelDia.length})</h2>
+            </div>
+            <div className="space-y-3">
+              {tareasNoDelDia.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  employees={employees}
+                  onClick={() => router.push(`/pwa/${companySlug}/tareas/${task.id}`)}
+                  isToday={false}
+                  companySlug={companySlug}
+                  router={router}
+                  isCompleted={!!completedMap[task.id]}
+                  completedBy={completedMap[task.id]?.employeeId}
+                  onToggle={() => toggleTask(task.id)}
+                  viewer={viewer}
+                />
+              ))}
             </div>
           </div>
         )}
 
         {/* No hay tareas */}
-        {pendientes.length === 0 && realizadas.length === 0 && (
+        {tareasOrdenadasHoy.length === 0 && tareasNoDelDia.length === 0 && (
           <div className="text-center py-12">
             <CheckSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No hay tareas para mostrar</h3>
