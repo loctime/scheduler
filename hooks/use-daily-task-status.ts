@@ -65,6 +65,12 @@ export function useDailyTaskStatus(ownerId: string | null) {
   }, [ownerId])
 
   const toggleTask = async (taskId: string) => {
+    console.log("🔍 TOGGLE TASK INICIO:")
+    console.log("  - taskId:", taskId)
+    console.log("  - ownerId:", ownerId)
+    console.log("  - viewer?.employeeId:", viewer?.employeeId)
+    console.log("  - completedMap antes:", completedMap)
+    
     if (!ownerId || !viewer?.employeeId || !db) {
       console.error("No se puede marcar tarea: falta ownerId, employeeId o db")
       return
@@ -81,14 +87,18 @@ export function useDailyTaskStatus(ownerId: string | null) {
     const docRef = doc(db, "apps", "horarios", "dailyTaskStatus", docId)
 
     const isCompleted = !!completedMap[taskId]
+    console.log("  - isCompleted (antes):", isCompleted)
+    
     let newCompleted: Record<string, CompletedTask>
 
     if (isCompleted) {
       // Desmarcar: remover la tarea
+      console.log("  - Acción: DESMARCAR tarea")
       newCompleted = { ...completedMap }
       delete newCompleted[taskId]
     } else {
       // Marcar: agregar la tarea
+      console.log("  - Acción: MARCAR tarea")
       newCompleted = {
         ...completedMap,
         [taskId]: {
@@ -97,6 +107,8 @@ export function useDailyTaskStatus(ownerId: string | null) {
         }
       }
     }
+
+    console.log("  - newCompleted después:", newCompleted)
 
     // Update local state immediately for better UX
     setCompletedMap(newCompleted)
