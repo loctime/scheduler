@@ -8,8 +8,8 @@ import { useToast } from "@/hooks/use-toast"
 export interface TaskFormData {
   title: string
   description?: string
-  detailedContent?: string
-  instructions?: string
+  detailedContent: string
+  instructions: string
   employeeIds?: string[]
   daysOfWeek?: number[]
   active: boolean

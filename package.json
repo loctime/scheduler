@@ -73,7 +73,9 @@
     "vaul": "^1.1.2",
     "xlsx": "^0.18.5",
     "xlsx-js-style": "^1.2.0",
-    "zod": "3.25.76"
+    "zod": "3.25.76",
+    "@ckeditor/ckeditor5-react": "^9.0.0",
+    "@ckeditor/ckeditor5-build-classic": "^44.2.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.9",

@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { TaskFormData } from "@/hooks/use-task-management"
 import { Empleado } from "@/lib/types"
+import { RichTextEditor } from "@/components/tasks/simple-rich-text-editor"
 
 const DIAS_SEMANA = [
   { id: 0, name: "Domingo" },
@@ -40,6 +41,9 @@ export function TaskForm({ task, employees, onSubmit, onCancel, isLoading = fals
     daysOfWeek: task?.daysOfWeek || [],
     active: task?.active ?? true,
   })
+
+  console.log("TaskForm - formData:", formData)
+  console.log("TaskForm - task:", task)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -105,26 +109,26 @@ export function TaskForm({ task, employees, onSubmit, onCancel, isLoading = fals
           {/* Contenido detallado */}
           <div>
             <Label htmlFor="detailedContent">Contenido Detallado</Label>
-            <Textarea
-              id="detailedContent"
-              value={formData.detailedContent}
-              onChange={(e) => setFormData(prev => ({ ...prev, detailedContent: e.target.value }))}
-              placeholder="Información detallada, pasos a seguir, etc."
-              rows={6}
+            <RichTextEditor
+              value={formData.detailedContent || ""}
+              onChange={(val: string) =>
+                setFormData(prev => ({ ...prev, detailedContent: val }))
+              }
               disabled={isLoading}
+              placeholder="Información detallada, pasos a seguir, etc."
             />
           </div>
 
           {/* Instrucciones */}
           <div>
             <Label htmlFor="instructions">Instrucciones Especiales</Label>
-            <Textarea
-              id="instructions"
-              value={formData.instructions}
-              onChange={(e) => setFormData(prev => ({ ...prev, instructions: e.target.value }))}
-              placeholder="Instrucciones importantes, advertencias, etc."
-              rows={4}
+            <RichTextEditor
+              value={formData.instructions || ""}
+              onChange={(val: string) =>
+                setFormData(prev => ({ ...prev, instructions: val }))
+              }
               disabled={isLoading}
+              placeholder="Instrucciones importantes, advertencias, etc."
             />
           </div>
 
