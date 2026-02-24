@@ -80,7 +80,7 @@ export default function TareasPage() {
 
   // Estado para controlar expansión de secciones
   const [expandedHoy, setExpandedHoy] = useState(true)
-  const [expandedTareas, setExpandedTareas] = useState(true)
+  const [expandedTareas, setExpandedTareas] = useState(false)
 
   if (ownerIdLoading || employeesLoading) {
     return (
