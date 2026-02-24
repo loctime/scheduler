@@ -3,21 +3,19 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { onAuthStateChanged } from "firebase/auth"
-import { auth, isFirebaseConfigured, db, COLLECTIONS } from "@/lib/firebase"
+import { auth, isFirebaseConfigured } from "@/lib/firebase"
 import { LoginForm } from "@/components/login-form"
 import { FirebaseConfigNotice } from "@/components/firebase-config-notice"
 import { Loader2 } from "lucide-react"
-import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore"
-
-// Función para detectar si está corriendo como PWA
-function isPWA(): boolean {
-  if (typeof window === "undefined") return false
-  return window.matchMedia("(display-mode: standalone)").matches
-}
+import { usePwaInstall } from "@/hooks/usePwaInstall"
+import { Button } from "@/components/ui/button"
+import { Download, X, Share2 } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
 
 export default function HomePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const { canInstall, isStandalone, isIOS, install, dismiss } = usePwaInstall()
 
   useEffect(() => {
     if (!isFirebaseConfigured() || !auth) {
@@ -26,8 +24,8 @@ export default function HomePage() {
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        // Solo redirigir al chat si está corriendo como PWA
-        if (isPWA()) {
+        // Si está corriendo como PWA, redirigir al chat
+        if (isStandalone) {
           router.push("/chat")
         } else {
           // Si es web normal, redirigir al dashboard
@@ -39,7 +37,7 @@ export default function HomePage() {
     })
 
     return () => unsubscribe()
-  }, [router])
+  }, [router, isStandalone])
 
   if (!isFirebaseConfigured()) {
     return <FirebaseConfigNotice />
@@ -55,7 +53,70 @@ export default function HomePage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <LoginForm />
+      <div className="w-full max-w-md space-y-4">
+        <LoginForm />
+        
+        {/* Botón de instalación para Android */}
+        {canInstall && !isIOS && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">Instalar como app</p>
+                  <p className="text-xs text-muted-foreground">
+                    Accedé rápido desde tu pantalla de inicio
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={install}
+                    className="gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Instalar</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={dismiss}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Mensaje instructivo para iOS */}
+        {isIOS && !isStandalone && (
+          <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <Share2 className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    Para instalar esta app
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                    Tocá el botón <span className="font-medium">Compartir</span> y elegí <span className="font-medium">"Agregar a pantalla de inicio"</span>
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-blue-600 dark:text-blue-400"
+                  onClick={dismiss}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   )
 }
