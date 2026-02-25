@@ -5,22 +5,24 @@ import { ShiftAssignment, Turno, MedioTurno } from "@/lib/types"
 import { getShiftDisplayTime } from "../utils/shift-display-utils"
 import { timeToMinutes } from "../utils/schedule-grid-utils"
 
-/** Obtiene la etiqueta de sector para un slot (1 = primera franja, 2 = segunda franja) si existe. */
-function getSectorLabelForSlot(assignment: ShiftAssignment, slot: 1 | 2): string | undefined {
-  const slots = (assignment as ShiftAssignment & { sectorSlots?: { 1?: string; 2?: string } }).sectorSlots
-  if (!slots) return undefined
-  return slot === 1 ? slots[1] : slots[2]
+/** Obtiene el sectorId asignado al slot (1 = primera franja, 2 = segunda franja). sectorSlots es array [{ slot, sectorId }]. */
+function getSectorIdForSlot(assignment: ShiftAssignment, slot: 1 | 2): string | undefined {
+  const list = assignment.sectorSlots
+  if (!list || !Array.isArray(list)) return undefined
+  const item = list.find((s) => s.slot === slot)
+  return item?.sectorId
 }
 
 /** Chip pequeño de sector, solo se renderiza si hay label. */
 function SectorChip({ label, className = "" }: { label: string; className?: string }) {
-  if (!label?.trim()) return null
+  const text = (typeof label === "string" ? label : label != null ? String(label) : "").trim()
+  if (!text) return null
   return (
     <span
       className={`inline-block text-[10px] sm:text-xs font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground truncate max-w-full ${className}`}
-      title={label}
+      title={text}
     >
-      {label}
+      {text}
     </span>
   )
 }
@@ -29,9 +31,11 @@ interface CellAssignmentsProps {
   assignments: ShiftAssignment[]
   getShiftInfo: (shiftId: string) => Turno | undefined
   mediosTurnos?: MedioTurno[]
+  /** Mapa sectorId -> nombre para mostrar en el chip (opcional). */
+  sectorNameById?: Map<string, string>
 }
 
-export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }: CellAssignmentsProps) {
+export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [], sectorNameById }: CellAssignmentsProps) {
   const orderedAssignments = useMemo(() => {
     if (assignments.length === 0) return []
 
@@ -221,8 +225,10 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
 
         // Turno cortado: cada franja en su propio bloque con su chip alineado (slot 1 ↔ primera franja, slot 2 ↔ segunda franja)
         if (isCutShift && displayTimeLines.length >= 2) {
-          const sector1 = getSectorLabelForSlot(assignment, 1)
-          const sector2 = getSectorLabelForSlot(assignment, 2)
+          const sectorId1 = getSectorIdForSlot(assignment, 1)
+          const sectorId2 = getSectorIdForSlot(assignment, 2)
+          const label1 = sectorId1 ? (sectorNameById?.get(sectorId1) ?? sectorId1) : undefined
+          const label2 = sectorId2 ? (sectorNameById?.get(sectorId2) ?? sectorId2) : undefined
           return (
             <div key={uniqueKey} className="w-full h-full flex flex-col absolute inset-0">
               {/* Primera franja: horario + chip slot 1 */}
@@ -230,21 +236,22 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
                 <span className="text-center text-base sm:text-lg md:text-xl lg:text-2xl font-semibold tabular-nums text-foreground">
                   {displayTimeLines[0]}
                 </span>
-                {sector1 && <SectorChip label={sector1} />}
+                {label1 && <SectorChip label={label1} />}
               </div>
               {/* Segunda franja: horario + chip slot 2 */}
               <div className="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-0">
                 <span className="text-center text-base sm:text-lg md:text-xl lg:text-2xl font-semibold tabular-nums text-foreground">
                   {displayTimeLines[1]}
                 </span>
-                {sector2 && <SectorChip label={sector2} />}
+                {label2 && <SectorChip label={label2} />}
               </div>
             </div>
           )
         }
 
         // Turno corrido: un único bloque con horario y chip de slot 1 debajo (sin agrupar con otra franja)
-        const sector1 = getSectorLabelForSlot(assignment, 1)
+        const sectorId1 = getSectorIdForSlot(assignment, 1)
+        const label1 = sectorId1 ? (sectorNameById?.get(sectorId1) ?? sectorId1) : undefined
         return (
           <div key={uniqueKey} className="w-full space-y-0.5">
             {displayTimeLines.map((line, lineIdx) => {
@@ -262,9 +269,9 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
                 </span>
               )
             })}
-            {sector1 && (
+            {label1 && (
               <div className="flex justify-center mt-0.5">
-                <SectorChip label={sector1} />
+                <SectorChip label={label1} />
               </div>
             )}
           </div>
