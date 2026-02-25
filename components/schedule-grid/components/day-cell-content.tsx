@@ -2,7 +2,8 @@
 
 import React, { useEffect, useRef, useState } from "react"
 import type { CSSProperties } from "react"
-import { ShiftAssignment, Turno, MedioTurno } from "@/lib/types"
+import { ShiftAssignment, Turno, MedioTurno, Separador } from "@/lib/types"
+import { Badge } from "@/components/ui/badge"
 import { CellAssignments } from "./cell-assignments"
 import { CellAssignmentsHome } from "./cell-assignments-home"
 
@@ -14,6 +15,7 @@ interface DayCellContentProps {
   mediosTurnos?: MedioTurno[]
   hasIncompleteAssignments?: boolean
   homeMode?: boolean
+  sectors?: Separador[]
 }
 
 export function DayCellContent({
@@ -24,6 +26,7 @@ export function DayCellContent({
   mediosTurnos = [],
   hasIncompleteAssignments = false,
   homeMode = false,
+  sectors = [],
 }: DayCellContentProps) {
 
   const incompleteClass = hasIncompleteAssignments
@@ -32,6 +35,21 @@ export function DayCellContent({
 
   const nonNoteAssignments = assignments.filter(a => a.type !== "nota")
   const noteAssignments = assignments.filter(a => a.type === "nota")
+
+
+  const sectorNameById = React.useMemo(() => {
+    const map = new Map<string, string>()
+    sectors.forEach((sector) => map.set(sector.id, sector.nombre))
+    return map
+  }, [sectors])
+
+  const sectorSlots = React.useMemo(() => {
+    const base = assignments.find((a) => a.type === "shift" || a.type === "medio_franco")
+    if (!base?.sectorSlots || base.sectorSlots.length === 0) return []
+    return [...base.sectorSlots]
+      .filter((slot) => slot.slot === 1 || slot.slot === 2)
+      .sort((a, b) => a.slot - b.slot)
+  }, [assignments])
 
   const hasCutShift = assignments.some((a) =>
     a.type === "shift" &&
@@ -78,6 +96,16 @@ const leftPaddingForNote = noteAssignments.length > 0 ? "pl-[12px]" : ""
             getShiftInfo={getShiftInfo}
             mediosTurnos={mediosTurnos}
           />
+        )}
+
+        {sectorSlots.length > 0 && (
+          <div className="mt-1 flex items-center gap-1">
+            {sectorSlots.map((slot) => (
+              <Badge key={slot.slot} variant="secondary" className="text-[10px] px-1.5 py-0.5">
+                {sectorNameById.get(slot.sectorId) || slot.sectorId}
+              </Badge>
+            ))}
+          </div>
         )}
 
         {dayStatus === "franco" && (

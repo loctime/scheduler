@@ -164,6 +164,7 @@ function areAssignmentsEqual(
     if ('endTime2' in assignment && 'endTime2' in other && assignment.endTime2 !== other.endTime2) return false
     if ('texto' in assignment && 'texto' in other && assignment.texto !== other.texto) return false
     if ('licenciaType' in assignment && 'licenciaType' in other && assignment.licenciaType !== other.licenciaType) return false
+    if (JSON.stringify(assignment.sectorSlots || []) !== JSON.stringify(other.sectorSlots || [])) return false
     return true
   })
 }

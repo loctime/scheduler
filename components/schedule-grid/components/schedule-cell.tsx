@@ -38,6 +38,7 @@ import { isAssignmentIncomplete, getIncompletenessReason } from "@/lib/assignmen
 import { EditarHorarioDialog } from "@/components/schedule-calendar/EditarHorarioDialog"
 import { LicenciaEmbarazoDialog } from "@/components/schedule-calendar/LicenciaEmbarazoDialog"
 import { getEmployeeRequest } from "@/lib/employee-requests"
+import { AsignarSectorDialog } from "./asignar-sector-dialog"
 
 interface ScheduleCellProps {
   date: string
@@ -103,6 +104,7 @@ function ScheduleCellComponent({
 }: ScheduleCellProps) {
   const [notaDialogOpen, setNotaDialogOpen] = useState(false)
   const [notaTexto, setNotaTexto] = useState("")
+  const [sectorDialogOpen, setSectorDialogOpen] = useState(false)
   // Estado local para pedidos de empleados
   const [employeeRequestActive, setEmployeeRequestActive] = useState(false)
   const [employeeRequestDescription, setEmployeeRequestDescription] = useState("")
@@ -243,6 +245,10 @@ function ScheduleCellComponent({
     return { assignment: first.assignment, shift: first.shift }
   }, [editableShiftAssignments])
   
+  const sectorEditableAssignment = React.useMemo(() => {
+    return assignments.find((a) => a.type === "shift" || a.type === "medio_franco") || null
+  }, [assignments])
+
   // Detectar si el turno base está huérfano (eliminado)
   const isOrphanShift = React.useMemo(() => {
     if (!firstShiftAssignment) return false
@@ -318,6 +324,20 @@ function ScheduleCellComponent({
     return Array.from(colorSet)
   }, [quickShifts])
   
+  const handleSaveSectorAssignment = (updatedAssignment: ShiftAssignment) => {
+    if (!onAssignmentUpdate || !sectorEditableAssignment) return
+
+    const targetIndex = assignments.findIndex((a) => a === sectorEditableAssignment)
+    if (targetIndex === -1) return
+
+    const updatedAssignments = assignments.map((assignment, index) =>
+      index === targetIndex ? updatedAssignment : assignment
+    )
+
+    onAssignmentUpdate(date, employeeId, updatedAssignments, { scheduleId })
+    setSectorDialogOpen(false)
+  }
+
   const handleOpenNotaDialog = () => {
     if (existingNota?.texto) {
       setNotaTexto(existingNota.texto)
@@ -542,6 +562,7 @@ function ScheduleCellComponent({
               getShiftInfo={getShiftInfo}
               mediosTurnos={mediosTurnos}
               hasIncompleteAssignments={hasIncompleteAssignments}
+              sectors={config?.separadores || []}
             />
           )}
         </div>
@@ -627,6 +648,11 @@ function ScheduleCellComponent({
                   )}
                   <ContextMenuSeparator />
                 </>
+              )}
+              {sectorEditableAssignment && config?.separadores && config.separadores.length > 0 && (
+                <ContextMenuItem onClick={() => setSectorDialogOpen(true)}>
+                  Asignar sector
+                </ContextMenuItem>
               )}
               <ContextMenuItem onClick={handleOpenNotaDialog}>
                 <FileText className="mr-2 h-4 w-4" />
@@ -720,6 +746,17 @@ function ScheduleCellComponent({
         </ContextMenuContent>
       </ContextMenu>
       
+      {sectorEditableAssignment && config?.separadores && config.separadores.length > 0 && (
+        <AsignarSectorDialog
+          open={sectorDialogOpen}
+          onOpenChange={setSectorDialogOpen}
+          assignment={sectorEditableAssignment}
+          shift={sectorEditableAssignment.shiftId ? getShiftInfo(sectorEditableAssignment.shiftId) : undefined}
+          sectors={config.separadores}
+          onSave={handleSaveSectorAssignment}
+        />
+      )}
+
       {/* Diálogo para agregar/editar nota */}
       <Dialog open={notaDialogOpen} onOpenChange={setNotaDialogOpen}>
         <DialogContent>
@@ -954,7 +991,8 @@ const areAssignmentsEqual = (nextAssignments: ShiftAssignment[], prevAssignments
       next.endTime !== prev.endTime ||
       next.startTime2 !== prev.startTime2 ||
       next.endTime2 !== prev.endTime2 ||
-      next.texto !== prev.texto
+      next.texto !== prev.texto ||
+      JSON.stringify(next.sectorSlots || []) !== JSON.stringify(prev.sectorSlots || [])
     ) {
       return false
     }
