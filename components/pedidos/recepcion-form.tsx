@@ -236,7 +236,7 @@ export function RecepcionForm({
               // Azul si recibido = enviado (y ambos > 0)
               cardClassName += "border-blue-500 bg-blue-50 dark:bg-blue-950/40 shadow-md"
             } else if (data.cantidadRecibida < producto.cantidadEnviada) {
-              // Amarillo si recibido < enviado
+              // Amarillo si recibido < enviado.
               cardClassName += "border-amber-500 bg-amber-50 dark:bg-amber-950/40 shadow-md"
             } else {
               cardClassName += "border-border bg-card shadow-sm hover:shadow-md"
