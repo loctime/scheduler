@@ -570,7 +570,8 @@ function ScheduleCellComponent({
         {!readonly && (
           <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10" data-shift-request-marker>
             {/* Ocultar ShiftRequestMarker si hay notas para evitar competencia visual */}
-            {!assignments.some(a => a.type === "nota") && (
+            {/* TEMPORALMENTE OCULTO - ShiftRequestMarker desactivado */}
+            {/* {!assignments.some(a => a.type === "nota") && (
               <ShiftRequestMarker 
                 active={employeeRequestActive}
                 description={employeeRequestDescription}
@@ -583,13 +584,11 @@ function ScheduleCellComponent({
                 mediosTurnos={mediosTurnos}
                 updateEmployeeRequestCache={updateEmployeeRequestCache}
                 onAssignmentUpdate={onAssignmentUpdate}
-                onAssign={(assignment) => onQuickAssignments?.([assignment])}
+                onAssign={handleQuickAssignment}
               />
-            )}
+            )} */}
           </div>
         )}
-        
-       
       </td>
         </ContextMenuTrigger>
         <ContextMenuContent>
