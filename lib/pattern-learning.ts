@@ -62,7 +62,8 @@ function assignmentsEqual(a1: ShiftAssignment[], a2: ShiftAssignment[]): boolean
       a1.startTime === a2.startTime &&
       a1.endTime === a2.endTime &&
       a1.startTime2 === a2.startTime2 &&
-      a1.endTime2 === a2.endTime2
+      a1.endTime2 === a2.endTime2 &&
+      JSON.stringify(a1.sectorSlots || []) === JSON.stringify(a2.sectorSlots || [])
     )
   })
 }

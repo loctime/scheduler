@@ -187,6 +187,10 @@ export interface ShiftAssignment {
   endTime2?: string
   texto?: string
   licenciaType?: "embarazo" | "vacaciones" | "otro"
+  sectorSlots?: Array<{
+    slot: 1 | 2
+    sectorId: string
+  }>
 }
 
 export type ShiftAssignmentValue = ShiftAssignment[]
