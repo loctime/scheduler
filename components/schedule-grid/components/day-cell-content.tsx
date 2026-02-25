@@ -59,7 +59,7 @@ const leftPaddingForNote = noteAssignments.length > 0 ? "pl-[12px]" : ""
     ? `relative flex flex-col gap-2 rounded w-full ${
         hasCutShift ? "min-h-[120px]" : "px-3 sm:px-4 md:px-5 py-2 sm:py-3 md:py-4"
       } ${leftPaddingForNote} ${incompleteClass}`
-    : `relative flex flex-col gap-1.5 px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 md:py-2 rounded min-h-[80px] w-full ${leftPaddingForNote} ${incompleteClass}` 
+    : `relative flex flex-col gap-1.5 px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 md:py-2 rounded ${hasCutShift ? "min-h-[100px]" : "min-h-[80px]"} w-full ${leftPaddingForNote} ${incompleteClass}` 
 
   const francoClasses = homeMode
     ? "text-center text-xl sm:text-2xl md:text-3xl font-bold block bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-3 py-2 rounded"

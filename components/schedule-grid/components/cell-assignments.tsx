@@ -230,20 +230,20 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [], 
           const label1 = sectorId1 ? (sectorNameById?.get(sectorId1) ?? sectorId1) : undefined
           const label2 = sectorId2 ? (sectorNameById?.get(sectorId2) ?? sectorId2) : undefined
           return (
-            <div key={uniqueKey} className="w-full h-full flex flex-col absolute inset-0">
-              {/* Primera franja: horario + chip slot 1 */}
-              <div className="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-0">
-                <span className="text-center text-base sm:text-lg md:text-xl lg:text-2xl font-semibold tabular-nums text-foreground">
+            <div key={uniqueKey} className="w-full h-full flex flex-col absolute inset-0 min-h-[100px]">
+              {/* Primera franja: horario + chip slot 1 (altura mínima para que el chip no se corte) */}
+              <div className="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[2.75rem] shrink-0">
+                <span className="text-center text-base sm:text-lg md:text-xl lg:text-2xl font-semibold tabular-nums text-foreground leading-tight">
                   {displayTimeLines[0]}
                 </span>
-                {label1 && <SectorChip label={label1} />}
+                {label1 && <span className="shrink-0"><SectorChip label={label1} /></span>}
               </div>
-              {/* Segunda franja: horario + chip slot 2 */}
-              <div className="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-0">
-                <span className="text-center text-base sm:text-lg md:text-xl lg:text-2xl font-semibold tabular-nums text-foreground">
+              {/* Segunda franja: horario + chip slot 2 (altura mínima para que el chip no se corte) */}
+              <div className="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[2.75rem] shrink-0">
+                <span className="text-center text-base sm:text-lg md:text-xl lg:text-2xl font-semibold tabular-nums text-foreground leading-tight">
                   {displayTimeLines[1]}
                 </span>
-                {label2 && <SectorChip label={label2} />}
+                {label2 && <span className="shrink-0"><SectorChip label={label2} /></span>}
               </div>
             </div>
           )
