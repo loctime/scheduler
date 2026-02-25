@@ -5,6 +5,26 @@ import { ShiftAssignment, Turno, MedioTurno } from "@/lib/types"
 import { getShiftDisplayTime } from "../utils/shift-display-utils"
 import { timeToMinutes } from "../utils/schedule-grid-utils"
 
+/** Obtiene la etiqueta de sector para un slot (1 = primera franja, 2 = segunda franja) si existe. */
+function getSectorLabelForSlot(assignment: ShiftAssignment, slot: 1 | 2): string | undefined {
+  const slots = (assignment as ShiftAssignment & { sectorSlots?: { 1?: string; 2?: string } }).sectorSlots
+  if (!slots) return undefined
+  return slot === 1 ? slots[1] : slots[2]
+}
+
+/** Chip pequeño de sector, solo se renderiza si hay label. */
+function SectorChip({ label, className = "" }: { label: string; className?: string }) {
+  if (!label?.trim()) return null
+  return (
+    <span
+      className={`inline-block text-[10px] sm:text-xs font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground truncate max-w-full ${className}`}
+      title={label}
+    >
+      {label}
+    </span>
+  )
+}
+
 interface CellAssignmentsProps {
   assignments: ShiftAssignment[]
   getShiftInfo: (shiftId: string) => Turno | undefined
@@ -196,41 +216,45 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
         // getShiftDisplayTime ya maneja el caso de horario incompleto
         const displayTimeLines = getShiftDisplayTime(assignment.shiftId || "", shift, assignment)
 
-        // Detectar si es turno cortado (tiene dos franjas)
+        // Detectar si es turno cortado (tiene dos franjas: startTime2 y endTime2)
         const isCutShift = !!(assignment.startTime && assignment.endTime && assignment.startTime2 && assignment.endTime2)
 
-        // Si es turno cortado, dividir en dos mitades
+        // Turno cortado: cada franja en su propio bloque con su chip alineado (slot 1 ↔ primera franja, slot 2 ↔ segunda franja)
         if (isCutShift && displayTimeLines.length >= 2) {
+          const sector1 = getSectorLabelForSlot(assignment, 1)
+          const sector2 = getSectorLabelForSlot(assignment, 2)
           return (
             <div key={uniqueKey} className="w-full h-full flex flex-col absolute inset-0">
-              {/* Primera mitad (arriba) - 50% altura */}
-              <div className="flex-1 flex items-center justify-center">
-                <span className={`text-center text-base sm:text-lg md:text-xl lg:text-2xl font-semibold tabular-nums text-foreground`}>
+              {/* Primera franja: horario + chip slot 1 */}
+              <div className="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-0">
+                <span className="text-center text-base sm:text-lg md:text-xl lg:text-2xl font-semibold tabular-nums text-foreground">
                   {displayTimeLines[0]}
                 </span>
+                {sector1 && <SectorChip label={sector1} />}
               </div>
-              {/* Segunda mitad (abajo) - 50% altura */}
-              <div className="flex-1 flex items-center justify-center">
-                <span className={`text-center text-base sm:text-lg md:text-xl lg:text-2xl font-semibold tabular-nums text-foreground`}>
+              {/* Segunda franja: horario + chip slot 2 */}
+              <div className="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-0">
+                <span className="text-center text-base sm:text-lg md:text-xl lg:text-2xl font-semibold tabular-nums text-foreground">
                   {displayTimeLines[1]}
                 </span>
+                {sector2 && <SectorChip label={sector2} />}
               </div>
             </div>
           )
         }
 
-        // Renderizar horarios desde el assignment (puede incluir "Horario incompleto")
+        // Turno corrido: un único bloque con horario y chip de slot 1 debajo (sin agrupar con otra franja)
+        const sector1 = getSectorLabelForSlot(assignment, 1)
         return (
           <div key={uniqueKey} className="w-full space-y-0.5">
             {displayTimeLines.map((line, lineIdx) => {
-              // Si es "Horario incompleto", usar estilo de advertencia
               const isIncomplete = line === "Horario incompleto"
               return (
-                <span 
-                  key={lineIdx} 
+                <span
+                  key={lineIdx}
                   className={`block text-center text-base sm:text-lg md:text-xl lg:text-2xl font-semibold tabular-nums mb-0.5 flex items-center justify-center ${
-                    isIncomplete 
-                      ? "text-amber-600 dark:text-amber-400 italic" 
+                    isIncomplete
+                      ? "text-amber-600 dark:text-amber-400 italic"
                       : "text-foreground"
                   }`}
                 >
@@ -238,6 +262,11 @@ export function CellAssignments({ assignments, getShiftInfo, mediosTurnos = [] }
                 </span>
               )
             })}
+            {sector1 && (
+              <div className="flex justify-center mt-0.5">
+                <SectorChip label={sector1} />
+              </div>
+            )}
           </div>
         )
       })}
