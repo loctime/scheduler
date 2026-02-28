@@ -4,7 +4,7 @@ import React, { memo, useMemo, useCallback, useState } from "react"
 import { format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 import { Card } from "@/components/ui/card"
-import { Empleado, Turno, Horario, HistorialItem, ShiftAssignment, MedioTurno } from "@/lib/types"
+import { Empleado, Turno, Horario, HistorialItem, ShiftAssignment, MedioTurno, Separador } from "@/lib/types"
 import { ShiftSelectorPopover } from "../shift-selector-popover"
 import { useConfig } from "@/hooks/use-config"
 import { useEmployeeOrder } from "@/hooks/use-employee-order"
@@ -61,6 +61,8 @@ interface ScheduleGridProps {
   mobileIndividualOnly?: boolean
   /** ID del empleado a mostrar primero en vista individual (p. ej. el de "¿Quién sos?"). */
   preferredEmployeeId?: string | null
+  separadoresOverride?: Separador[]
+  ordenEmpleadosOverride?: string[]
 }
 
 export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
@@ -83,6 +85,8 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
   onExportEmployeeImage,
   mobileIndividualOnly = false,
   preferredEmployeeId = null,
+  separadoresOverride,
+  ordenEmpleadosOverride,
 }, ref) => {
   const [selectedCell, setSelectedCell] = useState<{ date: string; employeeId: string } | null>(null)
   const [cellUndoHistory, setCellUndoHistory] = useState<Map<string, ShiftAssignment[]>>(new Map())
@@ -151,8 +155,8 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
   } = useScheduleGridData({
     employees: employeesToUse,
     shifts,
-    separadores: config?.separadores || [],
-    ordenEmpleados: config?.ordenEmpleados,
+    separadores: separadoresOverride || config?.separadores || [],
+    ordenEmpleados: ordenEmpleadosOverride || config?.ordenEmpleados,
     schedule: schedule && !('horarioId' in schedule) ? schedule as Horario : null,
     scheduleId: schedule?.id,
     isScheduleCompleted,
@@ -226,7 +230,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
   const sectorCoverage = useSectorCoverage({
     orderedItems: orderedItems ?? [],
     assignments: schedule?.assignments ?? {},
-    separadores: config?.separadores ?? [],
+    separadores: separadoresOverride ?? config?.separadores ?? [],
     weekDays,
   })
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, forwardRef } from "react"
+import { useState, useCallback, useMemo, forwardRef } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { ScheduleGrid, type EmployeeMonthlyStats } from "@/components/schedule-grid"
@@ -132,6 +132,36 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
   const handleOpenChange = onOpenChange || setInternalOpen
 
   // Hook para acciones de semana
+
+  const weekSnapshot = isCompleted ? weekSchedule?.weekSnapshot : undefined
+
+  const frozenEmployees = useMemo(() => {
+    if (!weekSnapshot?.employees) return employees
+    return weekSnapshot.employees.map((employee) => ({
+      id: employee.id,
+      name: employee.name,
+      ownerId: user?.uid || "",
+      userId: user?.uid || "",
+    }))
+  }, [weekSnapshot?.employees, employees, user?.uid])
+
+  const frozenShifts = useMemo(() => {
+    if (!weekSnapshot?.shifts) return shifts
+    return weekSnapshot.shifts.map((shift) => ({
+      id: shift.id,
+      name: shift.name,
+      color: shift.color,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+      startTime2: shift.startTime2,
+      endTime2: shift.endTime2,
+      colorPrimeraFranja: shift.colorPrimeraFranja,
+      colorSegundaFranja: shift.colorSegundaFranja,
+      ownerId: user?.uid || "",
+      userId: user?.uid || "",
+    }))
+  }, [weekSnapshot?.shifts, shifts, user?.uid])
+
   const weekActions = useWeekActions({
     weekDays,
     weekStartDate,
@@ -287,9 +317,9 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
           <ScheduleGrid
             ref={ref}
             weekDays={weekDays}
-            employees={employees}
-            allEmployees={allEmployees || employees}
-            shifts={shifts}
+            employees={frozenEmployees}
+            allEmployees={allEmployees || frozenEmployees}
+            shifts={frozenShifts}
             schedule={weekSchedule}
             onAssignmentUpdate={onAssignmentUpdate}
             monthRange={{ startDate: monthRange.start, endDate: monthRange.end }}
@@ -304,6 +334,8 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
             onExportEmployeeImage={undefined}
             mobileIndividualOnly={mobileIndividualOnly}
             preferredEmployeeId={preferredEmployeeId}
+            separadoresOverride={weekSnapshot?.separadores}
+            ordenEmpleadosOverride={weekSnapshot?.ordenEmpleados}
           />
         </div>
       </CollapsibleContent>
