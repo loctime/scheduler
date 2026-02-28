@@ -195,6 +195,12 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
 
   const handleMarkComplete = useCallback(async () => {
     if (!onMarkComplete) return
+
+    console.log("[WeekSchedule] click botón principal", {
+      weekId,
+      isCompleted,
+      action: isCompleted ? "create_new_version_for_edit" : "mark_week_complete",
+    })
     
     // Marcar directamente como completada sin mostrar advertencias
     setIsMarkingComplete(true)
@@ -220,6 +226,11 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
   // Handler para confirmar creación de nueva versión editable
   const handleConfirmEdit = useCallback(async () => {
     if (!pendingEditAction || !onMarkComplete) return
+
+    console.log("[WeekSchedule] confirm diálogo crear nueva versión", {
+      weekId,
+      pendingActionType: pendingEditAction.type,
+    })
 
     setConfirmEditDialogOpen(false)
 

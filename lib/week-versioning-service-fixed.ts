@@ -33,6 +33,11 @@ export class WeekVersioningService {
     }
 
     try {
+      console.log("[WeekVersioningService.createNewVersion] start", {
+        baseWeekId,
+        isCompleted: versionData.isCompleted,
+      })
+
       const weekRef = doc(db as Firestore, WEEKS_COLLECTION, baseWeekId)
       const versionsRef = collection(weekRef, VERSIONS_SUBCOLLECTION)
       
@@ -46,6 +51,11 @@ export class WeekVersioningService {
         
         const weekData = weekDoc.data() as WeekDocument
         const currentVersionNumber = weekData.currentVersionNumber
+        console.log("[WeekVersioningService.createNewVersion] current week", {
+          baseWeekId,
+          currentVersionNumber,
+          status: weekData.status,
+        })
         
         // 2️⃣ Leer versión actual desde Firestore (CLONADO REAL)
         const currentVersionRef = doc(versionsRef, currentVersionNumber.toString())
@@ -89,6 +99,12 @@ export class WeekVersioningService {
         }
         
         transaction.set(weekRef, updatedWeekData, { merge: true })
+
+        console.log("[WeekVersioningService.createNewVersion] transaction set", {
+          baseWeekId,
+          newVersionNumber,
+          targetStatus: updatedWeekData.status,
+        })
         
         return newVersionNumber
       })
