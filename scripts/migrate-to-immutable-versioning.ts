@@ -18,7 +18,7 @@ const WEEKS_COLLECTION = "apps/horarios/weeks"
 // ========================================
 
 /**
- * Obtiene todas las semanas que necesitan migración
+ * .Obtiene todas las semanas que necesitan migración
  */
 async function getWeeksNeedingMigration() {
   if (!db) {
