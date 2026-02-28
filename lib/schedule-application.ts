@@ -97,17 +97,23 @@ class ScheduleApplication implements ScheduleApplicationService {
             name: employee?.name || id,
           }
         }),
-        shifts: shifts.map((shift) => ({
-          id: shift.id,
-          name: shift.name,
-          color: shift.color,
-          startTime: shift.startTime,
-          endTime: shift.endTime,
-          startTime2: shift.startTime2,
-          endTime2: shift.endTime2,
-          colorPrimeraFranja: shift.colorPrimeraFranja,
-          colorSegundaFranja: shift.colorSegundaFranja,
-        })),
+        shifts: shifts
+          .filter(shift => shift.id && shift.name) // Filtrar shifts válidos
+          .map((shift) => {
+            const shiftData: any = {
+              id: shift.id,
+              name: shift.name,
+              color: shift.color,
+            }
+            // Solo incluir campos que no son undefined
+            if (shift.startTime !== undefined) shiftData.startTime = shift.startTime
+            if (shift.endTime !== undefined) shiftData.endTime = shift.endTime
+            if (shift.startTime2 !== undefined) shiftData.startTime2 = shift.startTime2
+            if (shift.endTime2 !== undefined) shiftData.endTime2 = shift.endTime2
+            if (shift.colorPrimeraFranja !== undefined) shiftData.colorPrimeraFranja = shift.colorPrimeraFranja
+            if (shift.colorSegundaFranja !== undefined) shiftData.colorSegundaFranja = shift.colorSegundaFranja
+            return shiftData
+          }),
         separadores: Array.isArray(config?.separadores)
           ? JSON.parse(JSON.stringify(config.separadores))
           : [],
