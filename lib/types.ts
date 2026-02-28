@@ -233,6 +233,8 @@ export interface Horario {
     shifts: Array<Pick<Turno, "id" | "name" | "color" | "startTime" | "endTime" | "startTime2" | "endTime2" | "colorPrimeraFranja" | "colorSegundaFranja">>
     separadores: Separador[]
     ordenEmpleados: string[]
+    assignments: Horario["assignments"]
+    dayStatus?: Horario["dayStatus"]
   }
 }
 

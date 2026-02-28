@@ -172,6 +172,27 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
     getWeekSchedule,
   })
 
+  const frozenSchedule = useMemo(() => {
+    if (!isCompleted || !weekSchedule?.weekSnapshot) return weekSchedule
+
+    const snapshot = weekSchedule.weekSnapshot
+
+    return {
+      id: weekSchedule.id,
+      nombre: weekSchedule.nombre,
+      weekStart: weekSchedule.weekStart,
+      semanaInicio: weekSchedule.semanaInicio,
+      semanaFin: weekSchedule.semanaFin,
+      ownerId: weekSchedule.ownerId,
+      completada: true,
+      assignments: snapshot.assignments,
+      dayStatus: snapshot.dayStatus,
+      createdAt: weekSchedule.createdAt,
+      createdBy: weekSchedule.createdBy,
+      createdByName: weekSchedule.createdByName,
+    }
+  }, [isCompleted, weekSchedule])
+
   const handleMarkComplete = useCallback(async () => {
     if (!onMarkComplete) return
     
@@ -209,20 +230,34 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
       // Luego ejecutar la acción pendiente si existe
       if (pendingEditAction.type === 'clear' && pendingEditAction.data?.employeeId) {
         await weekActions.executeClearEmployeeRow(pendingEditAction.data.employeeId)
+      } else if (pendingEditAction.type === 'assignment' && pendingEditAction.data) {
+        // Ejecutar la actualización de assignment después de desmarcar
+        const { date, employeeId, assignments, options } = pendingEditAction.data
+        onAssignmentUpdate?.(date, employeeId, assignments, options)
       }
-      // Las acciones de assignment se manejarán en el componente correspondiente
     } catch (error) {
       logger.error("Error al desmarcar semana como completada:", error)
     } finally {
       setPendingEditAction(null)
     }
-  }, [pendingEditAction, onMarkComplete, weekId, weekActions])
+  }, [pendingEditAction, onMarkComplete, weekId, weekActions, onAssignmentUpdate])
 
   // Handler para cancelar edición
   const handleCancelEdit = useCallback(() => {
     setConfirmEditDialogOpen(false)
     setPendingEditAction(null)
   }, [])
+
+  // Handler para actualizar assignments con confirmación si está completada
+  const handleAssignmentUpdate = useCallback((date: string, employeeId: string, assignments: ShiftAssignment[], options?: { scheduleId?: string }) => {
+    // Verificar si es una semana completada
+    if (!handleEditAttempt({ type: 'assignment', data: { date, employeeId, assignments, options } })) {
+      return
+    }
+    
+    // Si no está completada o el usuario confirmó, proceder con la actualización
+    onAssignmentUpdate?.(date, employeeId, assignments, options)
+  }, [handleEditAttempt, onAssignmentUpdate])
 
   // Handler para exportar que abre la semana si está cerrada
   const handleExportImage = useCallback(async () => {
@@ -320,8 +355,8 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
             employees={frozenEmployees}
             allEmployees={allEmployees || frozenEmployees}
             shifts={frozenShifts}
-            schedule={weekSchedule}
-            onAssignmentUpdate={onAssignmentUpdate}
+            schedule={frozenSchedule}
+            onAssignmentUpdate={handleAssignmentUpdate}
             monthRange={{ startDate: monthRange.start, endDate: monthRange.end }}
             mediosTurnos={mediosTurnos}
             employeeStats={employeeStats && employees ? Object.fromEntries(employees.map((emp, index) => [emp.id, employeeStats[index] || {}])) : undefined}

@@ -114,6 +114,8 @@ class ScheduleApplication implements ScheduleApplicationService {
         ordenEmpleados: Array.isArray(config?.ordenEmpleados)
           ? [...config.ordenEmpleados]
           : uniqueSnapshotEmployeeIds,
+        assignments: JSON.parse(JSON.stringify(scheduleData.assignments || {})),
+        dayStatus: JSON.parse(JSON.stringify(scheduleData.dayStatus || {})),
       }
     }
 
