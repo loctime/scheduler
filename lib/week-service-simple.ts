@@ -89,6 +89,9 @@ export class WeekService {
 
       return await runTransaction(db, async (transaction) => {
         // 1. Leer schedule actual
+        if (!db) {
+          throw new Error("Firestore no está configurado")
+        }
         const scheduleRef = doc(db, COLLECTIONS.SCHEDULES, scheduleId)
         const scheduleDoc = await transaction.get(scheduleRef)
         
@@ -192,6 +195,9 @@ export class WeekService {
 
       return await runTransaction(db, async (transaction) => {
         // 1. Verificar que existe documento base
+        if (!db) {
+          throw new Error("Firestore no está configurado")
+        }
         const weekRef = doc(db, WEEKS_COLLECTION, baseWeekId)
         const weekDoc = await transaction.get(weekRef)
         
