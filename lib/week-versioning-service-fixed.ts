@@ -12,7 +12,7 @@ import { db } from "@/lib/firebase"
 import { Empleado } from "@/lib/types"
 
 // Colecciones para el nuevo sistema de versionado
-const WEEKS_COLLECTION = "weeks"
+const WEEKS_COLLECTION = "apps/horarios/weeks"
 const VERSIONS_SUBCOLLECTION = "versions"
 
 export class WeekVersioningService {

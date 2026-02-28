@@ -11,7 +11,7 @@ import { collection, getDocs, query, orderBy } from "firebase/firestore"
 // ========================================
 
 const MIGRATION_BATCH_SIZE = 50
-const WEEKS_COLLECTION = "weeks"
+const WEEKS_COLLECTION = "apps/horarios/weeks"
 
 // ========================================
 // FUNCIONES DE MIGRACIÓN

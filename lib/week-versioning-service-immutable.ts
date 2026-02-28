@@ -21,7 +21,7 @@ import { Empleado } from "@/lib/types"
 // CONSTANTES DE COLECCIONES
 // ========================================
 
-const WEEKS_COLLECTION = "weeks"
+const WEEKS_COLLECTION = "apps/horarios/weeks"
 const VERSIONS_SUBCOLLECTION = "versions"
 
 // ========================================
@@ -371,7 +371,7 @@ export class WeekVersioningService {
     if (!db) return null
     
     try {
-      const weekRef = doc(db as Firestore, WEEKS_COLLECTION, baseWeekId)
+      const weekRef = doc(db as Firestore, , baseWeekId)
       const weekDoc = await getDoc(weekRef)
       
       if (!weekDoc.exists()) {
