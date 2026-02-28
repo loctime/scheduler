@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from "react"
-import { collection, query, orderBy, onSnapshot, where, getDocs } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, where, doc, getDoc } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import type { Horario } from "@/lib/types"
 import { format, subMonths, addMonths } from "date-fns"
@@ -23,6 +23,9 @@ interface UseSchedulesListenerReturn {
   error: Error | null
   getWeekSchedule: (weekStartStr: string) => Horario | null
 }
+
+const WEEKS_COLLECTION = "apps/horarios/weeks"
+const VERSIONS_SUBCOLLECTION = "versions"
 
 export function useSchedulesListener({
   user,
@@ -81,10 +84,69 @@ export function useSchedulesListener({
     const unsubscribe = onSnapshot(
       schedulesQuery,
       async (snapshot) => {
-        const schedulesData = snapshot.docs.map((scheduleDoc) => ({
+        const rawSchedules = snapshot.docs.map((scheduleDoc) => ({
           id: scheduleDoc.id,
           ...scheduleDoc.data(),
         })) as Horario[]
+
+        const schedulesData = await Promise.all(
+          rawSchedules.map(async (schedule) => {
+            if (!schedule.baseWeekId || !db) {
+              return schedule
+            }
+
+            try {
+              const weekRef = doc(db, WEEKS_COLLECTION, schedule.baseWeekId)
+              const weekDoc = await getDoc(weekRef)
+
+              if (!weekDoc.exists()) {
+                return schedule
+              }
+
+              const weekData = weekDoc.data() as {
+                status?: "draft" | "completed"
+                currentVersionNumber?: number
+              }
+
+              const currentVersionNumber = weekData.currentVersionNumber
+              if (!currentVersionNumber) {
+                return {
+                  ...schedule,
+                  completada: weekData.status === "completed",
+                } as Horario
+              }
+
+              const versionRef = doc(collection(weekRef, VERSIONS_SUBCOLLECTION), String(currentVersionNumber))
+              const versionDoc = await getDoc(versionRef)
+
+              if (!versionDoc.exists()) {
+                return {
+                  ...schedule,
+                  completada: weekData.status === "completed",
+                } as Horario
+              }
+
+              const versionData = versionDoc.data() as {
+                assignments?: Horario["assignments"]
+                dayStatus?: Horario["dayStatus"]
+              }
+
+              return {
+                ...schedule,
+                assignments: versionData.assignments || {},
+                dayStatus: versionData.dayStatus || {},
+                completada: weekData.status === "completed",
+              } as Horario
+            } catch (error) {
+              logger.error("[useSchedulesListener] Error hidratando semana versionada", {
+                scheduleId: schedule.id,
+                baseWeekId: schedule.baseWeekId,
+                error,
+              })
+              return schedule
+            }
+          })
+        )
 
         // Comparar con datos actuales para evitar re-renders innecesarios
         setSchedules((prevSchedules) => {

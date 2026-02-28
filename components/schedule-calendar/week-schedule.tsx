@@ -117,14 +117,12 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
   const hasExportHandlers = Boolean(onExportImage && onExportPDF)
   const canShowActions = showActions && hasExportHandlers
   const isCompleted = isScheduleCompleted(weekSchedule)
+  const isVersionedWeek = Boolean(weekSchedule?.baseWeekId)
+  const effectiveReadonly = readonly || isCompleted
   const [isMarkingComplete, setIsMarkingComplete] = useState(false)
   const [confirmClearRowDialogOpen, setConfirmClearRowDialogOpen] = useState(false)
   const [pendingClearRowEmployeeId, setPendingClearRowEmployeeId] = useState<string | null>(null)
   const [confirmEditDialogOpen, setConfirmEditDialogOpen] = useState(false)
-  const [pendingEditAction, setPendingEditAction] = useState<{
-    type: 'assignment' | 'clear'
-    data?: any
-  } | null>(null)
 
   // Si no se proporciona open/onOpenChange, usar estado interno
   const [internalOpen, setInternalOpen] = useState(false)
@@ -133,7 +131,7 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
 
   // Hook para acciones de semana
 
-  const weekSnapshot = isCompleted ? weekSchedule?.weekSnapshot : undefined
+  const weekSnapshot = !isVersionedWeek && isCompleted ? weekSchedule?.weekSnapshot : undefined
 
   const frozenEmployees = useMemo(() => {
     if (!weekSnapshot?.employees) return employees
@@ -168,12 +166,12 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
     weekSchedule,
     employees,
     user: user || null,
-    readonly,
+    readonly: effectiveReadonly,
     getWeekSchedule,
   })
 
   const frozenSchedule = useMemo(() => {
-    if (!isCompleted || !weekSchedule?.weekSnapshot) return weekSchedule
+    if (!isCompleted || isVersionedWeek || !weekSchedule?.weekSnapshot) return weekSchedule
 
     const snapshot = weekSchedule.weekSnapshot
 
@@ -191,7 +189,7 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
       createdBy: weekSchedule.createdBy,
       createdByName: weekSchedule.createdByName,
     }
-  }, [isCompleted, weekSchedule])
+  }, [isCompleted, isVersionedWeek, weekSchedule])
 
   const handleMarkComplete = useCallback(async () => {
     if (!onMarkComplete) return
@@ -202,7 +200,11 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
       action: isCompleted ? "create_new_version_for_edit" : "mark_week_complete",
     })
     
-    // Marcar directamente como completada sin mostrar advertencias
+    if (isCompleted) {
+      setConfirmEditDialogOpen(true)
+      return
+    }
+
     setIsMarkingComplete(true)
     try {
       await onMarkComplete(weekId)
@@ -211,54 +213,32 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
     } finally {
       setIsMarkingComplete(false)
     }
-  }, [onMarkComplete, weekId])
+  }, [onMarkComplete, weekId, isCompleted])
 
-  // Handler para cuando se intenta editar una semana completada
-  const handleEditAttempt = useCallback((action: { type: 'assignment' | 'clear', data?: any }) => {
-    if (isCompleted) {
-      setPendingEditAction(action)
-      setConfirmEditDialogOpen(true)
-      return false // Bloquear la acción
-    }
-    return true // Permitir la acción
-  }, [isCompleted])
-
-  // Handler para confirmar creación de nueva versión editable
   const handleConfirmEdit = useCallback(async () => {
-    if (!pendingEditAction || !onMarkComplete) return
+    if (!onMarkComplete) return
 
-    console.log("[WeekSchedule] confirm diálogo crear nueva versión", {
-      weekId,
-      pendingActionType: pendingEditAction.type,
-    })
+    console.log("[WeekSchedule] confirm diálogo crear nueva versión", { weekId })
 
     setConfirmEditDialogOpen(false)
+    setIsMarkingComplete(true)
 
     try {
       await onMarkComplete(weekId)
     } catch (error) {
       logger.error("Error al crear nueva versión editable:", error)
     } finally {
-      setPendingEditAction(null)
+      setIsMarkingComplete(false)
     }
-  }, [pendingEditAction, onMarkComplete, weekId])
+  }, [onMarkComplete, weekId])
 
-  // Handler para cancelar edición
   const handleCancelEdit = useCallback(() => {
     setConfirmEditDialogOpen(false)
-    setPendingEditAction(null)
   }, [])
 
-  // Handler para actualizar assignments con confirmación si está completada
   const handleAssignmentUpdate = useCallback((date: string, employeeId: string, assignments: ShiftAssignment[], options?: { scheduleId?: string }) => {
-    // Verificar si es una semana completada
-    if (!handleEditAttempt({ type: 'assignment', data: { date, employeeId, assignments, options } })) {
-      return
-    }
-    
-    // Si no está completada o el usuario confirmó, proceder con la actualización
     onAssignmentUpdate?.(date, employeeId, assignments, options)
-  }, [handleEditAttempt, onAssignmentUpdate])
+  }, [onAssignmentUpdate])
 
   // Handler para exportar que abre la semana si está cerrada
   const handleExportImage = useCallback(async () => {
@@ -294,11 +274,6 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
   //  Handler para limpiar fila de empleado que maneja confirmaciones
   const handleClearEmployeeRow = useCallback(
     async (employeeId: string): Promise<boolean> => {
-      // Verificar si es una semana completada
-      if (!handleEditAttempt({ type: 'clear', data: { employeeId } })) {
-        return false
-      }
-      
       // Si no está completada, proceder con la lógica normal
       if (shouldRequestConfirmation(weekSchedule, "clear")) {
         setPendingClearRowEmployeeId(employeeId)
@@ -307,7 +282,7 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
       }
       return await weekActions.executeClearEmployeeRow(employeeId)
     },
-    [weekSchedule, weekActions, handleEditAttempt]
+    [weekSchedule, weekActions]
   )
 
   const handleConfirmClearRow = useCallback(async () => {
@@ -324,7 +299,7 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 rounded-lg border border-border bg-card p-3 sm:p-4 shadow-sm transition-colors">
         <WeekScheduleHeader title={headerTitle} isOpen={isOpen} isCompleted={isCompleted} />
         <WeekScheduleActions
-          readonly={readonly}
+          readonly={effectiveReadonly}
           canShowExportActions={canShowActions}
           exporting={exporting || false}
           isCompleted={isCompleted}
@@ -371,11 +346,11 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
               
               return statsMap
             })() : undefined}
-            readonly={readonly}
+            readonly={effectiveReadonly}
             allSchedules={allSchedules}
             isScheduleCompleted={isCompleted}
             lastCompletedWeekStart={lastCompletedWeekStart ? format(lastCompletedWeekStart, "yyyy-MM-dd") : null}
-            onClearEmployeeRow={!readonly && user ? handleClearEmployeeRow : undefined}
+            onClearEmployeeRow={!effectiveReadonly && user ? handleClearEmployeeRow : undefined}
             user={user}
             onExportEmployeeImage={undefined}
             mobileIndividualOnly={mobileIndividualOnly}
