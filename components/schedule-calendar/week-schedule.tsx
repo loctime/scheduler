@@ -359,7 +359,17 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
             onAssignmentUpdate={handleAssignmentUpdate}
             monthRange={{ startDate: monthRange.start, endDate: monthRange.end }}
             mediosTurnos={mediosTurnos}
-            employeeStats={employeeStats && employees ? Object.fromEntries(employees.map((emp, index) => [emp.id, employeeStats[index] || {}])) : undefined}
+            employeeStats={employeeStats ? (() => {
+              const employeesToUse = isCompleted ? frozenEmployees : employees
+              const statsMap: Record<string, any> = {}
+              
+              // Mapear employeeStats por employeeId, no por índice
+              employeesToUse.forEach((emp, index) => {
+                statsMap[emp.id] = employeeStats[index] || {}
+              })
+              
+              return statsMap
+            })() : undefined}
             readonly={readonly}
             allSchedules={allSchedules}
             isScheduleCompleted={isCompleted}
