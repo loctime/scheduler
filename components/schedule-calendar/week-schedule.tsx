@@ -217,30 +217,20 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
     return true // Permitir la acción
   }, [isCompleted])
 
-  // Handler para confirmar edición de semana completada
+  // Handler para confirmar creación de nueva versión editable
   const handleConfirmEdit = useCallback(async () => {
     if (!pendingEditAction || !onMarkComplete) return
-    
+
     setConfirmEditDialogOpen(false)
-    
+
     try {
-      // Primero desmarcar como completada
       await onMarkComplete(weekId)
-      
-      // Luego ejecutar la acción pendiente si existe
-      if (pendingEditAction.type === 'clear' && pendingEditAction.data?.employeeId) {
-        await weekActions.executeClearEmployeeRow(pendingEditAction.data.employeeId)
-      } else if (pendingEditAction.type === 'assignment' && pendingEditAction.data) {
-        // Ejecutar la actualización de assignment después de desmarcar
-        const { date, employeeId, assignments, options } = pendingEditAction.data
-        onAssignmentUpdate?.(date, employeeId, assignments, options)
-      }
     } catch (error) {
-      logger.error("Error al desmarcar semana como completada:", error)
+      logger.error("Error al crear nueva versión editable:", error)
     } finally {
       setPendingEditAction(null)
     }
-  }, [pendingEditAction, onMarkComplete, weekId, weekActions, onAssignmentUpdate])
+  }, [pendingEditAction, onMarkComplete, weekId])
 
   // Handler para cancelar edición
   const handleCancelEdit = useCallback(() => {
@@ -406,15 +396,14 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
       <AlertDialog open={confirmEditDialogOpen} onOpenChange={setConfirmEditDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Editar semana completada?</AlertDialogTitle>
+            <AlertDialogTitle>¿Crear nueva versión para editar?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta semana está marcada como lista. Si la editas, dejará de estar completada.
-              ¿Deseas continuar?
+              Esta semana está finalizada y es inmutable. Para editar, se creará una nueva versión en borrador. ¿Deseas continuar?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={handleCancelEdit}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmEdit}>Continuar</AlertDialogAction>
+            <AlertDialogAction onClick={handleConfirmEdit}>Crear nueva versión</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

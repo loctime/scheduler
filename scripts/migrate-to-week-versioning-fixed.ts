@@ -96,15 +96,20 @@ async function migrateAllWeeks(): Promise<MigrationReport> {
           legacyWeek.dayStatus = {}
         }
         
-        // 3️⃣ Preservar weekSnapshot si existe
+        // 3️⃣ Preservar weekSnapshot completo si existe
         if (legacyWeek.weekSnapshot?.employees) {
-          console.log(`📸 Preservando snapshot con ${legacyWeek.weekSnapshot.employees.length} empleados`)
+          console.log(`📸 Preservando snapshot completo con ${legacyWeek.weekSnapshot.employees.length} empleados`)
         }
         
         // 4️⃣ Migrar al nuevo sistema (IDEMPOTENTE)
         const migrationSuccess = await WeekVersioningService.migrateFromLegacy(weekId, legacyWeek)
         
         if (migrationSuccess) {
+          const verification = await WeekVersioningService.verifyWeekStructure(weekId)
+          if (!verification.valid) {
+            throw new Error(`Migración inválida para ${weekId}: ${verification.reason}`)
+          }
+
           report.migratedSuccessfully++
           console.log(`✅ Semana ${weekId} migrada exitosamente`)
         } else {
@@ -172,6 +177,7 @@ function generateMigrationReport(report: MigrationReport): void {
   console.log("2. Probar carga de semanas en UI")
   console.log("3. Verificar creación de nuevas versiones")
   console.log("4. Validar inmutabilidad de versiones completadas")
+  console.log("5. Confirmar ausencia de campo embebido weeks/{id}.versions")
   
   console.log("=".repeat(60))
 }

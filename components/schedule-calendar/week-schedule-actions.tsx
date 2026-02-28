@@ -166,25 +166,25 @@ export function WeekScheduleActions({
             size="sm"
             onClick={onMarkComplete}
             disabled={isMarkingComplete}
-            aria-label={isCompleted ? "Desmarcar semana como completada" : "Marcar semana como completada"}
+            aria-label={isCompleted ? "Crear nueva versión para editar" : "Marcar semana como lista"}
             className={isCompleted ? "bg-green-600 hover:bg-green-700" : ""}
           >
             {isMarkingComplete ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {isCompleted ? "Desmarcando..." : "Marcando..."}
+                {isCompleted ? "Creando versión..." : "Marcando..."}
               </>
             ) : (
               <>
                 {isCompleted ? (
                   <>
                     <CheckCircle2 className="mr-2 h-4 w-4" />
-                    LISTO
+                    NUEVA VERSIÓN
                   </>
                 ) : (
                   <>
                     <Circle className="mr-2 h-4 w-4" />
-                    LISTO
+                    MARCAR LISTA
                   </>
                 )}
               </>

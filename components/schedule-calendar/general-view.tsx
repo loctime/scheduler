@@ -44,7 +44,7 @@ interface GeneralViewProps {
   onPreviousMonth: () => void
   onNextMonth: () => void
   user?: any
-  onMarkWeekComplete?: (weekStartStr: string, completed: boolean) => Promise<void> // 🔥 Cambio: string en lugar de Date
+  onMarkWeekComplete?: (weekStartStr: string, completed: boolean) => Promise<void>
   lastCompletedWeekStart?: string | null
   allSchedules?: Horario[]
   config?: Configuracion | null
@@ -268,7 +268,7 @@ export function GeneralView({
               user={user}
               onMarkComplete={onMarkWeekComplete ? (weekId: string) => {
                 const weekStartStr = weekId.replace('schedule-week-', '')
-                onMarkWeekComplete(weekStartStr, !weekSchedule?.completada)
+                onMarkWeekComplete(weekStartStr, true)
               } : undefined}
               lastCompletedWeekStart={lastCompletedWeekStart ? new Date(lastCompletedWeekStart) : undefined}
               onPublishSchedule={onPublishSchedule}

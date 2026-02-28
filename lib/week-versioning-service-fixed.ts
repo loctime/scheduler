@@ -4,11 +4,12 @@ import {
   CreateVersionData, 
   CreateVersionResult, 
   CompleteWeekResult,
-  WeekVersioningRules
+  WeekVersioningRules,
+  WeekSnapshotMeta
 } from "@/lib/types/week-versioning"
-import { doc, collection, serverTimestamp, setDoc, getDoc, runTransaction, query, orderBy, getDocs, Firestore } from "firebase/firestore"
+import { doc, collection, serverTimestamp, getDoc, runTransaction, query, orderBy, getDocs, Firestore } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { ShiftAssignment, Empleado } from "@/lib/types"
+import { Empleado } from "@/lib/types"
 
 // Colecciones para el nuevo sistema de versionado
 const WEEKS_COLLECTION = "weeks"
@@ -56,19 +57,14 @@ export class WeekVersioningService {
         
         const currentVersion = currentVersionDoc.data() as WeekVersion
         
-        // 3️⃣ Validar que versión actual no esté completada para edición directa
-        if (currentVersion.isCompleted && !versionData.isCompleted) {
-          throw new Error("No se puede editar una versión completada. Cree una nueva versión.")
-        }
-        
-        // 4️⃣ Calcular nuevo número de versión (CONCURRENCIA SEGURA)
+        // 3️⃣ Calcular nuevo número de versión (CONCURRENCIA SEGURA)
         const newVersionNumber = currentVersionNumber + 1
         
         if (!WeekVersioningRules.validateVersionNumber(newVersionNumber)) {
           throw new Error("Número de versión inválido")
         }
         
-        // 5️⃣ Crear nueva versión CLONANDO datos de la versión actual
+        // 4️⃣ Crear nueva versión CLONANDO datos de la versión actual
         const newVersion: WeekVersion = {
           versionNumber: newVersionNumber,
           isCompleted: versionData.isCompleted,
@@ -81,11 +77,11 @@ export class WeekVersioningService {
           previousVersionNumber: currentVersionNumber,
         }
         
-        // 6️⃣ Crear documento de nueva versión en subcolección
+        // 5️⃣ Crear documento de nueva versión en subcolección
         const newVersionRef = doc(versionsRef, newVersionNumber.toString())
         transaction.set(newVersionRef, newVersion)
         
-        // 7️⃣ Actualizar documento base con nueva versión actual
+        // 6️⃣ Actualizar documento base con nueva versión actual
         const updatedWeekData: Partial<WeekDocument> = {
           currentVersionNumber: newVersionNumber,
           status: versionData.isCompleted ? "completed" : "draft",
@@ -308,13 +304,30 @@ export class WeekVersioningService {
           return
         }
         
-        // Crear versión inicial desde datos legados
+        const hasWeekSnapshot = !!legacyWeekData.weekSnapshot
+        const snapshotMeta: WeekSnapshotMeta | undefined = hasWeekSnapshot
+          ? {
+              capturedAt: legacyWeekData.weekSnapshot?.capturedAt,
+              shifts: legacyWeekData.weekSnapshot?.shifts || [],
+              separadores: legacyWeekData.weekSnapshot?.separadores || [],
+              ordenEmpleados: legacyWeekData.weekSnapshot?.ordenEmpleados || [],
+            }
+          : undefined
+
+        // Crear versión inicial desde datos legados con fidelidad histórica completa
         const initialVersion: WeekVersion = {
           versionNumber: 1,
           isCompleted: legacyWeekData.completada || false,
-          assignments: legacyWeekData.assignments || {},
-          dayStatus: legacyWeekData.dayStatus || {},
-          employeesSnapshot: legacyWeekData.weekSnapshot?.employees || [],
+          assignments: hasWeekSnapshot
+            ? (legacyWeekData.weekSnapshot?.assignments || {})
+            : (legacyWeekData.assignments || {}),
+          dayStatus: hasWeekSnapshot
+            ? (legacyWeekData.weekSnapshot?.dayStatus || {})
+            : (legacyWeekData.dayStatus || {}),
+          employeesSnapshot: hasWeekSnapshot
+            ? (legacyWeekData.weekSnapshot?.employees || [])
+            : (legacyWeekData.employeesSnapshot || []),
+          snapshotMeta,
           createdAt: legacyWeekData.createdAt || serverTimestamp(),
           createdBy: legacyWeekData.createdBy,
           createdByName: legacyWeekData.createdByName,
@@ -350,6 +363,38 @@ export class WeekVersioningService {
     }
   }
   
+
+  /**
+   * Verificación de integridad estructural:
+   * - weeks/{baseWeekId} sin versions embebidas
+   * - versión actual existente en subcolección
+   */
+  static async verifyWeekStructure(baseWeekId: string): Promise<{ valid: boolean; reason?: string }> {
+    if (!db) return { valid: false, reason: "Firestore no está configurado" }
+
+    const weekRef = doc(db as Firestore, WEEKS_COLLECTION, baseWeekId)
+    const weekDoc = await getDoc(weekRef)
+
+    if (!weekDoc.exists()) {
+      return { valid: false, reason: "La semana no existe" }
+    }
+
+    const weekData = weekDoc.data() as any
+    if (weekData.versions) {
+      return { valid: false, reason: "Documento base contiene campo versions embebido" }
+    }
+
+    const currentVersionNumber = weekData.currentVersionNumber
+    const currentVersionRef = doc(collection(weekRef, VERSIONS_SUBCOLLECTION), String(currentVersionNumber))
+    const currentVersionDoc = await getDoc(currentVersionRef)
+
+    if (!currentVersionDoc.exists()) {
+      return { valid: false, reason: "No existe documento de versión actual en subcolección" }
+    }
+
+    return { valid: true }
+  }
+
   /**
    * VALIDACIÓN DE SEGURIDAD - No permite modificar versiones completadas
    */

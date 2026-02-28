@@ -1,6 +1,6 @@
 // Sistema de Versionado de Semanas - Arquitectura Inmutable y Escalable
 
-import { ShiftAssignment, Empleado } from "@/lib/types"
+import { ShiftAssignment } from "@/lib/types"
 
 // TIPOS PRINCIPALES - CONSOLIDADOS Y TIPOGRÁFICAMENTE CORRECTOS
 
@@ -23,6 +23,25 @@ export interface EmployeeSnapshot {
   name: string
 }
 
+export interface ShiftSnapshot {
+  id: string
+  name: string
+  color?: string
+  startTime?: string
+  endTime?: string
+  startTime2?: string
+  endTime2?: string
+  colorPrimeraFranja?: string
+  colorSegundaFranja?: string
+}
+
+export interface WeekSnapshotMeta {
+  capturedAt?: any
+  shifts?: ShiftSnapshot[]
+  separadores?: any[]
+  ordenEmpleados?: string[]
+}
+
 // VERSIÓN INDIVIDUAL - DOCUMENTO EN SUBCOLECCIÓN
 export interface WeekVersion {
   versionNumber: number
@@ -34,6 +53,7 @@ export interface WeekVersion {
   createdBy?: string
   createdByName?: string
   previousVersionNumber?: number
+  snapshotMeta?: WeekSnapshotMeta
 }
 
 // DOCUMENTO PRINCIPAL - SIN VERSIONES EMBEBIDAS
