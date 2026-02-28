@@ -28,13 +28,16 @@ export function useScheduleUpdates({
   const handleMarkWeekComplete = useCallback(
     async (weekStartStr: string, completed: boolean) => {
       try {
+        const existingWeek = getWeekSchedule(weekStartStr)
+        if (existingWeek?.completada === true && completed) {
+          throw new Error("Semana finalizada: crear nueva versión para editar (flujo legacy bloqueado)")
+        }
+
         await scheduleApplication.markWeekComplete(weekStartStr, completed, actor, employees, shifts, config)
 
         toast({
-          title: completed ? "Semana marcada como completada" : "Semana desmarcada",
-          description: completed
-            ? "La semana ha sido marcada como finalizada"
-            : "La semana ya no está marcada como completada",
+          title: "Semana finalizada",
+          description: "La semana fue marcada como lista. Para editar debes crear una nueva versión.",
         })
       } catch (error: any) {
         console.error("Error al marcar semana como completada:", error)
@@ -45,7 +48,7 @@ export function useScheduleUpdates({
         })
       }
     },
-    [actor, employees, shifts, config, toast],
+    [actor, employees, shifts, config, toast, getWeekSchedule],
   )
 
   const handleAssignmentUpdate = useCallback(

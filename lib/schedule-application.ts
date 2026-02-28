@@ -55,6 +55,10 @@ class ScheduleApplication implements ScheduleApplicationService {
     const scheduleId = buildScheduleDocId(ownerId, weekStartStr)
     const scheduleRef = doc(db, COLLECTIONS.SCHEDULES, scheduleId)
 
+    if (!completed) {
+      throw new Error("Semana finalizada: crear nueva versión para editar. No se permite desmarcar una semana lista.")
+    }
+
     const updateData: Record<string, any> = {
       ownerId,
       weekStart: weekStartStr,
@@ -174,6 +178,10 @@ class ScheduleApplication implements ScheduleApplicationService {
     // Leer el documento actual para preservar la estructura existente
     const currentDoc = await getDoc(scheduleRef)
     const currentData = currentDoc.exists() ? currentDoc.data() : {}
+
+    if (currentData.completada === true) {
+      throw new Error("Semana finalizada: crear nueva versión para editar antes de modificar asignaciones")
+    }
     
     // LOG TEMPORAL - Verificar lectura del documento
     console.log("📖 PRE-WRITE READ:", {

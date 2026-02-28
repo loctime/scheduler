@@ -7,8 +7,8 @@ import {
 } from "@/lib/types/week-versioning"
 import { 
   WeekVersioningService 
-} from "@/lib/week-versioning-service-new"
-import { Empleado, ShiftAssignment } from "@/lib/types"
+} from "@/lib/week-versioning-service-fixed"
+import { Empleado } from "@/lib/types"
 
 interface UseWeekVersioningProps {
   baseWeekId: string
@@ -56,8 +56,6 @@ export function useWeekVersioning({
 
   // Crear nueva versión para edición
   const createNewVersion = useCallback(async (
-    assignments: any,
-    dayStatus: any,
     isCompleted: boolean = false
   ): Promise<CreateVersionResult> => {
     if (!baseWeekId) {
@@ -71,27 +69,8 @@ export function useWeekVersioning({
     setState(prev => ({ ...prev, isCreatingNewVersion: true }))
 
     try {
-      // Crear snapshot de empleados
-      const employeeIdsInWeek = new Set<string>()
-      Object.values(assignments).forEach((dayAssignments: any) => {
-        if (!dayAssignments || typeof dayAssignments !== "object") return
-        Object.keys(dayAssignments).forEach((employeeId) => employeeIdsInWeek.add(employeeId))
-      })
-      
-      const employeesMap = new Map(employees.map((employee) => [employee.id, employee]))
-      const employeesSnapshot = Array.from(employeeIdsInWeek).map((id) => {
-        const employee = employeesMap.get(id)
-        return {
-          id,
-          name: employee?.name || id,
-        }
-      })
-
       const result = await WeekVersioningService.createNewVersion(baseWeekId, {
         isCompleted,
-        assignments,
-        dayStatus,
-        employeesSnapshot,
         createdBy: userId,
         createdByName: userName,
       })
@@ -112,7 +91,7 @@ export function useWeekVersioning({
         error: error instanceof Error ? error.message : "Error desconocido",
       }
     }
-  }, [baseWeekId, employees, userId, userName, loadCurrentVersion])
+  }, [baseWeekId, userId, userName, loadCurrentVersion])
 
   // Completar semana actual
   const completeWeek = useCallback(async (

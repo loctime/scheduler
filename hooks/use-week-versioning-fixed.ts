@@ -73,15 +73,8 @@ export function useWeekVersioning({
     setState(prev => ({ ...prev, isCreatingNewVersion: true }))
 
     try {
-      // Crear snapshot de empleados desde versión actual
-      const employeesSnapshot = employees.map((employee) => ({
-        id: employee.id,
-        name: employee.name,
-      }))
-
       const result = await WeekVersioningService.createNewVersion(baseWeekId, {
         isCompleted,
-        employeesSnapshot,
         createdBy: userId,
         createdByName: userName,
       })
@@ -102,7 +95,7 @@ export function useWeekVersioning({
         error: error instanceof Error ? error.message : "Error desconocido",
       }
     }
-  }, [baseWeekId, employees, userId, userName, loadCurrentVersion])
+  }, [baseWeekId, userId, userName, loadCurrentVersion])
 
   // Completar semana actual - CREA NUEVA VERSIÓN COMPLETADA
   const completeWeek = useCallback(async (
