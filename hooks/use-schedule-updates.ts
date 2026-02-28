@@ -3,6 +3,10 @@ import { useToast } from "@/hooks/use-toast"
 import { useConfig } from "@/hooks/use-config"
 import { useData } from "@/contexts/data-context"
 import { scheduleApplication } from "@/lib/schedule-application"
+import { WeekVersioningService } from "@/lib/week-versioning-service-fixed"
+import { buildScheduleDocId } from "@/lib/firestore-helpers"
+import { db, COLLECTIONS } from "@/lib/firebase"
+import { doc, serverTimestamp, setDoc } from "firebase/firestore"
 import type { Horario, Empleado, Turno, ShiftAssignment } from "@/lib/types"
 
 interface UseScheduleUpdatesProps {
@@ -29,8 +33,71 @@ export function useScheduleUpdates({
     async (weekStartStr: string, completed: boolean) => {
       try {
         const existingWeek = getWeekSchedule(weekStartStr)
+
+        console.log("[useScheduleUpdates] handleMarkWeekComplete", {
+          weekStartStr,
+          completed,
+          existingWeekId: existingWeek?.id,
+          existingWeekCompleted: existingWeek?.completada,
+        })
+
         if (existingWeek?.completada === true && completed) {
-          throw new Error("Semana finalizada: crear nueva versión para editar (flujo legacy bloqueado)")
+          const ownerId = actor?.role === "invited" && actor?.ownerId
+            ? actor.ownerId
+            : actor?.ownerId || actor?.uid
+
+          if (!ownerId || !db) {
+            throw new Error("No se pudo crear una nueva versión para editar")
+          }
+
+          const baseWeekId = buildScheduleDocId(ownerId, weekStartStr)
+
+          console.log("[useScheduleUpdates] creando nueva versión editable", {
+            baseWeekId,
+            ownerId,
+            weekStartStr,
+          })
+
+          // Paso 1: asegurar migración de la semana legada al modelo versionado
+          await WeekVersioningService.migrateFromLegacy(baseWeekId, {
+            ...existingWeek,
+            ownerId,
+            weekStart: weekStartStr,
+          })
+
+          // Paso 2: crear nueva versión draft clonada desde la actual (incluye completed)
+          const createResult = await WeekVersioningService.createNewVersion(baseWeekId, {
+            isCompleted: false,
+            createdBy: actor?.uid || ownerId,
+            createdByName: actor?.name || actor?.displayName || actor?.email || "Usuario",
+          })
+
+          if (!createResult.success) {
+            throw new Error(createResult.error || "No se pudo crear la nueva versión")
+          }
+
+          // Paso 3 (bridge legacy): habilitar edición en la UI actual basada en collection schedules
+          const scheduleRef = doc(db, COLLECTIONS.SCHEDULES, baseWeekId)
+          await setDoc(
+            scheduleRef,
+            {
+              completada: false,
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true },
+          )
+
+          console.log("[useScheduleUpdates] nueva versión editable creada", {
+            baseWeekId,
+            newVersionNumber: createResult.newVersionNumber,
+          })
+
+          toast({
+            title: "Nueva versión creada",
+            description: "Se creó una nueva versión borrador y la semana ya se puede editar.",
+          })
+
+          return
         }
 
         await scheduleApplication.markWeekComplete(weekStartStr, completed, actor, employees, shifts, config)
