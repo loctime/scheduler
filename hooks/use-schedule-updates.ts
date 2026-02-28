@@ -4,9 +4,8 @@ import { useConfig } from "@/hooks/use-config"
 import { useData } from "@/contexts/data-context"
 import { scheduleApplication } from "@/lib/schedule-application"
 import { WeekVersioningService } from "@/lib/week-versioning-service-fixed"
-import { buildScheduleDocId } from "@/lib/firestore-helpers"
-import { db, COLLECTIONS } from "@/lib/firebase"
-import { doc, serverTimestamp, setDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { doc, getDoc, collection, setDoc, serverTimestamp } from "firebase/firestore"
 import type { Horario, Empleado, Turno, ShiftAssignment } from "@/lib/types"
 
 interface UseScheduleUpdatesProps {
@@ -42,50 +41,27 @@ export function useScheduleUpdates({
         })
 
         if (existingWeek?.completada === true && completed) {
-          const ownerId = actor?.role === "invited" && actor?.ownerId
-            ? actor.ownerId
-            : actor?.ownerId || actor?.uid
+          const baseWeekId = existingWeek?.baseWeekId
 
-          if (!ownerId || !db) {
+          if (!baseWeekId || !db) {
             throw new Error("No se pudo crear una nueva versión para editar")
           }
 
-          const baseWeekId = buildScheduleDocId(ownerId, weekStartStr)
-
           console.log("[useScheduleUpdates] creando nueva versión editable", {
             baseWeekId,
-            ownerId,
             weekStartStr,
           })
 
-          // Paso 1: asegurar migración de la semana legada al modelo versionado
-          await WeekVersioningService.migrateFromLegacy(baseWeekId, {
-            ...existingWeek,
-            ownerId,
-            weekStart: weekStartStr,
-          })
-
-          // Paso 2: crear nueva versión draft clonada desde la actual (incluye completed)
+          // Paso 1: crear nueva versión draft clonada desde la actual (incluye completed)
           const createResult = await WeekVersioningService.createNewVersion(baseWeekId, {
             isCompleted: false,
-            createdBy: actor?.uid || ownerId,
+            createdBy: actor?.uid || existingWeek?.ownerId || "system",
             createdByName: actor?.name || actor?.displayName || actor?.email || "Usuario",
           })
 
           if (!createResult.success) {
             throw new Error(createResult.error || "No se pudo crear la nueva versión")
           }
-
-          // Paso 3 (bridge legacy): habilitar edición en la UI actual basada en collection schedules
-          const scheduleRef = doc(db, COLLECTIONS.SCHEDULES, baseWeekId)
-          await setDoc(
-            scheduleRef,
-            {
-              completada: false,
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true },
-          )
 
           console.log("[useScheduleUpdates] nueva versión editable creada", {
             baseWeekId,
@@ -156,6 +132,81 @@ export function useScheduleUpdates({
           }
         }
         
+
+        if (foundSchedule?.baseWeekId) {
+          if (!db) {
+            throw new Error("Firestore no está configurado")
+          }
+
+          const weekRef = doc(db, "apps/horarios/weeks", foundSchedule.baseWeekId)
+          const weekDoc = await getDoc(weekRef)
+
+          if (!weekDoc.exists()) {
+            throw new Error("Week document no existe para esta semana versionada")
+          }
+
+          const weekData = weekDoc.data() as { currentVersionNumber?: number; status?: "draft" | "completed" }
+          const currentVersionNumber = weekData.currentVersionNumber
+
+          if (!currentVersionNumber) {
+            throw new Error("La semana versionada no tiene versión actual")
+          }
+
+          if (weekData.status === "completed") {
+            throw new Error("Semana completada: primero debes crear una nueva versión borrador")
+          }
+
+          const versionRef = doc(collection(weekRef, "versions"), String(currentVersionNumber))
+          const versionDoc = await getDoc(versionRef)
+
+          if (!versionDoc.exists()) {
+            throw new Error("No existe la versión actual de la semana")
+          }
+
+          const versionData = versionDoc.data() as {
+            assignments?: Horario["assignments"]
+            dayStatus?: Horario["dayStatus"]
+            isCompleted?: boolean
+          }
+
+          if (versionData.isCompleted === true) {
+            throw new Error("No se puede modificar una versión completada")
+          }
+
+          const nextAssignments = JSON.parse(JSON.stringify(versionData.assignments || {})) as Horario["assignments"]
+          const nextDayStatus = JSON.parse(JSON.stringify(versionData.dayStatus || {})) as NonNullable<Horario["dayStatus"]>
+
+          if (!nextAssignments[date]) nextAssignments[date] = {}
+          nextAssignments[date][employeeId] = assignments
+
+          if (!nextDayStatus[date]) nextDayStatus[date] = {}
+          const assignmentType = assignments[0]?.type
+          if (assignmentType === "franco") {
+            nextDayStatus[date][employeeId] = "franco"
+          } else if (assignmentType === "medio_franco") {
+            nextDayStatus[date][employeeId] = "medio_franco"
+          } else {
+            nextDayStatus[date][employeeId] = "normal"
+          }
+
+          await setDoc(
+            versionRef,
+            {
+              assignments: nextAssignments,
+              dayStatus: nextDayStatus,
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true },
+          )
+
+          toast({
+            title: "Asignación actualizada",
+            description: "Los turnos de la versión borrador fueron actualizados correctamente",
+          })
+
+          return
+        }
+
         // LOG CONSOLIDADO - Toda la información de diagnóstico
         console.log("🔍 DIAGNÓSTICO COMPLETO - UPDATE ASSIGNMENT:", {
           // Información de la fecha clickeada
