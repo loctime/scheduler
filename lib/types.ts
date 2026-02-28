@@ -226,6 +226,14 @@ export interface Horario {
   createdByName?: string
   modifiedBy?: string
   modifiedByName?: string
+  weekSnapshot?: {
+    version: 1
+    capturedAt?: any
+    employees: Array<Pick<Empleado, "id" | "name">>
+    shifts: Array<Pick<Turno, "id" | "name" | "color" | "startTime" | "endTime" | "startTime2" | "endTime2" | "colorPrimeraFranja" | "colorSegundaFranja">>
+    separadores: Separador[]
+    ordenEmpleados: string[]
+  }
 }
 
 export interface Separador {

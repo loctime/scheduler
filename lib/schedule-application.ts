@@ -6,7 +6,14 @@ import { buildScheduleDocId } from "@/lib/firestore-helpers"
 import { validateAssignmentData, type AssignmentUpdateData } from "./schedule-domain"
 
 export interface ScheduleApplicationService {
-  markWeekComplete(weekStartStr: string, completed: boolean, user: any): Promise<void>
+  markWeekComplete(
+    weekStartStr: string,
+    completed: boolean,
+    user: any,
+    employees: Empleado[],
+    shifts: Turno[],
+    config: any,
+  ): Promise<void>
   updateAssignment(
     data: AssignmentUpdateData,
     user: any,
@@ -32,7 +39,14 @@ class ScheduleApplication implements ScheduleApplicationService {
     return format(startOfWeek(dateObj, { weekStartsOn }), "yyyy-MM-dd")
   }
 
-  async markWeekComplete(weekStartStr: string, completed: boolean, user: any): Promise<void> {
+  async markWeekComplete(
+    weekStartStr: string,
+    completed: boolean,
+    user: any,
+    employees: Empleado[],
+    shifts: Turno[],
+    config: any,
+  ): Promise<void> {
     if (!db) throw new Error("Firebase no está configurado")
 
     const ownerId = this.resolveOwnerId(user)
@@ -41,16 +55,69 @@ class ScheduleApplication implements ScheduleApplicationService {
     const scheduleId = buildScheduleDocId(ownerId, weekStartStr)
     const scheduleRef = doc(db, COLLECTIONS.SCHEDULES, scheduleId)
 
-    await setDoc(
-      scheduleRef,
-      {
-        ownerId,
-        weekStart: weekStartStr,
-        updatedAt: serverTimestamp(),
-        completada: completed,
-      },
-      { merge: true },
-    )
+    const updateData: Record<string, any> = {
+      ownerId,
+      weekStart: weekStartStr,
+      updatedAt: serverTimestamp(),
+      completada: completed,
+    }
+
+    if (completed) {
+      const scheduleDoc = await getDoc(scheduleRef)
+      const scheduleData = scheduleDoc.exists() ? scheduleDoc.data() : {}
+      const assignments = scheduleData.assignments || {}
+      const employeeIdsInWeek = new Set<string>()
+
+      Object.values(assignments).forEach((dayAssignments: any) => {
+        if (!dayAssignments || typeof dayAssignments !== "object") return
+        Object.keys(dayAssignments).forEach((employeeId) => employeeIdsInWeek.add(employeeId))
+      })
+
+      const employeesMap = new Map(employees.map((employee) => [employee.id, employee]))
+      const orderedEmployeeIds = Array.isArray(config?.ordenEmpleados)
+        ? (config.ordenEmpleados as string[])
+        : []
+      const snapshotEmployeeIds = orderedEmployeeIds
+        .filter((id) => employeesMap.has(id) || employeeIdsInWeek.has(id))
+        .concat(
+          Array.from(employeeIdsInWeek).filter(
+            (id) => !orderedEmployeeIds.includes(id),
+          ),
+        )
+
+      const uniqueSnapshotEmployeeIds = Array.from(new Set(snapshotEmployeeIds))
+
+      updateData.weekSnapshot = {
+        version: 1,
+        capturedAt: serverTimestamp(),
+        employees: uniqueSnapshotEmployeeIds.map((id) => {
+          const employee = employeesMap.get(id)
+          return {
+            id,
+            name: employee?.name || id,
+          }
+        }),
+        shifts: shifts.map((shift) => ({
+          id: shift.id,
+          name: shift.name,
+          color: shift.color,
+          startTime: shift.startTime,
+          endTime: shift.endTime,
+          startTime2: shift.startTime2,
+          endTime2: shift.endTime2,
+          colorPrimeraFranja: shift.colorPrimeraFranja,
+          colorSegundaFranja: shift.colorSegundaFranja,
+        })),
+        separadores: Array.isArray(config?.separadores)
+          ? JSON.parse(JSON.stringify(config.separadores))
+          : [],
+        ordenEmpleados: Array.isArray(config?.ordenEmpleados)
+          ? [...config.ordenEmpleados]
+          : uniqueSnapshotEmployeeIds,
+      }
+    }
+
+    await setDoc(scheduleRef, updateData, { merge: true })
   }
 
   async updateAssignment(
