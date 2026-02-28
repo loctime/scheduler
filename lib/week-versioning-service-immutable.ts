@@ -371,7 +371,7 @@ export class WeekVersioningService {
     if (!db) return null
     
     try {
-      const weekRef = doc(db as Firestore, , baseWeekId)
+      const weekRef = doc(db as Firestore, WEEKS_COLLECTION, baseWeekId)
       const weekDoc = await getDoc(weekRef)
       
       if (!weekDoc.exists()) {

@@ -209,6 +209,7 @@ export interface Horario {
   semanaInicio: string
   semanaFin: string
   ownerId: string
+  baseWeekId?: string // ID del documento en weeks/ si está versionado
   assignments: {
     [date: string]: {
       [empleadoId: string]: ShiftAssignment[]
