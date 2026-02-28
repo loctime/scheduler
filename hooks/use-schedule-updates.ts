@@ -28,7 +28,7 @@ export function useScheduleUpdates({
   const handleMarkWeekComplete = useCallback(
     async (weekStartStr: string, completed: boolean) => {
       try {
-        await scheduleApplication.markWeekComplete(weekStartStr, completed, actor)
+        await scheduleApplication.markWeekComplete(weekStartStr, completed, actor, employees, shifts, config)
 
         toast({
           title: completed ? "Semana marcada como completada" : "Semana desmarcada",
@@ -45,7 +45,7 @@ export function useScheduleUpdates({
         })
       }
     },
-    [actor, toast],
+    [actor, employees, shifts, config, toast],
   )
 
   const handleAssignmentUpdate = useCallback(
