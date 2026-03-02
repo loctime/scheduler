@@ -42,8 +42,9 @@ export function useEmployeeMonthStats({
       stats[employee.id] = initializeEmployeeMonthStats()
     })
 
-    // Early return si no hay datos suficientes
-    if (employees.length === 0 || shifts.length === 0) {
+    // Early return solo si no hay empleados (evita reiniciar stats cuando shifts
+    // está vacío temporalmente, p. ej. tras marcar semana completed/versionada).
+    if (employees.length === 0) {
       return stats
     }
 

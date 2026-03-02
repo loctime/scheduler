@@ -8,7 +8,6 @@ import { useData } from "@/contexts/data-context"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import { buildScheduleDocId } from "@/lib/firestore-helpers"
 import { getCache, setCache } from "@/lib/cache/indexeddb-cache"
-import { compareArraysByIds } from "@/lib/cache/cache-utils"
 
 interface UseSchedulesListenerProps {
   user: any
@@ -148,17 +147,11 @@ export function useSchedulesListener({
           })
         )
 
-        // Comparar con datos actuales para evitar re-renders innecesarios
-        setSchedules((prevSchedules) => {
-          if (compareArraysByIds(prevSchedules, schedulesData)) {
-            // No hay cambios, mantener datos anteriores
-            return prevSchedules
-          }
-
-          // Hay cambios, actualizar
-          logger.debug(`[useSchedulesListener] Cargados ${schedulesData.length} schedules desde Firestore`)
-          return schedulesData
-        })
+        // Siempre actualizar con datos hidratados para que stats y UI reflejen
+        // assignments/completada correctamente (evita que compareArraysByIds
+        // bloquee actualizaciones tras marcar LISTO en semanas versionadas).
+        setSchedules(schedulesData)
+        logger.debug("[useSchedulesListener] Schedules actualizados desde Firestore", { count: schedulesData.length })
         
         setLoading(false)
         setError(null)
