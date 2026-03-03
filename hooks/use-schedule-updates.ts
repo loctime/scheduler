@@ -76,6 +76,29 @@ export function useScheduleUpdates({
           return
         }
 
+        if (existingWeek?.baseWeekId && completed) {
+          const completeResult = await WeekVersioningService.completeCurrentWeek(
+            existingWeek.baseWeekId,
+            employees,
+            shifts,
+            JSON.parse(JSON.stringify(existingWeek.assignments || {})),
+            JSON.parse(JSON.stringify(existingWeek.dayStatus || {})),
+            actor?.uid || existingWeek.ownerId || "system",
+            actor?.name || actor?.displayName || actor?.email || "Usuario",
+          )
+
+          if (!completeResult.success) {
+            throw new Error(completeResult.error || "No se pudo marcar la semana versionada como lista")
+          }
+
+          toast({
+            title: "Semana finalizada",
+            description: "La semana versionada fue marcada como lista correctamente.",
+          })
+
+          return
+        }
+
         await scheduleApplication.markWeekComplete(weekStartStr, completed, actor, employees, shifts, config)
 
         toast({
