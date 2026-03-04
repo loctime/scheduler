@@ -19,6 +19,7 @@ import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { calculateHoursBreakdown } from "@/lib/validations"
 import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
 import { ShiftAssignment, ShiftAssignmentValue } from "@/lib/types"
+import { getScheduleDataForStats } from "@/lib/schedule-history"
 
 const normalizeAssignments = (value: ShiftAssignmentValue | undefined): ShiftAssignment[] => {
   if (!value || !Array.isArray(value) || value.length === 0) return []
@@ -296,13 +297,14 @@ export function HorariosMensualesContent() {
     monthWeeks.forEach((weekDays) => {
       const weekStartStr = format(weekDays[0], "yyyy-MM-dd")
       const weekSchedule = schedules.find((s) => s.weekStart === weekStartStr) || null
-      if (!weekSchedule?.assignments) return
+      const scheduleData = getScheduleDataForStats(weekSchedule)
+      if (!scheduleData.assignments) return
 
       weekDays.forEach((day) => {
         if (day < monthRange.startDate || day > monthRange.endDate) return
 
         const dateStr = format(day, "yyyy-MM-dd")
-        const dateAssignments = weekSchedule.assignments[dateStr]
+        const dateAssignments = scheduleData.assignments[dateStr]
         if (!dateAssignments) return
 
         Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
@@ -310,7 +312,7 @@ export function HorariosMensualesContent() {
             stats[employeeId] = { francos: 0, francosSemana: 0, horasExtrasSemana: 0, horasExtrasMes: 0, horasComputablesMes: 0, horasSemana: 0, horasLicenciaEmbarazo: 0, horasMedioFranco: 0 }
           }
 
-          const normalizedAssignments = normalizeAssignments(assignmentValue)
+          const normalizedAssignments = normalizeAssignments(assignmentValue as ShiftAssignmentValue)
           if (normalizedAssignments.length === 0) {
             return
           }
@@ -444,7 +446,7 @@ export function HorariosMensualesContent() {
                             if (week.schedule?.assignments) {
                               week.weekDays.forEach((day) => {
                                 const dateStr = format(day, "yyyy-MM-dd")
-                                const dateAssignments = week.schedule?.assignments[dateStr]
+                                const dateAssignments = getScheduleDataForStats(week.schedule).assignments[dateStr]
                                 if (!dateAssignments) return
 
                                 Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
@@ -455,7 +457,7 @@ export function HorariosMensualesContent() {
                                     }
                                   }
 
-                                  const normalizedAssignments = normalizeAssignments(assignmentValue)
+                                  const normalizedAssignments = normalizeAssignments(assignmentValue as ShiftAssignmentValue)
                                   if (normalizedAssignments.length === 0) {
                                     return
                                   }

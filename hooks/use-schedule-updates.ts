@@ -43,7 +43,16 @@ export function useScheduleUpdates({
         if (existingWeek?.completada === true && completed) {
           const baseWeekId = existingWeek?.baseWeekId
 
-          if (!baseWeekId || !db) {
+          if (!baseWeekId) {
+            await scheduleApplication.markWeekComplete(weekStartStr, false, actor, employees, shifts, config)
+            toast({
+              title: "Semana reabierta",
+              description: "La semana volvió a borrador. Ya se puede editar con normalidad.",
+            })
+            return
+          }
+
+          if (!db) {
             throw new Error("No se pudo crear una nueva versión para editar")
           }
 

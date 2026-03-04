@@ -84,7 +84,9 @@ export function useEmployeesByOwnerId(ownerId: string | null) {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as Empleado[]
+        const data = snapshot.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .filter((employee: any) => employee.isDeleted !== true) as Empleado[]
         setEmployees(data)
         setError(null)
         setLoading(false)

@@ -7,6 +7,7 @@ import { calculateHoursBreakdown } from "@/lib/validations"
 import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
 import { normalizeAssignments } from "@/lib/domain/normalize-assignments"
 import type { ShiftAssignmentValue } from "@/lib/types"
+import { getScheduleDataForStats } from "@/lib/schedule-history"
 
 export interface MonthGroup {
   monthKey: string
@@ -136,16 +137,23 @@ export function createCalculateMonthlyStats(
     monthWeeks.forEach((weekDays) => {
       const weekStartStr = format(weekDays[0], "yyyy-MM-dd")
       const weekSchedule = schedules.find((s) => s.weekStart === weekStartStr) || null
-      if (!weekSchedule?.assignments) return
+      if (!weekSchedule) return
+
+      const scheduleData = getScheduleDataForStats(weekSchedule)
 
       weekDays.forEach((day) => {
         if (day < monthRange.startDate || day > monthRange.endDate) return
 
         const dateStr = format(day, "yyyy-MM-dd")
-        const dateAssignments = weekSchedule.assignments[dateStr]
-        if (!dateAssignments) return
+        const dateAssignments = scheduleData.assignments?.[dateStr] || {}
+        const dateDayStatus = scheduleData.dayStatus?.[dateStr] || {}
+        const employeeIds = new Set([
+          ...Object.keys(dateAssignments),
+          ...Object.keys(dateDayStatus),
+        ])
+        if (employeeIds.size === 0) return
 
-        Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
+        employeeIds.forEach((employeeId) => {
           if (!stats[employeeId]) {
             stats[employeeId] = {
               francos: 0,
@@ -159,8 +167,10 @@ export function createCalculateMonthlyStats(
             }
           }
 
+          const assignmentValue = dateAssignments[employeeId]
           const normalizedAssignments = normalizeAssignments(assignmentValue as ShiftAssignmentValue)
-          if (normalizedAssignments.length === 0) return
+          const currentDayStatus = dateDayStatus[employeeId] || "normal"
+          if (normalizedAssignments.length === 0 && currentDayStatus === "normal") return
 
           let francosCount = 0
           normalizedAssignments.forEach((assignment) => {
@@ -170,6 +180,14 @@ export function createCalculateMonthlyStats(
               francosCount += 0.5
             }
           })
+
+          if (francosCount === 0) {
+            if (currentDayStatus === "franco") {
+              francosCount = 1
+            } else if (currentDayStatus === "medio_franco") {
+              francosCount = 0.5
+            }
+          }
 
           if (francosCount > 0) {
             stats[employeeId].francos += francosCount
