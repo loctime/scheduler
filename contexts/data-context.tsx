@@ -140,10 +140,12 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
         orderBy("name")
       )
       const snapshot = await getDocs(employeesQuery)
-      const employeesData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Empleado[]
+      const employeesData = snapshot.docs
+        .map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        .filter((employee: any) => employee.isDeleted !== true) as Empleado[]
 
       // Solo actualizar si hay cambios
       setEmployees((prev) => {
@@ -295,10 +297,12 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
     const unsubscribeEmployees = onSnapshot(
       employeesQuery,
       (snapshot) => {
-        const employeesData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Empleado[]
+        const employeesData = snapshot.docs
+          .map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+          .filter((employee: any) => employee.isDeleted !== true) as Empleado[]
         
         // Solo actualizar si hay cambios
         setEmployees((prev) => {

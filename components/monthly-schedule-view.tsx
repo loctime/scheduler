@@ -11,6 +11,7 @@ import type { Empleado, Horario, Turno } from "@/lib/types"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 import { calculateTotalDailyHours, toWorkingHoursConfig } from "@/lib/domain/working-hours"
 import { normalizeAssignments } from "@/lib/domain/normalize-assignments"
+import { getScheduleDataForStats } from "@/lib/schedule-history"
 import type { Configuracion } from "@/lib/types"
 
 export interface MonthGroup {
@@ -134,7 +135,7 @@ export function MonthlyScheduleView({
                     const workingConfig = toWorkingHoursConfig(config)
                     week.weekDays.forEach((day) => {
                       const dateStr = format(day, "yyyy-MM-dd")
-                      const dateAssignments = week.schedule?.assignments[dateStr]
+                      const dateAssignments = getScheduleDataForStats(week.schedule).assignments[dateStr]
                       if (!dateAssignments) return
 
                       Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
@@ -144,7 +145,7 @@ export function MonthlyScheduleView({
                             horasExtrasSemana: 0,
                           } as EmployeeMonthlyStats
                         }
-                        const normalized = normalizeAssignments(assignmentValue)
+                        const normalized = normalizeAssignments(assignmentValue as any)
                         if (normalized.length === 0) return
                         const { horasExtra } = calculateTotalDailyHours(normalized, workingConfig)
                         if (horasExtra > 0) {

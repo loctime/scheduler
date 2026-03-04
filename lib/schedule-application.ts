@@ -55,10 +55,6 @@ class ScheduleApplication implements ScheduleApplicationService {
     const scheduleId = buildScheduleDocId(ownerId, weekStartStr)
     const scheduleRef = doc(db, COLLECTIONS.SCHEDULES, scheduleId)
 
-    if (!completed) {
-      throw new Error("Semana finalizada: crear nueva versión para editar. No se permite desmarcar una semana lista.")
-    }
-
     const updateData: Record<string, any> = {
       ownerId,
       weekStart: weekStartStr,
@@ -91,16 +87,22 @@ class ScheduleApplication implements ScheduleApplicationService {
 
       const uniqueSnapshotEmployeeIds = Array.from(new Set(snapshotEmployeeIds))
 
+      const snapshotEmployees = uniqueSnapshotEmployeeIds.map((id) => {
+        const employee = employeesMap.get(id)
+        return {
+          id,
+          name: employee?.name || id,
+        }
+      })
+
       updateData.weekSnapshot = {
         version: 1,
         capturedAt: serverTimestamp(),
-        employees: uniqueSnapshotEmployeeIds.map((id) => {
-          const employee = employeesMap.get(id)
-          return {
-            id,
-            name: employee?.name || id,
-          }
-        }),
+        employees: snapshotEmployees,
+        employeeNameById: snapshotEmployees.reduce((acc, employee) => {
+          acc[employee.id] = employee.name
+          return acc
+        }, {} as Record<string, string>),
         shifts: shifts
           .filter(shift => shift.id && shift.name) // Filtrar shifts válidos
           .map((shift) => {

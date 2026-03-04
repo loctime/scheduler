@@ -3,6 +3,7 @@
 import { useMemo } from "react"
 import { WeekSchedule } from "@/components/schedule-calendar/week-schedule"
 import { useEmployeeWeekStats } from "@/hooks/use-employee-week-stats"
+import { getHistoricalEmployeeIds } from "@/lib/schedule-history"
 import type { Horario, Empleado, Turno, MedioTurno, ShiftAssignment, ShiftAssignmentValue, Configuracion } from "@/lib/types"
 import type { EmployeeMonthlyStats } from "@/components/schedule-grid"
 
@@ -79,9 +80,30 @@ export function WeekView({
   // Usar el weekStartDate calculado si se proporciona, sino usar weekDays[0]
   const weekStartDate = weekStartDateProp || weekDays[0]
 
+
+  const statsEmployees = useMemo(() => {
+    const map = new Map<string, Empleado>()
+
+    employees.forEach((employee) => {
+      map.set(employee.id, employee)
+    })
+
+    const historicalIds = getHistoricalEmployeeIds(weekSchedule)
+    historicalIds.forEach((employeeId) => {
+      if (!map.has(employeeId)) {
+        map.set(employeeId, {
+          id: employeeId,
+          name: `Empleado ${employeeId.slice(0, 8)}`,
+        } as Empleado)
+      }
+    })
+
+    return Array.from(map.values())
+  }, [employees, weekSchedule])
+
   // Usar el hook centralizado para calcular estadísticas semanales
   const weekStatsData = useEmployeeWeekStats({
-    employees,
+    employees: statsEmployees,
     weekDays,
     weekSchedule,
     shifts,
@@ -92,7 +114,7 @@ export function WeekView({
   // Convertir a formato legado para compatibilidad con WeekSchedule
   const weekStats = useMemo(() => {
     const stats: Record<string, EmployeeMonthlyStats> = {}
-    employees.forEach((employee) => {
+    statsEmployees.forEach((employee) => {
       const weekStat = weekStatsData[employee.id]
       const monthStat = employeeMonthlyStats[employee.id] || { 
         francos: 0, 
@@ -121,7 +143,30 @@ export function WeekView({
     })
 
     return stats
-  }, [employees, weekStatsData, employeeMonthlyStats])
+  }, [statsEmployees, weekStatsData, employeeMonthlyStats])
+
+
+  const orderedEmployeeStats = useMemo(() => {
+    const preferredOrder = weekSchedule?.completada === true && weekSchedule?.weekSnapshot?.employees
+      ? weekSchedule.weekSnapshot.employees.map((employee) => employee.id)
+      : employees.map((employee) => employee.id)
+
+    const orderedIds = [
+      ...preferredOrder,
+      ...Object.keys(weekStats).filter((employeeId) => !preferredOrder.includes(employeeId)),
+    ]
+
+    return orderedIds.map((employeeId) => weekStats[employeeId] || {
+      francos: 0,
+      francosSemana: 0,
+      horasExtrasSemana: 0,
+      horasExtrasMes: 0,
+      horasComputablesMes: 0,
+      horasSemana: 0,
+      horasLicenciaEmbarazo: 0,
+      horasMedioFranco: 0,
+    })
+  }, [weekSchedule, employees, weekStats])
 
   return (
     <WeekSchedule
@@ -143,7 +188,7 @@ export function WeekView({
       onExportExcel={() => onExportExcel?.(weekStartDate, weekDays, weekSchedule)}
       exporting={exporting}
       mediosTurnos={mediosTurnos}
-      employeeStats={Object.values(weekStats)}
+      employeeStats={orderedEmployeeStats}
       open={open}
       onOpenChange={onOpenChange}
       user={user}

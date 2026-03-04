@@ -5,6 +5,7 @@ import {
   initializeEmployeeWeekStats
 } from "@/types/employee-stats"
 import { ShiftAssignment, Turno, MedioTurno, Configuracion } from "@/lib/types"
+import { getScheduleDataForStats } from "@/lib/schedule-history"
 import { calculateAssignmentImpact } from "@/lib/domain/assignment-hours"
 import { normalizeAssignments } from "@/lib/domain/normalize-assignments"
 
@@ -43,11 +44,13 @@ export function useEmployeeWeekStats({
       return stats
     }
 
+    const scheduleData = getScheduleDataForStats(weekSchedule)
+
     // Procesar cada día de la semana
     weekDays.forEach((day) => {
       const dateStr = format(day, "yyyy-MM-dd")
-      const dateAssignments = weekSchedule.assignments?.[dateStr] || {}
-      const dayStatuses = weekSchedule.dayStatus?.[dateStr] || {}
+      const dateAssignments = scheduleData.assignments?.[dateStr] || {}
+      const dayStatuses = scheduleData.dayStatus?.[dateStr] || {}
       const employeeIds = new Set([
         ...Object.keys(dateAssignments),
         ...Object.keys(dayStatuses),
