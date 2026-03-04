@@ -15,6 +15,7 @@ import {
   getDocs,
   writeBatch,
   deleteField,
+  type Firestore,
 } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { DashboardLayout } from "@/components/dashboard-layout"
@@ -55,6 +56,99 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Horario, Turno } from "@/lib/types"
 
+/** Impacto de eliminar un empleado: semanas/días/turnos afectados (solo en semanas NO "Listo"). */
+export type EmployeeDeleteImpact = {
+  daysCount: number
+  shiftsCount: number
+  dates: string[]
+  fromWeekStart: string | null
+  lastCompletedWeekInfo: { start: string; end: string } | null
+  /** Schedules futuros editables con assignments, para "Limpiar horarios" sin re-lectura. */
+  schedulesToUpdate: Array<{ id: string; assignments: Horario["assignments"] }>
+}
+
+const BATCH_LIMIT = 500
+
+/**
+ * Calcula el impacto de eliminar un empleado: última semana completada, semanas futuras editables
+ * y conteo de días/turnos afectados. Reutilizable para el dialog y para la opción "Limpiar horarios".
+ */
+async function computeEmployeeDeleteImpact(
+  db: Firestore,
+  ownerId: string,
+  employeeId: string
+): Promise<EmployeeDeleteImpact> {
+  const schedulesRef = collection(db, COLLECTIONS.SCHEDULES)
+  const q = query(schedulesRef, where("ownerId", "==", ownerId))
+  const snapshot = await getDocs(q)
+  const allSchedules = snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as (Horario & { id: string })[]
+
+  const completedSchedules = allSchedules
+    .filter((s) => s.completada === true && s.weekStart)
+    .sort((a, b) => (b.weekStart || "").localeCompare(a.weekStart || ""))
+
+  const lastCompletedWeekStart: string | null =
+    completedSchedules.length > 0 ? (completedSchedules[0].weekStart ?? null) : null
+
+  const lastCompletedWeekInfo: { start: string; end: string } | null =
+    completedSchedules.length > 0
+      ? (() => {
+          const w = completedSchedules[0]
+          const weekStartDate = parseISO(w.weekStart!)
+          const weekEndDate = addDays(weekStartDate, 6)
+          return {
+            start: format(weekStartDate, "d 'de' MMMM 'de' yyyy", { locale: es }),
+            end: format(weekEndDate, "d 'de' MMMM 'de' yyyy", { locale: es }),
+          }
+        })()
+      : null
+
+  const futureEditable = allSchedules.filter((schedule) => {
+    if (schedule.completada === true) return false
+    if (!lastCompletedWeekStart) return true
+    return !!(schedule.weekStart && schedule.weekStart > lastCompletedWeekStart)
+  })
+
+  const datesSet = new Set<string>()
+  let daysCount = 0
+  let shiftsCount = 0
+  const schedulesToUpdate: Array<{ id: string; assignments: Horario["assignments"] }> = []
+
+  for (const schedule of futureEditable) {
+    const assignments = schedule.assignments || {}
+    let hasEmployee = false
+    const updatedAssignments: Horario["assignments"] = { ...assignments }
+
+    for (const dateKey of Object.keys(assignments)) {
+      const byEmployee = assignments[dateKey]
+      if (!byEmployee || !byEmployee[employeeId]) continue
+      hasEmployee = true
+      daysCount += 1
+      datesSet.add(dateKey)
+      const val = byEmployee[employeeId]
+      shiftsCount += Array.isArray(val) ? val.length : 1
+      const next = { ...byEmployee }
+      delete next[employeeId]
+      updatedAssignments[dateKey] = next
+    }
+
+    if (hasEmployee) {
+      schedulesToUpdate.push({ id: schedule.id, assignments: updatedAssignments })
+    }
+  }
+
+  const dates = Array.from(datesSet).sort()
+
+  return {
+    daysCount,
+    shiftsCount,
+    dates,
+    fromWeekStart: lastCompletedWeekStart,
+    lastCompletedWeekInfo,
+    schedulesToUpdate,
+  }
+}
+
 const PRESET_COLORS = [
   "#3b82f6", // blue
   "#10b981", // green
@@ -78,6 +172,7 @@ export default function EmpleadosPage() {
   const [employeeToDelete, setEmployeeToDelete] = useState<{ id: string; name: string } | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [lastCompletedWeekInfo, setLastCompletedWeekInfo] = useState<{ start: string; end: string } | null>(null)
+  const [employeeDeleteImpact, setEmployeeDeleteImpact] = useState<EmployeeDeleteImpact | null>(null)
   const [editingField, setEditingField] = useState<{id: string, field: string} | null>(null)
   const [inlineValue, setInlineValue] = useState("")
 
@@ -235,174 +330,66 @@ export default function EmpleadosPage() {
 
   const handleDeleteClick = async (id: string, name: string) => {
     setEmployeeToDelete({ id, name })
-    
-    if (db) {
+    setEmployeeDeleteImpact(null)
+
+    if (db && ownerId) {
       try {
-        if (!ownerId) {
-          throw new Error("Owner no válido")
-        }
-        const completedQuery = query(
-          collection(db, COLLECTIONS.SCHEDULES),
-          where("ownerId", "==", ownerId),
-          where("completada", "==", true),
-        )
-        const schedulesSnapshot = await getDocs(completedQuery)
-        
-        const allSchedules = schedulesSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Horario[]
-        
-        const completedSchedules = allSchedules
-          .filter((s) => s.weekStart)
-          .sort((a, b) => {
-            if (!a.weekStart || !b.weekStart) return 0
-            return b.weekStart.localeCompare(a.weekStart)
-          })
-        
-        if (completedSchedules.length > 0) {
-          const lastCompleted = completedSchedules[0]
-          const weekStartDate = parseISO(lastCompleted.weekStart!)
-          const weekEndDate = addDays(weekStartDate, 6)
-          
-          setLastCompletedWeekInfo({
-            start: format(weekStartDate, "d 'de' MMMM 'de' yyyy", { locale: es }),
-            end: format(weekEndDate, "d 'de' MMMM 'de' yyyy", { locale: es }),
-          })
-        } else {
-          setLastCompletedWeekInfo(null)
-        }
+        const impact = await computeEmployeeDeleteImpact(db, ownerId, id)
+        setEmployeeDeleteImpact(impact)
+        setLastCompletedWeekInfo(impact.lastCompletedWeekInfo)
       } catch (error) {
-        logger.error("Error al obtener información de semanas completadas:", error)
+        logger.error("Error al calcular impacto de eliminación:", error)
+        setEmployeeDeleteImpact(null)
         setLastCompletedWeekInfo(null)
       }
     }
-    
+
     setDeleteDialogOpen(true)
   }
 
-  const handleEmployeeDelete = async () => {
-    if (!employeeToDelete || !db) {
-      return
-    }
+  const handleEmployeeDelete = async (mode: "keepHours" | "clearHours") => {
+    if (!employeeToDelete || !db) return
 
     setIsDeleting(true)
     try {
-      if (!ownerId) {
-        throw new Error("Owner no válido")
-      }
-      const completedQuery = query(
-        collection(db, COLLECTIONS.SCHEDULES),
-        where("ownerId", "==", ownerId),
-        where("completada", "==", true),
-      )
-      const completedSnapshot = await getDocs(completedQuery)
-      
-      const allCompletedSchedules = completedSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Horario[]
-      
-      const completedSchedules = allCompletedSchedules
-        .filter((s) => s.weekStart)
-        .sort((a, b) => {
-          if (!a.weekStart || !b.weekStart) return 0
-          return b.weekStart.localeCompare(a.weekStart)
-        })
-      
-      let lastCompletedWeekStart: string | null = null
-      if (completedSchedules.length > 0) {
-        lastCompletedWeekStart = completedSchedules[0].weekStart || null
-      }
-      
-      if (!db) {
-        throw new Error("Firebase no está configurado")
-      }
-      
-      const schedulesQuery = query(
-        collection(db, COLLECTIONS.SCHEDULES),
-        where("ownerId", "==", ownerId)
-      )
-      const schedulesSnapshot = await getDocs(schedulesQuery)
-      
-      const allSchedules = schedulesSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Horario[]
-      
-      const schedulesToUpdate = allSchedules.filter((schedule) => {
-        if (schedule.completada === true) {
-          return false
+      if (!ownerId) throw new Error("Owner no válido")
+
+      if (mode === "clearHours") {
+        let toUpdate = employeeDeleteImpact?.schedulesToUpdate
+        if (!toUpdate?.length && (employeeDeleteImpact === null || employeeDeleteImpact.daysCount > 0)) {
+          const impact = await computeEmployeeDeleteImpact(db, ownerId, employeeToDelete.id)
+          toUpdate = impact.schedulesToUpdate
         }
-        
-        if (!lastCompletedWeekStart) {
-          return true
-        }
-        
-        if (schedule.weekStart && schedule.weekStart > lastCompletedWeekStart!) {
-          return true
-        }
-        
-        return false
-      })
-      
-      const BATCH_LIMIT = 500
-      const updates: Array<{ scheduleId: string; updateData: any }> = []
-      
-      for (const schedule of schedulesToUpdate) {
-        const scheduleDoc = schedulesSnapshot.docs.find((doc) => doc.id === schedule.id)
-        if (!scheduleDoc) continue
-        
-        const updatedAssignments = { ...schedule.assignments }
-        let hasChanges = false
-        
-        Object.keys(updatedAssignments).forEach((date) => {
-          if (updatedAssignments[date][employeeToDelete.id]) {
-            delete updatedAssignments[date][employeeToDelete.id]
-            hasChanges = true
+        if (toUpdate?.length) {
+          for (let i = 0; i < toUpdate.length; i += BATCH_LIMIT) {
+            const batch = writeBatch(db)
+            const chunk = toUpdate!.slice(i, i + BATCH_LIMIT)
+            for (const { id: scheduleId, assignments } of chunk) {
+              const scheduleRef = doc(db, COLLECTIONS.SCHEDULES, scheduleId)
+              batch.update(scheduleRef, { assignments, updatedAt: serverTimestamp() })
+            }
+            await batch.commit()
           }
-        })
-        
-        if (hasChanges) {
-          updates.push({
-            scheduleId: schedule.id,
-            updateData: {
-              assignments: updatedAssignments,
-              updatedAt: serverTimestamp(),
-            },
-          })
         }
       }
-      
-      if (updates.length > 0 && db) {
-        for (let i = 0; i < updates.length; i += BATCH_LIMIT) {
-          const batch = writeBatch(db)
-          const batchUpdates = updates.slice(i, i + BATCH_LIMIT)
-          
-          for (const { scheduleId, updateData } of batchUpdates) {
-            const scheduleRef = doc(db, COLLECTIONS.SCHEDULES, scheduleId)
-            batch.update(scheduleRef, updateData)
-          }
-          
-          await batch.commit()
-        }
-      }
-      
-      if (db) {
-        await deleteDoc(doc(db, COLLECTIONS.EMPLOYEES, employeeToDelete.id))
-      }
-      
+
+      await deleteDoc(doc(db, COLLECTIONS.EMPLOYEES, employeeToDelete.id))
       await refreshEmployees()
-      
       setDeleteDialogOpen(false)
       setEmployeeToDelete(null)
-      
-      toast({
-        title: "Empleado eliminado",
-        description: lastCompletedWeekStart 
-          ? `El empleado se ha eliminado de todas las semanas futuras a la última semana completada (${lastCompletedWeekStart})`
-          : "El empleado se ha eliminado de todos los horarios",
-      })
+      setEmployeeDeleteImpact(null)
+
+      if (mode === "keepHours") {
+        toast({
+          title: "Empleado eliminado",
+          description: "El empleado ha sido eliminado. Las horas ya registradas en estadísticas se mantienen.",
+        })
+      } else {
+        toast({
+          title: "Empleado eliminado",
+          description: "Se han limpiado sus horarios en semanas editables y el empleado ha sido eliminado.",
+        })
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -1106,7 +1093,13 @@ export default function EmpleadosPage() {
         </Dialog>
 
         {/* AlertDialog para eliminar empleado */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialog
+          open={deleteDialogOpen}
+          onOpenChange={(open) => {
+            setDeleteDialogOpen(open)
+            if (!open) setEmployeeDeleteImpact(null)
+          }}
+        >
           <AlertDialogContent className="border-2 border-destructive">
             <AlertDialogHeader>
               <div className="flex items-center gap-3 mb-2">
@@ -1122,54 +1115,86 @@ export default function EmpleadosPage() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="space-y-4 py-4">
-              <div className="bg-destructive/5 border-l-4 border-destructive p-4 rounded-r">
-                <p className="font-bold text-destructive mb-2">⚠️ Esta acción eliminará:</p>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-start gap-2">
-                    <span className="text-destructive font-bold">•</span>
-                    <span>Al empleado <strong>del sistema completamente</strong></span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-destructive font-bold">•</span>
-                    <span>Sus asignaciones de <strong>todas las semanas futuras</strong> a la última semana marcada como "listo"</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-600 font-bold">✓</span>
-                    <span className="text-green-700">Se mantendrán sus asignaciones en semanas ya marcadas como "listo" (historial)</span>
-                  </li>
-                </ul>
-              </div>
-              {lastCompletedWeekInfo && (
-                <div className="bg-green-50 dark:bg-green-950/20 border-2 border-green-500 rounded-lg p-4">
-                  <p className="font-bold text-green-700 dark:text-green-400 mb-2">
-                    📅 Última semana completada:
-                  </p>
-                  <p className="text-sm text-green-800 dark:text-green-300">
-                    <strong>Desde:</strong> {lastCompletedWeekInfo.start}
-                  </p>
-                  <p className="text-sm text-green-800 dark:text-green-300">
-                    <strong>Hasta:</strong> {lastCompletedWeekInfo.end}
-                  </p>
-                  <p className="text-xs text-green-700 dark:text-green-400 mt-2 italic">
-                    ✓ Todas las semanas hasta esta fecha están protegidas y no se eliminarán
-                  </p>
-                </div>
+              {(!employeeDeleteImpact || (employeeDeleteImpact.daysCount === 0 && employeeDeleteImpact.shiftsCount === 0)) ? (
+                <>
+                  <div className="bg-destructive/5 border-l-4 border-destructive p-4 rounded-r">
+                    <p className="font-bold text-destructive mb-2">⚠️ Esta acción eliminará al empleado del sistema.</p>
+                    <p className="text-sm">No tiene turnos en semanas futuras editables. Las semanas marcadas como &quot;Listo&quot; no se modifican.</p>
+                  </div>
+                  <p className="text-center font-bold text-destructive text-lg">⛔ Esta acción NO se puede deshacer</p>
+                </>
+              ) : (
+                <>
+                  <div className="bg-destructive/5 border-l-4 border-destructive p-4 rounded-r">
+                    <p className="font-bold text-destructive mb-2">⚠️ Este empleado tiene turnos en semanas NO &quot;Listo&quot;</p>
+                    <p className="text-sm mb-2">
+                      Si lo eliminas, desaparecerá de esas semanas. Las semanas &quot;Listo&quot; se conservan. Las horas ya registradas pueden permanecer en las estadísticas mensuales según la opción que elijas.
+                    </p>
+                    <ul className="space-y-1 text-sm mt-2">
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-600 font-bold">✓</span>
+                        <span className="text-green-700 dark:text-green-400">Semanas &quot;Listo&quot; no se modifican (historial protegido)</span>
+                      </li>
+                    </ul>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                    {employeeDeleteImpact.lastCompletedWeekInfo && (
+                      <p className="text-sm">
+                        <strong>Última semana completada:</strong> {employeeDeleteImpact.lastCompletedWeekInfo.start} – {employeeDeleteImpact.lastCompletedWeekInfo.end}
+                      </p>
+                    )}
+                    {employeeDeleteImpact.fromWeekStart && (
+                      <p className="text-sm">
+                        <strong>Desde semana:</strong> {employeeDeleteImpact.fromWeekStart}
+                      </p>
+                    )}
+                    <p className="text-sm"><strong>Días afectados:</strong> {employeeDeleteImpact.daysCount}</p>
+                    <p className="text-sm"><strong>Turnos afectados:</strong> {employeeDeleteImpact.shiftsCount}</p>
+                    {employeeDeleteImpact.dates.length > 0 && (
+                      <p className="text-sm">
+                        <strong>Fechas:</strong>{" "}
+                        {employeeDeleteImpact.dates.slice(0, 6).join(", ")}
+                        {employeeDeleteImpact.dates.length > 6 && ` y ${employeeDeleteImpact.dates.length - 6} más…`}
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-center font-bold text-destructive text-lg">⛔ Esta acción NO se puede deshacer</p>
+                </>
               )}
-              <p className="text-center font-bold text-destructive text-lg">
-                ⛔ Esta acción NO se puede deshacer
-              </p>
             </div>
-            <AlertDialogFooter className="gap-2">
+            <AlertDialogFooter className="gap-2 flex-wrap">
               <AlertDialogCancel disabled={isDeleting} className="w-full sm:w-auto">
                 Cancelar
               </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleEmployeeDelete}
-                disabled={isDeleting}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 w-full sm:w-auto font-bold text-lg py-3"
-              >
-                {isDeleting ? "Eliminando..." : "⚠️ Eliminar Definitivamente"}
-              </AlertDialogAction>
+              {(!employeeDeleteImpact || (employeeDeleteImpact.daysCount === 0 && employeeDeleteImpact.shiftsCount === 0)) ? (
+                <Button
+                  variant="destructive"
+                  onClick={() => handleEmployeeDelete("keepHours")}
+                  disabled={isDeleting}
+                  className="w-full sm:w-auto font-bold py-3"
+                >
+                  {isDeleting ? "Eliminando..." : "Eliminar definitivamente"}
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleEmployeeDelete("keepHours")}
+                    disabled={isDeleting}
+                    className="w-full sm:w-auto font-bold py-3 bg-destructive/80 hover:bg-destructive/90"
+                  >
+                    {isDeleting ? "Eliminando..." : "Eliminar y mantener horas"}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleEmployeeDelete("clearHours")}
+                    disabled={isDeleting}
+                    className="w-full sm:w-auto font-bold py-3"
+                  >
+                    {isDeleting ? "Eliminando..." : "Limpiar horarios y eliminar"}
+                  </Button>
+                </>
+              )}
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
