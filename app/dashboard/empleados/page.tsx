@@ -389,7 +389,11 @@ export default function EmpleadosPage() {
       }
       
       if (db) {
-        await deleteDoc(doc(db, COLLECTIONS.EMPLOYEES, employeeToDelete.id))
+        await updateDoc(doc(db, COLLECTIONS.EMPLOYEES, employeeToDelete.id), {
+          isDeleted: true,
+          deletedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
       }
       
       await refreshEmployees()
@@ -401,7 +405,7 @@ export default function EmpleadosPage() {
         title: "Empleado eliminado",
         description: lastCompletedWeekStart 
           ? `El empleado se ha eliminado de todas las semanas futuras a la última semana completada (${lastCompletedWeekStart})`
-          : "El empleado se ha eliminado de todos los horarios",
+          : "El empleado se desactivó y se eliminó de todos los horarios futuros",
       })
     } catch (error: any) {
       toast({

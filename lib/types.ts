@@ -231,6 +231,7 @@ export interface Horario {
     version: 1
     capturedAt?: any
     employees: Array<Pick<Empleado, "id" | "name">>
+    employeeNameById?: Record<string, string>
     shifts: Array<Pick<Turno, "id" | "name" | "color" | "startTime" | "endTime" | "startTime2" | "endTime2" | "colorPrimeraFranja" | "colorSegundaFranja">>
     separadores: Separador[]
     ordenEmpleados: string[]
