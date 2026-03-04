@@ -44,6 +44,11 @@ export function getHistoricalEmployeeIds(schedule: Horario | null | undefined): 
     Object.keys(dayAssignments).forEach((employeeId) => ids.add(employeeId))
   })
 
+  Object.values(source.dayStatus || {}).forEach((dayStatuses) => {
+    if (!dayStatuses || typeof dayStatuses !== "object") return
+    Object.keys(dayStatuses).forEach((employeeId) => ids.add(employeeId))
+  })
+
   if (schedule.weekSnapshot?.employees?.length) {
     schedule.weekSnapshot.employees.forEach((employee) => ids.add(employee.id))
   }

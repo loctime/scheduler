@@ -108,10 +108,11 @@ export function MonthlyScheduleView({
             <AccordionContent>
               <div className="space-y-2 sm:space-y-3 mt-2">
                 {month.weeks.map((week) => {
+                  const scheduleData = getScheduleDataForStats(week.schedule)
                   const weekEmps: Empleado[] = employees.length > 0
                     ? employees
-                    : Object.keys(week.schedule?.assignments || {}).flatMap((date) =>
-                        Object.keys(week.schedule?.assignments?.[date] || {})
+                    : Object.keys(scheduleData.assignments || {}).flatMap((date) =>
+                        Object.keys(scheduleData.assignments?.[date] || {})
                       ).filter((employeeId, index, array) => array.indexOf(employeeId) === index)
                       .map((employeeId) => ({ id: employeeId, name: `Empleado ${employeeId.slice(0, 8)}` } as Empleado))
                   const weekStats: Record<string, EmployeeMonthlyStats> = {}
@@ -131,11 +132,11 @@ export function MonthlyScheduleView({
                     }
                   })
 
-                  if (week.schedule?.assignments && config) {
+                  if (config) {
                     const workingConfig = toWorkingHoursConfig(config)
                     week.weekDays.forEach((day) => {
                       const dateStr = format(day, "yyyy-MM-dd")
-                      const dateAssignments = getScheduleDataForStats(week.schedule).assignments[dateStr]
+                      const dateAssignments = scheduleData.assignments[dateStr]
                       if (!dateAssignments) return
 
                       Object.entries(dateAssignments).forEach(([employeeId, assignmentValue]) => {
