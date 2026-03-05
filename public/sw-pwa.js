@@ -89,17 +89,23 @@ async function staleWhileRevalidate(request) {
   return cached || fetchPromise
 }
 
+// Dominios externos que el SW no debe interceptar (CSP u otros pueden bloquearlos)
+const IGNORED_ORIGINS = ["https://vercel.live"]
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return
 
   const url = new URL(event.request.url)
+  if (IGNORED_ORIGINS.some((origin) => url.origin === origin)) {
+    return
+  }
 
   // Navegación: network first con fallback a cache
   if (event.request.mode === "navigate" && url.pathname.includes("/pwa/")) {
     event.respondWith(
       fetch(event.request)
         .catch(() => caches.match("/pwa"))
-        .catch(() => new Response("Offline", { status: 503 }))
+        .then((res) => res || new Response("Offline", { status: 503 }))
     )
     return
   }
@@ -140,12 +146,11 @@ self.addEventListener("fetch", (event) => {
     return
   }
 
-  // Por defecto: network first
+  // Por defecto: network first; nunca devolver undefined (evita "Failed to convert value to 'Response'")
   event.respondWith(
-    fetch(event.request).catch(() => {
-      // Fallback a cache si está disponible
-      return caches.match(event.request)
-    })
+    fetch(event.request)
+      .catch(() => caches.match(event.request))
+      .then((res) => res || new Response("", { status: 503, statusText: "Service Unavailable" }))
   )
 })
 

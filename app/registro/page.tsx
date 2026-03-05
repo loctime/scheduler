@@ -273,6 +273,9 @@ function RegistroContent() {
   }
 
   if (!token || !tokenValid) {
+    const loginHref = redirectTo
+      ? `/?redirect=${encodeURIComponent(redirectTo)}`
+      : "/"
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-4">
         <Card className="w-full max-w-md">
@@ -282,6 +285,11 @@ function RegistroContent() {
               Este link de invitación no es válido o ya fue usado.
             </CardDescription>
           </CardHeader>
+          <CardContent>
+            <Button asChild className="w-full">
+              <a href={loginHref}>Ir a inicio de sesión</a>
+            </Button>
+          </CardContent>
         </Card>
       </div>
     )

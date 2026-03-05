@@ -5,6 +5,7 @@ import { User, LogOut, LogIn, RefreshCw } from "lucide-react"
 import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 import { useData } from "@/contexts/data-context"
+import { getPwaLastSlug } from "@/components/pwa/pwa-company-selector"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,14 +20,22 @@ import { cn } from "@/lib/utils"
 const LOGIN_PATH = "/"
 const DEFAULT_PWA_PATH = "/pwa"
 
-function getCurrentPath(): string {
+/** Ruta PWA a la que volver tras login: /pwa o /pwa/[slug]/home, recordando el slug. */
+function getRedirectPathAfterLogin(): string {
   if (typeof window === "undefined") return DEFAULT_PWA_PATH
-  return window.location.pathname || DEFAULT_PWA_PATH
+  const pathname = window.location.pathname || ""
+  if (pathname.startsWith("/pwa/") && pathname !== "/pwa" && pathname !== "/pwa/") {
+    const slug = getPwaLastSlug()
+    if (slug) return `/pwa/${slug}/home`
+    const match = pathname.match(/^\/pwa\/([^/]+)/)
+    if (match) return `/pwa/${match[1]}/home`
+  }
+  return DEFAULT_PWA_PATH
 }
 
-function buildLoginUrl(targetPath: string, changeAccount = false): string {
-  const safePath = targetPath.startsWith("/") ? targetPath : DEFAULT_PWA_PATH
-  const base = `${LOGIN_PATH}?redirect=${encodeURIComponent(safePath)}`
+function buildLoginUrl(changeAccount = false): string {
+  const redirectPath = getRedirectPathAfterLogin()
+  const base = `${LOGIN_PATH}?redirect=${encodeURIComponent(redirectPath)}`
   return changeAccount ? `${base}&change=1` : base
 }
 
@@ -44,17 +53,17 @@ export function UserStatusMenu() {
   const handleLogout = async () => {
     if (!auth) return
     await signOut(auth)
-    router.push(buildLoginUrl(getCurrentPath()))
+    router.push(buildLoginUrl(false))
   }
 
   const handleChangeAccount = async () => {
     if (!auth) return
     await signOut(auth)
-    router.push(buildLoginUrl(getCurrentPath(), true))
+    router.push(buildLoginUrl(true))
   }
 
   const handleLogin = () => {
-    router.push(buildLoginUrl(getCurrentPath()))
+    router.push(buildLoginUrl(false))
   }
 
   return (
