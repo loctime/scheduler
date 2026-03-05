@@ -195,6 +195,27 @@ export async function getCompanySlugFromOwnerId(ownerId: string | null): Promise
   }
 }
 
+/**
+ * Lista todos los slugs activos de un owner.
+ */
+export async function listCompanySlugsFromOwnerId(ownerId: string | null): Promise<string[]> {
+  if (!db || !ownerId) return []
+
+  try {
+    const publicCompaniesRef = collection(db!, PUBLIC_COMPANIES_COLLECTION)
+    const q = query(publicCompaniesRef, where("ownerId", "==", ownerId), where("active", "==", true))
+    const querySnapshot = await getDocs(q)
+
+    if (querySnapshot.empty) return []
+
+    return querySnapshot.docs
+      .map((docSnap) => docSnap.id)
+      .sort((a, b) => a.localeCompare(b))
+  } catch (error) {
+    console.error("[listCompanySlugsFromOwnerId] Error:", error)
+    return []
+  }
+}
 async function findCurrentSlugForOwner(ownerId: string): Promise<string | null> {
   return getCompanySlugFromOwnerId(ownerId)
 }
@@ -253,3 +274,5 @@ export async function changePublicCompanySlug(
     console.log(`✅ [changePublicCompanySlug] Slug cambiado: ${currentSlug} → ${normalizedSlug}`)
   })
 }
+
+

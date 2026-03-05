@@ -50,10 +50,19 @@ export function getPwaLastSlug(): string | null {
   }
 }
 
-export function PwaCompanySelector() {
+interface PwaCompanySelectorProps {
+  suggestedSlugs?: string[]
+}
+
+export function PwaCompanySelector({ suggestedSlugs = [] }: PwaCompanySelectorProps) {
   const router = useRouter()
   const [slug, setSlug] = useState("")
   const [error, setError] = useState<string | null>(null)
+
+  const goToSlug = (slugValue: string) => {
+    savePwaLastSlug(slugValue)
+    router.push(`/pwa/${slugValue}/home`)
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -67,8 +76,7 @@ export function PwaCompanySelector() {
       setError("Formato invalido. Usa letras minusculas, numeros y guiones (3-40 caracteres)")
       return
     }
-    savePwaLastSlug(normalized)
-    router.push(`/pwa/${normalized}/home`)
+    goToSlug(normalized)
   }
 
   return (
@@ -84,6 +92,19 @@ export function PwaCompanySelector() {
           </p>
         </CardHeader>
         <CardContent>
+          {suggestedSlugs.length > 0 && (
+            <div className="mb-4 space-y-2">
+              <p className="text-sm font-medium">Empresas disponibles</p>
+              <div className="grid gap-2">
+                {suggestedSlugs.map((item) => (
+                  <Button key={item} type="button" variant="outline" onClick={() => goToSlug(item)}>
+                    {item}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label htmlFor="slug">Identificador de empresa</Label>

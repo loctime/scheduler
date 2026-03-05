@@ -16,8 +16,19 @@ import {
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
-const LOGIN_PATH = "/registro"
-const PWA_PATH = "/pwa"
+const LOGIN_PATH = "/"
+const DEFAULT_PWA_PATH = "/pwa"
+
+function getCurrentPath(): string {
+  if (typeof window === "undefined") return DEFAULT_PWA_PATH
+  return window.location.pathname || DEFAULT_PWA_PATH
+}
+
+function buildLoginUrl(targetPath: string, changeAccount = false): string {
+  const safePath = targetPath.startsWith("/") ? targetPath : DEFAULT_PWA_PATH
+  const base = `${LOGIN_PATH}?redirect=${encodeURIComponent(safePath)}`
+  return changeAccount ? `${base}&change=1` : base
+}
 
 export function UserStatusMenu() {
   const { user } = useData()
@@ -33,17 +44,17 @@ export function UserStatusMenu() {
   const handleLogout = async () => {
     if (!auth) return
     await signOut(auth)
-    router.push(`${LOGIN_PATH}?redirect=${encodeURIComponent(PWA_PATH)}`)
+    router.push(buildLoginUrl(getCurrentPath()))
   }
 
   const handleChangeAccount = async () => {
     if (!auth) return
     await signOut(auth)
-    router.push(`${LOGIN_PATH}?redirect=${encodeURIComponent(PWA_PATH)}&change=1`)
+    router.push(buildLoginUrl(getCurrentPath(), true))
   }
 
   const handleLogin = () => {
-    router.push(`${LOGIN_PATH}?redirect=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : PWA_PATH)}`)
+    router.push(buildLoginUrl(getCurrentPath()))
   }
 
   return (
@@ -53,7 +64,7 @@ export function UserStatusMenu() {
           variant="ghost"
           size="icon"
           className="relative h-9 w-9 rounded-full"
-          aria-label={isAuthenticated ? "Menú de usuario" : "Iniciar sesión"}
+          aria-label={isAuthenticated ? "Menu de usuario" : "Iniciar sesion"}
         >
           <User
             className={cn(
@@ -89,18 +100,18 @@ export function UserStatusMenu() {
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleLogout} variant="destructive">
               <LogOut className="mr-2 h-4 w-4" />
-              Cerrar sesión
+              Cerrar sesion
             </DropdownMenuItem>
           </>
         ) : (
           <>
             <DropdownMenuLabel className="text-muted-foreground font-normal">
-              No has iniciado sesión
+              No has iniciado sesion
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogin}>
               <LogIn className="mr-2 h-4 w-4" />
-              Iniciar sesión
+              Iniciar sesion
             </DropdownMenuItem>
           </>
         )}

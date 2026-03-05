@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useMemo, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { onAuthStateChanged } from "firebase/auth"
 import { auth, isFirebaseConfigured } from "@/lib/firebase"
 import { LoginForm } from "@/components/login-form"
@@ -12,10 +12,22 @@ import { Button } from "@/components/ui/button"
 import { Download, X, Share2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 
+function sanitizeRedirectPath(path: string | null): string | null {
+  if (!path) return null
+  if (!path.startsWith("/")) return null
+  if (path.startsWith("//")) return null
+  return path
+}
+
 export default function HomePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const { canInstall, isStandalone, isIOS, install, dismiss } = usePwaInstall()
+
+  const redirectTarget = useMemo(() => {
+    return sanitizeRedirectPath(searchParams.get("redirect"))
+  }, [searchParams])
 
   useEffect(() => {
     if (!isFirebaseConfigured() || !auth) {
@@ -24,14 +36,14 @@ export default function HomePage() {
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        router.push("/dashboard")
+        router.replace(redirectTarget || "/dashboard")
       } else {
         setLoading(false)
       }
     })
 
     return () => unsubscribe()
-  }, [router])
+  }, [router, redirectTarget])
 
   if (!isFirebaseConfigured()) {
     return <FirebaseConfigNotice />
@@ -49,8 +61,7 @@ export default function HomePage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md space-y-4">
         <LoginForm />
-        
-        {/* Botón de instalación para Android */}
+
         {canInstall && !isIOS && (
           <Card className="border-primary/20 bg-primary/5">
             <CardContent className="p-4">
@@ -58,7 +69,7 @@ export default function HomePage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium">Instalar como app</p>
                   <p className="text-xs text-muted-foreground">
-                    Accedé rápido desde tu pantalla de inicio
+                    Accede rapido desde tu pantalla de inicio
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -84,7 +95,6 @@ export default function HomePage() {
           </Card>
         )}
 
-        {/* Mensaje instructivo para iOS */}
         {isIOS && !isStandalone && (
           <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
             <CardContent className="p-4">
@@ -95,7 +105,7 @@ export default function HomePage() {
                     Para instalar esta app
                   </p>
                   <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                    Tocá el botón <span className="font-medium">Compartir</span> y elegí <span className="font-medium">"Agregar a pantalla de inicio"</span>
+                    Toca el boton <span className="font-medium">Compartir</span> y elige <span className="font-medium">Agregar a pantalla de inicio</span>
                   </p>
                 </div>
                 <Button

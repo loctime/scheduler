@@ -6,41 +6,67 @@ import { Loader2 } from "lucide-react"
 import { getPwaLastSlug, savePwaLastSlug } from "@/components/pwa/pwa-company-selector"
 import { PwaCompanySelector } from "@/components/pwa/pwa-company-selector"
 import { useCompanySlug } from "@/hooks/use-company-slug"
+import { useData } from "@/contexts/data-context"
+import { getOwnerIdForActor } from "@/hooks/use-owner-id"
+import { listCompanySlugsFromOwnerId } from "@/lib/public-companies"
 
 /**
  * Pagina de entrada PWA (/pwa).
  * - Si hay slug guardado -> redirect a /pwa/{slug}/home
- * - Si no, intenta resolver slug del usuario autenticado
- * - Si no hay slug -> pantalla de seleccion de empresa
+ * - Si hay solo un slug para la cuenta -> redirect automatico
+ * - Si hay varios slugs -> selector con lista
+ * - Si no hay datos -> ingreso manual de slug
  */
 export default function PwaEntryPage() {
   const router = useRouter()
+  const { user, userData } = useData()
   const [checking, setChecking] = useState(true)
-  const [resolved, setResolved] = useState(false)
+  const [suggestedSlugs, setSuggestedSlugs] = useState<string[]>([])
   const { companySlug, isLoading: slugLoading } = useCompanySlug()
 
   useEffect(() => {
-    if (resolved) return
+    let cancelled = false
 
-    const lastSlug = getPwaLastSlug()
-    if (lastSlug) {
-      router.replace(`/pwa/${lastSlug}/home`)
-      setResolved(true)
-      return
-    }
-
-    if (!slugLoading) {
-      if (companySlug) {
-        savePwaLastSlug(companySlug)
-        router.replace(`/pwa/${companySlug}/home`)
-        setResolved(true)
+    const resolveEntry = async () => {
+      const lastSlug = getPwaLastSlug()
+      if (lastSlug) {
+        router.replace(`/pwa/${lastSlug}/home`)
         return
       }
 
+      if (slugLoading) return
+
+      if (companySlug) {
+        savePwaLastSlug(companySlug)
+        router.replace(`/pwa/${companySlug}/home`)
+        return
+      }
+
+      const ownerId = getOwnerIdForActor(user, userData) || user?.uid || null
+      if (!ownerId) {
+        if (!cancelled) setChecking(false)
+        return
+      }
+
+      const slugs = await listCompanySlugsFromOwnerId(ownerId)
+      if (cancelled) return
+
+      if (slugs.length === 1) {
+        savePwaLastSlug(slugs[0])
+        router.replace(`/pwa/${slugs[0]}/home`)
+        return
+      }
+
+      setSuggestedSlugs(slugs)
       setChecking(false)
-      setResolved(true)
     }
-  }, [router, slugLoading, companySlug, resolved])
+
+    resolveEntry()
+
+    return () => {
+      cancelled = true
+    }
+  }, [router, slugLoading, companySlug, user, userData])
 
   if (checking) {
     return (
@@ -50,5 +76,5 @@ export default function PwaEntryPage() {
     )
   }
 
-  return <PwaCompanySelector />
+  return <PwaCompanySelector suggestedSlugs={suggestedSlugs} />
 }
