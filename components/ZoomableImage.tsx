@@ -11,14 +11,16 @@ export interface ZoomableImageProps {
   onError?: (e: React.SyntheticEvent<HTMLImageElement, Event>) => void
   className?: string
   style?: React.CSSProperties
+  /** Escala inicial (ej. 1.35 = zoom de entrada en PWA para poder pan/pinch sin click previo). */
+  initialScale?: number
 }
 
 /**
  * Imagen con zoom/pan/pinch: doble tap, pinch, rueda, Ctrl+scroll.
  * Fondo negro cuando está ampliada y bloqueo de scroll del body.
  */
-export function ZoomableImage({ src, alt, onError, className, style }: ZoomableImageProps) {
-  const [isZoomed, setIsZoomed] = useState(false)
+export function ZoomableImage({ src, alt, onError, className, style, initialScale = 1 }: ZoomableImageProps) {
+  const [isZoomed, setIsZoomed] = useState(initialScale > 1.01)
 
   const handleTransformed = useCallback((_ref: unknown, state: { scale?: number }) => {
     const scale = state?.scale ?? 1
@@ -43,8 +45,8 @@ export function ZoomableImage({ src, alt, onError, className, style }: ZoomableI
       data-zoomed={isZoomed}
     >
       <TransformWrapper
-        initialScale={1}
-        minScale={1}
+        initialScale={initialScale}
+        minScale={0.5}
         maxScale={8}
         limitToBounds={false}
         centerOnInit
@@ -52,6 +54,7 @@ export function ZoomableImage({ src, alt, onError, className, style }: ZoomableI
         doubleClick={{ mode: "toggle", step: 0.7 }}
         wheel={{ step: 0.15, activationKeys: ["Control"] }}
         panning={{ velocityDisabled: true }}
+        pinch={{ step: 5 }}
       >
         <TransformComponent
           wrapperStyle={{

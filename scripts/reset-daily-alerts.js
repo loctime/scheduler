@@ -13,7 +13,7 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-const TARGET_DATES = ["2026-03-01"];
+const TARGET_DATES = ["2026-03-04"];
 
 async function resetAlerts() {
   console.log("🔍 Reseteando alertas por fecha...");

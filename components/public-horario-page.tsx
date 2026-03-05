@@ -635,6 +635,7 @@ function PublicHorarioPageComponent({ companySlug, ImageWrapper, headerClassName
                   src={imageSrc}
                   alt={imageAlt}
                   onError={handleImageError}
+                  initialScale={mode === "pwa" ? 1.35 : undefined}
                 />
               ) : (
                 <img
