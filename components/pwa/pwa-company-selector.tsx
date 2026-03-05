@@ -10,6 +10,7 @@ import { Building2 } from "lucide-react"
 import { isValidSlugFormat, normalizeCompanySlug } from "@/lib/public-companies"
 
 const PWA_LAST_SLUG_KEY = "pwa-last-slug"
+const PWA_LAST_SLUG_COOKIE = "pwa-last-slug"
 
 export function savePwaLastSlug(slug: string) {
   if (typeof window === "undefined") return
@@ -18,12 +19,32 @@ export function savePwaLastSlug(slug: string) {
   } catch {
     // ignore
   }
+  try {
+    document.cookie = `${PWA_LAST_SLUG_COOKIE}=${encodeURIComponent(slug)}; Path=/; Max-Age=31536000; SameSite=Lax`
+  } catch {
+    // ignore
+  }
 }
 
 export function getPwaLastSlug(): string | null {
   if (typeof window === "undefined") return null
   try {
-    return localStorage.getItem(PWA_LAST_SLUG_KEY)
+    const fromStorage = localStorage.getItem(PWA_LAST_SLUG_KEY)
+    if (fromStorage) return fromStorage
+  } catch {
+    // ignore
+  }
+
+  try {
+    const match = document.cookie
+      .split(";")
+      .map((part) => part.trim())
+      .find((part) => part.startsWith(`${PWA_LAST_SLUG_COOKIE}=`))
+
+    if (!match) return null
+
+    const value = match.slice(`${PWA_LAST_SLUG_COOKIE}=`.length)
+    return decodeURIComponent(value)
   } catch {
     return null
   }
@@ -43,7 +64,7 @@ export function PwaCompanySelector() {
       return
     }
     if (!isValidSlugFormat(normalized)) {
-      setError("Formato inválido. Usa letras minúsculas, números y guiones (3-40 caracteres)")
+      setError("Formato invalido. Usa letras minusculas, numeros y guiones (3-40 caracteres)")
       return
     }
     savePwaLastSlug(normalized)
