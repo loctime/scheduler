@@ -24,20 +24,14 @@ export default function HomePage() {
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        // Si está corriendo como PWA, redirigir al chat
-        if (isStandalone) {
-          router.push("/chat")
-        } else {
-          // Si es web normal, redirigir al dashboard
-          router.push("/dashboard")
-        }
+        router.push("/dashboard")
       } else {
         setLoading(false)
       }
     })
 
     return () => unsubscribe()
-  }, [router, isStandalone])
+  }, [router])
 
   if (!isFirebaseConfigured()) {
     return <FirebaseConfigNotice />

@@ -29,64 +29,6 @@ export interface Group {
   updatedAt?: any
 }
 
-export type TipoAccion = 
-  | "entrada" 
-  | "salida" 
-  | "actualizar_stock" 
-  | "crear_producto" 
-  | "editar_producto" 
-  | "eliminar_producto" 
-  | "consulta_stock" 
-  | "listar_productos"
-  | "listar_pedidos"
-  | "ver_pedido"
-  | "importar_productos"
-  | "inicializar_stock"
-  | "stock_bajo"
-  | "generar_pedido"
-  | "ayuda"
-  | "consulta_general"
-  | "conversacion"
-  | "cambiar_modo"
-  | "seleccionar_pedido"
-  | "ver_lista_acumulada"
-  | "deshacer_ultimo"
-  | "quitar_de_lista"
-  | "cambiar_cantidad"
-  | "agregar_multiples"
-  | "ver_ultimo_cambio_stock"
-  | "deshacer_ultimo_stock"
-  | "toggle_batch_stock"
-  | "ver_lista_cambios_stock"
-  | "actualizar_stock_multiples"
-
-export interface StockAccionParsed {
-  accion: TipoAccion
-  productoId?: string
-  producto?: string
-  cantidad?: number
-  unidad?: string
-  confianza?: number
-  mensaje?: string
-  comandoSugerido?: StockAccionParsed
-  stockMinimo?: number
-  pedidoId?: string
-  requiereConfirmacion?: boolean
-}
-
-export interface ChatMessage {
-  id: string
-  timestamp: Date
-  tipo: "usuario" | "sistema" | "error" | "confirmacion"
-  contenido: string
-  accion?: StockAccionParsed
-  requiereConfirmacion?: boolean
-  accionesRapidas?: Array<{
-    texto: string
-    accion: () => void
-  }>
-}
-
 export interface StockMovimiento {
   id: string
   productoId: string

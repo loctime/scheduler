@@ -5,8 +5,7 @@ import { useRouter, usePathname } from "next/navigation"
 import { onAuthStateChanged } from "firebase/auth"
 import { auth, isFirebaseConfigured } from "@/lib/firebase"
 import { DataProvider, useData } from "@/contexts/data-context"
-import { StockChatProvider } from "@/contexts/stock-chat-context"
-import { StockChatFloating } from "@/components/stock/stock-chat-floating"
+import { StockProvider } from "@/contexts/stock-context"
 import { Loader2 } from "lucide-react"
 
 // Mapeo de rutas a IDs de páginas
@@ -82,7 +81,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isPublicPage = isPublicMensualPage(pathname)
   
   if (isPublicPage) {
-    // Para páginas públicas, renderizar sin DataProvider ni StockChatProvider
+    // Para páginas públicas, renderizar sin DataProvider ni StockProvider
     return <>{children}</>
   }
 
@@ -92,12 +91,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <DataProvider user={user}>
-      <StockChatProvider user={user}>
+      <StockProvider user={user}>
         <ProtectedRoute user={user} pathname={pathname} router={router}>
           {children}
         </ProtectedRoute>
-        <StockChatFloating />
-      </StockChatProvider>
+      </StockProvider>
     </DataProvider>
   )
 }

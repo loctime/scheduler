@@ -11,7 +11,7 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
-import { useStockChatContext } from "@/contexts/stock-chat-context"
+import { useStock } from "@/contexts/stock-context"
 import { usePedidos } from "@/hooks/use-pedidos"
 import { useEnlacePublico } from "@/hooks/use-enlace-publico"
 import { useRemitos } from "@/hooks/use-remitos"
@@ -68,7 +68,7 @@ export default function PedidosPage() {
   const ownerId = useMemo(() => getOwnerIdForActor(user, userData), [user, userData])
   
   // Obtener stockActual del contexto global del chat
-  const { stockActual: stockActualGlobal } = useStockChatContext()
+  const { stockActual: stockActualGlobal } = useStock()
 
   const {
     pedidos,

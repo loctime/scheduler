@@ -25,7 +25,6 @@ import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Fa
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { useStockChatContext } from "@/contexts/stock-chat-context"
 import { useData } from "@/contexts/data-context"
 
 interface DashboardLayoutProps {
@@ -52,17 +51,6 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { userData } = useData()
-  
-  // Obtener estado del chat para ajustar el padding del contenido
-  let chatIsOpen = false
-  let setChatIsOpen: ((open: boolean) => void) | undefined = undefined
-  try {
-    const chatContext = useStockChatContext()
-    chatIsOpen = chatContext.chatIsOpen
-    setChatIsOpen = chatContext.setChatIsOpen
-  } catch {
-    // Si no hay contexto (página fuera del dashboard), no hacer nada
-  }
 
   const handleSignOut = async () => {
     if (!auth) return
@@ -223,15 +211,6 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative h-8 w-8 sm:h-10 sm:w-10"
-              onClick={() => setChatIsOpen?.(true)}
-              title="Abrir chat"
-            >
-              <MessageSquare className="h-4 w-4" />
-            </Button>
           </div>
 
           <DropdownMenu>
@@ -268,10 +247,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
       </header>
 
       {/* Main Content */}
-      <main className={cn(
-        "flex-1 p-3 sm:p-4 md:p-6 transition-all duration-300",
-        chatIsOpen && "lg:pr-[25%]" // padding-right cuando chat está abierto (25% del ancho) solo en desktop
-      )}>
+      <main className="flex-1 p-3 sm:p-4 md:p-6 transition-all duration-300">
         {children}
       </main>
     </div>
