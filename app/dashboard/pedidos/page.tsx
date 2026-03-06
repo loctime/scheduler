@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Plus, Package } from "lucide-react"
@@ -35,6 +36,7 @@ import {
   DEFAULT_FORMAT
 } from "@/components/pedidos/pedido-dialogs"
 import { FacturaImportDialog } from "@/components/pedidos/FacturaImportDialog"
+import { useFeatureFlags } from "@/hooks/use-feature-flags"
 
 export default function PedidosPage() {
   useEffect(() => {
@@ -45,8 +47,10 @@ export default function PedidosPage() {
   }, [])
 
   const { user, userData } = useData()
+  const router = useRouter()
   const { toast } = useToast()
   const ownerId = useMemo(() => getOwnerIdForActor(user, userData), [user, userData])
+  const flags = useFeatureFlags(ownerId, user?.uid)
   const { stockActual: stockActualGlobal } = useStock()
 
   const {
@@ -249,6 +253,15 @@ export default function PedidosPage() {
   }
 
   const handleGenerarEnlacePublicoDesdeControl = async () => {
+    if (flags.legacy.publicLinkReadOnly) {
+      toast({
+        title: "Enlaces publicos en modo solo lectura",
+        description: "No se pueden crear enlaces nuevos desde el flujo legacy.",
+        variant: "destructive"
+      })
+      return
+    }
+
     if (!selectedPedido || !resultadoEngine) {
       toast({
         title: "Error",
@@ -276,10 +289,15 @@ export default function PedidosPage() {
       toast({ title: "Error", description: "No se pudo generar el pedido", variant: "destructive" })
       return
     }
+
     const url = `${typeof window !== "undefined" ? window.location.origin : ""}/pedido-publico/${enlaceActivo.id}`
     const textoCompleto = `${resultadoEngine.texto}\n\n\n${url}`
     navigator.clipboard.writeText(textoCompleto)
     toast({ title: "Pedido y enlace copiados", description: "El pedido y el enlace se han copiado al portapapeles" })
+  }
+
+  const handleAbrirLogisticaV2 = () => {
+    router.push("/dashboard/documentos-logistica")
   }
 
   const handleOpenCreate = () => {
@@ -485,6 +503,8 @@ export default function PedidosPage() {
                     setActiveTab={setActiveTab}
                     selectedPedido={selectedPedido}
                     remitosCount={remitosList.length}
+                    showV2Shortcut={flags.logisticsV2.enabled}
+                    onOpenV2={handleAbrirLogisticaV2}
                   />
 
                   {products.length > 0 && (
@@ -497,7 +517,11 @@ export default function PedidosPage() {
                       loadingEnlace={loadingEnlace}
                       onCopyPedido={handleCopyPedido}
                       onLlevarPedidoASheet={handleLlevarPedidoASheet}
-                      onGenerarEnlace={handleGenerarEnlace}
+                      onGenerarEnlace={flags.legacy.publicLinkReadOnly ? () => toast({
+                        title: "Enlaces publicos en modo solo lectura",
+                        description: "No se pueden crear enlaces nuevos desde el flujo legacy.",
+                        variant: "destructive"
+                      }) : handleGenerarEnlace}
                       onVerPedido={handleVerPedido}
                       hasSheetUrl={!!selectedPedido?.sheetUrl}
                     />
@@ -599,3 +623,4 @@ export default function PedidosPage() {
     </DashboardLayout>
   )
 }
+

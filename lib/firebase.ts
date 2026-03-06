@@ -77,9 +77,18 @@ export const COLLECTIONS = {
   REMITOS: getCollectionPath("remitos"),
   RECEPCIONES: getCollectionPath("recepciones"),
   ENLACES_PUBLICOS: getCollectionPath("enlaces_publicos"),
+  PEDIDOS_INTERNOS_V2: getCollectionPath("pedidos_internos"),
+  REMITOS_SALIDA_V2: getCollectionPath("remitos_salida"),
+  RECEPCIONES_REMITO_V2: getCollectionPath("recepciones_remito"),
+  DEVOLUCIONES_REMITO_V2: getCollectionPath("devoluciones_remito"),
+  STOCK_MOVEMENTS_V2: getCollectionPath("stock_movements_v2"),
+  DOCUMENT_FILES_V2: getCollectionPath("document_files"),
+  AUDIT_LOGS_V2: getCollectionPath("audit_logs"),
+  COUNTERS_V2: getCollectionPath("counters"),
   INVITACIONES: getCollectionPath("invitaciones"),
   GROUPS: getCollectionPath("groups"),
   CONVERSACIONES: getCollectionPath("conversaciones"),
   MENSAJES: getCollectionPath("mensajes"),
   EMPLOYEE_FIXED_RULES: getCollectionPath("employee_fixed_rules"),
 } as const
+

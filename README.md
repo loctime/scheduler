@@ -1186,3 +1186,17 @@ Para problemas con Vercel:
 Para problemas con Ollama:
 - [Documentación Ollama](https://ollama.ai/docs)
 - El chat funciona sin Ollama, es completamente opcional
+
+## Logistica V2 (Implementacion incremental)
+
+La base de Logistica V2 se activo con convivencia temporal legacy/V2.
+
+Feature flags disponibles:
+- `NEXT_PUBLIC_LOGISTICS_V2_ENABLED`
+- `NEXT_PUBLIC_LOGISTICS_V2_REMITOS`
+- `NEXT_PUBLIC_LOGISTICS_V2_RECEPCIONES`
+- `NEXT_PUBLIC_LOGISTICS_V2_DEVOLUCIONES`
+- `NEXT_PUBLIC_LEGACY_PUBLIC_LINK_READ_ONLY`
+
+URL backend:
+- `NEXT_PUBLIC_CONTROLFILE_API_URL`

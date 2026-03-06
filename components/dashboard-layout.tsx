@@ -21,7 +21,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Factory, Shield, UserCog, MessageSquare, AlertTriangle, Package, CheckSquare } from "lucide-react"
+import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Factory, Shield, UserCog, MessageSquare, AlertTriangle, Package, CheckSquare, FileText } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -38,6 +38,10 @@ const navItems = [
   { href: "/dashboard/empleados", label: "Empleados", icon: Users },
   { href: "/dashboard/tareas", label: "Tareas", icon: CheckSquare },
   { href: "/dashboard/pedidos", label: "Pedidos", icon: ShoppingCart },
+  { href: "/dashboard/remitos/nuevo", label: "Remitos V2", icon: Package, permission: "pedidos" },
+  { href: "/dashboard/recepciones/nueva", label: "Recepciones V2", icon: Package, permission: "pedidos" },
+  { href: "/dashboard/devoluciones/nueva", label: "Devoluciones V2", icon: Package, permission: "pedidos" },
+  { href: "/dashboard/documentos-logistica", label: "Docs Logistica", icon: FileText, permission: "pedidos" },
   { href: "/dashboard/stock-console", label: "Stock Rápido", icon: Package, permission: "pedidos" },
   { href: "/mensajeria", label: "Mensajería", icon: MessageSquare },
   { href: "/dashboard/dias-especiales", label: "Días Especiales", icon: AlertTriangle, role: "admin" },
@@ -64,6 +68,11 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     "/dashboard/horarios-mensuales": "horarios",
     "/dashboard/tareas": "tareas",
     "/dashboard/pedidos": "pedidos",
+    "/dashboard/remitos/nuevo": "pedidos",
+    "/dashboard/remitos/[id]": "pedidos",
+    "/dashboard/recepciones/nueva": "pedidos",
+    "/dashboard/devoluciones/nueva": "pedidos",
+    "/dashboard/documentos-logistica": "pedidos",
     "/dashboard/stock-console": "pedidos",
     "/dashboard/fabrica": "fabrica",
     "/dashboard/fabrica/historial": "fabrica",
@@ -253,3 +262,4 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     </div>
   )
 }
+

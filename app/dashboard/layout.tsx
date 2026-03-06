@@ -15,6 +15,11 @@ const ROUTE_TO_PAGE_ID: Record<string, string> = {
   "/dashboard/horarios-mensuales": "horarios", // Vista mensual también mapea a "horarios"
   "/dashboard/tareas": "tareas",
   "/dashboard/pedidos": "pedidos",
+  "/dashboard/remitos/nuevo": "pedidos",
+  "/dashboard/remitos/[id]": "pedidos",
+  "/dashboard/recepciones/nueva": "pedidos",
+  "/dashboard/devoluciones/nueva": "pedidos",
+  "/dashboard/documentos-logistica": "pedidos",
   "/dashboard/stock-console": "pedidos",
   "/dashboard/fabrica": "fabrica",
   "/dashboard/fabrica/historial": "fabrica",
@@ -36,6 +41,11 @@ const isPublicMensualPage = (path: string) => path.match(/^\/dashboard\/horarios
 const FACTORY_PAGES = ["/dashboard/fabrica", "/dashboard/fabrica/historial"]
 const MANAGER_PAGES = ["/dashboard/gerente"]
 const ADMIN_PAGES = ["/dashboard/admin"]
+function resolvePageId(pathname: string): string | undefined {
+  if (ROUTE_TO_PAGE_ID[pathname]) return ROUTE_TO_PAGE_ID[pathname]
+  if (pathname.startsWith("/dashboard/remitos/")) return "pedidos"
+  return undefined
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -117,7 +127,7 @@ function ProtectedRoute({
 
   useEffect(() => {
     if (userData) {
-      const pageId = ROUTE_TO_PAGE_ID[pathname]
+      const pageId = resolvePageId(pathname)
       
       // Verificar permisos basados en páginas accesibles si el usuario tiene permisos definidos
       if (userData.permisos?.paginas && Array.isArray(userData.permisos.paginas) && userData.permisos.paginas.length > 0) {
@@ -207,3 +217,5 @@ function ProtectedRoute({
 
   return <>{children}</>
 }
+
+

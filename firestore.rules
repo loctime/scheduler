@@ -10,6 +10,50 @@ service cloud.firestore {
     function uid() { return request.auth.uid; }
     
     // Roles desde documento - CONTROL-STORE
+    /* ===============================
+       LOGISTICA V2 (READ CLIENT / WRITE BACKEND)
+       =============================== */
+    
+    match /apps/horarios/pedidos_internos/{docId} {
+      allow read: if isAuth() && resource.data.ownerId != null && horariosCanActFor(resource.data.ownerId);
+      allow write: if false;
+    }
+    
+    match /apps/horarios/remitos_salida/{docId} {
+      allow read: if isAuth() && resource.data.ownerId != null && horariosCanActFor(resource.data.ownerId);
+      allow write: if false;
+    }
+    
+    match /apps/horarios/recepciones_remito/{docId} {
+      allow read: if isAuth() && resource.data.ownerId != null && horariosCanActFor(resource.data.ownerId);
+      allow write: if false;
+    }
+    
+    match /apps/horarios/devoluciones_remito/{docId} {
+      allow read: if isAuth() && resource.data.ownerId != null && horariosCanActFor(resource.data.ownerId);
+      allow write: if false;
+    }
+    
+    match /apps/horarios/stock_movements_v2/{docId} {
+      allow read: if isAuth() && resource.data.ownerId != null && horariosCanActFor(resource.data.ownerId);
+      allow write: if false;
+    }
+    
+    match /apps/horarios/document_files/{docId} {
+      allow read: if isAuth() && resource.data.ownerId != null && horariosCanActFor(resource.data.ownerId);
+      allow write: if false;
+    }
+    
+    match /apps/horarios/audit_logs/{docId} {
+      allow read: if isAuth() && resource.data.ownerId != null && horariosCanActFor(resource.data.ownerId);
+      allow write: if false;
+    }
+    
+    match /apps/horarios/counters/{docId} {
+      allow read: if isAuth() && resource.data.ownerId != null && horariosCanActFor(resource.data.ownerId);
+      allow write: if false;
+    }
+    
     function controlStoreUserDocExists() {
       return isAuth() && exists(/databases/$(db)/documents/apps/control-store/users/$(uid()));
     }
@@ -449,3 +493,5 @@ service cloud.firestore {
     }
   }
 }
+
+
