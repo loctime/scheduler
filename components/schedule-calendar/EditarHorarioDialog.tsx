@@ -346,12 +346,12 @@ export function EditarHorarioDialog({
                         className="h-6 px-1.5 text-[10px]"
                         onClick={() => {
                           if (editStartTime) {
-                            setEditStartTime(adjustTime(editStartTime, 15))
+                            setEditStartTime(adjustTime(editStartTime, 30))
                           }
                         }}
-                        title="Sumar 15 min"
+                        title="Sumar 30 min"
                       >
-                        +15
+                        +30
                       </Button>
                     </div>
                   </div>

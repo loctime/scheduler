@@ -249,9 +249,14 @@ export function SeparatorRow({
                     <AlertTriangle className="h-3.5 w-3.5" />
                   </span>
                 )}
-                <span className="text-xs font-semibold text-muted-foreground capitalize">
-                  {format(day, "EEEE", { locale: es })}
-                </span>
+                <div className="flex flex-col items-center leading-tight">
+                  <span className="text-xs font-semibold text-muted-foreground capitalize">
+                    {format(day, "EEEE", { locale: es })}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {format(day, "dd/MM")}
+                  </span>
+                </div>
               </td>
             )
           })}
