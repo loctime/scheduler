@@ -121,7 +121,7 @@ function NumericInput({
         onFocus?.()
         setTimeout(() => (e.target as HTMLInputElement).select(), 0)
       }}
-      className={cn("h-8 w-16 text-center text-base font-medium text-black px-1", className)}
+      className={cn("h-9 w-16 text-center text-lg font-medium text-black px-1", className)}
     />
   )
 }
@@ -163,7 +163,7 @@ function CellNombre({
             if (e.key === "Enter") onSave()
             if (e.key === "Escape") onCancel()
           }}
-          className="h-8 text-base text-black flex-1 min-w-0"
+          className="h-9 text-lg text-black flex-1 min-w-0"
         />
         <Button variant="ghost" size="icon" onClick={onSave} className="h-7 w-7 shrink-0 text-green-600">
           <Check className="h-4 w-4" />
@@ -185,7 +185,7 @@ function CellNombre({
           e.stopPropagation()
           onStartEdit()
         }}
-        className="text-left text-base font-medium text-black truncate flex-1 min-w-0 hover:bg-muted/50 active:bg-muted rounded px-1 -mx-1 touch-manipulation cursor-pointer"
+        className="text-left text-lg font-medium text-black truncate flex-1 min-w-0 hover:bg-muted/50 active:bg-muted rounded px-1 -mx-1 touch-manipulation cursor-pointer"
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >
         {product.nombre}
@@ -219,12 +219,12 @@ function CellTipo({
   const isPack = (product.modoCompra ?? "unidad") === "pack"
   return (
     <div className="flex items-center gap-2 shrink-0">
-      <span className="text-[10px] text-black whitespace-nowrap">Unidad</span>
+      <span className="text-xs text-black whitespace-nowrap">Unidad</span>
       <Switch
         checked={isPack}
         onCheckedChange={(checked) => onChange(checked ? "pack" : "unidad")}
       />
-      <span className="text-[10px] text-black whitespace-nowrap">Pack</span>
+      <span className="text-xs text-black whitespace-nowrap">Pack</span>
     </div>
   )
 }
@@ -301,16 +301,16 @@ function CellStockMinimo({
       <Button
         variant="outline"
         size="icon"
-        className="h-7 w-7 rounded-full shrink-0"
+        className="h-8 w-8 rounded-full shrink-0"
         onClick={() => handleChange(Math.max(0, displayValue - 1))}
         disabled={displayValue <= 0}
       >
-        <Minus className="h-3 w-3" />
+        <Minus className="h-3.5 w-3.5" />
       </Button>
       <NumericInput
         value={displayValue}
         onChange={(n) => handleChange(Math.max(0, n))}
-        className="h-7 w-14 text-sm"
+        className="h-8 w-14 text-sm"
         dataRow={rowIndex}
         dataCol="stockMinimo"
         onKeyDown={onKeyDown}
@@ -318,10 +318,10 @@ function CellStockMinimo({
       <Button
         variant="outline"
         size="icon"
-        className="h-7 w-7 rounded-full shrink-0"
+        className="h-8 w-8 rounded-full shrink-0"
         onClick={() => handleChange(displayValue + 1)}
       >
-        <Plus className="h-3 w-3" />
+        <Plus className="h-3.5 w-3.5" />
       </Button>
     </div>
   )
@@ -344,7 +344,7 @@ function CellStockActual({
       <Button
         variant="outline"
         size="icon"
-        className="h-8 w-8 rounded-full shrink-0"
+        className="h-9 w-9 rounded-full shrink-0"
         onClick={() => onChange(Math.max(0, v - 1))}
         disabled={v <= 0}
       >
@@ -353,12 +353,12 @@ function CellStockActual({
       <NumericInput
         value={v}
         onChange={onChange}
-        className="h-8 w-14 text-base"
+        className="h-9 w-16 text-lg"
         dataRow={rowIndex}
         dataCol="stockActual"
         onKeyDown={onKeyDown}
       />
-      <Button variant="outline" size="icon" className="h-8 w-8 rounded-full shrink-0" onClick={() => onChange(v + 1)}>
+      <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => onChange(v + 1)}>
         <Plus className="h-4 w-4" />
       </Button>
     </div>
@@ -471,7 +471,7 @@ const ProductoRow = React.memo(function ProductoRow({
     <div
       key={product.id}
       className={cn(
-        "grid grid-cols-[40px_32px_120px_140px_1fr_80px_80px] gap-2 items-center rounded-lg border bg-card px-3 py-3 shadow-sm hover:shadow-md transition-all duration-200 ease-out motion-safe:transition-transform",
+        "grid grid-cols-[40px_32px_120px_140px_1fr_80px_80px] gap-2 items-center rounded-lg border bg-card px-3 py-4 shadow-sm hover:shadow-md transition-all duration-200 ease-out motion-safe:transition-transform",
         isCritical && "border-red-600 border-2 bg-red-50 shadow-md",
         sortMode === "severity" && isCritical && "ring-1 ring-red-200/80",
         isDragging && "opacity-50"
@@ -1158,7 +1158,7 @@ export function ProductosTable({
       </div>
 
       {/* Encabezados de columna */}
-      <div className="grid grid-cols-[40px_32px_120px_140px_1fr_80px_80px] gap-2 px-3 py-3 border-b border-border bg-muted/30 text-sm font-medium text-black">
+      <div className="grid grid-cols-[40px_32px_120px_140px_1fr_80px_80px] gap-2 px-3 py-4 border-b border-border bg-muted/30 text-base font-semibold text-black">
         <div className="flex items-center justify-center pr-2 border-r border-border">
           {/* Espacio para drag handle */}
         </div>
