@@ -7,6 +7,7 @@ import { useStockConsole } from "@/hooks/use-stock-console"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { PwaNumericInput } from "@/components/pwa/pwa-numeric-input"
 import { Check, X, Package, ArrowLeft, Minus, Plus, MessageCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -25,6 +26,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+
+const STOCK_CONSOLE_COLUMNS = ["mode-unidad", "value", "mode-pack"] as const
+
+type SortMode = "manual" | "severity"
+type StockConsoleColumn = (typeof STOCK_CONSOLE_COLUMNS)[number]
 
 /** Abrevia el nombre para vista móvil si supera 15 caracteres; si no, lo deja igual. */
 function abbreviateProductName(nombre: string): string {
@@ -66,7 +72,23 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
   // Hook siempre llamado antes de cualquier return (regla de hooks de React)
   const stockConsole = useStockConsole(user)
-  const { state, pedidos, productos, stockActual, movimientosPendientes, totalIngresos, totalEgresos, setSelectedPedidoId, incrementarCantidad, decrementarCantidad, setCantidad, limpiarCantidades, confirmarMovimientos, setStockReal } = stockConsole
+  const {
+    state,
+    pedidos,
+    productos,
+    stockActual,
+    movimientosPendientes,
+    totalIngresos,
+    totalEgresos,
+    setSelectedPedidoId,
+    incrementarCantidad,
+    decrementarCantidad,
+    setCantidad,
+    limpiarCantidades,
+    confirmarMovimientos,
+    setStockReal,
+    updateProductsOrder,
+  } = stockConsole
 
   // Generación automática del texto del pedido (basado en stock mínimo, ignora cantidades manuales)
   const textoPedidoAutomatico = useMemo(() => {
@@ -117,6 +139,9 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
   }, [state.selectedPedidoId, pedidos, productos, stockActual])
 
   const [mode, setMode] = useState<"work" | "control">("work")
+  const [sortMode, setSortMode] = useState<SortMode>("manual")
+  const [productsToRender, setProductsToRender] = useState(productos)
+  const isReorderingRef = useRef(false)
 
   // Estado local temporal para stock en modo control (optimización de performance)
   const [localStockControl, setLocalStockControl] = useState<Record<string, number>>({})
@@ -203,37 +228,65 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
     }))
   }, [])
 
-  // Función para ordenar productos por criticidad
+  useEffect(() => {
+    if (isReorderingRef.current) {
+      return
+    }
+    setProductsToRender(productos)
+  }, [productos])
+
+  const persistManualOrder = useCallback(async (nextOrder: typeof productos, previousOrder: typeof productos) => {
+    isReorderingRef.current = true
+    setProductsToRender(nextOrder)
+
+    const ok = await updateProductsOrder(nextOrder.map((producto) => producto.id))
+    if (!ok) {
+      setProductsToRender(previousOrder)
+    }
+
+    isReorderingRef.current = false
+  }, [updateProductsOrder])
+
+  const moveProductByKeyboard = useCallback(async (productId: string, direction: -1 | 1) => {
+    const currentIndex = productsToRender.findIndex((producto) => producto.id === productId)
+    const nextIndex = currentIndex + direction
+
+    if (currentIndex === -1 || nextIndex < 0 || nextIndex >= productsToRender.length) {
+      return
+    }
+
+    const previousOrder = productsToRender
+    const nextOrder = [...productsToRender]
+    const [movedProduct] = nextOrder.splice(currentIndex, 1)
+    nextOrder.splice(nextIndex, 0, movedProduct)
+
+    await persistManualOrder(nextOrder, previousOrder)
+  }, [persistManualOrder, productsToRender])
+
   const productosOrdenados = useMemo(() => {
-    if (!productos || productos.length === 0) {
-      return productos || []
+    if (sortMode === "manual") {
+      return productsToRender
     }
-    
-    // Verificar si hay productos críticos
-    const hasCritical = productos.some(product => {
-      const stock = stockActual[product.id] ?? 0
-      return product.stockMinimo > stock
-    })
-    
-    if (!hasCritical) {
-      return productos
-    }
-    
-    // Crear una copia del array y ordenar por criticidad: mayor criticidad primero
-    return [...productos].sort((a, b) => {
-      const stockA = stockActual[a.id] ?? 0
-      const stockB = stockActual[b.id] ?? 0
 
-      const criticidadA = a.stockMinimo - stockA
-      const criticidadB = b.stockMinimo - stockB
+    const manualIndexes = new Map(productsToRender.map((producto, index) => [producto.id, index]))
 
-      // Ordenar descendente: mayor criticidad primero
-      if (criticidadB === criticidadA) {
-        return 0
+    return [...productsToRender].sort((a, b) => {
+      const stockA = mode === "control"
+        ? (localStockControl[a.id] ?? stockActual[a.id] ?? 0)
+        : (stockActual[a.id] ?? 0)
+      const stockB = mode === "control"
+        ? (localStockControl[b.id] ?? stockActual[b.id] ?? 0)
+        : (stockActual[b.id] ?? 0)
+      const severityA = a.stockMinimo - stockA
+      const severityB = b.stockMinimo - stockB
+
+      if (severityB !== severityA) {
+        return severityB - severityA
       }
-      return criticidadB - criticidadA
+
+      return (manualIndexes.get(a.id) ?? 0) - (manualIndexes.get(b.id) ?? 0)
     })
-  }, [productos, stockActual])
+  }, [localStockControl, mode, productsToRender, sortMode, stockActual])
 
   // Estado para trackear productos que cambiaron de criticidad
   const [productosRecientes, setProductosRecientes] = useState<Set<string>>(new Set())
@@ -405,6 +458,81 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
     })
   }, [productos])
 
+  const findFocusableCell = useCallback((rowIndex: number, colIndex: number, direction: -1 | 1 = 1) => {
+    for (let index = colIndex; index >= 0 && index < STOCK_CONSOLE_COLUMNS.length; index += direction) {
+      const col = STOCK_CONSOLE_COLUMNS[index]
+      const target = document.querySelector<HTMLElement>(`[data-row="${rowIndex}"][data-col="${col}"]`)
+      if (target) {
+        return target
+      }
+    }
+
+    return null
+  }, [])
+
+  const focusCell = useCallback((rowIndex: number, col: StockConsoleColumn) => {
+    const startIndex = STOCK_CONSOLE_COLUMNS.indexOf(col)
+    const target = findFocusableCell(rowIndex, startIndex, 1) ?? findFocusableCell(rowIndex, startIndex, -1)
+    if (target) {
+      target.focus()
+      if (target instanceof HTMLInputElement) {
+        target.select()
+      }
+    }
+  }, [findFocusableCell])
+
+  const handleArrowNavigation = useCallback((
+    e: React.KeyboardEvent<HTMLElement>,
+    rowIndex: number,
+    col: StockConsoleColumn,
+    productId: string
+  ) => {
+    if (e.shiftKey && e.key === "ArrowUp") {
+      e.preventDefault()
+      void moveProductByKeyboard(productId, -1)
+      return
+    }
+
+    if (e.shiftKey && e.key === "ArrowDown") {
+      e.preventDefault()
+      void moveProductByKeyboard(productId, 1)
+      return
+    }
+
+    const currentColIndex = STOCK_CONSOLE_COLUMNS.indexOf(col)
+    let nextRow = rowIndex
+    let nextColIndex = currentColIndex
+
+    switch (e.key) {
+      case "ArrowUp":
+        nextRow = rowIndex - 1
+        break
+      case "ArrowDown":
+        nextRow = rowIndex + 1
+        break
+      case "ArrowLeft":
+        nextColIndex = currentColIndex - 1
+        break
+      case "ArrowRight":
+        nextColIndex = currentColIndex + 1
+        break
+      default:
+        return
+    }
+
+    if (nextRow < 0 || nextRow >= productosOrdenados.length) {
+      return
+    }
+
+    const nextCol = STOCK_CONSOLE_COLUMNS[nextColIndex]
+    if (!nextCol) {
+      return
+    }
+
+    e.preventDefault()
+    focusCell(nextRow, nextCol)
+  }, [focusCell, moveProductByKeyboard, productosOrdenados.length])
+
   // Si no tiene permisos, mostrar mensaje de acceso denegado (después de todos los hooks)
   if (!tienePermisoPedidos) {
     return (
@@ -446,6 +574,29 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
           ) : null}
           <h1 className="text-lg sm:text-xl font-bold flex-1">{isPWA ? "Stock" : "Stock Rápido"}</h1>
           <div className="flex items-center gap-2 shrink-0">
+            <ToggleGroup
+              type="single"
+              value={sortMode}
+              onValueChange={(value) => {
+                if (value === "manual" || value === "severity") {
+                  setSortMode(value)
+                }
+              }}
+              variant="outline"
+              size="sm"
+              className={cn(
+                "hidden md:flex bg-white/70",
+                isPWA && "bg-white border-red-200"
+              )}
+              aria-label="Modo de ordenamiento"
+            >
+              <ToggleGroupItem value="manual" className="text-xs px-2">
+                Orden manual
+              </ToggleGroupItem>
+              <ToggleGroupItem value="severity" className="text-xs px-2">
+                Prioridad de compra
+              </ToggleGroupItem>
+            </ToggleGroup>
             {/* Botones en header para PWA */}
             {isPWA && state.selectedPedidoId && textoPedidoAutomatico && (
               <>
@@ -514,6 +665,28 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
         {/* Selector de Pedido (compacto) — siempre visible con sticky */}
         <div className="fixed top-12 sm:top-14 left-0 right-0 z-30 bg-white border-b-2 border-gray-300 shadow-md">
+          <div className="border-b border-gray-200 px-2 py-1.5 md:hidden">
+            <ToggleGroup
+              type="single"
+              value={sortMode}
+              onValueChange={(value) => {
+                if (value === "manual" || value === "severity") {
+                  setSortMode(value)
+                }
+              }}
+              variant="outline"
+              size="sm"
+              className="grid w-full grid-cols-2"
+              aria-label="Modo de ordenamiento"
+            >
+              <ToggleGroupItem value="manual" className="text-xs">
+                Orden manual
+              </ToggleGroupItem>
+              <ToggleGroupItem value="severity" className="text-xs">
+                Prioridad de compra
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
           <div className="overflow-x-auto overflow-y-hidden max-h-[3.5rem] sm:max-h-[4rem]">
             <div className="flex flex-wrap gap-1.5 sm:gap-2 w-max min-w-full max-h-[3.5rem] sm:max-h-[4rem] px-2 sm:px-2.5 py-1.5 sm:py-2">
               
@@ -536,8 +709,8 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
         {/* Lista de Productos — cards compactas, número protagonista */}
         {state.selectedPedidoId && productos.length > 0 && (
-          <div className="pt-20 sm:pt-24 p-3 space-y-2">
-            {productosOrdenados.map((producto) => {
+          <div className="pt-28 md:pt-20 lg:pt-24 p-3 space-y-2">
+            {productosOrdenados.map((producto, rowIndex) => {
               const cantidad = state.cantidades[producto.id] || 0
               // En modo control, usar localStockControl si existe, sino stockActual (para UI inmediata)
               const stockRaw = mode === "control" 
@@ -552,6 +725,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
               const isPackProduct = esModoPack(producto)
               const delta = vm === "pack" ? getCantidadPorPack(producto) : 1
               const unidadLabel = producto.unidadBase || producto.unidad || "U"
+              const severity = stockMinimo - stock
 
               // Modo work: input = cantidad a pedir. Modo control: input = stock real.
               const isControl = mode === "control"
@@ -576,10 +750,11 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                 <div
                   key={producto.id}
                   className={cn(
-                    "relative rounded-2xl border-2 shadow-sm active:shadow-md transition-all duration-500 ease-out flex overflow-hidden",
+                    "relative rounded-2xl border-2 shadow-sm active:shadow-md transition-all duration-200 ease-out flex overflow-hidden",
                     isStockBajo 
                       ? "border-orange-500 bg-orange-50/50" 
                       : "border-gray-200/80 bg-white",
+                    sortMode === "severity" && isStockBajo && "bg-amber-500/10 border-amber-400",
                     // Animación sutil cuando deja de ser crítico
                     !isStockBajo && productosRecientes.has(producto.id) && "animate-pulse bg-green-50/30 border-green-300"
                   )}
@@ -608,6 +783,12 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
                   {/* Izquierda: info del producto en 3 filas */}
                   <div className="relative z-10 flex-1 min-w-0 flex flex-col justify-center p-3 gap-1">
+                    {sortMode === "severity" && isStockBajo && (
+                      <div className="mb-1 flex items-center gap-1 text-[11px] font-semibold text-amber-700">
+                        <span aria-hidden="true">🔺</span>
+                        <span>prioridad {severity}</span>
+                      </div>
+                    )}
                     {/* Fila 1: solo nombre (abreviado en móvil), puede continuar abajo sin truncar */}
                     <p className="text-base font-semibold text-gray-900 min-w-0 break-words">
                       <span className="lg:hidden">{abbreviateProductName(producto.nombre)}</span>
@@ -627,6 +808,9 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                           <button
                             type="button"
                             onClick={() => setVisualModeFor(producto.id, "unidad")}
+                            data-row={rowIndex}
+                            data-col="mode-unidad"
+                            onKeyDown={(e) => handleArrowNavigation(e, rowIndex, "mode-unidad", producto.id)}
                             className={cn(
                               "px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors",
                               vm === "unidad" ? "bg-gray-300 text-gray-900" : "text-gray-600 hover:bg-gray-100"
@@ -638,6 +822,9 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                           <button
                             type="button"
                             onClick={() => setVisualModeFor(producto.id, "pack")}
+                            data-row={rowIndex}
+                            data-col="mode-pack"
+                            onKeyDown={(e) => handleArrowNavigation(e, rowIndex, "mode-pack", producto.id)}
                             className={cn(
                               "px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors",
                               vm === "pack" ? "bg-gray-300 text-gray-900" : "text-gray-600 hover:bg-gray-100"
@@ -682,6 +869,9 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                           id={`input-${producto.id}`}
                           step={1}
                           value={displayValue}
+                          data-row={rowIndex}
+                          data-col="value"
+                          onKeyDown={(e) => handleArrowNavigation(e, rowIndex, "value", producto.id)}
                           onChange={(e) => {
                             e.stopPropagation()
                             const raw = parseInt(e.target.value, 10)
@@ -719,6 +909,9 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                           id={`input-${producto.id}`}
                           step={1}
                           value={displayValue}
+                          data-row={rowIndex}
+                          data-col="value"
+                          onKeyDown={(e) => handleArrowNavigation(e, rowIndex, "value", producto.id)}
                           onChange={(e) => {
                             e.stopPropagation()
                             const raw = parseInt(e.target.value, 10)
@@ -751,7 +944,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
         {/* Estado vacío */}
         {(!state.selectedPedidoId || productos.length === 0) && (
-          <div className="pt-20 sm:pt-24 p-8 text-center">
+          <div className="pt-28 md:pt-20 lg:pt-24 p-8 text-center">
             <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
               {state.selectedPedidoId ? "No hay productos" : "Selecciona un pedido"}

@@ -10,9 +10,10 @@ import {
   onSnapshot,
   doc,
   updateDoc,
+  writeBatch,
   serverTimestamp,
 } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
 import { confirmarMovimientos } from "@/src/services/stock/movimientosService"
@@ -414,6 +415,36 @@ export function useStockConsole(user: any) {
     setState(prev => ({ ...prev, cantidades: {} }))
   }, [])
 
+  const updateProductsOrder = useCallback(async (newOrder: string[]): Promise<boolean> => {
+    if (!db || !ownerId || !user?.uid) return false
+
+    try {
+      const dbInstance = db
+      const batch = writeBatch(dbInstance)
+
+      newOrder.forEach((productId, index) => {
+        batch.update(doc(dbInstance, COLLECTIONS.PRODUCTS, productId), {
+          orden: index,
+          ownerId,
+          userId: user.uid,
+          updatedAt: serverTimestamp(),
+        })
+      })
+
+      await batch.commit()
+      return true
+    } catch (error: any) {
+      console.error("Error al actualizar orden en stock console:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el orden",
+        variant: "destructive",
+      })
+      await loadProductos()
+      return false
+    }
+  }, [db, loadProductos, ownerId, toast, user])
+
   /** Actualiza el stock real del producto en Firestore (modo control físico). */
   const setStockReal = useCallback(async (productoId: string, value: number): Promise<boolean> => {
     if (!db || !user?.uid || !ownerId || value < 0) return false
@@ -612,5 +643,6 @@ export function useStockConsole(user: any) {
     limpiarCantidades,
     confirmarMovimientos,
     setStockReal,
+    updateProductsOrder,
   }
 }
