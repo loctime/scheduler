@@ -121,7 +121,7 @@ function NumericInput({
         onFocus?.()
         setTimeout(() => (e.target as HTMLInputElement).select(), 0)
       }}
-      className={cn("h-7 w-14 text-center text-sm font-medium px-1", className)}
+      className={cn("h-8 w-14 text-center text-base font-medium px-1", className)}
     />
   )
 }
@@ -163,13 +163,13 @@ function CellNombre({
             if (e.key === "Enter") onSave()
             if (e.key === "Escape") onCancel()
           }}
-          className="h-7 text-sm flex-1 min-w-0"
+          className="h-8 text-base flex-1 min-w-0"
         />
-        <Button variant="ghost" size="icon" onClick={onSave} className="h-6 w-6 shrink-0 text-green-600">
-          <Check className="h-3 w-3" />
+        <Button variant="ghost" size="icon" onClick={onSave} className="h-7 w-7 shrink-0 text-green-600">
+          <Check className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" onClick={onCancel} className="h-6 w-6 shrink-0">
-          <X className="h-3 w-3" />
+        <Button variant="ghost" size="icon" onClick={onCancel} className="h-7 w-7 shrink-0">
+          <X className="h-4 w-4" />
         </Button>
       </div>
     )
@@ -185,7 +185,7 @@ function CellNombre({
           e.stopPropagation()
           onStartEdit()
         }}
-        className="text-left text-sm font-medium truncate flex-1 min-w-0 hover:bg-muted/50 active:bg-muted rounded px-1 -mx-1 touch-manipulation cursor-pointer"
+        className="text-left text-base font-medium truncate flex-1 min-w-0 hover:bg-muted/50 active:bg-muted rounded px-1 -mx-1 touch-manipulation cursor-pointer"
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >
         {product.nombre}
@@ -199,11 +199,11 @@ function CellNombre({
           e.stopPropagation()
           onStartEdit()
         }}
-        className="h-7 w-7 sm:h-6 sm:w-6 shrink-0 text-muted-foreground hover:text-foreground active:bg-muted touch-manipulation cursor-pointer"
+        className="h-8 w-8 sm:h-7 sm:w-7 shrink-0 text-muted-foreground hover:text-foreground active:bg-muted touch-manipulation cursor-pointer"
         style={{ WebkitTapHighlightColor: 'transparent' }}
         title="Editar nombre"
       >
-        <Pencil className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
+        <Pencil className="h-4 w-4 sm:h-3 sm:w-3" />
       </Button>
     </div>
   )
@@ -301,16 +301,16 @@ function CellStockMinimo({
       <Button
         variant="outline"
         size="icon"
-        className="h-6 w-6 rounded-full shrink-0"
+        className="h-7 w-7 rounded-full shrink-0"
         onClick={() => handleChange(Math.max(0, displayValue - 1))}
         disabled={displayValue <= 0}
       >
-        <Minus className="h-2.5 w-2.5" />
+        <Minus className="h-3 w-3" />
       </Button>
       <NumericInput
         value={displayValue}
         onChange={(n) => handleChange(Math.max(0, n))}
-        className="h-6 w-10 text-xs"
+        className="h-7 w-12 text-sm"
         dataRow={rowIndex}
         dataCol="stockMinimo"
         onKeyDown={onKeyDown}
@@ -318,10 +318,10 @@ function CellStockMinimo({
       <Button
         variant="outline"
         size="icon"
-        className="h-6 w-6 rounded-full shrink-0"
+        className="h-7 w-7 rounded-full shrink-0"
         onClick={() => handleChange(displayValue + 1)}
       >
-        <Plus className="h-2.5 w-2.5" />
+        <Plus className="h-3 w-3" />
       </Button>
     </div>
   )
@@ -344,22 +344,22 @@ function CellStockActual({
       <Button
         variant="outline"
         size="icon"
-        className={btnIcon}
+        className="h-8 w-8 rounded-full shrink-0"
         onClick={() => onChange(Math.max(0, v - 1))}
         disabled={v <= 0}
       >
-        <Minus className="h-3.5 w-3.5" />
+        <Minus className="h-4 w-4" />
       </Button>
       <NumericInput
         value={v}
         onChange={onChange}
-        className="h-7 w-14 text-sm"
+        className="h-8 w-14 text-base"
         dataRow={rowIndex}
         dataCol="stockActual"
         onKeyDown={onKeyDown}
       />
-      <Button variant="outline" size="icon" className={btnIcon} onClick={() => onChange(v + 1)}>
-        <Plus className="h-3.5 w-3.5" />
+      <Button variant="outline" size="icon" className="h-8 w-8 rounded-full shrink-0" onClick={() => onChange(v + 1)}>
+        <Plus className="h-4 w-4" />
       </Button>
     </div>
   )
@@ -471,28 +471,50 @@ const ProductoRow = React.memo(function ProductoRow({
     <div
       key={product.id}
       className={cn(
-        "rounded-lg border bg-card px-3 py-2 flex flex-col sm:flex-row sm:items-center gap-2 shadow-sm hover:shadow-md transition-all duration-200 ease-out motion-safe:transition-transform",
+        "grid grid-cols-[auto_auto_auto_auto_1fr_auto_auto] gap-2 items-center rounded-lg border bg-card px-3 py-3 shadow-sm hover:shadow-md transition-all duration-200 ease-out motion-safe:transition-transform",
         isCritical && "border-red-600 border-2 bg-red-50 shadow-md",
         sortMode === "severity" && isCritical && "ring-1 ring-red-200/80",
         isDragging && "opacity-50"
       )}
     >
-      {dragHandleProps && (
-        <div
-          {...dragHandleProps}
-          className="shrink-0 flex items-center cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground lg:flex hidden"
-        >
-          <GripVertical className="h-4 w-4" />
-        </div>
-      )}
+      <div className="flex items-center justify-center w-8 pr-2 border-r border-border">
+        {dragHandleProps && (
+          <div
+            {...dragHandleProps}
+            className="flex items-center cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground lg:flex hidden"
+          >
+            <GripVertical className="h-4 w-4" />
+          </div>
+        )}
+      </div>
       
-      {isCritical && (
-        <div className="shrink-0 flex items-center">
+      <div className="flex items-center justify-center w-6 pr-2 border-r border-border">
+        {isCritical && (
           <AlertTriangle className="h-4 w-4 text-red-600" />
-        </div>
-      )}
+        )}
+      </div>
 
-      <div className="flex-1 min-w-0 flex items-center gap-2">
+      <div className="flex items-center gap-1 pr-2 border-r border-border">
+        <CellStockMinimo
+          product={product}
+          localValueUnits={stockMinimoLocal}
+          onLocalChangeUnits={(v) => setStockMinimoLocal(product.id, v)}
+          onUpdateUnits={(v) => onUpdateProduct(product.id, "stockMinimo", String(v))}
+          rowIndex={rowIndex}
+          onKeyDown={(e) => onCellKeyDown(e, rowIndex, "stockMinimo", product.id)}
+        />
+      </div>
+
+      <div className="flex items-center gap-1 pr-2 border-r border-border">
+        <CellStockActual
+          value={stockActualValue}
+          onChange={(v) => onLocalStockChange(product.id, v)}
+          rowIndex={rowIndex}
+          onKeyDown={(e) => onCellKeyDown(e, rowIndex, "stockActual", product.id)}
+        />
+      </div>
+
+      <div className="flex items-center gap-2 min-w-0 pr-2 border-r border-border">
         {sortMode === "severity" && severity > 0 && (
           <div className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
             <span aria-hidden="true">🔺</span> {severity}
@@ -513,49 +535,22 @@ const ProductoRow = React.memo(function ProductoRow({
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-        <div className="flex items-center gap-2 shrink-0">
-          <CellTipo product={product} onChange={handleTipoChange} />
-        </div>
+      <div className="flex items-center justify-center pr-2 border-r border-border">
+        <CellTipo product={product} onChange={handleTipoChange} />
+      </div>
 
-        <div className="flex items-center gap-1 shrink-0">
-          <span className="text-[10px] text-muted-foreground">U/pack</span>
-          <CellUnidadesPorPack
-            product={product}
-            value={unidadesPorPackValue}
-            onChange={(v) => setUnidadesPorPackEdit(product.id, v)}
-            onBlur={(num) => {
-              if (num >= 2 && num !== (product.cantidadPorPack ?? 6)) {
-                onUpdateProduct(product.id, "cantidadPorPack", String(num))
-              }
-            }}
-            inputRef={unidadesPorPackInputRef}
-          />
-        </div>
-
-        <div className="flex items-center gap-1 shrink-0">
-          <span className="text-[10px] text-muted-foreground">Mín</span>
-          <CellStockMinimo
-            product={product}
-            localValueUnits={stockMinimoLocal}
-            onLocalChangeUnits={(v) => setStockMinimoLocal(product.id, v)}
-            onUpdateUnits={(v) => onUpdateProduct(product.id, "stockMinimo", String(v))}
-            rowIndex={rowIndex}
-            onKeyDown={(e) => onCellKeyDown(e, rowIndex, "stockMinimo", product.id)}
-          />
-        </div>
-
-        <div className="flex items-center gap-1 shrink-0">
-          <span className="text-[10px] text-muted-foreground">Stock</span>
-          <CellStockActual
-            value={stockActualValue}
-            onChange={(v) => onLocalStockChange(product.id, v)}
-            rowIndex={rowIndex}
-            onKeyDown={(e) => onCellKeyDown(e, rowIndex, "stockActual", product.id)}
-          />
-        </div>
-
-        <CellDelete onDelete={() => onDeleteProduct(product.id)} />
+      <div className="flex items-center justify-center">
+        <CellUnidadesPorPack
+          product={product}
+          value={unidadesPorPackValue}
+          onChange={(v) => setUnidadesPorPackEdit(product.id, v)}
+          onBlur={(num) => {
+            if (num >= 2 && num !== (product.cantidadPorPack ?? 6)) {
+              onUpdateProduct(product.id, "cantidadPorPack", String(num))
+            }
+          }}
+          inputRef={unidadesPorPackInputRef}
+        />
       </div>
     </div>
   )
@@ -1162,7 +1157,22 @@ export function ProductosTable({
         </div>
       </div>
 
-      <div className="space-y-1 p-2">
+      {/* Encabezados de columna */}
+      <div className="grid grid-cols-[auto_auto_auto_auto_1fr_auto_auto] gap-2 px-3 py-3 border-b border-border bg-muted/30 text-sm font-medium text-muted-foreground">
+        <div className="flex items-center justify-center w-8 pr-2 border-r border-border">
+          {/* Espacio para drag handle */}
+        </div>
+        <div className="flex items-center justify-center w-6 pr-2 border-r border-border">
+          {/* Espacio para warning */}
+        </div>
+        <div className="flex items-center pr-2 border-r border-border">Mín</div>
+        <div className="flex items-center pr-2 border-r border-border">Stock</div>
+        <div className="flex items-center pr-2 border-r border-border">Producto</div>
+        <div className="flex items-center justify-center pr-2 border-r border-border">Tipo</div>
+        <div className="flex items-center justify-center">U/pack</div>
+      </div>
+
+      <div className="p-2 space-y-1">
         {!isDesktop && (
           <div className="pb-1">
             <ToggleGroup
