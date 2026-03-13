@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Trash2, Upload, Package, Minus, Plus, PlusCircle, X, Check, AlertTriangle, Pencil, GripVertical } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { cn } from "@/lib/utils"
 import { Producto } from "@/lib/types"
 import {
@@ -27,6 +28,10 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 
 const btnIcon = "h-7 w-7 rounded-full transition-transform active:scale-95 shrink-0"
+const NAVIGATION_COLUMNS = ["stockMinimo", "stockActual"] as const
+
+type SortMode = "manual" | "severity"
+type NavigationColumn = (typeof NAVIGATION_COLUMNS)[number]
 
 /** Hook para detectar si estamos en desktop (lg+) */
 function useIsDesktop() {
@@ -85,21 +90,33 @@ function NumericInput({
   min = 0,
   className,
   onFocus,
+  inputRef,
+  onKeyDown,
+  dataRow,
+  dataCol,
 }: {
   value: number | undefined
   onChange: (v: number) => void
   min?: number
   className?: string
   onFocus?: () => void
+  inputRef?: React.Ref<HTMLInputElement>
+  onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>
+  dataRow?: number
+  dataCol?: NavigationColumn
 }) {
   const num = value !== undefined ? value : 0
   return (
     <Input
+      ref={inputRef}
       type="number"
       inputMode="numeric"
       min={min}
       value={num}
+      data-row={dataRow}
+      data-col={dataCol}
       onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)}
+      onKeyDown={onKeyDown}
       onFocus={(e) => {
         onFocus?.()
         setTimeout(() => (e.target as HTMLInputElement).select(), 0)
@@ -256,11 +273,15 @@ function CellStockMinimo({
   localValueUnits,
   onLocalChangeUnits,
   onUpdateUnits,
+  rowIndex,
+  onKeyDown,
 }: {
   product: Producto
   localValueUnits: number
   onLocalChangeUnits: (units: number) => void
   onUpdateUnits: (units: number) => void
+  rowIndex: number
+  onKeyDown: React.KeyboardEventHandler<HTMLInputElement>
 }) {
   const unidadesPorPack = getUnidadesPorPack(product)
   const isPackProduct = isPack(product)
@@ -290,6 +311,9 @@ function CellStockMinimo({
         value={displayValue}
         onChange={(n) => handleChange(Math.max(0, n))}
         className="h-6 w-10 text-xs"
+        dataRow={rowIndex}
+        dataCol="stockMinimo"
+        onKeyDown={onKeyDown}
       />
       <Button
         variant="outline"
@@ -306,9 +330,13 @@ function CellStockMinimo({
 function CellStockActual({
   value,
   onChange,
+  rowIndex,
+  onKeyDown,
 }: {
   value: number
   onChange: (v: number) => void
+  rowIndex: number
+  onKeyDown: React.KeyboardEventHandler<HTMLInputElement>
 }) {
   const v = value ?? 0
   return (
@@ -322,7 +350,14 @@ function CellStockActual({
       >
         <Minus className="h-3.5 w-3.5" />
       </Button>
-      <NumericInput value={v} onChange={onChange} className="h-7 w-14 text-sm" />
+      <NumericInput
+        value={v}
+        onChange={onChange}
+        className="h-7 w-14 text-sm"
+        dataRow={rowIndex}
+        dataCol="stockActual"
+        onKeyDown={onKeyDown}
+      />
       <Button variant="outline" size="icon" className={btnIcon} onClick={() => onChange(v + 1)}>
         <Plus className="h-3.5 w-3.5" />
       </Button>
@@ -347,6 +382,7 @@ function CellDelete({ onDelete }: { onDelete: () => void }) {
 
 interface ProductoRowProps {
   product: Producto
+  rowIndex: number
   stockActualValue: number
   stockMinimoLocal: number
   setStockMinimoLocal: (productId: string, v: number) => void
@@ -361,12 +397,16 @@ interface ProductoRowProps {
   onLocalStockChange: (productId: string, value: number) => void
   onDeleteProduct: (productId: string) => void
   isCritical?: boolean
+  severity?: number
+  sortMode: SortMode
+  onCellKeyDown: (e: React.KeyboardEvent<HTMLInputElement>, rowIndex: number, col: NavigationColumn, productId: string) => void
   dragHandleProps?: any
   isDragging?: boolean
 }
 
 const ProductoRow = React.memo(function ProductoRow({
   product,
+  rowIndex,
   stockActualValue,
   stockMinimoLocal,
   setStockMinimoLocal,
@@ -381,6 +421,9 @@ const ProductoRow = React.memo(function ProductoRow({
   onLocalStockChange,
   onDeleteProduct,
   isCritical = false,
+  severity = 0,
+  sortMode,
+  onCellKeyDown,
   dragHandleProps,
   isDragging = false,
 }: ProductoRowProps) {
@@ -428,8 +471,9 @@ const ProductoRow = React.memo(function ProductoRow({
     <div
       key={product.id}
       className={cn(
-        "rounded-lg border bg-card px-3 py-2 flex flex-col sm:flex-row sm:items-center gap-2 shadow-sm hover:shadow-md transition-all",
+        "rounded-lg border bg-card px-3 py-2 flex flex-col sm:flex-row sm:items-center gap-2 shadow-sm hover:shadow-md transition-all duration-200 ease-out motion-safe:transition-transform",
         isCritical && "border-red-600 border-2 bg-red-50 shadow-md",
+        sortMode === "severity" && isCritical && "ring-1 ring-red-200/80",
         isDragging && "opacity-50"
       )}
     >
@@ -449,6 +493,11 @@ const ProductoRow = React.memo(function ProductoRow({
       )}
 
       <div className="flex-1 min-w-0 flex items-center gap-2">
+        {sortMode === "severity" && severity > 0 && (
+          <div className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
+            <span aria-hidden="true">🔺</span> {severity}
+          </div>
+        )}
         <CellNombre
           product={product}
           isEditing={isEditingNombre}
@@ -491,12 +540,19 @@ const ProductoRow = React.memo(function ProductoRow({
             localValueUnits={stockMinimoLocal}
             onLocalChangeUnits={(v) => setStockMinimoLocal(product.id, v)}
             onUpdateUnits={(v) => onUpdateProduct(product.id, "stockMinimo", String(v))}
+            rowIndex={rowIndex}
+            onKeyDown={(e) => onCellKeyDown(e, rowIndex, "stockMinimo", product.id)}
           />
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
           <span className="text-[10px] text-muted-foreground">Stock</span>
-          <CellStockActual value={stockActualValue} onChange={(v) => onLocalStockChange(product.id, v)} />
+          <CellStockActual
+            value={stockActualValue}
+            onChange={(v) => onLocalStockChange(product.id, v)}
+            rowIndex={rowIndex}
+            onKeyDown={(e) => onCellKeyDown(e, rowIndex, "stockActual", product.id)}
+          />
         </div>
 
         <CellDelete onDelete={() => onDeleteProduct(product.id)} />
@@ -665,6 +721,7 @@ export function ProductosTable({
   const [stockMinimoLocal, setStockMinimoLocal] = useState<Record<string, number>>({})
   const [unidadesPorPackEdit, setUnidadesPorPackEditState] = useState<Record<string, string>>({})
   const [productsToRender, setProductsToRender] = useState<Producto[]>([])
+  const [sortMode, setSortMode] = useState<SortMode>("manual")
 
   // Estado local temporal para stock (optimización de performance)
   const [localStock, setLocalStock] = useState<Record<string, number>>({})
@@ -681,7 +738,7 @@ export function ProductosTable({
     })
   )
 
-  // Función para ordenar productos por orden manual (desktop)
+  // Función para ordenar productos por orden manual
   const sortProductsByOrder = useCallback((productsList: Producto[]) => {
     if (!productsList || productsList.length === 0) {
       return productsList || []
@@ -693,39 +750,9 @@ export function ProductosTable({
     })
   }, [])
 
-  // Orden final: desktop = orden manual; mobile = críticos por criticidad + no críticos en orden manual
-  const orderedProducts = useMemo(() => {
-    // Desktop → respetar orden manual completo
-    if (isDesktop) {
-      return sortProductsByOrder(products)
-    }
-
-    // Mobile → orden híbrido
-    const productsInOrder = sortProductsByOrder(products)
-    const criticos: Producto[] = []
-    const noCriticos: Producto[] = []
-
-    productsInOrder.forEach((p) => {
-      const stock = stockActual[p.id] ?? 0
-      const criticidad = p.stockMinimo - stock
-
-      if (criticidad > 0) {
-        criticos.push(p)
-      } else {
-        noCriticos.push(p)
-      }
-    })
-
-    // Ordenar SOLO críticos por mayor criticidad
-    criticos.sort((a, b) => {
-      const stockA = stockActual[a.id] ?? 0
-      const stockB = stockActual[b.id] ?? 0
-      return (b.stockMinimo - stockB) - (a.stockMinimo - stockA)
-    })
-
-    // Retornar críticos primero + resto en orden manual
-    return [...criticos, ...noCriticos]
-  }, [products, stockActual, isDesktop, sortProductsByOrder])
+  const manualProducts = useMemo(() => {
+    return sortProductsByOrder(products)
+  }, [products, sortProductsByOrder])
 
   // Inicializar localStock desde stockActual solo si no hay cambios pendientes
   useEffect(() => {
@@ -790,16 +817,40 @@ export function ProductosTable({
     }
   }, [localStock, stockActual, onStockChange])
 
-  // Sincronizar orderedProducts con productsToRender (sin sobrescribir reorden optimista)
+  // Sincronizar el orden manual con el estado local optimista
   useEffect(() => {
     if (isReorderingRef.current) {
       return
     }
-    setProductsToRender(orderedProducts)
-  }, [orderedProducts])
+    setProductsToRender(manualProducts)
+  }, [manualProducts])
+
+  const persistManualOrder = useCallback((nextOrder: Producto[], previousOrder: Producto[]) => {
+    isReorderingRef.current = true
+    setProductsToRender(nextOrder)
+
+    if (!onProductsOrderUpdate) {
+      isReorderingRef.current = false
+      return
+    }
+
+    onProductsOrderUpdate(nextOrder.map((p) => p.id))
+      .then(() => {
+        isReorderingRef.current = false
+      })
+      .catch((error) => {
+        console.error("Error al actualizar orden:", error)
+        isReorderingRef.current = false
+        setProductsToRender(previousOrder)
+      })
+  }, [onProductsOrderUpdate])
 
   // Manejar el final del drag & drop
   const handleDragEnd = useCallback((event: DragEndEvent) => {
+    if (sortMode !== "manual") {
+      return
+    }
+
     const { active, over } = event
 
     if (!over || active.id === over.id) {
@@ -813,36 +864,23 @@ export function ProductosTable({
       return
     }
 
-    // Marcar que estamos reordenando para evitar que el efecto sobrescriba
-    isReorderingRef.current = true
-
-    // Guardar el orden anterior para poder revertir si falla
     const previousOrder = productsToRender
-
-    // Actualizar el orden localmente inmediatamente (optimistic update)
     const newOrder = arrayMove(productsToRender, oldIndex, newIndex)
-    setProductsToRender(newOrder)
+    persistManualOrder(newOrder, previousOrder)
+  }, [persistManualOrder, productsToRender, sortMode])
 
-    // Persistir el nuevo orden en segundo plano sin bloquear la UI
-    if (onProductsOrderUpdate) {
-      const newOrderIds = newOrder.map((p: Producto) => p.id)
-      // No usar await para no bloquear la UI
-      onProductsOrderUpdate(newOrderIds)
-        .then(() => {
-          // Cuando se complete exitosamente, permitir que el efecto actualice si es necesario
-          isReorderingRef.current = false
-        })
-        .catch((error) => {
-          console.error("Error al actualizar orden:", error)
-          // Si falla, revertir al orden anterior
-          isReorderingRef.current = false
-          setProductsToRender(previousOrder)
-        })
-    } else {
-      // Si no hay función de actualización, solo permitir que el efecto actualice
-      isReorderingRef.current = false
+  const moveProductByKeyboard = useCallback((productId: string, direction: -1 | 1) => {
+    const currentIndex = productsToRender.findIndex((product) => product.id === productId)
+    const nextIndex = currentIndex + direction
+
+    if (currentIndex === -1 || nextIndex < 0 || nextIndex >= productsToRender.length) {
+      return
     }
-  }, [productsToRender, onProductsOrderUpdate])
+
+    const previousOrder = productsToRender
+    const nextOrder = arrayMove(productsToRender, currentIndex, nextIndex)
+    persistManualOrder(nextOrder, previousOrder)
+  }, [persistManualOrder, productsToRender])
 
   // Verificar si hay productos críticos para el indicador
   const hasCriticalProducts = useMemo(() => {
@@ -911,17 +949,93 @@ export function ProductosTable({
     }
   }, [onCreateProduct, newProductNombre, newProductStockMinimo, newProductTipoCompra, newProductUnidadesPorPack, stockMinimoDefault])
 
+  const displayedProducts = useMemo(() => {
+    if (sortMode === "manual") {
+      return productsToRender
+    }
+
+    const manualIndexes = new Map(productsToRender.map((product, index) => [product.id, index]))
+
+    return [...productsToRender].sort((a, b) => {
+      const severityA = a.stockMinimo - (localStock[a.id] ?? stockActual[a.id] ?? 0)
+      const severityB = b.stockMinimo - (localStock[b.id] ?? stockActual[b.id] ?? 0)
+
+      if (severityB !== severityA) {
+        return severityB - severityA
+      }
+
+      return (manualIndexes.get(a.id) ?? 0) - (manualIndexes.get(b.id) ?? 0)
+    })
+  }, [localStock, productsToRender, sortMode, stockActual])
+
+  const focusCell = useCallback((rowIndex: number, col: NavigationColumn) => {
+    const target = document.querySelector<HTMLInputElement>(`[data-row="${rowIndex}"][data-col="${col}"]`)
+    if (target) {
+      target.focus()
+      target.select()
+    }
+  }, [])
+
+  const handleCellKeyDown = useCallback((
+    e: React.KeyboardEvent<HTMLInputElement>,
+    rowIndex: number,
+    col: NavigationColumn,
+    productId: string
+  ) => {
+    if (e.shiftKey && e.key === "ArrowUp") {
+      e.preventDefault()
+      moveProductByKeyboard(productId, -1)
+      return
+    }
+
+    if (e.shiftKey && e.key === "ArrowDown") {
+      e.preventDefault()
+      moveProductByKeyboard(productId, 1)
+      return
+    }
+
+    const currentColIndex = NAVIGATION_COLUMNS.indexOf(col)
+    let nextRow = rowIndex
+    let nextColIndex = currentColIndex
+
+    switch (e.key) {
+      case "ArrowUp":
+        nextRow = rowIndex - 1
+        break
+      case "ArrowDown":
+        nextRow = rowIndex + 1
+        break
+      case "ArrowLeft":
+        nextColIndex = currentColIndex - 1
+        break
+      case "ArrowRight":
+        nextColIndex = currentColIndex + 1
+        break
+      default:
+        return
+    }
+
+    const nextCol = NAVIGATION_COLUMNS[nextColIndex]
+    if (!nextCol || nextRow < 0 || nextRow >= displayedProducts.length) {
+      return
+    }
+
+    e.preventDefault()
+    focusCell(nextRow, nextCol)
+  }, [displayedProducts.length, focusCell, moveProductByKeyboard])
+
   // Renderizar productos - siempre usar useMemo fuera de cualquier condición
   const renderedProducts = useMemo(
     () =>
-      productsToRender.map((product) => {
+      displayedProducts.map((product, rowIndex) => {
         // Usar localStock si existe, sino stockActual (para UI inmediata)
         const stockActualValue = localStock[product.id] ?? stockActual[product.id] ?? 0
-        const criticidad = product.stockMinimo - stockActualValue
-        const isCritical = criticidad > 0
+        const severity = product.stockMinimo - stockActualValue
+        const isCritical = severity > 0
 
         const productRowProps = {
           product,
+          rowIndex,
           stockActualValue,
           stockMinimoLocal: stockMinimoLocal[product.id] ?? product.stockMinimo,
           setStockMinimoLocal: setStockMinimoLocalFor,
@@ -936,9 +1050,12 @@ export function ProductosTable({
           onLocalStockChange: handleLocalStockChange,
           onDeleteProduct,
           isCritical,
+          severity,
+          sortMode,
+          onCellKeyDown: handleCellKeyDown,
         }
 
-        return isDesktop ? (
+        return isDesktop && sortMode === "manual" ? (
           <SortableProductoRow
             key={product.id}
             id={product.id}
@@ -952,7 +1069,7 @@ export function ProductosTable({
         )
       }),
     [
-      productsToRender,
+      displayedProducts,
       localStock,
       stockActual,
       stockMinimoLocal,
@@ -968,6 +1085,8 @@ export function ProductosTable({
       handleLocalStockChange,
       onDeleteProduct,
       isDesktop,
+      sortMode,
+      handleCellKeyDown,
     ]
   )
 
@@ -999,35 +1118,83 @@ export function ProductosTable({
           <h3 className="text-sm font-semibold">Productos</h3>
           <p className="text-xs text-muted-foreground">
             {products.length} productos
-            {isDesktop ? (
-              <span className="ml-2 text-xs text-muted-foreground">(Orden manual - arrastra para reordenar)</span>
+            {sortMode === "manual" ? (
+              <span className="ml-2 text-xs text-muted-foreground">
+                (Orden manual{isDesktop ? " - arrastra o usa Shift + flechas" : ""})
+              </span>
             ) : hasCriticalProducts ? (
-              <span className="ml-2 text-xs text-orange-600">(Ordenado por criticidad)</span>
+              <span className="ml-2 text-xs text-orange-600">(🔺 Prioridad de compra activa)</span>
             ) : null}
           </p>
         </div>
-        {onCreateProduct && (
-          <Button
-            variant="ghost"
+        <div className="flex items-center gap-2">
+          <ToggleGroup
+            type="single"
+            value={sortMode}
+            onValueChange={(value) => {
+              if (value === "manual" || value === "severity") {
+                setSortMode(value)
+              }
+            }}
+            variant="outline"
             size="sm"
-            onClick={() => setIsCreatingProduct(true)}
-            className="h-7 text-xs px-2 rounded-full"
+            className="hidden sm:flex"
+            aria-label="Modo de ordenamiento"
           >
-            <PlusCircle className="h-3.5 w-3.5 mr-1" />
-            Agregar
-          </Button>
-        )}
+            <ToggleGroupItem value="manual" className="text-xs px-2">
+              Orden manual
+            </ToggleGroupItem>
+            <ToggleGroupItem value="severity" className="text-xs px-2">
+              Prioridad de compra
+            </ToggleGroupItem>
+          </ToggleGroup>
+          {onCreateProduct && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsCreatingProduct(true)}
+              className="h-7 text-xs px-2 rounded-full"
+            >
+              <PlusCircle className="h-3.5 w-3.5 mr-1" />
+              Agregar
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="space-y-1 p-2">
-        {isDesktop ? (
+        {!isDesktop && (
+          <div className="pb-1">
+            <ToggleGroup
+              type="single"
+              value={sortMode}
+              onValueChange={(value) => {
+                if (value === "manual" || value === "severity") {
+                  setSortMode(value)
+                }
+              }}
+              variant="outline"
+              size="sm"
+              className="grid w-full grid-cols-2"
+              aria-label="Modo de ordenamiento"
+            >
+              <ToggleGroupItem value="manual" className="text-xs">
+                Orden manual
+              </ToggleGroupItem>
+              <ToggleGroupItem value="severity" className="text-xs">
+                Prioridad de compra
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+        )}
+        {isDesktop && sortMode === "manual" ? (
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
           >
             <SortableContext
-              items={productsToRender.map((p) => p.id)}
+              items={displayedProducts.map((p) => p.id)}
               strategy={verticalListSortingStrategy}
             >
               {renderedProducts}
