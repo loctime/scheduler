@@ -121,7 +121,7 @@ function NumericInput({
         onFocus?.()
         setTimeout(() => (e.target as HTMLInputElement).select(), 0)
       }}
-      className={cn("h-8 w-14 text-center text-base font-medium px-1", className)}
+      className={cn("h-8 w-16 text-center text-base font-medium text-black px-1", className)}
     />
   )
 }
@@ -163,7 +163,7 @@ function CellNombre({
             if (e.key === "Enter") onSave()
             if (e.key === "Escape") onCancel()
           }}
-          className="h-8 text-base flex-1 min-w-0"
+          className="h-8 text-base text-black flex-1 min-w-0"
         />
         <Button variant="ghost" size="icon" onClick={onSave} className="h-7 w-7 shrink-0 text-green-600">
           <Check className="h-4 w-4" />
@@ -185,7 +185,7 @@ function CellNombre({
           e.stopPropagation()
           onStartEdit()
         }}
-        className="text-left text-base font-medium truncate flex-1 min-w-0 hover:bg-muted/50 active:bg-muted rounded px-1 -mx-1 touch-manipulation cursor-pointer"
+        className="text-left text-base font-medium text-black truncate flex-1 min-w-0 hover:bg-muted/50 active:bg-muted rounded px-1 -mx-1 touch-manipulation cursor-pointer"
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >
         {product.nombre}
@@ -219,12 +219,12 @@ function CellTipo({
   const isPack = (product.modoCompra ?? "unidad") === "pack"
   return (
     <div className="flex items-center gap-2 shrink-0">
-      <span className="text-[10px] text-muted-foreground whitespace-nowrap">Unidad</span>
+      <span className="text-[10px] text-black whitespace-nowrap">Unidad</span>
       <Switch
         checked={isPack}
         onCheckedChange={(checked) => onChange(checked ? "pack" : "unidad")}
       />
-      <span className="text-[10px] text-muted-foreground whitespace-nowrap">Pack</span>
+      <span className="text-[10px] text-black whitespace-nowrap">Pack</span>
     </div>
   )
 }
@@ -310,7 +310,7 @@ function CellStockMinimo({
       <NumericInput
         value={displayValue}
         onChange={(n) => handleChange(Math.max(0, n))}
-        className="h-7 w-12 text-sm"
+        className="h-7 w-14 text-sm"
         dataRow={rowIndex}
         dataCol="stockMinimo"
         onKeyDown={onKeyDown}
@@ -471,13 +471,13 @@ const ProductoRow = React.memo(function ProductoRow({
     <div
       key={product.id}
       className={cn(
-        "grid grid-cols-[auto_auto_auto_auto_1fr_auto_auto] gap-2 items-center rounded-lg border bg-card px-3 py-3 shadow-sm hover:shadow-md transition-all duration-200 ease-out motion-safe:transition-transform",
+        "grid grid-cols-[40px_32px_120px_140px_1fr_80px_80px] gap-2 items-center rounded-lg border bg-card px-3 py-3 shadow-sm hover:shadow-md transition-all duration-200 ease-out motion-safe:transition-transform",
         isCritical && "border-red-600 border-2 bg-red-50 shadow-md",
         sortMode === "severity" && isCritical && "ring-1 ring-red-200/80",
         isDragging && "opacity-50"
       )}
     >
-      <div className="flex items-center justify-center w-8 pr-2 border-r border-border">
+      <div className="flex items-center justify-center pr-2 border-r border-border">
         {dragHandleProps && (
           <div
             {...dragHandleProps}
@@ -488,13 +488,13 @@ const ProductoRow = React.memo(function ProductoRow({
         )}
       </div>
       
-      <div className="flex items-center justify-center w-6 pr-2 border-r border-border">
+      <div className="flex items-center justify-center pr-2 border-r border-border">
         {isCritical && (
           <AlertTriangle className="h-4 w-4 text-red-600" />
         )}
       </div>
 
-      <div className="flex items-center gap-1 pr-2 border-r border-border">
+      <div className="flex items-center justify-center gap-1 pr-2 border-r border-border">
         <CellStockMinimo
           product={product}
           localValueUnits={stockMinimoLocal}
@@ -505,7 +505,7 @@ const ProductoRow = React.memo(function ProductoRow({
         />
       </div>
 
-      <div className="flex items-center gap-1 pr-2 border-r border-border">
+      <div className="flex items-center justify-center gap-1 pr-2 border-r border-border">
         <CellStockActual
           value={stockActualValue}
           onChange={(v) => onLocalStockChange(product.id, v)}
@@ -1158,15 +1158,15 @@ export function ProductosTable({
       </div>
 
       {/* Encabezados de columna */}
-      <div className="grid grid-cols-[auto_auto_auto_auto_1fr_auto_auto] gap-2 px-3 py-3 border-b border-border bg-muted/30 text-sm font-medium text-muted-foreground">
-        <div className="flex items-center justify-center w-8 pr-2 border-r border-border">
+      <div className="grid grid-cols-[40px_32px_120px_140px_1fr_80px_80px] gap-2 px-3 py-3 border-b border-border bg-muted/30 text-sm font-medium text-black">
+        <div className="flex items-center justify-center pr-2 border-r border-border">
           {/* Espacio para drag handle */}
         </div>
-        <div className="flex items-center justify-center w-6 pr-2 border-r border-border">
+        <div className="flex items-center justify-center pr-2 border-r border-border">
           {/* Espacio para warning */}
         </div>
-        <div className="flex items-center pr-2 border-r border-border">Mín</div>
-        <div className="flex items-center pr-2 border-r border-border">Stock</div>
+        <div className="flex items-center justify-center pr-2 border-r border-border">Mín</div>
+        <div className="flex items-center justify-center pr-2 border-r border-border">Stock</div>
         <div className="flex items-center pr-2 border-r border-border">Producto</div>
         <div className="flex items-center justify-center pr-2 border-r border-border">Tipo</div>
         <div className="flex items-center justify-center">U/pack</div>
