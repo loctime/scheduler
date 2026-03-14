@@ -1,13 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Copy, FileText, Link as LinkIcon, ExternalLink, Bell, Loader2, ChevronDown } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
+import { Copy, FileText, Link as LinkIcon, ExternalLink, Bell, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export interface PedidoActionsProps {
@@ -18,6 +12,7 @@ export interface PedidoActionsProps {
   enlaceActivo: { id: string } | null
   loadingEnlace: boolean
   onCopyPedido: () => void
+  onCopyStock: () => void
   onLlevarPedidoASheet: () => void
   onGenerarEnlace: () => void
   onVerPedido: () => void
@@ -32,6 +27,7 @@ export function PedidoActions({
   enlaceActivo,
   loadingEnlace,
   onCopyPedido,
+  onCopyStock,
   onLlevarPedidoASheet,
   onGenerarEnlace,
   onVerPedido,
@@ -54,26 +50,35 @@ export function PedidoActions({
       </div>
 
       <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto justify-end">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm" className="h-7 px-2 flex-1 sm:flex-initial" disabled={productosAPedirCount === 0}>
-              <Copy className="h-3.5 w-3.5 sm:mr-1" />
-              <span className="sm:hidden text-xs">copiar</span>
-              <span className="hidden sm:inline text-xs">copiar</span>
-              <ChevronDown className="h-3 w-3 ml-1 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onCopyPedido}>
-              <Copy className="h-4 w-4 mr-2" />
-              Copiar pedido completo
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onLlevarPedidoASheet} disabled={!hasSheetUrl}>
-              <FileText className="h-4 w-4 mr-2" />
-              Llevar pedido a Sheet
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Button
+          size="sm"
+          className="h-7 px-2 flex-1 sm:flex-initial"
+          disabled={productosAPedirCount === 0}
+          onClick={onCopyStock}
+        >
+          <Copy className="h-3.5 w-3.5 sm:mr-1" />
+          <span className="text-xs">copiar stock</span>
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2 flex-1 sm:flex-initial"
+          disabled={productosAPedirCount === 0}
+          onClick={onCopyPedido}
+        >
+          <Copy className="h-3.5 w-3.5 sm:mr-1" />
+          <span className="text-xs">copiar pedido</span>
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2 flex-1 sm:flex-initial"
+          onClick={onLlevarPedidoASheet}
+          disabled={!hasSheetUrl}
+        >
+          <FileText className="h-3.5 w-3.5 sm:mr-1" />
+          <span className="text-xs">sheet</span>
+        </Button>
         <Button
           size="sm"
           variant="outline"

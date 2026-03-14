@@ -162,9 +162,10 @@ export default function PedidosPage() {
     selectedPedido,
     products,
     productosAPedirActualizados,
-    resultadoEngine
+    resultadoEngine,
+    stockActual
   })
-  const { handleCopyPedido, handleLlevarPedidoASheet, handleWhatsApp } = actions
+  const { handleCopyPedido, handleCopyStock, handleLlevarPedidoASheet, handleWhatsApp } = actions
 
   const [createPedidoOpen, setCreatePedidoOpen] = useState(false)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
@@ -519,6 +520,7 @@ export default function PedidosPage() {
                       enlaceActivo={enlaceActivo}
                       loadingEnlace={loadingEnlace}
                       onCopyPedido={handleCopyPedido}
+                      onCopyStock={handleCopyStock}
                       onLlevarPedidoASheet={handleLlevarPedidoASheet}
                       onGenerarEnlace={flags.legacy.publicLinkReadOnly ? () => toast({
                         title: "Enlaces publicos en modo solo lectura",
