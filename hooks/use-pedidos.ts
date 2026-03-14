@@ -528,6 +528,15 @@ export function usePedidos(user: any) {
         }
         updateData.stockMinimoUnits = normalizeStockMinimoInput(product, num)
         updateData.stockMinimo = deleteField()
+      } else if (field === "stockMinimoUnits") {
+        if (!product) return false
+        const num = parseInt(value, 10)
+        if (isNaN(num) || num < 0) {
+          toast({ title: "Error", description: "Stock inválido", variant: "destructive" })
+          return false
+        }
+        updateData.stockMinimoUnits = num
+        updateData.stockMinimo = deleteField()
       } else if (field === "unidad") {
         updateData.unidad = value.trim() || "U"
         updateData.unidadBase = value.trim() || "U"

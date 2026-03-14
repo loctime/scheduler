@@ -49,7 +49,7 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 
 const btnIcon = "h-7 w-7 rounded-full transition-transform active:scale-95 shrink-0"
-const NAVIGATION_COLUMNS = ["stockMinimo", "stockActual"] as const
+const NAVIGATION_COLUMNS = ["stockMinimoUnits", "stockActual"] as const
 
 type SortMode = "manual" | "severity"
 type NavigationColumn = (typeof NAVIGATION_COLUMNS)[number]
@@ -148,6 +148,7 @@ function CellNombre({
   onSave,
   onCancel,
   inputRef,
+  equivalencia,
 }: {
   product: Producto
   isEditing: boolean
@@ -157,6 +158,7 @@ function CellNombre({
   onSave: () => void
   onCancel: () => void
   inputRef: React.RefObject<HTMLInputElement | null>
+  equivalencia?: { fullLabel: string }
 }) {
   const handleEdit = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault()
@@ -200,6 +202,11 @@ function CellNombre({
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >
         {product.nombre}
+        {esModoPack(product) && equivalencia && (
+          <span className="text-[11px] text-muted-foreground ml-1">
+            {equivalencia.fullLabel}
+          </span>
+        )}
       </button>
       <Button
         variant="ghost"
@@ -320,7 +327,7 @@ function CellStockMinimo({
         onChange={(n) => handleChange(Math.max(0, n))}
         className="h-8 w-14 text-sm"
         dataRow={rowIndex}
-        dataCol="stockMinimo"
+        dataCol="stockMinimoUnits"
         onKeyDown={onKeyDown}
       />
       <Button
@@ -519,9 +526,9 @@ const ProductoRow = React.memo(function ProductoRow({
           product={product}
           localValueUnits={stockMinimoLocal}
           onLocalChangeUnits={(v) => setStockMinimoLocal(product.id, v)}
-          onUpdateUnits={(v) => onUpdateProduct(product.id, "stockMinimo", String(v))}
+          onUpdateUnits={(v) => onUpdateProduct(product.id, "stockMinimoUnits", String(v))}
           rowIndex={rowIndex}
-          onKeyDown={(e) => onCellKeyDown(e, rowIndex, "stockMinimo", product.id)}
+          onKeyDown={(e) => onCellKeyDown(e, rowIndex, "stockMinimoUnits", product.id)}
         />
       </div>
 
@@ -553,12 +560,8 @@ const ProductoRow = React.memo(function ProductoRow({
           onSave={handleSaveNombre}
           onCancel={handleCancelEdit}
           inputRef={inputRef}
+          equivalencia={equivalencia}
         />
-        {esModoPack(product) && (
-          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-            {equivalencia.fullLabel}
-          </span>
-        )}
       </div>
 
       <div className="flex items-center justify-center pr-2 border-r border-border">
