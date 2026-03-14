@@ -152,7 +152,7 @@ export default function PedidoDetallePage() {
   }
 
   const estado = pedido.estado || "creado"
-  const productosAPedir = products.filter(p => calcularPedido(p.stockMinimo, stockActual[p.id]) > 0)
+  const productosAPedir = products.filter(p => calcularPedido(p.stockMinimo ?? 0, stockActual[p.id] ?? 0) > 0)
 
   return (
     <DashboardLayout user={user}>

@@ -75,7 +75,7 @@ export function crearRemitoPedido(
 ): Omit<Remito, "id" | "numero" | "createdAt"> {
   const productosAPedir = productos
     .map(p => {
-      const pedidoBase = calcularPedido(p.stockMinimo, stockActual[p.id])
+      const pedidoBase = calcularPedido(p.stockMinimo ?? 0, stockActual[p.id] ?? 0)
       const ajuste = ajustesPedido?.[p.id] ?? 0
       let cantidadFinal: number
       if (esModoPack(p)) {
@@ -118,9 +118,9 @@ export function crearRemitoEnvio(
   calcularPedido: (stockMinimo: number, stockActual?: number) => number
 ): Omit<Remito, "id" | "numero" | "createdAt"> {
   const productosAPedir = productos
-    .filter(p => calcularPedido(p.stockMinimo, stockActual[p.id]) > 0)
+    .filter(p => calcularPedido(p.stockMinimo ?? 0, stockActual[p.id] ?? 0) > 0)
     .map(p => {
-      const cantidadPedida = calcularPedido(p.stockMinimo, stockActual[p.id])
+      const cantidadPedida = calcularPedido(p.stockMinimo ?? 0, stockActual[p.id] ?? 0)
       return {
         productoId: p.id,
         productoNombre: p.nombre,

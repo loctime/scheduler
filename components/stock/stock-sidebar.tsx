@@ -170,7 +170,7 @@ function ProductoItem({
   producto: Producto
   cantidad: number 
 }) {
-  const esBajo = cantidad < producto.stockMinimo
+  const esBajo = cantidad < (producto.stockMinimo ?? 0)
   const esCritico = cantidad === 0
 
   return (

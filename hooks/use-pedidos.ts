@@ -648,9 +648,10 @@ export function usePedidos(user: any) {
     if (!db || !ownerId || !user?.uid) return false
 
     try {
-      const batch = writeBatch(db)
+      const dbInstance = db // TypeScript ahora sabe que db no es undefined
+      const batch = writeBatch(dbInstance)
       products.forEach((product) => {
-        batch.update(doc(db, COLLECTIONS.PRODUCTS, product.id), {
+        batch.update(doc(dbInstance, COLLECTIONS.PRODUCTS, product.id), {
           stockActualUnits: 0,
           stockActual: deleteField(),
           updatedAt: serverTimestamp(),

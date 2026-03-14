@@ -191,7 +191,7 @@ export function useEnlacePublico(user: any) {
           return {
             id: p.id,
             nombre: p.nombre,
-            stockMinimo: p.stockMinimo,
+            stockMinimo: p.stockMinimo ?? 0,
             cantidadPedida: cantidadPedida, // Solo usar cantidad calculada (ya filtramos los que son 0)
             unidad: p.unidad,
             orden: p.orden,
