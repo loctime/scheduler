@@ -297,7 +297,6 @@ function CellStockMinimo({
   const displayValue = esModoPack(product)
     ? Math.floor(localValueUnits / getCantidadPorPack(product))
     : localValueUnits
-  const equivalencia = formatStockForDisplay(product, localValueUnits)
 
   const handleChange = (n: number) => {
     const units = normalizeStockMinimoInput(product, n)
@@ -332,11 +331,6 @@ function CellStockMinimo({
       >
         <Plus className="h-3.5 w-3.5" />
       </Button>
-      {esModoPack(product) && (
-        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-          {equivalencia.fullLabel}
-        </span>
-      )}
     </div>
   )
 }
@@ -358,7 +352,6 @@ function CellStockActual({
   const displayValue = esModoPack(product)
     ? Math.floor(units / getCantidadPorPack(product))
     : units
-  const equivalencia = formatStockForDisplay(product, units)
   const handleChange = (nextValue: number) => {
     onChange(normalizeStockActualInput(product, Math.max(0, nextValue)))
   }
@@ -385,11 +378,6 @@ function CellStockActual({
       <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => handleChange(displayValue + 1)}>
         <Plus className="h-4 w-4" />
       </Button>
-      {esModoPack(product) && (
-        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-          {equivalencia.fullLabel}
-        </span>
-      )}
     </div>
   )
 }
@@ -497,6 +485,7 @@ const ProductoRow = React.memo(function ProductoRow({
   )
 
   const unidadesPorPackValue = unidadesPorPackEdit || String(product.cantidadPorPack ?? 6)
+  const equivalencia = formatStockForDisplay(product, stockActualValue)
 
   return (
     <div
@@ -565,6 +554,11 @@ const ProductoRow = React.memo(function ProductoRow({
           onCancel={handleCancelEdit}
           inputRef={inputRef}
         />
+        {esModoPack(product) && (
+          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+            {equivalencia.fullLabel}
+          </span>
+        )}
       </div>
 
       <div className="flex items-center justify-center pr-2 border-r border-border">
