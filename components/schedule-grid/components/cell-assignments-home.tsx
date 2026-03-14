@@ -114,6 +114,10 @@ export function CellAssignmentsHome({ assignments, getShiftInfo, mediosTurnos = 
             ? mediosTurnos.find((medio) => medio.startTime === assignment.startTime && medio.endTime === assignment.endTime)
             : undefined
 
+          // CORRECCIÓN: Obtener sectorId para mostrar chip (igual lógica que turnos normales)
+          const sectorId = getSectorIdForSlot(assignment, 1)
+          const sectorLabel = sectorId ? (sectorNameById?.get(sectorId) ?? sectorId) : undefined
+
           if (hasTime) {
             const timeText = displayTimeLines[0] || `${assignment.startTime} - ${assignment.endTime}`
             const medioTurnoColor = medioTurnoMatch?.color || shift?.color || '#10b981'
@@ -129,16 +133,29 @@ export function CellAssignmentsHome({ assignments, getShiftInfo, mediosTurnos = 
                 <span className="block text-center text-lg sm:text-xl md:text-2xl font-bold bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-3 py-2 rounded">
                   1/2 FRANCO
                 </span>
+                {/* CORRECCIÓN: Mostrar chip de sector si está asignado */}
+                {sectorLabel && (
+                  <div className="flex justify-center mt-1">
+                    <SectorChipHome label={sectorLabel} />
+                  </div>
+                )}
               </div>
             )
           } else {
             return (
-              <span 
-                key={`medio-franco-${idx}`} 
-                className="block text-center text-xl sm:text-2xl md:text-3xl font-bold bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-3 py-2 rounded"
-              >
-                1/2 FRANCO
-              </span>
+              <div key={`medio-franco-${idx}`} className="w-full space-y-1">
+                <span 
+                  className="block text-center text-xl sm:text-2xl md:text-3xl font-bold bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-3 py-2 rounded"
+                >
+                  1/2 FRANCO
+                </span>
+                {/* CORRECCIÓN: Mostrar chip de sector si está asignado (incluso sin horario) */}
+                {sectorLabel && (
+                  <div className="flex justify-center mt-1">
+                    <SectorChipHome label={sectorLabel} />
+                  </div>
+                )}
+              </div>
             )
           }
         }

@@ -19,6 +19,7 @@ const files = [
   'emails.rules',
   'valentin.rules',
   'controlrepo.rules',
+  'controlChat.rules',
 
   // Horarios / Scheduler
   'horarios.rules',

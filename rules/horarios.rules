@@ -254,6 +254,24 @@ match /apps/horarios/schedules/{docId} {
 }
 
 /* ===============================
+   WEEKS (base week + versions)
+   =============================== */
+
+match /apps/horarios/weeks/{baseWeekId} {
+  allow read, write: if isAuth()
+    && horariosCanActFor(
+      resource != null ? resource.data.ownerId : request.resource.data.ownerId
+    );
+
+  match /versions/{versionNumber} {
+    allow read, write: if isAuth()
+      && horariosCanActFor(
+        get(/databases/$(db)/documents/apps/horarios/weeks/$(baseWeekId)).data.ownerId
+      );
+  }
+}
+
+/* ===============================
    HISTORIAL (cambios de horarios)
    =============================== */
 
