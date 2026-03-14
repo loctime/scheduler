@@ -20,11 +20,30 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
 import { Pedido, Producto } from "@/lib/types"
-import { esModoPack, unidadesToPacksFloor } from "@/lib/unidades-utils"
+import { buildPedidoOficial } from "@/lib/build-pedido-oficial"
+import {
+  getStockMinimoUnits,
+  normalizeStockMinimoInput,
+} from "@/lib/unidades-utils"
 import { useData } from "@/contexts/data-context"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
 const DEFAULT_FORMAT = "{nombre} ({cantidad})"
+
+function normalizeProduct(product: Producto): Producto {
+  const stockMinimoUnits = getStockMinimoUnits(product)
+  const stockActualUnits = Math.max(0, Math.floor(product.stockActualUnits ?? (product as any).stockActual ?? 0))
+
+  return {
+    ...product,
+    stockMinimo: stockMinimoUnits,
+    stockMinimoUnits,
+    stockActualUnits,
+    unidadBase: product.unidadBase || product.unidad || "U",
+    unidad: product.unidad || product.unidadBase || "U",
+    modoCompra: product.modoCompra || "unidad",
+  }
+}
 
 export function usePedidos(user: any) {
   const { toast } = useToast()
@@ -94,10 +113,12 @@ export function usePedidos(user: any) {
         where("pedidoId", "==", selectedPedido.id)
       )
       const snapshot = await getDocs(productsQuery)
-      const productsData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Producto[]
+      const productsData = snapshot.docs.map((doc) =>
+        normalizeProduct({
+          id: doc.id,
+          ...doc.data(),
+        } as Producto)
+      )
       
       // Ordenar por orden, y si tienen el mismo orden, alfabéticamente
       productsData.sort((a, b) => {
@@ -110,6 +131,12 @@ export function usePedidos(user: any) {
       })
       
       setProducts(productsData)
+      setStockActual(
+        productsData.reduce<Record<string, number>>((acc, product) => {
+          acc[product.id] = product.stockActualUnits ?? 0
+          return acc
+        }, {})
+      )
     } catch (error: any) {
       logger.error("Error al cargar productos:", error)
       toast({
@@ -210,7 +237,6 @@ export function usePedidos(user: any) {
   useEffect(() => {
     if (selectedPedido) {
       loadProducts()
-      setStockActual({})
     }
   }, [selectedPedido?.id])
 
@@ -246,14 +272,14 @@ export function usePedidos(user: any) {
   }, [selectedPedido?.id, user])
 
   // Calcular pedido recomendado
-  const calcularPedido = useCallback((stockMinimo: number, stockActualValue: number | undefined): number => {
+  const calcularPedido = useCallback((stockMinimoUnits: number, stockActualValue: number | undefined): number => {
     const actual = stockActualValue ?? 0
-    return Math.max(0, stockMinimo - actual)
+    return Math.max(0, stockMinimoUnits - actual)
   }, [])
 
   // Productos con pedido > 0
   const productosAPedir = useMemo(() => {
-    return products.filter(p => calcularPedido(p.stockMinimo, stockActual[p.id]) > 0)
+    return products.filter((p) => calcularPedido(p.stockMinimoUnits ?? p.stockMinimo ?? 0, stockActual[p.id]) > 0)
   }, [products, stockActual, calcularPedido])
 
   // Crear pedido
@@ -445,8 +471,11 @@ export function usePedidos(user: any) {
         batch.set(docRef, {
           pedidoId: selectedPedido.id,
           nombre,
-          stockMinimo: selectedPedido.stockMinimoDefault,
+          stockMinimoUnits: selectedPedido.stockMinimoDefault,
+          stockActualUnits: 0,
           unidad: "U",
+          unidadBase: "U",
+          modoCompra: "unidad",
           orden: nombresMap.get(nombre) ?? maxOrden + nuevos.indexOf(nombre),
           ownerId,
           userId: user.uid,
@@ -476,6 +505,7 @@ export function usePedidos(user: any) {
     if (!ownerId) return false
 
     try {
+      const product = products.find((item) => item.id === productId)
       const updateData: any = {
         updatedAt: serverTimestamp(),
         ownerId,
@@ -489,12 +519,14 @@ export function usePedidos(user: any) {
         }
         updateData.nombre = value.trim()
       } else if (field === "stockMinimo") {
+        if (!product) return false
         const num = parseInt(value, 10)
         if (isNaN(num) || num < 0) {
           toast({ title: "Error", description: "Stock inválido", variant: "destructive" })
           return false
         }
-        updateData.stockMinimo = num
+        updateData.stockMinimoUnits = normalizeStockMinimoInput(product, num)
+        updateData.stockMinimo = deleteField()
       } else if (field === "unidad") {
         updateData.unidad = value.trim() || "U"
         updateData.unidadBase = value.trim() || "U"
@@ -522,7 +554,7 @@ export function usePedidos(user: any) {
       toast({ title: "Error", description: "No se pudo actualizar", variant: "destructive" })
       return false
     }
-  }, [loadProducts, ownerId, user, toast])
+  }, [loadProducts, ownerId, products, user, toast])
 
   // Crear producto individual
   const createProduct = useCallback(async (
@@ -558,12 +590,14 @@ export function usePedidos(user: any) {
       }
 
       const modo = modoCompra || "unidad"
+      const baseUnidad = unidad?.trim() || "U"
       const docRef = await addDoc(collection(db, COLLECTIONS.PRODUCTS), {
         pedidoId: selectedPedido.id,
         nombre: nombre.trim(),
-        stockMinimo: stockMinimo ?? selectedPedido.stockMinimoDefault,
-        unidad: unidad?.trim() || "U",
-        unidadBase: unidad?.trim() || "U",
+        stockMinimoUnits: stockMinimo ?? selectedPedido.stockMinimoDefault,
+        stockActualUnits: 0,
+        unidad: baseUnidad,
+        unidadBase: baseUnidad,
         modoCompra: modo,
         ...(modo === "pack" && cantidadPorPack != null && cantidadPorPack > 1
           ? { cantidadPorPack }
@@ -609,10 +643,36 @@ export function usePedidos(user: any) {
   }, [loadProducts, toast])
 
   // Limpiar stock
-  const clearStock = useCallback(() => {
-    setStockActual({})
-    toast({ title: "Stock limpiado" })
-  }, [toast])
+  const clearStock = useCallback(async () => {
+    if (!db || !ownerId || !user?.uid) return false
+
+    try {
+      const batch = writeBatch(db)
+      products.forEach((product) => {
+        batch.update(doc(db, COLLECTIONS.PRODUCTS, product.id), {
+          stockActualUnits: 0,
+          stockActual: deleteField(),
+          updatedAt: serverTimestamp(),
+          ownerId,
+          userId: user.uid,
+        })
+      })
+
+      await batch.commit()
+      setStockActual(
+        products.reduce<Record<string, number>>((acc, product) => {
+          acc[product.id] = 0
+          return acc
+        }, {})
+      )
+      toast({ title: "Stock limpiado" })
+      return true
+    } catch (error: any) {
+      logger.error("Error al limpiar stock:", error)
+      toast({ title: "Error", description: "No se pudo limpiar el stock", variant: "destructive" })
+      return false
+    }
+  }, [db, ownerId, products, toast, user])
 
   // Actualizar orden de productos
   const updateProductsOrder = useCallback(async (newOrder: string[]) => {
@@ -657,25 +717,19 @@ export function usePedidos(user: any) {
   // Generar texto del pedido (usa placeholders {cantidad}, {cantidadUnidades}, {cantidadPacks}, {unidad})
   const generarTextoPedido = useCallback((): string => {
     if (!selectedPedido) return ""
-    
-    const lineas = productosAPedir.map(p => {
-      const cantidadUnidades = calcularPedido(p.stockMinimo, stockActual[p.id])
-      const cantidadPacks = esModoPack(p) ? unidadesToPacksFloor(p, cantidadUnidades) : cantidadUnidades
-      const unidad = p.unidadBase || p.unidad || "U"
-      let texto = selectedPedido.formatoSalida
-      texto = texto.replace(/{nombre}/g, p.nombre)
-      texto = texto.replace(/{cantidad}/g, cantidadUnidades.toString())
-      texto = texto.replace(/{cantidadUnidades}/g, cantidadUnidades.toString())
-      texto = texto.replace(/{cantidadPacks}/g, cantidadPacks.toString())
-      texto = texto.replace(/{unidad}/g, unidad)
-      return texto.trim()
+
+    const resultado = buildPedidoOficial({
+      pedido: {
+        nombre: selectedPedido.nombre,
+        formatoSalida: selectedPedido.formatoSalida,
+        mensajePrevio: selectedPedido.mensajePrevio,
+      },
+      productos: products,
+      stockActual,
     })
-    
-    // Usar mensaje previo personalizado o el default con emoji
-    const encabezado = selectedPedido.mensajePrevio?.trim() || `📦 ${selectedPedido.nombre}`
-    
-    return `${encabezado}\n\n${lineas.join("\n")}\n\nTotal: ${productosAPedir.length} productos`
-  }, [selectedPedido, productosAPedir, stockActual, calcularPedido])
+
+    return resultado?.texto || ""
+  }, [selectedPedido, products, stockActual])
 
   // Actualizar estado del pedido
   const updatePedidoEstado = useCallback(async (

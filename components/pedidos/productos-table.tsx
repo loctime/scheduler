@@ -10,6 +10,13 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { cn } from "@/lib/utils"
 import { Producto } from "@/lib/types"
 import {
+  esModoPack,
+  formatStockForDisplay,
+  getCantidadPorPack,
+  normalizeStockActualInput,
+  normalizeStockMinimoInput,
+} from "@/lib/unidades-utils"
+import {
   DndContext,
   closestCenter,
   KeyboardSensor,
@@ -50,16 +57,6 @@ function useIsDesktop() {
   }, [])
 
   return isDesktop
-}
-
-/** Unidades por pack: 1 si es unidad, cantidadPorPack si es pack. */
-function getUnidadesPorPack(p: Producto): number {
-  if (p.modoCompra !== "pack" || !p.cantidadPorPack || p.cantidadPorPack < 1) return 1
-  return p.cantidadPorPack
-}
-
-function isPack(p: Producto): boolean {
-  return p.modoCompra === "pack" && getUnidadesPorPack(p) > 1
 }
 
 // --- .Props de la tabla (sin modos ni lógica de pedido) ---
@@ -242,7 +239,7 @@ function CellUnidadesPorPack({
   onBlur: (num: number) => void
   inputRef?: React.RefObject<HTMLInputElement | null>
 }) {
-  const disabled = !isPack(product)
+  const disabled = !esModoPack(product)
   return (
     <div className="flex items-center gap-1 shrink-0">
       <Input
@@ -267,7 +264,7 @@ function CellUnidadesPorPack({
   )
 }
 
-/** Mín: en unidades si producto es unidad; en packs si producto es pack. Se guarda siempre en unidades en Firestore. */
+/** Mín: se persiste en unidades; pack es solo una forma de entrada en UI. */
 function CellStockMinimo({
   product,
   localValueUnits,
@@ -283,15 +280,13 @@ function CellStockMinimo({
   rowIndex: number
   onKeyDown: React.KeyboardEventHandler<HTMLInputElement>
 }) {
-  const unidadesPorPack = getUnidadesPorPack(product)
-  const isPackProduct = isPack(product)
-
-  const displayValue = isPackProduct
-    ? Math.floor(localValueUnits / unidadesPorPack)
+  const displayValue = esModoPack(product)
+    ? Math.floor(localValueUnits / getCantidadPorPack(product))
     : localValueUnits
+  const equivalencia = formatStockForDisplay(product, localValueUnits)
 
   const handleChange = (n: number) => {
-    const units = isPackProduct ? n * unidadesPorPack : n
+    const units = normalizeStockMinimoInput(product, n)
     onLocalChangeUnits(units)
     onUpdateUnits(units)
   }
@@ -323,44 +318,64 @@ function CellStockMinimo({
       >
         <Plus className="h-3.5 w-3.5" />
       </Button>
+      {esModoPack(product) && (
+        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+          {equivalencia.fullLabel}
+        </span>
+      )}
     </div>
   )
 }
 
 function CellStockActual({
+  product,
   value,
   onChange,
   rowIndex,
   onKeyDown,
 }: {
+  product: Producto
   value: number
   onChange: (v: number) => void
   rowIndex: number
   onKeyDown: React.KeyboardEventHandler<HTMLInputElement>
 }) {
-  const v = value ?? 0
+  const units = value ?? 0
+  const displayValue = esModoPack(product)
+    ? Math.floor(units / getCantidadPorPack(product))
+    : units
+  const equivalencia = formatStockForDisplay(product, units)
+  const handleChange = (nextValue: number) => {
+    onChange(normalizeStockActualInput(product, Math.max(0, nextValue)))
+  }
+
   return (
     <div className="flex items-center gap-0.5 shrink-0">
       <Button
         variant="outline"
         size="icon"
         className="h-9 w-9 rounded-full shrink-0"
-        onClick={() => onChange(Math.max(0, v - 1))}
-        disabled={v <= 0}
+        onClick={() => handleChange(Math.max(0, displayValue - 1))}
+        disabled={displayValue <= 0}
       >
         <Minus className="h-4 w-4" />
       </Button>
       <NumericInput
-        value={v}
-        onChange={onChange}
+        value={displayValue}
+        onChange={handleChange}
         className="h-9 w-16 text-lg"
         dataRow={rowIndex}
         dataCol="stockActual"
         onKeyDown={onKeyDown}
       />
-      <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => onChange(v + 1)}>
+      <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => handleChange(displayValue + 1)}>
         <Plus className="h-4 w-4" />
       </Button>
+      {esModoPack(product) && (
+        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+          {equivalencia.fullLabel}
+        </span>
+      )}
     </div>
   )
 }
@@ -432,7 +447,7 @@ const ProductoRow = React.memo(function ProductoRow({
   const [focusUnidadesPorPack, setFocusUnidadesPorPack] = useState(false)
 
   useEffect(() => {
-    if (focusUnidadesPorPack && isPack(product) && unidadesPorPackInputRef.current) {
+    if (focusUnidadesPorPack && esModoPack(product) && unidadesPorPackInputRef.current) {
       unidadesPorPackInputRef.current.focus()
       unidadesPorPackInputRef.current.select()
       setFocusUnidadesPorPack(false)
@@ -507,6 +522,7 @@ const ProductoRow = React.memo(function ProductoRow({
 
       <div className="flex items-center justify-center gap-1 pr-2 border-r border-border">
         <CellStockActual
+          product={product}
           value={stockActualValue}
           onChange={(v) => onLocalStockChange(product.id, v)}
           rowIndex={rowIndex}
@@ -925,9 +941,25 @@ export function ProductosTable({
 
   const handleCreateProduct = useCallback(async () => {
     if (!onCreateProduct || !newProductNombre.trim()) return
-    const stockMinimo = parseInt(newProductStockMinimo, 10) || stockMinimoDefault
     const modoCompra = newProductTipoCompra
     const cantidadPorPack = modoCompra === "pack" ? parseInt(newProductUnidadesPorPack, 10) : undefined
+    const productoDraft: Producto = {
+      id: "draft",
+      pedidoId: "draft",
+      nombre: newProductNombre.trim(),
+      stockMinimoUnits: stockMinimoDefault,
+      stockMinimo: stockMinimoDefault,
+      unidad: "U",
+      unidadBase: "U",
+      modoCompra,
+      cantidadPorPack,
+      ownerId: "draft",
+      userId: "draft",
+    }
+    const stockMinimo = normalizeStockMinimoInput(
+      productoDraft,
+      parseInt(newProductStockMinimo, 10) || stockMinimoDefault
+    )
     const productId = await onCreateProduct(
       newProductNombre.trim(),
       stockMinimo,
@@ -1010,9 +1042,14 @@ export function ProductosTable({
         return
     }
 
+    // Validar límites de filas y columnas
+    if (nextRow < 0 || nextRow >= displayedProducts.length) {
+      return // No permitir navegar fuera de los límites de filas
+    }
+    
     const nextCol = NAVIGATION_COLUMNS[nextColIndex]
-    if (!nextCol || nextRow < 0 || nextRow >= displayedProducts.length) {
-      return
+    if (!nextCol) {
+      return // No permitir navegar fuera de los límites de columnas
     }
 
     e.preventDefault()

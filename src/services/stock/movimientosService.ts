@@ -4,6 +4,7 @@ import {
   runTransaction,
   serverTimestamp,
   addDoc,
+  deleteField,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { 
@@ -31,7 +32,7 @@ async function getStockActual(productoId: string): Promise<number> {
     if (!productDoc.exists()) {
       throw new Error(`Producto ${productoId} no encontrado`)
     }
-    return productDoc.data().stockActual || 0
+    return productDoc.data().stockActualUnits ?? productDoc.data().stockActual ?? 0
   })
 }
 
@@ -85,7 +86,7 @@ export async function confirmarMovimientos(
         }
         return {
           doc,
-          stockActual: doc.data().stockActual || 0,
+          stockActual: doc.data().stockActualUnits ?? doc.data().stockActual ?? 0,
           movimiento: movimientos[index]
         }
       })
@@ -111,7 +112,8 @@ export async function confirmarMovimientos(
 
         // Actualizar stock del producto
         transaction.update(productDoc.ref, {
-          stockActual: nuevoStock,
+          stockActualUnits: nuevoStock,
+          stockActual: deleteField(),
           updatedAt: serverTimestamp(),
         })
 

@@ -18,7 +18,7 @@ import { usePedidoEnlaces } from "@/hooks/pedidos/use-pedido-enlaces"
 import { usePedidoRemitos } from "@/hooks/pedidos/use-pedido-remitos"
 import { usePedidoActions } from "@/hooks/pedidos/use-pedido-actions"
 import { db, COLLECTIONS } from "@/lib/firebase"
-import { doc, serverTimestamp, getDoc, updateDoc, deleteDoc } from "firebase/firestore"
+import { doc, serverTimestamp, getDoc, updateDoc, deleteDoc, deleteField } from "firebase/firestore"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import { PedidosSidebar } from "@/components/pedidos/pedidos-sidebar"
 import { PedidoHeader } from "@/components/pedidos/PedidoHeader"
@@ -322,9 +322,11 @@ export default function PedidosPage() {
       setImportText("")
     }
   }
-  const handleClearStock = () => {
-    clearStock()
-    setClearDialogOpen(false)
+  const handleClearStock = async () => {
+    const success = await clearStock()
+    if (success) {
+      setClearDialogOpen(false)
+    }
   }
 
   const handleStartEditName = () => {
@@ -415,7 +417,8 @@ export default function PedidosPage() {
       if (!db || !user || !ownerId) return
       const productRef = doc(db, COLLECTIONS.PRODUCTS, productId)
       await updateDoc(productRef, {
-        stockActual: value,
+        stockActualUnits: value,
+        stockActual: deleteField(),
         updatedAt: serverTimestamp(),
         ownerId,
         userId: user.uid

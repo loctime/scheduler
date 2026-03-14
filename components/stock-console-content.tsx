@@ -13,8 +13,15 @@ import { Check, X, Package, ArrowLeft, Minus, Plus, MessageCircle } from "lucide
 import { cn } from "@/lib/utils"
 import { UserStatusMenu } from "@/components/pwa/UserStatusMenu"
 import { PwaViewerBadge } from "@/components/pwa/PwaViewerBadge"
-import { esModoPack, getCantidadPorPack, unidadesSignedToPacksFloor, packsSignedToUnidades } from "@/lib/unidades-utils"
-import { ejecutarPedidoEngine } from "@/lib/pedido-engine"
+import {
+  esModoPack,
+  formatStockForDisplay,
+  getCantidadPorPack,
+  getStockMinimoUnits,
+  normalizeStockActualInput,
+  packsSignedToUnidades,
+  unidadesSignedToPacksFloor,
+} from "@/lib/unidades-utils"
 import { buildPedidoOficial } from "@/lib/build-pedido-oficial"
 import {
   AlertDialog,
@@ -90,53 +97,26 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
     updateProductsOrder,
   } = stockConsole
 
-  // Generación automática del texto del pedido (basado en stock mínimo, ignora cantidades manuales)
-  const textoPedidoAutomatico = useMemo(() => {
-    const selectedPedido = pedidos.find(p => p.id === state.selectedPedidoId)
+  const selectedPedido = useMemo(
+    () => pedidos.find((pedido) => pedido.id === state.selectedPedidoId) || null,
+    [pedidos, state.selectedPedidoId]
+  )
+
+  const resultadoPedidoOficial = useMemo(() => {
     if (!selectedPedido) return null
-    
-    // Calcular cantidades automáticas basadas en stock mínimo
-    const productosCalculados = productos
-      .map(producto => {
-        const stockMinimo = producto.stockMinimo || 0
-        const stockActualProducto = stockActual[producto.id] || 0
-        const cantidadPedida = Math.max(0, stockMinimo - stockActualProducto)
-        
-        if (cantidadPedida === 0) return null
-        
-        const unidad = producto.unidadBase || producto.unidad || "U"
-        
-        return {
-          productoId: producto.id,
-          nombre: producto.nombre,
-          cantidad: cantidadPedida,
-          unidad
-        }
-      })
-      .filter((p): p is NonNullable<typeof p> => p !== null)
-    
-    if (productosCalculados.length === 0) {
-      // Si no hay productos que pedir, generar texto vacío
-      const encabezado = selectedPedido.mensajePrevio?.trim() || `📦 ${selectedPedido.nombre}`
-      return `${encabezado}\n\nTotal: 0 productos`
-    }
-    
-    // Generar líneas de texto
-    const lineas = productosCalculados.map(p => {
-      const formato = selectedPedido.formatoSalida || "{nombre}: {cantidad} {unidad}"
-      
-      return formato
-        .replace(/{nombre}/g, p.nombre)
-        .replace(/{cantidad}/g, p.cantidad.toString())
-        .replace(/{cantidadUnidades}/g, p.cantidad.toString())
-        .replace(/{cantidadPacks}/g, p.cantidad.toString())
-        .replace(/{unidad}/g, p.unidad)
-        .trim()
+
+    return buildPedidoOficial({
+      pedido: {
+        nombre: selectedPedido.nombre,
+        formatoSalida: selectedPedido.formatoSalida,
+        mensajePrevio: selectedPedido.mensajePrevio,
+      },
+      productos,
+      stockActual,
     })
-    
-    const encabezado = selectedPedido.mensajePrevio?.trim() || `📦 ${selectedPedido.nombre}`
-    return `${encabezado}\n\n${lineas.join("\n")}\n\nTotal: ${productosCalculados.length} productos`
-  }, [state.selectedPedidoId, pedidos, productos, stockActual])
+  }, [productos, selectedPedido, stockActual])
+
+  const textoPedidoAutomatico = resultadoPedidoOficial?.texto || null
 
   const [mode, setMode] = useState<"work" | "control">("work")
   const [sortMode, setSortMode] = useState<SortMode>("manual")
@@ -277,8 +257,8 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
       const stockB = mode === "control"
         ? (localStockControl[b.id] ?? stockActual[b.id] ?? 0)
         : (stockActual[b.id] ?? 0)
-      const severityA = a.stockMinimo - stockA
-      const severityB = b.stockMinimo - stockB
+      const severityA = getStockMinimoUnits(a) - stockA
+      const severityB = getStockMinimoUnits(b) - stockB
 
       if (severityB !== severityA) {
         return severityB - severityA
@@ -408,7 +388,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
     
     productos.forEach(producto => {
       const stock = stockActual[producto.id] ?? 0
-      const isCritico = producto.stockMinimo > stock
+      const isCritico = getStockMinimoUnits(producto) > stock
       
       if (isCritico) {
         nuevosCriticos.add(producto.id)
@@ -717,7 +697,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                 ? (localStockControl[producto.id] ?? stockActual[producto.id] ?? 0)
                 : (stockActual[producto.id] || 0)
               const stock = stockRaw
-              const stockMinimo = producto.stockMinimo || 0
+              const stockMinimo = getStockMinimoUnits(producto)
               const isStockBajo = stock < stockMinimo
               const stockDisponible = stock
               const cantidadMinimaPermitida = -stockDisponible
@@ -726,6 +706,8 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
               const delta = vm === "pack" ? getCantidadPorPack(producto) : 1
               const unidadLabel = producto.unidadBase || producto.unidad || "U"
               const severity = stockMinimo - stock
+              const stockDisplay = formatStockForDisplay(producto, stock)
+              const minimoDisplay = formatStockForDisplay(producto, stockMinimo)
 
               // Modo work: input = cantidad a pedir. Modo control: input = stock real.
               const isControl = mode === "control"
@@ -801,7 +783,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                         "text-sm font-medium",
                         isStockBajo ? "text-red-600 font-bold" : "text-gray-700"
                       )}>
-                        Stock: {stock}
+                        Stock: {stockDisplay.fullLabel}
                       </span>
                       {isPackProduct ? (
                         <div className="flex items-center gap-1.5 shrink-0">
@@ -844,7 +826,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                         "font-medium",
                         isStockBajo ? "text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded" : "text-gray-700"
                       )}>
-                        Mín: {stockMinimo}
+                        Mín: {minimoDisplay.fullLabel}
                       </span>
                       {(isControl ? stock !== 0 : cantidad !== 0) && (
                         <span className="text-gray-600">{equivalenciaText}</span>
@@ -876,7 +858,9 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                             e.stopPropagation()
                             const raw = parseInt(e.target.value, 10)
                             if (isNaN(raw) || raw < 0) return
-                            const unidades = vm === "pack" ? packsSignedToUnidades(producto, raw) : raw
+                            const unidades = vm === "pack"
+                              ? normalizeStockActualInput(producto, raw)
+                              : raw
                             handleLocalStockChange(producto.id, unidades)
                           }}
                           className="h-11 w-12 text-center text-xl font-bold tabular-nums border border-gray-200/80 rounded-lg bg-gray-50/50 focus-visible:ring-2 focus-visible:ring-gray-300/50 p-0"

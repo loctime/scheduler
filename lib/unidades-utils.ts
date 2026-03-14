@@ -1,78 +1,150 @@
-/**
- * Helpers centralizados para conversión unidad ↔ pack.
- * Toda la lógica de conversión del sistema debe pasar por estas funciones.
- */
 import type { Producto } from "./types"
 
-/** Tipo mínimo requerido para conversiones (Producto o items de productosEnviados) */
-export type ProductoLike = Partial<Pick<Producto, "modoCompra" | "cantidadPorPack" | "unidadBase" | "unidad">>
+export type ProductoLike = Partial<
+  Pick<Producto, "modoCompra" | "cantidadPorPack" | "unidadBase" | "unidad" | "stockMinimo" | "stockMinimoUnits">
+> & {
+  stockActual?: number
+  stockActualUnits?: number
+}
 
-/**
- * Obtiene la cantidad de unidades por pack.
- * Si modoCompra !== "pack" → retorna 1 (tratado como unidad).
- */
-export function getCantidadPorPack(product: ProductoLike): number {
-  if (product.modoCompra !== "pack" || !product.cantidadPorPack || product.cantidadPorPack < 1) {
+export interface StockDisplay {
+  units: number
+  packs: number
+  remainderUnits: number
+  primaryLabel: string
+  equivalenceLabel: string
+  fullLabel: string
+}
+
+function sanitizeInteger(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.floor(value))
+}
+
+export function getCantidadPorPack(producto?: ProductoLike | null): number {
+  if (!producto || producto.modoCompra !== "pack") {
     return 1
   }
-  return product.cantidadPorPack
+
+  const cantidad = Number(producto.cantidadPorPack)
+  if (!Number.isFinite(cantidad) || cantidad < 2) {
+    return 1
+  }
+
+  return Math.floor(cantidad)
 }
 
-/**
- * Convierte unidades a packs.
- * Usa Math.ceil (1.1 unidades = 2 packs si cantidadPorPack es 1).
- * Nunca retorna valores negativos.
- */
-export function unidadesToPacks(product: ProductoLike, unidades: number): number {
-  if (unidades <= 0) return 0
-  const qty = getCantidadPorPack(product)
-  return Math.max(0, Math.ceil(unidades / qty))
+export function esModoPack(producto?: ProductoLike | null): boolean {
+  return !!producto && producto.modoCompra === "pack" && getCantidadPorPack(producto) > 1
 }
 
-/**
- * Convierte packs a unidades.
- * packs * cantidadPorPack
- * Nunca retorna valores negativos.
- */
-export function packsToUnidades(product: ProductoLike, packs: number): number {
-  if (packs <= 0) return 0
-  const qty = getCantidadPorPack(product)
-  return Math.max(0, packs * qty)
+export function packsToUnits(packs: number, cantidadPorPack: number): number {
+  return sanitizeInteger(packs) * Math.max(1, sanitizeInteger(cantidadPorPack))
 }
 
-/**
- * Calcula cuántos packs equivalen a un pedido dado en unidades.
- * Útil para obtener el pedido base en packs cuando se trabaja con ajustes en packs.
- */
-export function calcularPedidoBaseEnPacks(product: ProductoLike, pedidoEnUnidades: number): number {
-  return unidadesToPacks(product, pedidoEnUnidades)
+export function unitsToPacks(units: number, cantidadPorPack: number): number {
+  const normalizedUnits = sanitizeInteger(units)
+  const normalizedPackSize = Math.max(1, sanitizeInteger(cantidadPorPack))
+
+  if (normalizedUnits === 0) {
+    return 0
+  }
+
+  return Math.ceil(normalizedUnits / normalizedPackSize)
 }
 
-/**
- * Convierte unidades a packs usando Math.floor (packs completos).
- * Útil para mostrar "X packs" cuando se tiene cantidad en unidades.
- */
-export function unidadesToPacksFloor(product: ProductoLike, unidades: number): number {
-  if (unidades <= 0) return 0
-  const qty = getCantidadPorPack(product)
-  return Math.max(0, Math.floor(unidades / qty))
+export function getStockMinimoUnits(producto?: ProductoLike | null): number {
+  if (!producto) return 0
+  const value = producto.stockMinimoUnits ?? producto.stockMinimo ?? 0
+  return sanitizeInteger(Number(value))
 }
 
-/** Indica si el producto se compra por pack */
-export function esModoPack(product: ProductoLike): boolean {
-  return product.modoCompra === "pack" && getCantidadPorPack(product) > 1
+export function getStockActualUnits(producto?: ProductoLike | null): number {
+  if (!producto) return 0
+  const value = producto.stockActualUnits ?? producto.stockActual ?? 0
+  return sanitizeInteger(Number(value))
 }
 
-/** Unidades (signed) a packs (signed) con floor. Para display: -18 u → -3 packs */
-export function unidadesSignedToPacksFloor(product: ProductoLike, unidades: number): number {
-  if (unidades === 0) return 0
-  const absPacks = unidadesToPacksFloor(product, Math.abs(unidades))
-  return unidades >= 0 ? absPacks : -absPacks
+export function normalizeStockMinimoInput(producto: ProductoLike, valorUI: number): number {
+  if (esModoPack(producto)) {
+    return packsToUnits(valorUI, getCantidadPorPack(producto))
+  }
+
+  return sanitizeInteger(valorUI)
 }
 
-/** Packs (signed) a unidades (signed). Para input: -3 packs → -18 u */
-export function packsSignedToUnidades(product: ProductoLike, packs: number): number {
-  if (packs === 0) return 0
-  const absUnidades = packsToUnidades(product, Math.abs(packs))
-  return packs >= 0 ? absUnidades : -absUnidades
+export function normalizeStockActualInput(producto: ProductoLike, valorUI: number): number {
+  if (esModoPack(producto)) {
+    return packsToUnits(valorUI, getCantidadPorPack(producto))
+  }
+
+  return sanitizeInteger(valorUI)
+}
+
+export function formatStockForDisplay(producto: ProductoLike, units: number): StockDisplay {
+  const normalizedUnits = sanitizeInteger(units)
+
+  if (!esModoPack(producto)) {
+    const primaryLabel = `${normalizedUnits} ${producto.unidadBase || producto.unidad || "unidades"}`
+    return {
+      units: normalizedUnits,
+      packs: normalizedUnits,
+      remainderUnits: 0,
+      primaryLabel,
+      equivalenceLabel: primaryLabel,
+      fullLabel: primaryLabel,
+    }
+  }
+
+  const cantidadPorPack = getCantidadPorPack(producto)
+  const packs = Math.floor(normalizedUnits / cantidadPorPack)
+  const remainderUnits = normalizedUnits % cantidadPorPack
+  const unidadesLabel = producto.unidadBase || producto.unidad || "unidades"
+  const packLabel = `${packs} pack${packs === 1 ? "" : "s"}`
+  const remainderLabel =
+    remainderUnits > 0
+      ? `${remainderUnits} ${unidadesLabel}${remainderUnits === 1 ? "" : ""}`
+      : ""
+  const primaryLabel = remainderLabel ? `${packLabel} + ${remainderLabel}` : packLabel
+  const equivalenceLabel = `${normalizedUnits} ${unidadesLabel}`
+
+  return {
+    units: normalizedUnits,
+    packs,
+    remainderUnits,
+    primaryLabel,
+    equivalenceLabel,
+    fullLabel: `${primaryLabel} (${equivalenceLabel})`,
+  }
+}
+
+export function unidadesToPacks(producto: ProductoLike, unidades: number): number {
+  return unitsToPacks(unidades, getCantidadPorPack(producto))
+}
+
+export function packsToUnidades(producto: ProductoLike, packs: number): number {
+  return packsToUnits(packs, getCantidadPorPack(producto))
+}
+
+export function calcularPedidoBaseEnPacks(producto: ProductoLike, pedidoEnUnidades: number): number {
+  return unidadesToPacks(producto, pedidoEnUnidades)
+}
+
+export function unidadesToPacksFloor(producto: ProductoLike, unidades: number): number {
+  const normalizedUnits = sanitizeInteger(unidades)
+  const cantidadPorPack = getCantidadPorPack(producto)
+  if (normalizedUnits === 0) return 0
+  return Math.floor(normalizedUnits / cantidadPorPack)
+}
+
+export function unidadesSignedToPacksFloor(producto: ProductoLike, unidades: number): number {
+  if (!Number.isFinite(unidades) || unidades === 0) return 0
+  const sign = unidades >= 0 ? 1 : -1
+  return unidadesToPacksFloor(producto, Math.abs(unidades)) * sign
+}
+
+export function packsSignedToUnidades(producto: ProductoLike, packs: number): number {
+  if (!Number.isFinite(packs) || packs === 0) return 0
+  const sign = packs >= 0 ? 1 : -1
+  return packsToUnidades(producto, Math.abs(packs)) * sign
 }

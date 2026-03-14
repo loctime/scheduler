@@ -12,6 +12,7 @@ import {
   updateDoc,
   writeBatch,
   serverTimestamp,
+  deleteField,
 } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
@@ -29,9 +30,25 @@ import type { Pedido, Producto } from "@/lib/types"
 import { getPedidoUsage, recordPedidoUsage } from "@/lib/stock-console-pedido-uso"
 import { getCache, setCache } from "@/lib/cache/indexeddb-cache"
 import { compareArraysByIds, compareRecords } from "@/lib/cache/cache-utils"
+import { getStockMinimoUnits } from "@/lib/unidades-utils"
 
 // Renombrar la función para evitar conflicto
 const confirmarMovimientosService = confirmarMovimientos
+
+function normalizeProducto(producto: Producto): Producto {
+  const stockMinimoUnits = getStockMinimoUnits(producto)
+  const stockActualUnits = Math.max(0, Math.floor(producto.stockActualUnits ?? (producto as any).stockActual ?? 0))
+
+  return {
+    ...producto,
+    stockMinimo: stockMinimoUnits,
+    stockMinimoUnits,
+    stockActualUnits,
+    unidadBase: producto.unidadBase || producto.unidad || "U",
+    unidad: producto.unidad || producto.unidadBase || "U",
+    modoCompra: producto.modoCompra || "unidad",
+  }
+}
 
 export function useStockConsole(user: any) {
   const { toast } = useToast()
@@ -218,10 +235,12 @@ export function useStockConsole(user: any) {
         where("pedidoId", "==", state.selectedPedidoId)
       )
       const snapshot = await getDocs(productsQuery)
-      const productosData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Producto[]
+      const productosData = snapshot.docs.map((doc) =>
+        normalizeProducto({
+          id: doc.id,
+          ...doc.data(),
+        } as Producto)
+      )
       
       productosData.sort((a, b) => {
         const ordenA = a.orden ?? 0
@@ -235,7 +254,7 @@ export function useStockConsole(user: any) {
       // Cargar stock actual
       const stockMap: Record<string, number> = {}
       productosData.forEach(producto => {
-        stockMap[producto.id] = (producto as any).stockActual || 0
+        stockMap[producto.id] = producto.stockActualUnits ?? 0
       })
       
       if (!mountedRef.current) return
@@ -302,11 +321,12 @@ export function useStockConsole(user: any) {
         
         snapshot.forEach((doc) => {
           const data = doc.data()
-          stockMap[doc.id] = data.stockActual || 0
-          productosData.push({
+          const producto = normalizeProducto({
             id: doc.id,
             ...data,
           } as Producto)
+          stockMap[doc.id] = producto.stockActualUnits ?? 0
+          productosData.push(producto)
         })
         
         productosData.sort((a, b) => {
@@ -453,7 +473,9 @@ export function useStockConsole(user: any) {
       // Obtener valor anterior antes del update
       const productRef = doc(db, "apps/horarios/products", productoId)
       const productDoc = await getDoc(productRef)
-      const previousValue = productDoc.exists() ? (productDoc.data().stockActual ?? 0) : 0
+      const previousValue = productDoc.exists()
+        ? Math.max(0, Math.floor(productDoc.data().stockActualUnits ?? productDoc.data().stockActual ?? 0))
+        : 0
       
       // Evitar log si no hay cambio
       if (previousValue === val) {
@@ -465,7 +487,8 @@ export function useStockConsole(user: any) {
       const productName = productDoc.exists() ? (productDoc.data().nombre || 'Producto desconocido') : 'Producto desconocido'
 
       await updateDoc(productRef, {
-        stockActual: val,
+        stockActualUnits: val,
+        stockActual: deleteField(),
         updatedAt: serverTimestamp(),
         ownerId,
         userId: user.uid,

@@ -1,4 +1,15 @@
-import { esModoPack, unidadesToPacks, packsToUnidades, unidadesToPacksFloor, type ProductoLike } from "@/lib/unidades-utils"
+import {
+  esModoPack,
+  formatStockForDisplay,
+  getStockMinimoUnits,
+  unitsToPacks,
+  type ProductoLike,
+} from "./unidades-utils"
+
+export interface PedidoEngineProduct extends ProductoLike {
+  id: string
+  nombre: string
+}
 
 export interface PedidoEngineInput {
   pedido: {
@@ -6,31 +17,33 @@ export interface PedidoEngineInput {
     formatoSalida: string
     mensajePrevio?: string
   }
-  productos: Array<{
-    id: string
-    nombre: string
-    stockMinimo: number
-    modoCompra?: "unidad" | "pack" | string
-    cantidadPorPack?: number
-    unidadBase?: string
-    unidad?: string
-  }>
+  productos: PedidoEngineProduct[]
   stockActual: Record<string, number>
   ajustesPedido?: Record<string, number>
-  calcularPedido: (stockMinimo: number, stockActual?: number) => number
+  cantidadesManuales?: Record<string, number>
+  usarCantidadesManuales?: boolean
+}
+
+export interface PedidoCalculado {
+  productoId: string
+  nombre: string
+  cantidadUnidades: number
+  cantidadPacks: number
+  unidad: string
+  stockMinimoUnits: number
+  stockActualUnits: number
+  display: ReturnType<typeof formatStockForDisplay>
 }
 
 export interface PedidoEngineOutput {
-  productosCalculados: Array<{
-    productoId: string
-    nombre: string
-    cantidadUnidades: number
-    cantidadPacks: number
-    unidad: string
-  }>
+  productosCalculados: PedidoCalculado[]
   cantidadesPedidas: Record<string, number>
   texto: string
   totalProductos: number
+}
+
+export function calcularPedidoSugerido(stockMinimoUnits: number, stockActualUnits: number): number {
+  return Math.max(0, Math.floor(stockMinimoUnits) - Math.max(0, Math.floor(stockActualUnits)))
 }
 
 export function ejecutarPedidoEngine({
@@ -38,70 +51,64 @@ export function ejecutarPedidoEngine({
   productos,
   stockActual,
   ajustesPedido = {},
-  calcularPedido,
+  cantidadesManuales = {},
+  usarCantidadesManuales = false,
 }: PedidoEngineInput): PedidoEngineOutput {
-
-  const productosCalculados: PedidoEngineOutput["productosCalculados"] = []
+  const productosCalculados: PedidoCalculado[] = []
   const cantidadesPedidas: Record<string, number> = {}
 
   for (const producto of productos) {
-    const stockActualProducto = stockActual[producto.id] ?? 0
+    const stockMinimoUnits = getStockMinimoUnits(producto)
+    const stockActualUnits = Math.max(0, Math.floor(stockActual[producto.id] ?? 0))
+    const baseUnits = usarCantidadesManuales
+      ? Math.max(0, Math.floor(cantidadesManuales[producto.id] ?? 0))
+      : calcularPedidoSugerido(stockMinimoUnits, stockActualUnits)
+    const ajusteUnits = usarCantidadesManuales ? 0 : Math.floor(ajustesPedido[producto.id] ?? 0)
+    const cantidadUnidades = Math.max(0, baseUnits + ajusteUnits)
 
-    let cantidadUnidades = 0
-    let cantidadPacks = 0
-
-    const pedidoBase = calcularPedido(producto.stockMinimo, stockActualProducto)
-    const ajuste = ajustesPedido[producto.id] ?? 0
-
-    if (esModoPack(producto as ProductoLike)) {
-      const pedidoBasePacks = unidadesToPacks(producto as ProductoLike, pedidoBase)
-      const totalPacks = Math.max(0, pedidoBasePacks + ajuste)
-
-      cantidadUnidades = packsToUnidades(producto as ProductoLike, totalPacks)
-      cantidadPacks = totalPacks
-    } else {
-      cantidadUnidades = Math.max(0, pedidoBase + ajuste)
-      cantidadPacks = cantidadUnidades
+    if (cantidadUnidades <= 0) {
+      continue
     }
 
-    if (cantidadUnidades > 0) {
-      const unidad = producto.unidadBase || producto.unidad || "U"
+    const unidad = producto.unidadBase || producto.unidad || "U"
+    const cantidadPacks = esModoPack(producto)
+      ? unitsToPacks(cantidadUnidades, producto.cantidadPorPack ?? 1)
+      : cantidadUnidades
 
-      productosCalculados.push({
-        productoId: producto.id,
-        nombre: producto.nombre,
-        cantidadUnidades,
-        cantidadPacks: esModoPack(producto as ProductoLike)
-          ? cantidadPacks
-          : cantidadUnidades,
-        unidad,
-      })
-
-      cantidadesPedidas[producto.id] = cantidadUnidades
+    const calculado: PedidoCalculado = {
+      productoId: producto.id,
+      nombre: producto.nombre,
+      cantidadUnidades,
+      cantidadPacks,
+      unidad,
+      stockMinimoUnits,
+      stockActualUnits,
+      display: formatStockForDisplay(producto, cantidadUnidades),
     }
+
+    productosCalculados.push(calculado)
+    cantidadesPedidas[producto.id] = cantidadUnidades
   }
 
-  const lineas = productosCalculados.map((p) => {
+  const lineas = productosCalculados.map((producto) => {
     let texto = pedido.formatoSalida
-
-    texto = texto.replace(/{nombre}/g, p.nombre)
-    texto = texto.replace(/{cantidad}/g, p.cantidadUnidades.toString())
-    texto = texto.replace(/{cantidadUnidades}/g, p.cantidadUnidades.toString())
-    texto = texto.replace(/{cantidadPacks}/g, p.cantidadPacks.toString())
-    texto = texto.replace(/{unidad}/g, p.unidad)
-
+    texto = texto.replace(/{nombre}/g, producto.nombre)
+    texto = texto.replace(/{cantidad}/g, producto.cantidadUnidades.toString())
+    texto = texto.replace(/{cantidadUnidades}/g, producto.cantidadUnidades.toString())
+    texto = texto.replace(/{cantidadPacks}/g, producto.cantidadPacks.toString())
+    texto = texto.replace(/{unidad}/g, producto.unidad)
     return texto.trim()
   })
 
-  const encabezado =
-    pedido.mensajePrevio?.trim() || `📦 ${pedido.nombre}`
-
-  const textoFinal = `${encabezado}\n\n${lineas.join("\n")}\n\nTotal: ${productosCalculados.length} productos`
+  const encabezado = pedido.mensajePrevio?.trim() || `[Pedido] ${pedido.nombre}`
+  const texto = lineas.length > 0
+    ? `${encabezado}\n\n${lineas.join("\n")}\n\nTotal: ${productosCalculados.length} productos`
+    : `${encabezado}\n\nTotal: 0 productos`
 
   return {
     productosCalculados,
     cantidadesPedidas,
-    texto: textoFinal,
+    texto,
     totalProductos: productosCalculados.length,
   }
 }

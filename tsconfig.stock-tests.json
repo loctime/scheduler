@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": ".codex-test",
+    "rootDir": ".",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "isolatedModules": false,
+    "incremental": false
+  },
+  "include": [
+    "__tests__/stock-domain.test.ts",
+    "lib/unidades-utils.ts",
+    "lib/pedido-engine.ts",
+    "lib/build-pedido-oficial.ts",
+    "lib/types.ts"
+  ]
+}

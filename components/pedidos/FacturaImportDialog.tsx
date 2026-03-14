@@ -18,6 +18,7 @@ import Tesseract from "tesseract.js"
 import type { Producto } from "@/lib/types"
 import { getOCRConfig, DEFAULT_OCR_CONFIG } from "@/lib/ocr-config"
 import { parseFactura, matchProducts, type ParsedItem, type MatchedItem } from "@/lib/ocr-utils"
+import { normalizeStockActualInput } from "@/lib/unidades-utils"
 
 interface FacturaImportDialogProps {
   open: boolean
@@ -137,8 +138,13 @@ export function FacturaImportDialog({
       
       for (const item of matchedItems) {
         if (item.status === "ok" && item.matchedProductId) {
+          const producto = products.find((candidate) => candidate.id === item.matchedProductId)
+          if (!producto) {
+            continue
+          }
           const currentStock = stockActual[item.matchedProductId] ?? 0
-          const newStock = currentStock + item.cantidad
+          const ingresoUnits = normalizeStockActualInput(producto, item.cantidad)
+          const newStock = currentStock + ingresoUnits
           updates.push(Promise.resolve(onStockChange(item.matchedProductId, newStock)))
         }
       }
@@ -159,7 +165,7 @@ export function FacturaImportDialog({
     } finally {
       setConfirming(false)
     }
-  }, [matchedItems, stockActual, onStockChange, onOpenChange])
+  }, [matchedItems, onOpenChange, onStockChange, products, stockActual])
 
   const handleClose = useCallback(() => {
     if (!loading && !confirming) {

@@ -240,7 +240,9 @@ export interface Producto {
   pedidoId: string
   nombre: string
   aliases?: string[]
-  stockMinimo: number
+  stockMinimo?: number
+  stockMinimoUnits?: number
+  stockActualUnits?: number
   unidad?: string
   /** Unidad base para stock y pedidos (ej: "unidad", "kg", "litro"). Default "U". */
   unidadBase?: string
