@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
 import { Pedido, Producto } from "@/lib/types"
 import { buildPedidoOficial } from "@/lib/build-pedido-oficial"
+import { getPedidoSugeridoUnits } from "@/lib/pedido-engine"
 import {
   getStockMinimoUnits,
   normalizeStockMinimoInput,
@@ -279,8 +280,8 @@ export function usePedidos(user: any) {
 
   // Productos con pedido > 0
   const productosAPedir = useMemo(() => {
-    return products.filter((p) => calcularPedido(p.stockMinimoUnits ?? p.stockMinimo ?? 0, stockActual[p.id]) > 0)
-  }, [products, stockActual, calcularPedido])
+    return products.filter((p) => getPedidoSugeridoUnits(p, stockActual[p.id] ?? 0) > 0)
+  }, [products, stockActual])
 
   // Crear pedido
   const createPedido = useCallback(async (nombre: string, stockMinimoDefault: number, formatoSalida: string) => {

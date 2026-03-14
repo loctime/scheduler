@@ -1,10 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.calcularPedidoSugerido = calcularPedidoSugerido;
+exports.getPedidoSugeridoUnits = getPedidoSugeridoUnits;
 exports.ejecutarPedidoEngine = ejecutarPedidoEngine;
 const unidades_utils_1 = require("./unidades-utils");
 function calcularPedidoSugerido(stockMinimoUnits, stockActualUnits) {
     return Math.max(0, Math.floor(stockMinimoUnits) - Math.max(0, Math.floor(stockActualUnits)));
+}
+function getPedidoSugeridoUnits(producto, stockActualUnits) {
+    return calcularPedidoSugerido((0, unidades_utils_1.getStockMinimoUnits)(producto), stockActualUnits);
 }
 function ejecutarPedidoEngine({ pedido, productos, stockActual, ajustesPedido = {}, cantidadesManuales = {}, usarCantidadesManuales = false, }) {
     const productosCalculados = [];
@@ -14,7 +18,7 @@ function ejecutarPedidoEngine({ pedido, productos, stockActual, ajustesPedido = 
         const stockActualUnits = Math.max(0, Math.floor(stockActual[producto.id] ?? 0));
         const baseUnits = usarCantidadesManuales
             ? Math.max(0, Math.floor(cantidadesManuales[producto.id] ?? 0))
-            : calcularPedidoSugerido(stockMinimoUnits, stockActualUnits);
+            : getPedidoSugeridoUnits(producto, stockActualUnits);
         const ajusteUnits = usarCantidadesManuales ? 0 : Math.floor(ajustesPedido[producto.id] ?? 0);
         const cantidadUnidades = Math.max(0, baseUnits + ajusteUnits);
         if (cantidadUnidades <= 0) {

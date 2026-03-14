@@ -23,6 +23,8 @@ import {
   unidadesSignedToPacksFloor,
 } from "@/lib/unidades-utils"
 import { buildPedidoOficial } from "@/lib/build-pedido-oficial"
+import { getPedidoSugeridoUnits } from "@/lib/pedido-engine"
+import { getStockStatus } from "@/lib/stock-status"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -257,8 +259,8 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
       const stockB = mode === "control"
         ? (localStockControl[b.id] ?? stockActual[b.id] ?? 0)
         : (stockActual[b.id] ?? 0)
-      const severityA = getStockMinimoUnits(a) - stockA
-      const severityB = getStockMinimoUnits(b) - stockB
+      const severityA = getPedidoSugeridoUnits(a, stockA)
+      const severityB = getPedidoSugeridoUnits(b, stockB)
 
       if (severityB !== severityA) {
         return severityB - severityA
@@ -388,7 +390,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
     
     productos.forEach(producto => {
       const stock = stockActual[producto.id] ?? 0
-      const isCritico = getStockMinimoUnits(producto) > stock
+      const isCritico = getStockStatus(producto, stock) !== "OK"
       
       if (isCritico) {
         nuevosCriticos.add(producto.id)
@@ -698,14 +700,15 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
                 : (stockActual[producto.id] || 0)
               const stock = stockRaw
               const stockMinimo = getStockMinimoUnits(producto)
-              const isStockBajo = stock < stockMinimo
+              const stockStatus = getStockStatus(producto, stock)
+              const isStockBajo = stockStatus !== "OK"
               const stockDisponible = stock
               const cantidadMinimaPermitida = -stockDisponible
               const vm = getVisualMode(producto.id, producto)
               const isPackProduct = esModoPack(producto)
               const delta = vm === "pack" ? getCantidadPorPack(producto) : 1
               const unidadLabel = producto.unidadBase || producto.unidad || "U"
-              const severity = stockMinimo - stock
+              const severity = getPedidoSugeridoUnits(producto, stock)
               const stockDisplay = formatStockForDisplay(producto, stock)
               const minimoDisplay = formatStockForDisplay(producto, stockMinimo)
 

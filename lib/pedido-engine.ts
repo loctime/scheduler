@@ -46,6 +46,10 @@ export function calcularPedidoSugerido(stockMinimoUnits: number, stockActualUnit
   return Math.max(0, Math.floor(stockMinimoUnits) - Math.max(0, Math.floor(stockActualUnits)))
 }
 
+export function getPedidoSugeridoUnits(producto: PedidoEngineProduct, stockActualUnits: number): number {
+  return calcularPedidoSugerido(getStockMinimoUnits(producto), stockActualUnits)
+}
+
 export function ejecutarPedidoEngine({
   pedido,
   productos,
@@ -62,7 +66,7 @@ export function ejecutarPedidoEngine({
     const stockActualUnits = Math.max(0, Math.floor(stockActual[producto.id] ?? 0))
     const baseUnits = usarCantidadesManuales
       ? Math.max(0, Math.floor(cantidadesManuales[producto.id] ?? 0))
-      : calcularPedidoSugerido(stockMinimoUnits, stockActualUnits)
+      : getPedidoSugeridoUnits(producto, stockActualUnits)
     const ajusteUnits = usarCantidadesManuales ? 0 : Math.floor(ajustesPedido[producto.id] ?? 0)
     const cantidadUnidades = Math.max(0, baseUnits + ajusteUnits)
 

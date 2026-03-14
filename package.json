@@ -8,7 +8,7 @@
     "dev": "next dev",
     "generate:icons": "node scripts/generate-icons.js",
     "lint": "eslint .",
-    "test:stock": "tsc -p tsconfig.stock-tests.json && node .codex-test/__tests__/stock-domain.test.js",
+    "test:stock": "tsc -p tsconfig.stock-tests.json && node .codex-test/tests/stock-domain.test.js",
     "start": "next start"
   },
   "dependencies": {

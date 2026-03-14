@@ -8,6 +8,8 @@ exports.getStockMinimoUnits = getStockMinimoUnits;
 exports.getStockActualUnits = getStockActualUnits;
 exports.normalizeStockMinimoInput = normalizeStockMinimoInput;
 exports.normalizeStockActualInput = normalizeStockActualInput;
+exports.recalculateStockForPackChange = recalculateStockForPackChange;
+exports.shouldPromptForPackChange = shouldPromptForPackChange;
 exports.formatStockForDisplay = formatStockForDisplay;
 exports.unidadesToPacks = unidadesToPacks;
 exports.packsToUnidades = packsToUnidades;
@@ -67,6 +69,26 @@ function normalizeStockActualInput(producto, valorUI) {
         return packsToUnits(valorUI, getCantidadPorPack(producto));
     }
     return sanitizeInteger(valorUI);
+}
+function recalculateStockForPackChange(stockActualUnits, oldPack, newPack, mode) {
+    const currentUnits = sanitizeInteger(stockActualUnits);
+    const previousPack = Math.max(1, sanitizeInteger(oldPack));
+    const nextPack = Math.max(1, sanitizeInteger(newPack));
+    switch (mode) {
+        case "keep_units":
+            return currentUnits;
+        case "keep_packs": {
+            const packsActuales = Math.floor(currentUnits / previousPack);
+            return packsActuales * nextPack;
+        }
+        case "clear_stock":
+            return 0;
+        default:
+            return currentUnits;
+    }
+}
+function shouldPromptForPackChange(stockActualUnits, oldPack, newPack) {
+    return sanitizeInteger(stockActualUnits) > 0 && Math.max(1, sanitizeInteger(oldPack)) !== Math.max(1, sanitizeInteger(newPack));
 }
 function formatStockForDisplay(producto, units) {
     const normalizedUnits = sanitizeInteger(units);

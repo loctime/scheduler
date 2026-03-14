@@ -16,6 +16,8 @@ export interface StockDisplay {
   fullLabel: string
 }
 
+export type PackChangeMode = "keep_units" | "keep_packs" | "clear_stock"
+
 function sanitizeInteger(value: number): number {
   if (!Number.isFinite(value)) return 0
   return Math.max(0, Math.floor(value))
@@ -79,6 +81,34 @@ export function normalizeStockActualInput(producto: ProductoLike, valorUI: numbe
   }
 
   return sanitizeInteger(valorUI)
+}
+
+export function recalculateStockForPackChange(
+  stockActualUnits: number,
+  oldPack: number,
+  newPack: number,
+  mode: PackChangeMode
+): number {
+  const currentUnits = sanitizeInteger(stockActualUnits)
+  const previousPack = Math.max(1, sanitizeInteger(oldPack))
+  const nextPack = Math.max(1, sanitizeInteger(newPack))
+
+  switch (mode) {
+    case "keep_units":
+      return currentUnits
+    case "keep_packs": {
+      const packsActuales = Math.floor(currentUnits / previousPack)
+      return packsActuales * nextPack
+    }
+    case "clear_stock":
+      return 0
+    default:
+      return currentUnits
+  }
+}
+
+export function shouldPromptForPackChange(stockActualUnits: number, oldPack: number, newPack: number): boolean {
+  return sanitizeInteger(stockActualUnits) > 0 && Math.max(1, sanitizeInteger(oldPack)) !== Math.max(1, sanitizeInteger(newPack))
 }
 
 export function formatStockForDisplay(producto: ProductoLike, units: number): StockDisplay {

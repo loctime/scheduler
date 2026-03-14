@@ -11,10 +11,11 @@
     "incremental": false
   },
   "include": [
-    "__tests__/stock-domain.test.ts",
+    "tests/stock-domain.test.ts",
     "lib/unidades-utils.ts",
     "lib/pedido-engine.ts",
     "lib/build-pedido-oficial.ts",
-    "lib/types.ts"
+    "lib/types.ts",
+    "lib/stock-status.ts"
   ]
 }

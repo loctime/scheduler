@@ -5,6 +5,8 @@ import {
   formatStockForDisplay,
   normalizeStockMinimoInput,
   packsToUnits,
+  recalculateStockForPackChange,
+  shouldPromptForPackChange,
   unitsToPacks,
 } from "../lib/unidades-utils"
 
@@ -126,6 +128,36 @@ const tests: Array<{ name: string; run: () => void }> = [
     run: () => {
       const display = formatStockForDisplay(productoPack, 25)
       assert.equal(display.fullLabel, "2 packs + 1 unidades (25 unidades)")
+    },
+  },
+  {
+    name: "recalculateStockForPackChange mantiene unidades actuales",
+    run: () => {
+      assert.equal(recalculateStockForPackChange(48, 24, 12, "keep_units"), 48)
+    },
+  },
+  {
+    name: "recalculateStockForPackChange mantiene cantidad de packs",
+    run: () => {
+      assert.equal(recalculateStockForPackChange(48, 24, 12, "keep_packs"), 24)
+    },
+  },
+  {
+    name: "recalculateStockForPackChange limpia stock",
+    run: () => {
+      assert.equal(recalculateStockForPackChange(48, 24, 12, "clear_stock"), 0)
+    },
+  },
+  {
+    name: "recalculateStockForPackChange descarta resto al mantener packs",
+    run: () => {
+      assert.equal(recalculateStockForPackChange(50, 24, 12, "keep_packs"), 24)
+    },
+  },
+  {
+    name: "shouldPromptForPackChange no pide dialogo con stock 0",
+    run: () => {
+      assert.equal(shouldPromptForPackChange(0, 24, 12), false)
     },
   },
 ]

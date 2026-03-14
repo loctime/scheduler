@@ -7,14 +7,28 @@ import { Trash2, Upload, Package, Minus, Plus, PlusCircle, X, Check, AlertTriang
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/utils"
 import { Producto } from "@/lib/types"
+import { getPedidoSugeridoUnits } from "@/lib/pedido-engine"
+import { getStockStatus } from "@/lib/stock-status"
 import {
   esModoPack,
   formatStockForDisplay,
   getCantidadPorPack,
   normalizeStockActualInput,
   normalizeStockMinimoInput,
+  recalculateStockForPackChange,
+  shouldPromptForPackChange,
+  type PackChangeMode,
 } from "@/lib/unidades-utils"
 import {
   DndContext,
@@ -410,6 +424,7 @@ interface ProductoRowProps {
   inputRef: React.RefObject<HTMLInputElement | null>
   onUpdateProduct: (productId: string, field: string, value: string) => Promise<boolean>
   onLocalStockChange: (productId: string, value: number) => void
+  onPackSizeChange: (product: Producto, nextPack: number, stockActualUnits: number) => void
   onDeleteProduct: (productId: string) => void
   isCritical?: boolean
   severity?: number
@@ -434,6 +449,7 @@ const ProductoRow = React.memo(function ProductoRow({
   inputRef,
   onUpdateProduct,
   onLocalStockChange,
+  onPackSizeChange,
   onDeleteProduct,
   isCritical = false,
   severity = 0,
@@ -562,7 +578,7 @@ const ProductoRow = React.memo(function ProductoRow({
           onChange={(v) => setUnidadesPorPackEdit(product.id, v)}
           onBlur={(num) => {
             if (num >= 2 && num !== (product.cantidadPorPack ?? 6)) {
-              onUpdateProduct(product.id, "cantidadPorPack", String(num))
+              onPackSizeChange(product, num, stockActualValue)
             }
           }}
           inputRef={unidadesPorPackInputRef}
@@ -737,6 +753,13 @@ export function ProductosTable({
   // Estado local temporal para stock (optimización de performance)
   const [localStock, setLocalStock] = useState<Record<string, number>>({})
   const debounceTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({})
+  const [packChangeDialog, setPackChangeDialog] = useState<{
+    product: Producto
+    oldPack: number
+    newPack: number
+    stockActualUnits: number
+    packsActuales: number
+  } | null>(null)
   
   // Referencia para evitar que el efecto sobrescriba cambios de orden optimistas
   const isReorderingRef = useRef(false)
@@ -897,7 +920,7 @@ export function ProductosTable({
   const hasCriticalProducts = useMemo(() => {
     return products.some(product => {
       const stock = stockActual[product.id] ?? 0
-      return product.stockMinimo > stock
+      return getStockStatus(product, stock) !== "OK"
     })
   }, [products, stockActual])
 
@@ -938,6 +961,55 @@ export function ProductosTable({
       [productId]: value,
     }))
   }, [])
+
+  const handlePackSizeChange = useCallback(
+    async (product: Producto, nextPack: number, stockActualUnits: number) => {
+      const oldPack = getCantidadPorPack(product)
+      if (!shouldPromptForPackChange(stockActualUnits, oldPack, nextPack)) {
+        await onUpdateProduct(product.id, "cantidadPorPack", String(nextPack))
+        setUnidadesPorPackEdit(product.id, String(nextPack))
+        return
+      }
+
+      setPackChangeDialog({
+        product,
+        oldPack,
+        newPack: nextPack,
+        stockActualUnits,
+        packsActuales: Math.floor(stockActualUnits / oldPack),
+      })
+    },
+    [onUpdateProduct]
+  )
+
+  const confirmPackSizeChange = useCallback(
+    async (mode: PackChangeMode) => {
+      if (!packChangeDialog) return
+
+      const { product, oldPack, newPack, stockActualUnits } = packChangeDialog
+      const nextUnits = recalculateStockForPackChange(stockActualUnits, oldPack, newPack, mode)
+
+      setLocalStock((prev) => ({
+        ...prev,
+        [product.id]: nextUnits,
+      }))
+
+      await onUpdateProduct(product.id, "cantidadPorPack", String(newPack))
+      if (nextUnits !== stockActualUnits) {
+        onStockChange(product.id, nextUnits)
+      }
+
+      setUnidadesPorPackEdit(product.id, String(newPack))
+      setPackChangeDialog(null)
+    },
+    [onStockChange, onUpdateProduct, packChangeDialog, setUnidadesPorPackEdit]
+  )
+
+  const cancelPackSizeChange = useCallback(() => {
+    if (!packChangeDialog) return
+    setUnidadesPorPackEdit(packChangeDialog.product.id, String(packChangeDialog.oldPack))
+    setPackChangeDialog(null)
+  }, [packChangeDialog, setUnidadesPorPackEdit])
 
   const handleCreateProduct = useCallback(async () => {
     if (!onCreateProduct || !newProductNombre.trim()) return
@@ -984,8 +1056,8 @@ export function ProductosTable({
     const manualIndexes = new Map(productsToRender.map((product, index) => [product.id, index]))
 
     return [...productsToRender].sort((a, b) => {
-      const severityA = a.stockMinimo - (localStock[a.id] ?? stockActual[a.id] ?? 0)
-      const severityB = b.stockMinimo - (localStock[b.id] ?? stockActual[b.id] ?? 0)
+      const severityA = getPedidoSugeridoUnits(a, localStock[a.id] ?? stockActual[a.id] ?? 0)
+      const severityB = getPedidoSugeridoUnits(b, localStock[b.id] ?? stockActual[b.id] ?? 0)
 
       if (severityB !== severityA) {
         return severityB - severityA
@@ -1062,14 +1134,14 @@ export function ProductosTable({
       displayedProducts.map((product, rowIndex) => {
         // Usar localStock si existe, sino stockActual (para UI inmediata)
         const stockActualValue = localStock[product.id] ?? stockActual[product.id] ?? 0
-        const severity = product.stockMinimo - stockActualValue
-        const isCritical = severity > 0
+        const severity = getPedidoSugeridoUnits(product, stockActualValue)
+        const isCritical = getStockStatus(product, stockActualValue) !== "OK"
 
         const productRowProps = {
           product,
           rowIndex,
           stockActualValue,
-          stockMinimoLocal: stockMinimoLocal[product.id] ?? product.stockMinimo,
+          stockMinimoLocal: stockMinimoLocal[product.id] ?? product.stockMinimoUnits ?? product.stockMinimo ?? 0,
           setStockMinimoLocal: setStockMinimoLocalFor,
           unidadesPorPackEdit: unidadesPorPackEdit[product.id] ?? "",
           setUnidadesPorPackEdit,
@@ -1080,6 +1152,7 @@ export function ProductosTable({
           inputRef,
           onUpdateProduct,
           onLocalStockChange: handleLocalStockChange,
+          onPackSizeChange: handlePackSizeChange,
           onDeleteProduct,
           isCritical,
           severity,
@@ -1115,6 +1188,7 @@ export function ProductosTable({
       inputRef,
       onUpdateProduct,
       handleLocalStockChange,
+      handlePackSizeChange,
       onDeleteProduct,
       isDesktop,
       sortMode,
@@ -1273,6 +1347,48 @@ export function ProductosTable({
           />
         )}
       </div>
+
+      <AlertDialog open={!!packChangeDialog} onOpenChange={(open) => {
+        if (!open) {
+          cancelPackSizeChange()
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cambiar tamano del pack</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>Este producto tiene stock registrado.</p>
+                {packChangeDialog && (
+                  <>
+                    <p>
+                      Stock actual:
+                      {" "}
+                      {packChangeDialog.stockActualUnits} unidades
+                      {" "}
+                      ({packChangeDialog.packsActuales} packs de {packChangeDialog.oldPack})
+                    </p>
+                    <p>El nuevo tamano de pack sera: {packChangeDialog.newPack} unidades por pack</p>
+                    <p>Debes decidir como ajustar el inventario.</p>
+                  </>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
+            <Button onClick={() => void confirmPackSizeChange("keep_units")}>
+              Mantener unidades actuales
+            </Button>
+            <Button onClick={() => void confirmPackSizeChange("keep_packs")}>
+              Mantener cantidad de packs
+            </Button>
+            <Button variant="destructive" onClick={() => void confirmPackSizeChange("clear_stock")}>
+              Limpiar stock del producto
+            </Button>
+            <AlertDialogCancel onClick={cancelPackSizeChange}>Cancelar</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
