@@ -44,20 +44,7 @@ function TareasContent() {
   // Estados para el calendario interactivo
   const [quickDialogOpen, setQuickDialogOpen] = useState(false)
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedShift, setSelectedShift] = useState<TaskShift | null>(null)
-  const [currentWeek, setCurrentWeek] = useState<Date[]>(() => {
-    const today = new Date()
-    const currentDay = today.getDay()
-    const week = []
-    
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(today)
-      date.setDate(today.getDate() - currentDay + i)
-      week.push(date)
-    }
-    return week
-  })
 
   const { employees, user, userData } = useData()
   console.log("User desde useData:", user)
@@ -77,9 +64,8 @@ function TareasContent() {
   }, [tasks])
 
   // Funciones para el calendario interactivo
-  const handleCellClick = (dayId: number, date: Date, shift: TaskShift) => {
+  const handleCellClick = (dayId: number, shift: TaskShift) => {
     setSelectedDay(dayId)
-    setSelectedDate(date)
     setSelectedShift(shift)
     setQuickDialogOpen(true)
   }
@@ -89,23 +75,11 @@ function TareasContent() {
     setViewMode("edit")
   }
 
-  const handleWeekChange = (direction: 'prev' | 'next') => {
-    const newWeek = [...currentWeek]
-    const daysToMove = direction === 'prev' ? -7 : 7
-    
-    newWeek.forEach(date => {
-      date.setDate(date.getDate() + daysToMove)
-    })
-    
-    setCurrentWeek(newWeek)
-  }
-
   const handleQuickCreateTask = async (data: TaskFormData) => {
     const result = await createTask(data)
     if (result) {
       setQuickDialogOpen(false)
       setSelectedDay(null)
-      setSelectedDate(null)
       setSelectedShift(null)
       toast({
         title: "Tarea creada",
@@ -239,8 +213,6 @@ function TareasContent() {
                 tasks={tasks} // Todas las tareas para el calendario
                 onTaskClick={handleTaskClick}
                 onCellClick={handleCellClick}
-                onWeekChange={handleWeekChange}
-                currentWeek={currentWeek}
               />
             </CardContent>
           </Card>
@@ -276,17 +248,14 @@ function TareasContent() {
 
       {/* Diálogo rápido para crear tareas */}
       <QuickTaskDialog
-        open={quickDialogOpen}
-        onOpenChange={setQuickDialogOpen}
-        onSubmit={handleQuickCreateTask}
-        employees={employees}
-        selectedDay={selectedDay || undefined}
-        selectedDate={selectedDate || undefined}
-        selectedShift={selectedShift || undefined}
-        isLoading={managementLoading}
-      />
-
-      {/* Existing dialogs */}
+                open={quickDialogOpen}
+                onOpenChange={setQuickDialogOpen}
+                onSubmit={handleQuickCreateTask}
+                employees={employees}
+                selectedDay={selectedDay || undefined}
+                selectedShift={selectedShift || undefined}
+                isLoading={managementLoading}
+              />  
       <Dialog open={viewMode === "create"} onOpenChange={(open) => !open && setViewMode("list")}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>

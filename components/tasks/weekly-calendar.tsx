@@ -9,19 +9,17 @@ import { TaskType, TaskShift } from "@/types/task"
 interface WeeklyCalendarProps {
   tasks: Task[]
   onTaskClick: (task: Task) => void
-  onCellClick: (dayId: number, date: Date, shift: TaskShift) => void
-  onWeekChange?: (direction: 'prev' | 'next') => void
-  currentWeek?: Date[]
+  onCellClick: (dayId: number, shift: TaskShift) => void
 }
 
 const DIAS_SEMANA = [
-  { id: 0, name: "Dom" },
-  { id: 1, name: "Lun" },
-  { id: 2, name: "Mar" },
-  { id: 3, name: "Mié" },
-  { id: 4, name: "Jue" },
-  { id: 5, name: "Vie" },
-  { id: 6, name: "Sáb" },
+  { id: 1, name: "Lunes" },
+  { id: 2, name: "Martes" },
+  { id: 3, name: "Miércoles" },
+  { id: 4, name: "Jueves" },
+  { id: 5, name: "Viernes" },
+  { id: 6, name: "Sábado" },
+  { id: 0, name: "Domingo" },
 ]
 
 const TURNOS = [
@@ -32,56 +30,32 @@ const TURNOS = [
 export function WeeklyCalendar({ 
   tasks, 
   onTaskClick, 
-  onCellClick, 
-  onWeekChange,
-  currentWeek 
+  onCellClick
 }: WeeklyCalendarProps) {
-  const [selectedDay, setSelectedDay] = useState<number | null>(null)
-
-  // Generar semana actual si no se proporciona
-  const weekDates = currentWeek || (() => {
-    const today = new Date()
-    const currentDay = today.getDay()
-    const week = []
-    
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(today)
-      date.setDate(today.getDate() - currentDay + i)
-      week.push(date)
-    }
-    return week
-  })()
-
-  // Obtener tareas para un día y turno específicos
-  const getTasksForDayAndShift = (dayId: number, date: Date, shift: TaskShift) => {
-    const dateString = date.getFullYear().toString() + 
-                     (date.getMonth() + 1).toString().padStart(2, '0') + 
-                     date.getDate().toString().padStart(2, '0')
-
+  // Obtener tareas para un día y turno específicos (solo tareas semanales)
+  const getTasksForDayAndShift = (dayId: number, shift: TaskShift) => {
     return tasks.filter(task => {
       const taskType = task.taskType || "weekly"
       
-      // Filtrar por tipo y fecha primero
-      let matchesDate = false
-      switch (taskType) {
-        case "daily":
-          matchesDate = true
-          break
-        case "weekly":
-          matchesDate = task.daysOfWeek?.includes(dayId) || false
-          break
-        case "specific":
-          matchesDate = task.specificDate === dateString
-          break
-        default:
-          matchesDate = task.daysOfWeek?.includes(dayId) || false
+      // Solo mostrar tareas semanales y diarias
+      if (taskType === "specific") return false
+      
+      // Para tareas diarias, mostrar en todos los días
+      if (taskType === "daily") {
+        const taskShift = task.shift || "both"
+        return taskShift === "both" || taskShift === shift
       }
       
-      if (!matchesDate) return false
+      // Para tareas semanales, verificar si coincide el día
+      if (taskType === "weekly") {
+        const matchesDay = task.daysOfWeek?.includes(dayId) || false
+        if (!matchesDay) return false
+        
+        const taskShift = task.shift || "both"
+        return taskShift === "both" || taskShift === shift
+      }
       
-      // Filtrar por turno
-      const taskShift = task.shift || "both"
-      return taskShift === "both" || taskShift === shift
+      return false
     })
   }
 
@@ -120,45 +94,17 @@ export function WeeklyCalendar({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg">Calendario Semanal</CardTitle>
-          <div className="flex items-center gap-2">
-            {onWeekChange && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onWeekChange('prev')}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onWeekChange('next')}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </>
-            )}
-          </div>
         </div>
       </CardHeader>
       <CardContent>
-        {/* Header con días y turnos */}
+        {/* Header con días */}
         <div className="grid grid-cols-8 gap-2 mb-2">
           <div></div> {/* Espacio vacío para turnos */}
-          {DIAS_SEMANA.map((dia) => {
-            const date = weekDates[DIAS_SEMANA.findIndex(d => d.id === dia.id)]
-            const isToday = new Date().toDateString() === date.toDateString()
-            
-            return (
-              <div key={dia.id} className="text-center">
-                <div className="font-semibold text-sm">{dia.name}</div>
-                <div className={`text-xs ${isToday ? 'text-blue-600 font-bold' : 'text-gray-500'}`}>
-                  {date.getDate()}
-                </div>
-              </div>
-            )
-          })}
+          {DIAS_SEMANA.map((dia) => (
+            <div key={dia.id} className="text-center">
+              <div className="font-semibold text-sm">{dia.name}</div>
+            </div>
+          ))}
         </div>
 
         {/* Filas de turnos */}
@@ -174,31 +120,36 @@ export function WeeklyCalendar({
             
             {/* Celdas de días para este turno */}
             {DIAS_SEMANA.map((dia) => {
-              const date = weekDates[DIAS_SEMANA.findIndex(d => d.id === dia.id)]
-              const shiftTasks = getTasksForDayAndShift(dia.id, date, turno.id)
+              const shiftTasks = getTasksForDayAndShift(dia.id, turno.id)
               
               return (
                 <div
                   key={`${dia.id}-${turno.id}`}
-                  className="border rounded-lg min-h-[100px] p-2 hover:bg-gray-50 transition-colors cursor-pointer"
-                  onClick={() => onCellClick(dia.id, date, turno.id)}
+                  className="border rounded-lg min-h-[120px] p-2 hover:bg-gray-50 transition-colors cursor-pointer"
+                  onClick={() => onCellClick(dia.id, turno.id)}
                 >
                   <div className="space-y-1">
                     {shiftTasks.slice(0, 2).map(task => (
                       <div
                         key={task.id}
-                        className={`text-xs p-1 rounded border cursor-pointer hover:shadow-sm transition-shadow ${getTaskColor(task)} ${
+                        className={`text-xs p-2 rounded border cursor-pointer hover:shadow-md transition-all duration-200 ${getTaskColor(task)} ${
                           !task.active ? 'opacity-50 line-through' : ''
                         }`}
                         onClick={(e) => {
                           e.stopPropagation()
                           onTaskClick(task)
                         }}
+                        title={`${task.title}${task.description ? '\n' + task.description : ''}`}
                       >
                         <div className="flex items-center gap-1">
-                          <span>{getTaskIcon(task)}</span>
-                          <div className="truncate flex-1">{task.title}</div>
+                          <span className="flex-shrink-0">{getTaskIcon(task)}</span>
+                          <div className="truncate flex-1 font-medium">{task.title}</div>
                         </div>
+                        {task.employeeIds && task.employeeIds.length > 0 && (
+                          <div className="text-xs opacity-75 mt-1 truncate">
+                            👥 {task.employeeIds.length} asignado{task.employeeIds.length > 1 ? 's' : ''}
+                          </div>
+                        )}
                       </div>
                     ))}
                     
@@ -213,7 +164,7 @@ export function WeeklyCalendar({
                         className="h-6 flex items-center justify-center text-gray-400 hover:text-gray-600"
                         onClick={(e) => {
                           e.stopPropagation()
-                          onCellClick(dia.id, date, turno.id)
+                          onCellClick(dia.id, turno.id)
                         }}
                       >
                         <Plus className="h-3 w-3" />
@@ -235,10 +186,6 @@ export function WeeklyCalendar({
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-blue-100 border border-blue-200 rounded"></div>
             <span className="text-xs text-gray-600">Semanales</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-purple-100 border border-purple-200 rounded"></div>
-            <span className="text-xs text-gray-600">Específicas</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-600">🌅 Mañana</span>
