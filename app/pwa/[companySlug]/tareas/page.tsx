@@ -65,6 +65,9 @@ export default function TareasPage() {
   const today = new Date()
   const todayName = DIAS_SEMANA[today.getDay()]
   const todayDayNumber = today.getDay()
+  const todayString = today.getFullYear().toString() + 
+                     (today.getMonth() + 1).toString().padStart(2, '0') + 
+                     today.getDate().toString().padStart(2, '0')
 
   // Paso 1: Filtrado correcto por empleado
   const filteredTasks = useMemo(() => {
@@ -81,18 +84,40 @@ export default function TareasPage() {
     })
   }, [tasks, ownerId, viewer?.employeeId])
 
-  // Paso 2: Separar tareas del día vs no del día
+  // Paso 2: Separar tareas del día vs no del día (actualizado para nuevos tipos)
   const { tareasDelDia, tareasNoDelDia } = useMemo(() => {
-    const tareasDelDia = filteredTasks.filter(task =>
-      task.daysOfWeek?.includes(todayDayNumber)
-    )
+    const tareasDelDia = filteredTasks.filter(task => {
+      const taskType = task.taskType || "weekly" // Compatibilidad hacia atrás
+      
+      switch (taskType) {
+        case "daily":
+          return true // Aparecen todos los días
+        case "weekly":
+          return task.daysOfWeek?.includes(todayDayNumber) || false
+        case "specific":
+          return task.specificDate === todayString
+        default:
+          return task.daysOfWeek?.includes(todayDayNumber) || false
+      }
+    })
     
-    const tareasNoDelDia = filteredTasks.filter(task =>
-      !task.daysOfWeek?.includes(todayDayNumber)
-    )
+    const tareasNoDelDia = filteredTasks.filter(task => {
+      const taskType = task.taskType || "weekly" // Compatibilidad hacia atrás
+      
+      switch (taskType) {
+        case "daily":
+          return false // Las diarias siempre son del día
+        case "weekly":
+          return !task.daysOfWeek?.includes(todayDayNumber)
+        case "specific":
+          return task.specificDate !== todayString
+        default:
+          return !task.daysOfWeek?.includes(todayDayNumber)
+      }
+    })
     
     return { tareasDelDia, tareasNoDelDia }
-  }, [filteredTasks, todayDayNumber])
+  }, [filteredTasks, todayDayNumber, todayString])
 
   // Paso 3: Dentro de tareasDelDia separar pendientes y completadas
   const { pendientes, completadas } = useMemo(() => {

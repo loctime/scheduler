@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { Task } from "@/types/task"
+import { Task, TaskType } from "@/types/task"
 
 export function useTasks(employeeId?: string, ownerId?: string | null) {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -58,11 +58,26 @@ export function useTasks(employeeId?: string, ownerId?: string | null) {
 
         setTasks(tasksData)
 
-        // Calcular tareas del día
-        const today = new Date().getDay()
+        // Calcular tareas del día con nueva lógica
+        const today = new Date()
+        const todayDayNumber = today.getDay()
+        const todayString = today.getFullYear().toString() + 
+                           (today.getMonth() + 1).toString().padStart(2, '0') + 
+                           today.getDate().toString().padStart(2, '0')
+        
         const todayTasksData = tasksData.filter(task => {
-          const isToday = task.daysOfWeek?.includes(today)
-          return isToday
+          const taskType = task.taskType || "weekly" // Compatibilidad hacia atrás
+          
+          switch (taskType) {
+            case "daily":
+              return true // Aparecen todos los días
+            case "weekly":
+              return task.daysOfWeek?.includes(todayDayNumber) || false
+            case "specific":
+              return task.specificDate === todayString
+            default:
+              return task.daysOfWeek?.includes(todayDayNumber) || false
+          }
         })
 
         setTodayTasks(todayTasksData)

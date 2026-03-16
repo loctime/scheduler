@@ -9,8 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TaskFormData } from "@/hooks/use-task-management"
 import { Empleado } from "@/lib/types"
+import { TaskType } from "@/types/task"
 import { RichTextEditor } from "@/components/tasks/simple-rich-text-editor"
 
 const DIAS_SEMANA = [
@@ -39,6 +41,8 @@ export function TaskForm({ task, employees, onSubmit, onCancel, isLoading = fals
     instructions: task?.instructions || "",
     employeeIds: task?.employeeIds || [],
     daysOfWeek: task?.daysOfWeek || [],
+    taskType: task?.taskType || "weekly",
+    specificDate: task?.specificDate || "",
     active: task?.active ?? true,
   })
 
@@ -106,6 +110,95 @@ export function TaskForm({ task, employees, onSubmit, onCancel, isLoading = fals
 
           <Separator />
 
+          {/* Tipo de tarea */}
+          <div>
+            <Label htmlFor="taskType" className="text-base font-medium">Tipo de Tarea</Label>
+            <Select
+              value={formData.taskType || "weekly"}
+              onValueChange={(value: TaskType) =>
+                setFormData(prev => ({ 
+                  ...prev, 
+                  taskType: value,
+                  // Limpiar campos irrelevantes al cambiar tipo
+                  daysOfWeek: value === "weekly" ? prev.daysOfWeek : [],
+                  specificDate: value === "specific" ? prev.specificDate : ""
+                }))
+              }
+              disabled={isLoading}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona el tipo de tarea" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="daily">Diaria (todos los días)</SelectItem>
+                <SelectItem value="weekly">Semanal (días específicos)</SelectItem>
+                <SelectItem value="specific">Fecha específica</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Campos condicionales según tipo */}
+          {formData.taskType === "weekly" && (
+            <div>
+              <Label className="text-base font-medium">Días de la Semana</Label>
+              <p className="text-sm text-gray-500 mb-3">
+                Selecciona los días en que esta tarea debe mostrarse
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {DIAS_SEMANA.map((dia) => (
+                  <div key={dia.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`day-${dia.id}`}
+                      checked={formData.daysOfWeek?.includes(dia.id) || false}
+                      onCheckedChange={(checked) => 
+                        handleDayChange(dia.id, checked as boolean)
+                      }
+                      disabled={isLoading}
+                    />
+                    <Label 
+                      htmlFor={`day-${dia.id}`}
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      {dia.name}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              {(!formData.daysOfWeek || formData.daysOfWeek.length === 0) && (
+                <p className="text-sm text-gray-500 mt-2">
+                  La tarea no se mostrará como "tarea del día"
+                </p>
+              )}
+            </div>
+          )}
+
+          {formData.taskType === "specific" && (
+            <div>
+              <Label htmlFor="specificDate">Fecha Específica</Label>
+              <Input
+                id="specificDate"
+                type="date"
+                value={formData.specificDate || ""}
+                onChange={(e) => setFormData(prev => ({ ...prev, specificDate: e.target.value }))}
+                disabled={isLoading}
+                min={new Date().toISOString().split('T')[0]} // No permitir fechas pasadas
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                La tarea solo se mostrará en esta fecha específica
+              </p>
+            </div>
+          )}
+
+          {formData.taskType === "daily" && (
+            <div className="bg-blue-50 p-3 rounded-lg">
+              <p className="text-sm text-blue-700">
+                <strong>Tarea diaria:</strong> Esta tarea aparecerá todos los días para los empleados asignados.
+              </p>
+            </div>
+          )}
+
+          <Separator />
+
           {/* Contenido detallado */}
           <div>
             <Label htmlFor="detailedContent">Contenido Detallado</Label>
@@ -164,41 +257,6 @@ export function TaskForm({ task, employees, onSubmit, onCancel, isLoading = fals
               <Badge variant="secondary" className="mt-2">
                 Visible para todos los empleados
               </Badge>
-            )}
-          </div>
-
-          <Separator />
-
-          {/* Días de la semana */}
-          <div>
-            <Label className="text-base font-medium">Días de la Semana</Label>
-            <p className="text-sm text-gray-500 mb-3">
-              Selecciona los días en que esta tarea debe mostrarse
-            </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {DIAS_SEMANA.map((dia) => (
-                <div key={dia.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`day-${dia.id}`}
-                    checked={formData.daysOfWeek?.includes(dia.id) || false}
-                    onCheckedChange={(checked) => 
-                      handleDayChange(dia.id, checked as boolean)
-                    }
-                    disabled={isLoading}
-                  />
-                  <Label 
-                    htmlFor={`day-${dia.id}`}
-                    className="text-sm font-normal cursor-pointer"
-                  >
-                    {dia.name}
-                  </Label>
-                </div>
-              ))}
-            </div>
-            {(!formData.daysOfWeek || formData.daysOfWeek.length === 0) && (
-              <p className="text-sm text-gray-500 mt-2">
-                La tarea no se mostrará como "tarea del día"
-              </p>
             )}
           </div>
 

@@ -2,6 +2,8 @@ import { useState } from "react"
 import { collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Task } from "@/types/task"
+import { Empleado } from "@/lib/types"
+import { TaskType } from "@/types/task"
 import { useOwnerId } from "@/hooks/use-owner-id"
 import { useToast } from "@/hooks/use-toast"
 
@@ -12,6 +14,8 @@ export interface TaskFormData {
   instructions: string
   employeeIds?: string[]
   daysOfWeek?: number[]
+  taskType?: TaskType
+  specificDate?: string // YYYY-MM-DD
   active: boolean
 }
 

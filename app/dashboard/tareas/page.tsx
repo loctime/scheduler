@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, ArrowLeft } from "lucide-react"
@@ -11,6 +11,7 @@ import { useTaskManagement } from "@/hooks/use-task-management"
 import { useData } from "@/contexts/data-context"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Task } from "@/types/task"
+import { TaskType } from "@/types/task"
 import { TaskFormData } from "@/hooks/use-task-management"
 import {
   Dialog,
@@ -45,6 +46,15 @@ function TareasContent() {
   const { tasks, isLoading: tasksLoading } = useTasks(undefined, userData?.ownerId)
   const { createTask, updateTask, deleteTask, toggleTaskActive, isLoading: managementLoading } = useTaskManagement()
   const { toast } = useToast()
+
+  // Organizar tareas por tipo
+  const { dailyTasks, weeklyTasks, specificTasks } = useMemo(() => {
+    const dailyTasks = tasks.filter(task => (task.taskType || "weekly") === "daily")
+    const weeklyTasks = tasks.filter(task => (task.taskType || "weekly") === "weekly")
+    const specificTasks = tasks.filter(task => (task.taskType || "weekly") === "specific")
+    
+    return { dailyTasks, weeklyTasks, specificTasks }
+  }, [tasks])
 
   const handleCreateTask = async (data: TaskFormData) => {
     const result = await createTask(data)
@@ -102,6 +112,59 @@ function TareasContent() {
 
   const isLoading = tasksLoading || managementLoading
 
+  // Componente para calendario semanal simple
+  const WeeklyCalendar = ({ tasks }: { tasks: Task[] }) => {
+    const daysOfWeek = [
+      { id: 1, name: "Lunes" },
+      { id: 2, name: "Martes" },
+      { id: 3, name: "Miércoles" },
+      { id: 4, name: "Jueves" },
+      { id: 5, name: "Viernes" },
+      { id: 6, name: "Sábado" },
+      { id: 0, name: "Domingo" },
+    ]
+
+    return (
+      <div className="grid grid-cols-7 gap-4">
+        {daysOfWeek.map(day => {
+          const dayTasks = tasks.filter(task => 
+            task.daysOfWeek?.includes(day.id)
+          )
+          
+          return (
+            <div key={day.id} className="border rounded-lg p-3">
+              <h4 className="font-semibold text-sm mb-2 text-center">{day.name}</h4>
+              <div className="space-y-2">
+                {dayTasks.map(task => (
+                  <div 
+                    key={task.id}
+                    className={`text-xs p-2 rounded border cursor-pointer hover:bg-gray-50 ${
+                      !task.active ? 'opacity-50 line-through' : 'bg-white'
+                    }`}
+                    onClick={() => {
+                      setSelectedTask(task)
+                      setViewMode("edit")
+                    }}
+                  >
+                    <div className="font-medium truncate">{task.title}</div>
+                    {task.description && (
+                      <div className="text-gray-500 truncate">{task.description}</div>
+                    )}
+                  </div>
+                ))}
+                {dayTasks.length === 0 && (
+                  <div className="text-xs text-gray-400 text-center py-4">
+                    Sin tareas
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -130,15 +193,82 @@ function TareasContent() {
 
       {/* Contenido principal */}
       {viewMode === "list" && (
-        <TaskList
-          tasks={tasks}
-          employees={employees}
-          onEdit={handleEditTask}
-          onDelete={handleDeleteClick}
-          onToggleActive={handleToggleActive}
-          onView={handleViewTask}
-          isLoading={isLoading}
-        />
+        <div className="space-y-8">
+          {/* Tareas Diarias */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                Tareas Diarias ({dailyTasks.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {dailyTasks.length > 0 ? (
+                <TaskList
+                  tasks={dailyTasks}
+                  employees={employees}
+                  onEdit={handleEditTask}
+                  onDelete={handleDeleteClick}
+                  onToggleActive={handleToggleActive}
+                  onView={handleViewTask}
+                  isLoading={isLoading}
+                />
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  No hay tareas diarias configuradas
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Tareas Semanales - Calendario */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                Tareas Semanales ({weeklyTasks.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {weeklyTasks.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <WeeklyCalendar tasks={weeklyTasks} />
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  No hay tareas semanales configuradas
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Tareas Específicas */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                Tareas por Fecha ({specificTasks.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {specificTasks.length > 0 ? (
+                <TaskList
+                  tasks={specificTasks.sort((a, b) => (a.specificDate || '').localeCompare(b.specificDate || ''))}
+                  employees={employees}
+                  onEdit={handleEditTask}
+                  onDelete={handleDeleteClick}
+                  onToggleActive={handleToggleActive}
+                  onView={handleViewTask}
+                  isLoading={isLoading}
+                />
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  No hay tareas con fecha específica configuradas
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {viewMode === "create" && (
