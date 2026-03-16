@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Copy, FileText, Link as LinkIcon, ExternalLink, Bell, Loader2 } from "lucide-react"
+import { Copy, FileText, Link as LinkIcon, ExternalLink, Bell, Loader2, Image } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export interface PedidoActionsProps {
@@ -16,6 +16,7 @@ export interface PedidoActionsProps {
   onLlevarPedidoASheet: () => void
   onGenerarEnlace: () => void
   onVerPedido: () => void
+  onExportImage: () => void
   hasSheetUrl: boolean
 }
 
@@ -31,6 +32,7 @@ export function PedidoActions({
   onLlevarPedidoASheet,
   onGenerarEnlace,
   onVerPedido,
+  onExportImage,
   hasSheetUrl
 }: PedidoActionsProps) {
   return (
@@ -68,6 +70,16 @@ export function PedidoActions({
         >
           <Copy className="h-3.5 w-3.5 sm:mr-1" />
           <span className="text-xs">copiar pedido</span>
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2 flex-1 sm:flex-initial"
+          disabled={productosAPedirCount === 0}
+          onClick={onExportImage}
+        >
+          <Image className="h-3.5 w-3.5 sm:mr-1" />
+          <span className="text-xs">imagen</span>
         </Button>
         <Button
           size="sm"

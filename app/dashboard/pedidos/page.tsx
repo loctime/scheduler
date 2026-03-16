@@ -22,7 +22,7 @@ import { doc, serverTimestamp, getDoc, updateDoc, deleteDoc, deleteField } from 
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import { PedidosSidebar } from "@/components/pedidos/pedidos-sidebar"
 import { PedidoHeader } from "@/components/pedidos/PedidoHeader"
-import { PedidoActions } from "@/components/pedidos/PedidoActions"
+import { PedidoActionsWithImageExport } from "@/components/pedidos/PedidoActionsWithImageExport"
 import { PedidosTabs } from "@/components/pedidos/PedidosTabs"
 import { ProductosTab } from "@/components/pedidos/ProductosTab"
 import { RemitosTab } from "@/components/pedidos/RemitosTab"
@@ -512,11 +512,13 @@ export default function PedidosPage() {
                   />
 
                   {products.length > 0 && (
-                    <PedidoActions
+                    <PedidoActionsWithImageExport
+                      selectedPedido={selectedPedido}
+                      productosAPedirActualizados={productosAPedirActualizados}
+                      user={user}
                       productosAPedirCount={productosAPedirActualizados.length}
                       productosAPedirLength={productosAPedir.length}
                       resultadoEngine={resultadoEngine}
-                      selectedPedido={selectedPedido}
                       enlaceActivo={enlaceActivo}
                       loadingEnlace={loadingEnlace}
                       onCopyPedido={handleCopyPedido}
