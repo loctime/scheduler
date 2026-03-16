@@ -3,7 +3,7 @@ import { collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp } from "
 import { db } from "@/lib/firebase"
 import { Task } from "@/types/task"
 import { Empleado } from "@/lib/types"
-import { TaskType } from "@/types/task"
+import { TaskType, TaskShift } from "@/types/task"
 import { useOwnerId } from "@/hooks/use-owner-id"
 import { useToast } from "@/hooks/use-toast"
 
@@ -16,6 +16,7 @@ export interface TaskFormData {
   daysOfWeek?: number[]
   taskType?: TaskType
   specificDate?: string // YYYY-MM-DD
+  shift?: TaskShift // Turno: mañana, tarde o ambos
   active: boolean
 }
 

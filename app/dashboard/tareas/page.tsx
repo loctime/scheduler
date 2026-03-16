@@ -6,12 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, ArrowLeft } from "lucide-react"
 import { TaskForm } from "@/components/tasks/task-form"
 import { TaskList } from "@/components/tasks/task-list"
+import { WeeklyCalendar } from "@/components/tasks/weekly-calendar"
+import { QuickTaskDialog } from "@/components/tasks/quick-task-dialog"
 import { useTasks } from "@/hooks/use-tasks"
 import { useTaskManagement } from "@/hooks/use-task-management"
 import { useData } from "@/contexts/data-context"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Task } from "@/types/task"
-import { TaskType } from "@/types/task"
+import { TaskType, TaskShift } from "@/types/task"
 import { TaskFormData } from "@/hooks/use-task-management"
 import {
   Dialog,
@@ -38,6 +40,24 @@ function TareasContent() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
+  
+  // Estados para el calendario interactivo
+  const [quickDialogOpen, setQuickDialogOpen] = useState(false)
+  const [selectedDay, setSelectedDay] = useState<number | null>(null)
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [selectedShift, setSelectedShift] = useState<TaskShift | null>(null)
+  const [currentWeek, setCurrentWeek] = useState<Date[]>(() => {
+    const today = new Date()
+    const currentDay = today.getDay()
+    const week = []
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today)
+      date.setDate(today.getDate() - currentDay + i)
+      week.push(date)
+    }
+    return week
+  })
 
   const { employees, user, userData } = useData()
   console.log("User desde useData:", user)
@@ -55,6 +75,44 @@ function TareasContent() {
     
     return { dailyTasks, weeklyTasks, specificTasks }
   }, [tasks])
+
+  // Funciones para el calendario interactivo
+  const handleCellClick = (dayId: number, date: Date, shift: TaskShift) => {
+    setSelectedDay(dayId)
+    setSelectedDate(date)
+    setSelectedShift(shift)
+    setQuickDialogOpen(true)
+  }
+
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task)
+    setViewMode("edit")
+  }
+
+  const handleWeekChange = (direction: 'prev' | 'next') => {
+    const newWeek = [...currentWeek]
+    const daysToMove = direction === 'prev' ? -7 : 7
+    
+    newWeek.forEach(date => {
+      date.setDate(date.getDate() + daysToMove)
+    })
+    
+    setCurrentWeek(newWeek)
+  }
+
+  const handleQuickCreateTask = async (data: TaskFormData) => {
+    const result = await createTask(data)
+    if (result) {
+      setQuickDialogOpen(false)
+      setSelectedDay(null)
+      setSelectedDate(null)
+      setSelectedShift(null)
+      toast({
+        title: "Tarea creada",
+        description: "La tarea se ha creado exitosamente",
+      })
+    }
+  }
 
   const handleCreateTask = async (data: TaskFormData) => {
     const result = await createTask(data)
@@ -112,59 +170,6 @@ function TareasContent() {
 
   const isLoading = tasksLoading || managementLoading
 
-  // Componente para calendario semanal simple
-  const WeeklyCalendar = ({ tasks }: { tasks: Task[] }) => {
-    const daysOfWeek = [
-      { id: 1, name: "Lunes" },
-      { id: 2, name: "Martes" },
-      { id: 3, name: "Miércoles" },
-      { id: 4, name: "Jueves" },
-      { id: 5, name: "Viernes" },
-      { id: 6, name: "Sábado" },
-      { id: 0, name: "Domingo" },
-    ]
-
-    return (
-      <div className="grid grid-cols-7 gap-4">
-        {daysOfWeek.map(day => {
-          const dayTasks = tasks.filter(task => 
-            task.daysOfWeek?.includes(day.id)
-          )
-          
-          return (
-            <div key={day.id} className="border rounded-lg p-3">
-              <h4 className="font-semibold text-sm mb-2 text-center">{day.name}</h4>
-              <div className="space-y-2">
-                {dayTasks.map(task => (
-                  <div 
-                    key={task.id}
-                    className={`text-xs p-2 rounded border cursor-pointer hover:bg-gray-50 ${
-                      !task.active ? 'opacity-50 line-through' : 'bg-white'
-                    }`}
-                    onClick={() => {
-                      setSelectedTask(task)
-                      setViewMode("edit")
-                    }}
-                  >
-                    <div className="font-medium truncate">{task.title}</div>
-                    {task.description && (
-                      <div className="text-gray-500 truncate">{task.description}</div>
-                    )}
-                  </div>
-                ))}
-                {dayTasks.length === 0 && (
-                  <div className="text-xs text-gray-400 text-center py-4">
-                    Sin tareas
-                  </div>
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -221,24 +226,22 @@ function TareasContent() {
             </CardContent>
           </Card>
 
-          {/* Tareas Semanales - Calendario */}
+          {/* Tareas Semanales - Calendario Interactivo */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                Tareas Semanales ({weeklyTasks.length})
+                Calendario Semanal
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {weeklyTasks.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <WeeklyCalendar tasks={weeklyTasks} />
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  No hay tareas semanales configuradas
-                </div>
-              )}
+              <WeeklyCalendar
+                tasks={tasks} // Todas las tareas para el calendario
+                onTaskClick={handleTaskClick}
+                onCellClick={handleCellClick}
+                onWeekChange={handleWeekChange}
+                currentWeek={currentWeek}
+              />
             </CardContent>
           </Card>
 
@@ -271,24 +274,50 @@ function TareasContent() {
         </div>
       )}
 
-      {viewMode === "create" && (
-        <TaskForm
-          employees={employees}
-          onSubmit={handleCreateTask}
-          onCancel={handleCancel}
-          isLoading={isLoading}
-        />
-      )}
+      {/* Diálogo rápido para crear tareas */}
+      <QuickTaskDialog
+        open={quickDialogOpen}
+        onOpenChange={setQuickDialogOpen}
+        onSubmit={handleQuickCreateTask}
+        employees={employees}
+        selectedDay={selectedDay || undefined}
+        selectedDate={selectedDate || undefined}
+        selectedShift={selectedShift || undefined}
+        isLoading={managementLoading}
+      />
 
-      {viewMode === "edit" && selectedTask && (
-        <TaskForm
-          task={selectedTask}
-          employees={employees}
-          onSubmit={handleUpdateTask}
-          onCancel={handleCancel}
-          isLoading={isLoading}
-        />
-      )}
+      {/* Existing dialogs */}
+      <Dialog open={viewMode === "create"} onOpenChange={(open) => !open && setViewMode("list")}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Crear Nueva Tarea</DialogTitle>
+          </DialogHeader>
+          <TaskForm
+            task={null}
+            employees={employees}
+            onSubmit={handleCreateTask}
+            onCancel={handleCancel}
+            isLoading={isLoading}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={viewMode === "edit"} onOpenChange={(open) => !open && setViewMode("list")}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Tarea</DialogTitle>
+          </DialogHeader>
+          {selectedTask && (
+            <TaskForm
+              task={selectedTask}
+              employees={employees}
+              onSubmit={handleUpdateTask}
+              onCancel={handleCancel}
+              isLoading={isLoading}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Diálogo de confirmación de eliminación */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

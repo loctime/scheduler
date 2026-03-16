@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TaskFormData } from "@/hooks/use-task-management"
 import { Empleado } from "@/lib/types"
-import { TaskType } from "@/types/task"
+import { TaskType, TaskShift } from "@/types/task"
 import { RichTextEditor } from "@/components/tasks/simple-rich-text-editor"
 
 const DIAS_SEMANA = [
@@ -43,6 +43,7 @@ export function TaskForm({ task, employees, onSubmit, onCancel, isLoading = fals
     daysOfWeek: task?.daysOfWeek || [],
     taskType: task?.taskType || "weekly",
     specificDate: task?.specificDate || "",
+    shift: task?.shift || "both",
     active: task?.active ?? true,
   })
 
@@ -196,6 +197,32 @@ export function TaskForm({ task, employees, onSubmit, onCancel, isLoading = fals
               </p>
             </div>
           )}
+
+          <Separator />
+
+          {/* Turno */}
+          <div>
+            <Label htmlFor="shift" className="text-base font-medium">Turno</Label>
+            <Select
+              value={formData.shift || "both"}
+              onValueChange={(value: TaskShift) =>
+                setFormData(prev => ({ ...prev, shift: value }))
+              }
+              disabled={isLoading}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona el turno" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="morning">🌅 Turno Mañana</SelectItem>
+                <SelectItem value="afternoon">🌇 Turno Tarde</SelectItem>
+                <SelectItem value="both">🔄 Ambos Turnos</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-gray-500 mt-1">
+              Selecciona en qué turno se debe realizar esta tarea
+            </p>
+          </div>
 
           <Separator />
 

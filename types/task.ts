@@ -1,4 +1,5 @@
 export type TaskType = "daily" | "weekly" | "specific"
+export type TaskShift = "morning" | "afternoon" | "both"
 
 export interface Task {
   id: string
@@ -11,6 +12,7 @@ export interface Task {
   daysOfWeek?: number[]
   taskType?: TaskType
   specificDate?: string // YYYY-MM-DD
+  shift?: TaskShift // Turno: mañana, tarde o ambos
   active: boolean
   createdAt: any
 }
