@@ -98,38 +98,38 @@ export function WeeklyCalendar({
       </CardHeader>
       <CardContent>
         {/* Header con días */}
-        <div className="grid grid-cols-8 gap-2 mb-2">
-          <div></div> {/* Espacio vacío para turnos */}
+        <div className="grid grid-cols-8 gap-1 mb-2">
+          <div className="w-8"></div> {/* Columna estrecha para turnos */}
           {DIAS_SEMANA.map((dia) => (
-            <div key={dia.id} className="text-center">
-              <div className="font-semibold text-sm">{dia.name}</div>
+            <div key={dia.id} className="text-center font-semibold text-sm">
+              {dia.name}
             </div>
           ))}
         </div>
 
         {/* Filas de turnos */}
         {TURNOS.map((turno) => (
-          <div key={turno.id} className="grid grid-cols-8 gap-2">
-            {/* Header del turno */}
-            <div className="flex items-center justify-center">
+          <div key={turno.id} className="grid grid-cols-8 gap-1 mb-2">
+            {/* Header del turno - columna estrecha */}
+            <div className="w-8 flex items-center justify-center">
               <div className="text-center">
-                <div className="text-lg">{turno.icon}</div>
+                <div className="text-sm">{turno.icon}</div>
                 <div className="text-xs font-medium">{turno.name}</div>
               </div>
             </div>
             
-            {/* Celdas de días para este turno */}
+            {/* Celdas de días - más grandes */}
             {DIAS_SEMANA.map((dia) => {
               const shiftTasks = getTasksForDayAndShift(dia.id, turno.id)
               
               return (
                 <div
                   key={`${dia.id}-${turno.id}`}
-                  className="border rounded-lg min-h-[120px] p-2 hover:bg-gray-50 transition-colors cursor-pointer"
+                  className="border rounded-lg min-h-[140px] p-3 hover:bg-gray-50 transition-colors cursor-pointer"
                   onClick={() => onCellClick(dia.id, turno.id)}
                 >
-                  <div className="space-y-1">
-                    {shiftTasks.slice(0, 2).map(task => (
+                  <div className="space-y-2">
+                    {shiftTasks.slice(0, 3).map(task => (
                       <div
                         key={task.id}
                         className={`text-xs p-2 rounded border cursor-pointer hover:shadow-md transition-all duration-200 ${getTaskColor(task)} ${
@@ -139,37 +139,31 @@ export function WeeklyCalendar({
                           e.stopPropagation()
                           onTaskClick(task)
                         }}
-                        title={`${task.title}${task.description ? '\n' + task.description : ''}`}
+                        title={task.title}
                       >
                         <div className="flex items-center gap-1">
                           <span className="flex-shrink-0">{getTaskIcon(task)}</span>
                           <div className="truncate flex-1 font-medium">{task.title}</div>
                         </div>
-                        {task.employeeIds && task.employeeIds.length > 0 && (
-                          <div className="text-xs opacity-75 mt-1 truncate">
-                            👥 {task.employeeIds.length} asignado{task.employeeIds.length > 1 ? 's' : ''}
-                          </div>
-                        )}
                       </div>
                     ))}
                     
-                    {shiftTasks.length > 2 && (
+                    {shiftTasks.length > 3 && (
                       <div className="text-xs text-gray-500 text-center">
-                        +{shiftTasks.length - 2} más
+                        +{shiftTasks.length - 3} más
                       </div>
                     )}
                     
-                    {shiftTasks.length === 0 && (
-                      <div 
-                        className="h-6 flex items-center justify-center text-gray-400 hover:text-gray-600"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onCellClick(dia.id, turno.id)
-                        }}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </div>
-                    )}
+                    {/* Botón + siempre visible */}
+                    <div 
+                      className="h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onCellClick(dia.id, turno.id)
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </div>
                   </div>
                 </div>
               )
@@ -177,7 +171,7 @@ export function WeeklyCalendar({
           </div>
         ))}
 
-        {/* Leyenda */}
+        {/* Leyenda optimizada */}
         <div className="flex items-center gap-4 mt-4 pt-4 border-t">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-green-100 border border-green-200 rounded"></div>

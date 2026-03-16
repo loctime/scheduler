@@ -107,12 +107,22 @@ function TareasContent() {
 
   const handleDeleteTask = async () => {
     if (!taskToDelete) return
-
+    
     const result = await deleteTask(taskToDelete.id)
     if (result) {
       setDeleteDialogOpen(false)
       setTaskToDelete(null)
+      setViewMode("list")
+      toast({
+        title: "Tarea eliminada",
+        description: "La tarea se ha eliminado exitosamente",
+      })
     }
+  }
+
+  const handleDeleteClick = (task: Task) => {
+    setTaskToDelete(task)
+    setDeleteDialogOpen(true)
   }
 
   const handleToggleActive = async (task: Task) => {
@@ -122,11 +132,6 @@ function TareasContent() {
   const handleEditTask = (task: Task) => {
     setSelectedTask(task)
     setViewMode("edit")
-  }
-
-  const handleDeleteClick = (task: Task) => {
-    setTaskToDelete(task)
-    setDeleteDialogOpen(true)
   }
 
   const handleViewTask = (task: Task) => {
@@ -282,6 +287,7 @@ function TareasContent() {
               employees={employees}
               onSubmit={handleUpdateTask}
               onCancel={handleCancel}
+              onDelete={() => handleDeleteClick(selectedTask)}
               isLoading={isLoading}
             />
           )}

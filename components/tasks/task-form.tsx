@@ -30,10 +30,11 @@ interface TaskFormProps {
   employees: Empleado[]
   onSubmit: (data: TaskFormData) => void
   onCancel: () => void
+  onDelete?: () => void
   isLoading?: boolean
 }
 
-export function TaskForm({ task, employees, onSubmit, onCancel, isLoading = false }: TaskFormProps) {
+export function TaskForm({ task, employees, onSubmit, onCancel, onDelete, isLoading = false }: TaskFormProps) {
   const [formData, setFormData] = useState<TaskFormData>({
     title: task?.title || "",
     description: task?.description || "",
@@ -305,21 +306,36 @@ export function TaskForm({ task, employees, onSubmit, onCancel, isLoading = fals
           </div>
 
           {/* Botones */}
-          <div className="flex justify-end space-x-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-              disabled={isLoading}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              disabled={isLoading || !formData.title.trim()}
-            >
-              {isLoading ? "Guardando..." : (task?.title ? "Actualizar" : "Crear")}
-            </Button>
+          <div className="flex justify-between pt-4">
+            {/* Botón eliminar - solo en modo edición */}
+            {task?.title && onDelete && (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={onDelete}
+                disabled={isLoading}
+              >
+                Eliminar Tarea
+              </Button>
+            )}
+            
+            {/* Botones principales */}
+            <div className="flex space-x-3 ml-auto">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                disabled={isLoading}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={isLoading || !formData.title.trim()}
+              >
+                {isLoading ? "Guardando..." : (task?.title ? "Actualizar" : "Crear")}
+              </Button>
+            </div>
           </div>
         </form>
       </CardContent>
