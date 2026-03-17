@@ -120,6 +120,11 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
   const isMobile = useIsMobile()
   const { updateEmployeeOrder, addSeparator, updateSeparator, deleteSeparator } = useEmployeeOrder()
 
+  // Efecto para asegurar vista individual en móvil - REMOVIDO: causaba re-render infinito
+  // useEffect(() => {
+  //   if (isMobile) setIsIndividualView(true)
+  // }, [isMobile])
+
 
   // Hook para reglas fijas
   const { hasFixedRule, getRuleForDay } = useEmployeeFixedRules({ 
@@ -165,9 +170,17 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     allEmployees: allEmployees || employees, // Todos los empleados (sin filtrar) para el filtrado correcto
   })
 
+  // Ref para evitar múltiples generaciones de imagen
+  const hasGeneratedRef = useRef(false)
+
   // Efecto para generar imagen de la grilla en móvil solo cuando hay datos (evita grilla en blanco en PWA/mensual)
   useEffect(() => {
-    if (!isMobile || (orderedItems?.length ?? 0) === 0) return
+    if (!isMobile) return
+    if ((orderedItems?.length ?? 0) === 0) return
+    if (hasGeneratedRef.current) return
+
+    hasGeneratedRef.current = true
+
     const id = requestAnimationFrame(() => {
       setTimeout(() => {
         if (hiddenGridRef.current) {
@@ -175,8 +188,9 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
         }
       }, 300)
     })
+
     return () => cancelAnimationFrame(id)
-  }, [isMobile, generateImage, orderedItems?.length])
+  }, [isMobile, orderedItems?.length])
 
   // Hook para estilos de celdas
   const { getCellBackgroundStyle } = useCellBackgroundStyles({
@@ -601,6 +615,14 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     const weekStartDate = weekDays[0]
     const showOnlyIndividual = mobileIndividualOnly || isIndividualView
 
+    console.log("📱 ScheduleGrid Mobile:", {
+      isMobile,
+      mobileIndividualOnly,
+      isIndividualView,
+      showOnlyIndividual,
+      viewMode: showOnlyIndividual ? "individual" : "grid"
+    })
+
     // Renderizar vista individual (o siempre si mobileIndividualOnly, p. ej. mensual)
     if (showOnlyIndividual) {
       return (
@@ -637,6 +659,7 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     }
     
     // Renderizar vista completa con imagen generada (ocultar toggle si mobileIndividualOnly)
+    console.log("📱 Renderizando vista grilla en mobile")
     return (
       <>
         {!mobileIndividualOnly && (
@@ -669,31 +692,18 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
         {/* Contenedor oculto para generar imagen - ref directo al Card */}
         {renderDesktopGrid({ containerRef: hiddenGridRef })}
         
-        {/* Vista de imagen generada o fallback a grilla real si falla (p. ej. PWA/Safari) */}
+        {/* Vista de imagen generada o fallback a grilla real - FORZAR FALLBACK TEMPORALMENTE */}
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <div className="text-sm text-gray-500">Generando vista del horario...</div>
           </div>
-        ) : imageUrl ? (
-          <div className="w-full overflow-x-auto">
-            <img
-              src={imageUrl}
-              alt="Horario completo"
-              style={{
-                width: '1400px',
-                maxWidth: 'none',
-                height: 'auto',
-              }}
-            />
-          </div>
-        ) : (orderedItems?.length ?? 0) > 0 ? (
-          <div className="w-full overflow-x-auto">
-            {renderDesktopGrid()}
-          </div>
         ) : (
-          <div className="flex items-center justify-center py-8">
-            <div className="text-sm text-gray-500">Preparando vista del horario...</div>
-          </div>
+          <>
+            <div className="text-xs text-gray-500 mb-2">� Forzando fallback: grilla real (evitando imagen en blanco)</div>
+            <div className="w-full overflow-x-auto">
+              {renderDesktopGrid()}
+            </div>
+          </>
         )}
       </>
     )
@@ -726,6 +736,12 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
                 const insertIndex = itemIndex
                 // Detectar si es el primer separador (está en el índice 0)
                 const isFirstSeparator = item.type === "separator" && itemIndex === 0
+
+                // En mobile, ocultar separadores temporalmente para evitar bugs de renderizado
+                if (isMobile && item.type === "separator") {
+                  console.log("🚫 Ocultando separador en mobile:", item.data)
+                  return null
+                }
 
                 return (
                   <React.Fragment key={item.type === "employee" ? `emp-${item.data.id}` : `sep-${item.data.id}`}>

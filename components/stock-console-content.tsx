@@ -120,7 +120,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
 
   const textoPedidoAutomatico = resultadoPedidoOficial?.texto || null
 
-  const [mode, setMode] = useState<"work" | "control">("work")
+  const [mode, setMode] = useState<"work" | "control">("control")
   const [sortMode, setSortMode] = useState<SortMode>("manual")
   const [productsToRender, setProductsToRender] = useState(productos)
   const isReorderingRef = useRef(false)

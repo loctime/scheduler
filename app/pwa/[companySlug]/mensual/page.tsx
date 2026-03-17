@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, UserCircle, ArrowLeft } from "lucide-react"
+import { Loader2, UserCircle, ArrowLeft, Grid, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { PwaViewerBadge, useViewer, notifyViewerChanged } from "@/components/pwa/PwaViewerBadge"
@@ -16,6 +16,7 @@ import { useOwnerIdFromSlug, useEmployeesByOwnerId, useShiftsByOwnerId, useConfi
 import { MonthlyScheduleView } from "@/components/monthly-schedule-view"
 import { PWA_THEMES } from "@/lib/pwa-themes"
 import type { MonthGroup } from "@/lib/monthly-utils"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 /**
  * Página PWA de horarios mensuales bajo /pwa/[slug]/mensual.
@@ -30,7 +31,9 @@ export default function PwaMensualPage() {
   const viewer = useViewer()
   const preferredEmployeeId = viewer?.employeeId ?? null
   const [showEmployeeSelector, setShowEmployeeSelector] = useState(false)
+  const [viewMode, setViewMode] = useState<"individual" | "grid">("individual")
   const { toast } = useToast()
+  const isMobile = useIsMobile()
 
   const { ownerId, loading: ownerIdLoading } = useOwnerIdFromSlug(companySlug)
   const { employees, loading: employeesLoading } = useEmployeesByOwnerId(ownerId)
@@ -53,6 +56,17 @@ export default function PwaMensualPage() {
     monthStartDay,
     weekStartsOn,
   })
+
+  // Logs para debugging
+  useEffect(() => {
+    console.log("🔍 PWA Mensual - Estado:", {
+      isMobile,
+      viewMode,
+      companySlug,
+      monthGroups: allMonthGroups.length,
+      employees: employees.length
+    })
+  }, [isMobile, viewMode, companySlug, allMonthGroups.length, employees.length])
 
   const isLoading = ownerIdLoading || employeesLoading || shiftsLoading || configLoading || schedulesLoading
   
@@ -158,7 +172,39 @@ export default function PwaMensualPage() {
               </h1>
               <p className="text-sm text-muted-foreground">Vista mensual</p>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
+              {isMobile && (
+                <div className="flex bg-muted rounded-lg p-1">
+                  <button
+                    onClick={() => {
+                      console.log("🔄 Cambiando a vista individual")
+                      setViewMode("individual")
+                    }}
+                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                      viewMode === "individual"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Users className="h-3 w-3" />
+                    Individual
+                  </button>
+                  <button
+                    onClick={() => {
+                      console.log("🔄 Cambiando a vista grilla")
+                      setViewMode("grid")
+                    }}
+                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                      viewMode === "grid"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Grid className="h-3 w-3" />
+                    Grilla
+                  </button>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => setShowEmployeeSelector(true)}
@@ -190,7 +236,7 @@ export default function PwaMensualPage() {
           isLoading={false}
           calculateMonthlyStats={calculateMonthlyStats}
           readonly
-          mobileIndividualOnly
+          mobileIndividualOnly={isMobile && viewMode === "individual"}
           preferredEmployeeId={preferredEmployeeId}
         />
       </div>
