@@ -197,10 +197,10 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
   // Estado de tareas completadas (sistema unificado)
   const { completed, toggleTask } = useDailyTaskStatus(ownerId)
   
-  // Filtrar tareas del día usando lógica centralizada
+  // Filtrar tareas del día usando lógica centralizada (excluir reference)
   const todayDate = new Date()
   const todayTasks = tasks.filter(t => 
-    isTaskForToday(t, todayDate)
+    t.taskType !== "reference" && isTaskForToday(t, todayDate)
   )
   
   // Separar pendientes y realizadas

@@ -8,6 +8,7 @@ import { CheckSquare, Clock, Calendar, AlertCircle, ArrowLeft, Check, ChevronDow
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useOwnerIdFromSlug, useEmployeesByOwnerId } from "@/hooks/use-owner-data"
 import { useTasks } from "@/hooks/use-tasks"
 import { useDailyTaskStatus } from "@/hooks/use-daily-task-status"
@@ -85,18 +86,25 @@ export default function TareasPage() {
     })
   }, [tasks, ownerId, viewer?.employeeId])
 
-  // Paso 2: Separar tareas del día vs no del día usando lógica centralizada
+  // Paso 1.5: Separar execution vs reference tasks
+  const { executionTasks, referenceTasks } = useMemo(() => {
+    const execution = filteredTasks.filter(task => task.taskType !== "reference")
+    const reference = filteredTasks.filter(task => task.taskType === "reference")
+    return { executionTasks: execution, referenceTasks: reference }
+  }, [filteredTasks])
+
+  // Paso 2: Separar tareas del día vs no del día usando lógica centralizada (solo execution tasks)
   const { tareasDelDia, tareasNoDelDia } = useMemo(() => {
-    const tareasDelDia = filteredTasks.filter(task => 
+    const tareasDelDia = executionTasks.filter(task => 
       isTaskForToday(task, today)
     )
     
-    const tareasNoDelDia = filteredTasks.filter(task => 
+    const tareasNoDelDia = executionTasks.filter(task => 
       !isTaskForToday(task, today)
     )
     
     return { tareasDelDia, tareasNoDelDia }
-  }, [filteredTasks, today])
+  }, [executionTasks, today])
 
   // Paso 3: Dentro de tareasDelDia separar pendientes y completadas
   const { pendientes, completadas } = useMemo(() => {
@@ -175,89 +183,143 @@ export default function TareasPage() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto p-4 space-y-6">
-        {/* Sección 1: Pendientes del día */}
-        {tareasOrdenadasHoy.length > 0 && (
-          <div>
-            <div 
-              className="flex items-center space-x-2 mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
-              onClick={() => setExpandedHoy(!expandedHoy)}
-            >
-              {expandedHoy ? (
-                <ChevronDown className="h-5 w-5 text-yellow-600" />
-              ) : (
-                <ChevronRight className="h-5 w-5 text-yellow-600" />
-              )}
-              <CheckSquare className="h-5 w-5 text-yellow-600" />
-              <h2 className="text-lg font-medium text-yellow-700">Pendientes del día ({tareasOrdenadasHoy.length})</h2>
-            </div>
-            {expandedHoy && (
-              <div className="space-y-3">
-                {tareasOrdenadasHoy.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    employees={employees}
-                    onClick={() => router.push(`/pwa/${companySlug}/tareas/${task.id}`)}
-                    isToday={true}
-                    companySlug={companySlug}
-                    router={router}
-                    isCompleted={!!completed[task.id]}
-                    completedBy={completed[task.id]?.employeeId}
-                    onToggle={() => toggleTask(task.id)}
-                    viewer={viewer}
-                  />
-                ))}
+      <div className="max-w-4xl mx-auto p-4">
+        <Tabs defaultValue="tareas" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="tareas" className="flex items-center gap-2">
+              <CheckSquare className="h-4 w-4" />
+              🧾 Tareas
+            </TabsTrigger>
+            <TabsTrigger value="procedimientos" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              📚 Procedimientos
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="tareas" className="space-y-6">
+            {/* Sección 1: Pendientes del día */}
+            {tareasOrdenadasHoy.length > 0 && (
+              <div>
+                <div 
+                  className="flex items-center space-x-2 mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                  onClick={() => setExpandedHoy(!expandedHoy)}
+                >
+                  {expandedHoy ? (
+                    <ChevronDown className="h-5 w-5 text-yellow-600" />
+                  ) : (
+                    <ChevronRight className="h-5 w-5 text-yellow-600" />
+                  )}
+                  <CheckSquare className="h-5 w-5 text-yellow-600" />
+                  <h2 className="text-lg font-medium text-yellow-700">Pendientes del día ({tareasOrdenadasHoy.length})</h2>
+                </div>
+                {expandedHoy && (
+                  <div className="space-y-3">
+                    {tareasOrdenadasHoy.map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        employees={employees}
+                        onClick={() => router.push(`/pwa/${companySlug}/tareas/${task.id}`)}
+                        isToday={true}
+                        companySlug={companySlug}
+                        router={router}
+                        isCompleted={!!completed[task.id]}
+                        completedBy={completed[task.id]?.employeeId}
+                        onToggle={() => toggleTask(task.id)}
+                        viewer={viewer}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-          </div>
-        )}
 
-        {/* Sección 2: Tareas (no del día) */}
-        {tareasNoDelDia.length > 0 && (
-          <div>
-            <div 
-              className="flex items-center space-x-2 mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
-              onClick={() => setExpandedTareas(!expandedTareas)}
-            >
-              {expandedTareas ? (
-                <ChevronDown className="h-5 w-5 text-blue-600" />
-              ) : (
-                <ChevronRight className="h-5 w-5 text-blue-600" />
-              )}
-              <Calendar className="h-5 w-5 text-blue-600" />
-              <h2 className="text-lg font-medium text-blue-700">Tareas ({tareasNoDelDia.length})</h2>
-            </div>
-            {expandedTareas && (
-              <div className="space-y-3">
-                {tareasNoDelDia.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    employees={employees}
-                    onClick={() => router.push(`/pwa/${companySlug}/tareas/${task.id}`)}
-                    isToday={false}
-                    companySlug={companySlug}
-                    router={router}
-                    isCompleted={!!completed[task.id]}
-                    completedBy={completed[task.id]?.employeeId}
-                    onToggle={() => toggleTask(task.id)}
-                    viewer={viewer}
-                  />
-                ))}
+            {/* Sección 2: Tareas (no del día) */}
+            {tareasNoDelDia.length > 0 && (
+              <div>
+                <div 
+                  className="flex items-center space-x-2 mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                  onClick={() => setExpandedTareas(!expandedTareas)}
+                >
+                  {expandedTareas ? (
+                    <ChevronDown className="h-5 w-5 text-blue-600" />
+                  ) : (
+                    <ChevronRight className="h-5 w-5 text-blue-600" />
+                  )}
+                  <Calendar className="h-5 w-5 text-blue-600" />
+                  <h2 className="text-lg font-medium text-blue-700">Tareas ({tareasNoDelDia.length})</h2>
+                </div>
+                {expandedTareas && (
+                  <div className="space-y-3">
+                    {tareasNoDelDia.map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        employees={employees}
+                        onClick={() => router.push(`/pwa/${companySlug}/tareas/${task.id}`)}
+                        isToday={false}
+                        companySlug={companySlug}
+                        router={router}
+                        isCompleted={!!completed[task.id]}
+                        completedBy={completed[task.id]?.employeeId}
+                        onToggle={() => toggleTask(task.id)}
+                        viewer={viewer}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-          </div>
-        )}
 
-        {/* No hay tareas */}
-        {tareasOrdenadasHoy.length === 0 && tareasNoDelDia.length === 0 && (
-          <div className="text-center py-12">
-            <CheckSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No hay tareas para mostrar</h3>
-            <p className="text-gray-600">No se encontraron tareas activas para este día.</p>
-          </div>
-        )}
+            {/* No hay tareas */}
+            {tareasOrdenadasHoy.length === 0 && tareasNoDelDia.length === 0 && (
+              <div className="text-center py-12">
+                <CheckSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No hay tareas para mostrar</h3>
+                <p className="text-gray-600">No se encontraron tareas activas para este día.</p>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="procedimientos" className="space-y-4">
+            {referenceTasks.length > 0 ? (
+              <div className="space-y-3">
+                {referenceTasks.map((task) => (
+                  <div 
+                    key={task.id}
+                    className="bg-amber-50 border border-amber-200 rounded-lg p-4 cursor-pointer hover:bg-amber-100 transition-colors"
+                    onClick={() => router.push(`/pwa/${companySlug}/tareas/${task.id}`)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="font-semibold text-amber-900 text-lg mb-2">
+                          {task.title}
+                        </div>
+                        {task.description && (
+                          <div className="text-sm text-amber-700 mb-2">
+                            {task.description}
+                          </div>
+                        )}
+                        <div className="text-xs text-amber-600">
+                          📚 Procedimiento / Guía
+                        </div>
+                      </div>
+                      <div className="text-amber-600">
+                        <ChevronRight className="h-5 w-5" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No hay procedimientos</h3>
+                <p className="text-gray-600">No se encontraron guías o procedimientos disponibles.</p>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   )
@@ -319,28 +381,30 @@ function TaskCard({ task, employees, onClick, isToday, companySlug, router, isCo
         </div>
 
         {/* Checkbox */}
-        <button
-          onClick={handleToggle}
-          className={`flex items-center space-x-2 text-sm font-medium px-3 py-1 rounded-md border transition-colors ${
-            isCompleted 
-              ? 'bg-green-500 text-white border-green-500 hover:bg-green-600' 
-              : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
-          }`}
-          disabled={!viewer?.employeeId}
-        >
-          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-            isCompleted 
-              ? 'bg-white border-white' 
-              : 'border-gray-400'
-          }`}>
-            {isCompleted && (
-              <svg className="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010-1.414l-8 8a1 1 0 01-1.414 1.414L8.586 7H4a1 1 0 00-1 1v8a1 1 0 001 1h12a1 1 0 001-1v-8a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            )}
-          </div>
-          {isCompleted ? "Desmarcar" : "Realizado"}
-        </button>
+        {task.taskType !== "reference" && (
+          <button
+            onClick={handleToggle}
+            className={`flex items-center space-x-2 text-sm font-medium px-3 py-1 rounded-md border transition-colors ${
+              isCompleted 
+                ? 'bg-green-500 text-white border-green-500 hover:bg-green-600' 
+                : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+            }`}
+            disabled={!viewer?.employeeId}
+          >
+            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+              isCompleted 
+                ? 'bg-white border-white' 
+                : 'border-gray-400'
+            }`}>
+              {isCompleted && (
+                <svg className="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010-1.414l-8 8a1 1 0 01-1.414 1.414L8.586 7H4a1 1 0 00-1 1v8a1 1 0 001 1h12a1 1 0 001-1v-8a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              )}
+            </div>
+            {isCompleted ? "Desmarcar" : "Realizado"}
+          </button>
+        )}
       </div>
 
       {/* Descripción y botones */}

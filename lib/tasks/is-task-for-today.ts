@@ -32,6 +32,9 @@ export function isTaskForToday(task: Task, today: Date): boolean {
     case "specific":
       return task.specificDate === todayString
     
+    case "reference":
+      return false // Las guías nunca aparecen como "tarea del día"
+    
     default:
       // Comportamiento legacy: si no tiene taskType, tratar como weekly
       return task.daysOfWeek?.includes(todayDayNumber) || false

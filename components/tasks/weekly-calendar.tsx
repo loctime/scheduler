@@ -37,8 +37,8 @@ export function WeeklyCalendar({
     return tasks.filter(task => {
       const taskType = task.taskType || "weekly"
       
-      // Solo mostrar tareas semanales y diarias
-      if (taskType === "specific") return false
+      // No mostrar tareas reference ni specific en calendario
+      if (taskType === "specific" || taskType === "reference") return false
       
       // Para tareas diarias, mostrar en todos los días
       if (taskType === "daily") {
@@ -186,6 +186,38 @@ export function WeeklyCalendar({
             <span className="text-xs text-gray-600">🌇 Tarde</span>
           </div>
         </div>
+
+        {/* Sección de Procedimientos/Guías */}
+        {(() => {
+          const referenceTasks = tasks.filter(task => task.taskType === "reference")
+          if (referenceTasks.length === 0) return null
+          
+          return (
+            <div className="mt-6 pt-4 border-t">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-lg">📚</span>
+                <h3 className="font-medium text-gray-900">Procedimientos / Guías</h3>
+                <Badge variant="outline" className="text-xs">
+                  {referenceTasks.length}
+                </Badge>
+              </div>
+              <div className="space-y-2">
+                {referenceTasks.map(task => (
+                  <div 
+                    key={task.id}
+                    className="p-3 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer"
+                    onClick={() => onTaskClick(task)}
+                  >
+                    <div className="font-medium text-amber-900">{task.title}</div>
+                    {task.description && (
+                      <div className="text-sm text-amber-700 mt-1">{task.description}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
       </CardContent>
     </Card>
   )

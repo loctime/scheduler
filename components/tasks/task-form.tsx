@@ -135,6 +135,7 @@ export function TaskForm({ task, employees, onSubmit, onCancel, onDelete, isLoad
                 <SelectItem value="daily">Diaria (todos los días)</SelectItem>
                 <SelectItem value="weekly">Semanal (días específicos)</SelectItem>
                 <SelectItem value="specific">Fecha específica</SelectItem>
+                <SelectItem value="reference">Procedimiento / Guía</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -195,6 +196,14 @@ export function TaskForm({ task, employees, onSubmit, onCancel, onDelete, isLoad
             <div className="bg-blue-50 p-3 rounded-lg">
               <p className="text-sm text-blue-700">
                 <strong>Tarea diaria:</strong> Esta tarea aparecerá todos los días para los empleados asignados.
+              </p>
+            </div>
+          )}
+
+          {formData.taskType === "reference" && (
+            <div className="bg-amber-50 p-3 rounded-lg">
+              <p className="text-sm text-amber-700">
+                <strong>Procedimiento / Guía:</strong> Esta tarea no aparece como "tarea del día". Es un documento de consulta para los empleados.
               </p>
             </div>
           )}

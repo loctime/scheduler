@@ -1,4 +1,4 @@
-export type TaskType = "daily" | "weekly" | "specific"
+export type TaskType = "daily" | "weekly" | "specific" | "reference"
 export type TaskShift = "morning" | "afternoon" | "both"
 
 export interface Task {
