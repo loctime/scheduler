@@ -355,7 +355,7 @@ export const WeekSchedule = forwardRef<HTMLDivElement, WeekScheduleProps>(({
             onExportEmployeeImage={undefined}
             mobileIndividualOnly={mobileIndividualOnly}
             preferredEmployeeId={preferredEmployeeId}
-            separadoresOverride={weekSnapshot?.separadores}
+            separadoresOverride={mobileIndividualOnly ? [] : weekSnapshot?.separadores}
             ordenEmpleadosOverride={weekSnapshot?.ordenEmpleados}
           />
         </div>

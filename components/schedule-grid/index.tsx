@@ -615,13 +615,23 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     const weekStartDate = weekDays[0]
     const showOnlyIndividual = mobileIndividualOnly || isIndividualView
 
-    console.log("📱 ScheduleGrid Mobile:", {
-      isMobile,
-      mobileIndividualOnly,
-      isIndividualView,
-      showOnlyIndividual,
-      viewMode: showOnlyIndividual ? "individual" : "grid"
-    })
+    // Logs específicos para vista individual
+    if (showOnlyIndividual) {
+      console.log("👤 Vista Individual Debug:", {
+        isMobile,
+        mobileIndividualOnly,
+        isIndividualView,
+        showOnlyIndividual,
+        separadoresOverrideCount: separadoresOverride?.length || 0,
+        orderedItemsCount: orderedItems?.length || 0,
+        orderedItemsTypes: orderedItems?.map(item => item.type) || [],
+        // Verificar si hay separadores en orderedItems
+        separadoresEnOrderedItems: orderedItems?.filter(item => item.type === "separator") || [],
+        // Verificar employeesForMobile está limpio
+        employeesForMobileCount: employeesForMobile?.length || 0,
+        employeesForMobileIds: employeesForMobile?.map(emp => emp.id) || []
+      })
+    }
 
     // Renderizar vista individual (o siempre si mobileIndividualOnly, p. ej. mensual)
     if (showOnlyIndividual) {
@@ -659,7 +669,6 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
     }
     
     // Renderizar vista completa con imagen generada (ocultar toggle si mobileIndividualOnly)
-    console.log("📱 Renderizando vista grilla en mobile")
     return (
       <>
         {!mobileIndividualOnly && (
