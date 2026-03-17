@@ -10,6 +10,7 @@ const VIEWER_CHANGED_EVENT = "horario.viewer.changed"
 export interface ViewerInfo {
   employeeId: string
   employeeName: string
+  canCreateTasks?: boolean // Permite crear tareas desde PWA
 }
 
 function readViewerFromStorage(): ViewerInfo | null {

@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { QuickCreateTaskDialog } from "@/components/tasks/quick-create-task-dialog"
 import { useOwnerIdFromSlug, useEmployeesByOwnerId } from "@/hooks/use-owner-data"
 import { useTasks } from "@/hooks/use-tasks"
 import { useDailyTaskStatus } from "@/hooks/use-daily-task-status"
@@ -126,7 +127,8 @@ export default function TareasPage() {
 
   // Estado para controlar expansión de secciones
   const [expandedHoy, setExpandedHoy] = useState(true)
-  const [expandedTareas, setExpandedTareas] = useState(false)
+  const [expandedTareas, setExpandedTareas] = useState(true)
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false)
 
   if (ownerIdLoading || employeesLoading) {
     return (
@@ -194,6 +196,15 @@ export default function TareasPage() {
               <Calendar className="h-4 w-4" />
               📚 Procedimientos
             </TabsTrigger>
+            
+            {/* Botón Nueva tarea - visible para todos los empleados */}
+            <Button
+              onClick={() => setQuickCreateOpen(true)}
+              className="ml-auto"
+              size="sm"
+            >
+              ➕ Nueva tarea
+            </Button>
           </TabsList>
 
           <TabsContent value="tareas" className="space-y-6">
@@ -321,6 +332,15 @@ export default function TareasPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Diálogo de creación rápida */}
+      <QuickCreateTaskDialog
+        open={quickCreateOpen}
+        onOpenChange={setQuickCreateOpen}
+        employees={employees}
+        viewerId={viewer?.employeeId || ''}
+        ownerId={ownerId}
+      />
     </div>
   )
 }
@@ -412,6 +432,13 @@ function TaskCard({ task, employees, onClick, isToday, companySlug, router, isCo
         {task.description && (
           <div className="text-sm text-muted-foreground flex-1 mr-4">
             {task.description}
+          </div>
+        )}
+        
+        {/* Mostrar 'Creada por' si es tarea de empleado */}
+        {task.source === "employee" && (
+          <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+            Creada por {viewer?.employeeName || 'Empleado'}
           </div>
         )}
         

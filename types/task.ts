@@ -15,4 +15,6 @@ export interface Task {
   shift?: TaskShift // Turno: mañana, tarde o ambos
   active: boolean
   createdAt: any
+  createdBy?: string // ID del empleado que creó la tarea (solo para tareas de empleados)
+  source?: string // "admin" | "employee" // Origen de la tarea
 }

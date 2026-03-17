@@ -100,6 +100,7 @@ export interface Empleado {
   phone?: string
   ownerId: string
   userId: string
+  canCreateTasks?: boolean // Permite crear tareas desde PWA (default: true)
   createdAt?: any
   updatedAt?: any
 }

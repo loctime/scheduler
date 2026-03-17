@@ -31,6 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 
 type ViewMode = "list" | "create" | "edit"
@@ -45,6 +46,9 @@ function TareasContent() {
   const [quickDialogOpen, setQuickDialogOpen] = useState(false)
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [selectedShift, setSelectedShift] = useState<TaskShift | null>(null)
+  
+  // Estado para filtro de empleados en calendario
+  const [selectedEmployeeForCalendar, setSelectedEmployeeForCalendar] = useState<string>("all")
 
   const { employees, user, userData } = useData()
   console.log("User desde useData:", user)
@@ -62,6 +66,21 @@ function TareasContent() {
     
     return { dailyTasks, weeklyTasks, specificTasks }
   }, [tasks])
+
+  // Filtrar tareas para el calendario según empleado seleccionado
+  const filteredTasksForCalendar = useMemo(() => {
+    if (selectedEmployeeForCalendar === "all") {
+      return tasks
+    }
+    
+    return tasks.filter(task => {
+      // Si no tiene employeeIds → es para todos
+      if (!task.employeeIds || task.employeeIds.length === 0) return true
+      
+      // Verificar si incluye al empleado seleccionado
+      return task.employeeIds.includes(selectedEmployeeForCalendar)
+    })
+  }, [tasks, selectedEmployeeForCalendar])
 
   // Funciones para el calendario interactivo
   const handleCellClick = (dayId: number, shift: TaskShift) => {
@@ -208,14 +227,37 @@ function TareasContent() {
           {/* Tareas Semanales - Calendario Interactivo */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                Calendario Semanal
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  Calendario Semanal
+                </CardTitle>
+                
+                {/* Filtro de empleados */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Empleado:</span>
+                  <Select
+                    value={selectedEmployeeForCalendar}
+                    onValueChange={setSelectedEmployeeForCalendar}
+                  >
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Todos los empleados" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los empleados</SelectItem>
+                      {employees?.map((emp) => (
+                        <SelectItem key={emp.id} value={emp.id}>
+                          {emp.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <WeeklyCalendar
-                tasks={tasks} // Todas las tareas para el calendario
+                tasks={filteredTasksForCalendar} // Tareas filtradas por empleado
                 onTaskClick={handleTaskClick}
                 onCellClick={handleCellClick}
               />
