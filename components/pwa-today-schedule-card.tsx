@@ -112,6 +112,56 @@ function PwaTodayScheduleCardComponent({ companySlug, horario: horarioProp, shif
   const todayAssignments = currentViewer && currentViewer.employeeId ? dayData?.[currentViewer.employeeId] : undefined
   const tomorrowData = currentWeek?.days?.[tomorrowStr] as Record<string, any> | undefined
   const tomorrowAssignments = currentViewer && currentViewer.employeeId ? tomorrowData?.[currentViewer.employeeId] : undefined
+  
+  // OBTENER dayStatus DE MAÑANA (fuente de verdad)
+  const tomorrowDayStatus = currentViewer && currentViewer.employeeId 
+    ? currentWeek?.dayStatus?.[tomorrowStr]?.[currentViewer.employeeId] as "normal" | "franco" | "medio_franco" | undefined
+    : undefined
+
+  // FUNCIÓN PARA OBTENER TEXTO CORRECTO DEL ESTADO
+  const getTomorrowStatusText = (dayStatus: "normal" | "franco" | "medio_franco" | undefined, fallbackInfo: ReturnType<typeof getTodayScheduleInfo>) => {
+    // Priorizar dayStatus sobre el análisis de assignments
+    if (dayStatus === "medio_franco") {
+      // Para medio franco, mostrar horario si existe, sino solo el label
+      if (fallbackInfo.timeBlocks.length > 0) {
+        return fallbackInfo.timeBlocks.map((b) => {
+          const start = b.startTime.endsWith(":00") ? b.startTime.slice(0, -3) : b.startTime
+          const end = b.endTime.endsWith(":00") ? b.endTime.slice(0, -3) : b.endTime
+          return `${start} a ${end}`
+        }).join(", ")
+      } else {
+        return "1/2 Franco"
+      }
+    }
+    
+    if (dayStatus === "franco") {
+      return "Franco"
+    }
+    
+    // Para "normal" o undefined, usar el análisis de assignments (trabaja)
+    if (fallbackInfo.status === "franco") {
+      return "Franco"
+    }
+    
+    if (fallbackInfo.status === "medio_franco") {
+      return fallbackInfo.timeBlocks.length > 0
+        ? fallbackInfo.timeBlocks.map((b) => {
+            const start = b.startTime.endsWith(":00") ? b.startTime.slice(0, -3) : b.startTime
+            const end = b.endTime.endsWith(":00") ? b.endTime.slice(0, -3) : b.endTime
+            return `${start} a ${end}`
+          }).join(", ")
+        : "Medio franco"
+    }
+    
+    // Trabaja - mostrar horarios
+    return fallbackInfo.timeBlocks.length > 0
+      ? fallbackInfo.timeBlocks.map((b) => {
+          const start = b.startTime.endsWith(":00") ? b.startTime.slice(0, -3) : b.startTime
+          const end = b.endTime.endsWith(":00") ? b.endTime.slice(0, -3) : b.endTime
+          return `${start} a ${end}`
+        }).join(", ")
+      : "—"
+  }
 
   const isLoadingState = !horarioProp && (isLoading || !horario?.publishedWeekId)
   
@@ -176,34 +226,10 @@ function PwaTodayScheduleCardComponent({ companySlug, horario: horarioProp, shif
         </p>
       )
     }
-    const { status, timeBlocks } = scheduleInfo
     
-    // Función helper para formatear tiempo (quitar :00 si está presente)
-    const formatTime = (time: string): string => {
-      if (!time) return time
-      if (time.endsWith(":00")) {
-        return time.slice(0, -3)
-      }
-      return time
-    }
+    // USAR dayStatus PRIORITARIO sobre assignments
+    const text = getTomorrowStatusText(tomorrowDayStatus, scheduleInfo)
     
-    // Función helper para formatear rango de tiempo
-    const formatTimeRange = (start: string, end: string): string => {
-      const formattedStart = formatTime(start)
-      const formattedEnd = formatTime(end)
-      return `${formattedStart} a ${formattedEnd}`
-    }
-    
-    const text =
-      status === "franco"
-        ? "Franco"
-        : status === "medio_franco"
-          ? timeBlocks.length > 0
-            ? timeBlocks.map((b: { startTime: string; endTime: string }) => formatTimeRange(b.startTime, b.endTime)).join(", ")
-            : "Medio franco"
-          : timeBlocks.length > 0
-            ? timeBlocks.map((b: { startTime: string; endTime: string }) => formatTimeRange(b.startTime, b.endTime)).join(", ")
-            : "—"
     return (
       <p className="text-sm text-muted-foreground">
         mañana: <span className="font-medium text-foreground tabular-nums">{text}</span>
