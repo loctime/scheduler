@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Empleado, Turno, ShiftAssignment, MedioTurno } from "@/lib/types"
-import { CellAssignments } from "./cell-assignments"
+import { CellAssignmentsMobile } from "./cell-assignments-mobile"
 import { InlineShiftSelector } from "./inline-shift-selector"
 import { GripVertical, Plus, RotateCcw, Lock, Download, FileText } from "lucide-react"
 import { getDay, parseISO } from "date-fns"
@@ -249,10 +249,11 @@ export function ScheduleGridMobile({
                           />
                         ) : (
                           <div className="text-xs sm:text-sm">
-                            <CellAssignments
+                            <CellAssignmentsMobile
                               assignments={assignments}
-                              getShiftInfo={getShiftInfo}
-                              mediosTurnos={mediosTurnos}
+                              shifts={shifts}
+                              dayStatus={dayStatus}
+                              readonly={readonly}
                             />
                             {dayStatus === "franco" && (
                               <span className="block text-center text-xs sm:text-sm md:text-base font-bold bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
