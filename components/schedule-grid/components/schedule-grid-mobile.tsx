@@ -252,6 +252,7 @@ export function ScheduleGridMobile({
                             <CellAssignmentsMobile
                               assignments={assignments}
                               shifts={shifts}
+                              mediosTurnos={mediosTurnos}
                               dayStatus={dayStatus}
                               readonly={readonly}
                             />

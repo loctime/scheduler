@@ -708,7 +708,6 @@ export const ScheduleGrid = forwardRef<HTMLDivElement, ScheduleGridProps>(({
           </div>
         ) : (
           <>
-            <div className="text-xs text-gray-500 mb-2">� Forzando fallback: grilla real (evitando imagen en blanco)</div>
             <div className="w-full overflow-x-auto">
               {renderDesktopGrid()}
             </div>
