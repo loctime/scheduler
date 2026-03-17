@@ -26,7 +26,7 @@ const DIAS_SEMANA = [
 ]
 
 interface TaskFormProps {
-  task?: Partial<TaskFormData>
+  task?: Partial<TaskFormData> | null
   employees: Empleado[]
   onSubmit: (data: TaskFormData) => void
   onCancel: () => void

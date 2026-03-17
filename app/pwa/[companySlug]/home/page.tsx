@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useTasks } from "@/hooks/use-tasks"
 import { useDailyTaskStatus } from "@/hooks/use-daily-task-status"
 import { AlertTriangle, Check, ChevronDown, ChevronUp } from "lucide-react"
+import { isTaskForToday } from "@/lib/tasks/is-task-for-today"
 
 // Constantes para mensajes informativos
 const MENSAJES_DEL_DIA = [
@@ -196,10 +197,10 @@ function TodayScheduleCell({ companySlug, employeeId }: { companySlug: string; e
   // Estado de tareas completadas (sistema unificado)
   const { completed, toggleTask } = useDailyTaskStatus(ownerId)
   
-  // Filtrar tareas del día
+  // Filtrar tareas del día usando lógica centralizada
   const todayDate = new Date()
   const todayTasks = tasks.filter(t => 
-    t.daysOfWeek?.includes(todayDate.getDay())
+    isTaskForToday(t, todayDate)
   )
   
   // Separar pendientes y realizadas

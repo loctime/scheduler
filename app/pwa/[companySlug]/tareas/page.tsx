@@ -13,6 +13,7 @@ import { useTasks } from "@/hooks/use-tasks"
 import { useDailyTaskStatus } from "@/hooks/use-daily-task-status"
 import { PwaViewerBadge, useViewer } from "@/components/pwa/PwaViewerBadge"
 import { Task } from "@/types/task"
+import { isTaskForToday } from "@/lib/tasks/is-task-for-today"
 
 const DIAS_SEMANA = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
 
@@ -84,40 +85,18 @@ export default function TareasPage() {
     })
   }, [tasks, ownerId, viewer?.employeeId])
 
-  // Paso 2: Separar tareas del día vs no del día (actualizado para nuevos tipos)
+  // Paso 2: Separar tareas del día vs no del día usando lógica centralizada
   const { tareasDelDia, tareasNoDelDia } = useMemo(() => {
-    const tareasDelDia = filteredTasks.filter(task => {
-      const taskType = task.taskType || "weekly" // Compatibilidad hacia atrás
-      
-      switch (taskType) {
-        case "daily":
-          return true // Aparecen todos los días
-        case "weekly":
-          return task.daysOfWeek?.includes(todayDayNumber) || false
-        case "specific":
-          return task.specificDate === todayString
-        default:
-          return task.daysOfWeek?.includes(todayDayNumber) || false
-      }
-    })
+    const tareasDelDia = filteredTasks.filter(task => 
+      isTaskForToday(task, today)
+    )
     
-    const tareasNoDelDia = filteredTasks.filter(task => {
-      const taskType = task.taskType || "weekly" // Compatibilidad hacia atrás
-      
-      switch (taskType) {
-        case "daily":
-          return false // Las diarias siempre son del día
-        case "weekly":
-          return !task.daysOfWeek?.includes(todayDayNumber)
-        case "specific":
-          return task.specificDate !== todayString
-        default:
-          return !task.daysOfWeek?.includes(todayDayNumber)
-      }
-    })
+    const tareasNoDelDia = filteredTasks.filter(task => 
+      !isTaskForToday(task, today)
+    )
     
     return { tareasDelDia, tareasNoDelDia }
-  }, [filteredTasks, todayDayNumber, todayString])
+  }, [filteredTasks, today])
 
   // Paso 3: Dentro de tareasDelDia separar pendientes y completadas
   const { pendientes, completadas } = useMemo(() => {
