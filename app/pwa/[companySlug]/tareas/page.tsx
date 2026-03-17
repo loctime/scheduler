@@ -340,7 +340,7 @@ export default function TareasPage() {
         onOpenChange={setQuickCreateOpen}
         employees={employees}
         viewerId={viewer?.employeeId || ''}
-        ownerId={ownerId}
+        ownerId={ownerId || ''}
       />
     </div>
   )
