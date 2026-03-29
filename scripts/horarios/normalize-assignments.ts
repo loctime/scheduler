@@ -14,8 +14,8 @@
 
 import { initializeApp, getApps } from "firebase/app"
 import { getFirestore, collection, getDocs, doc, updateDoc, getDoc } from "firebase/firestore"
-import { detectIncompleteAssignments, normalizeAssignmentFromShift } from "../lib/assignment-utils"
-import { Horario, Turno, ShiftAssignment } from "../lib/types"
+import { detectIncompleteAssignments, normalizeAssignmentFromShift } from "../../lib/assignment-utils"
+import { Horario, Turno, ShiftAssignment } from "../../lib/types"
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,

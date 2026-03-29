@@ -1,9 +1,9 @@
 // Script de Migración Segura - Sistema de Versionado Inmutable
 // Migra semanas del formato antiguo isCompleted/weekSnapshot al nuevo sistema
 
-import { WeekVersioningService } from "../lib/week-versioning-service-immutable"
-import { LegacyWeekData, MigrationResult } from "../lib/types/week-versioning-new"
-import { db } from "../lib/firebase"
+import { WeekVersioningService } from "../../lib/week-versioning-service-immutable"
+import { LegacyWeekData, MigrationResult } from "../../lib/types/week-versioning-new"
+import { db } from "../../lib/firebase"
 import { collection, getDocs, query, orderBy } from "firebase/firestore"
 
 // ========================================

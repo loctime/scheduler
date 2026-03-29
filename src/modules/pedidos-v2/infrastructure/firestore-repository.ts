@@ -29,6 +29,10 @@ import {
   validateRecepcion
 } from "../domain/rules"
 
+type AuditLogInsert = Omit<AuditLog, "id" | "createdAt"> & {
+  createdAt: ReturnType<typeof serverTimestamp>
+}
+
 const padNumber = (value: number, size = 6) => String(value).padStart(size, "0")
 
 async function nextCounter(counterId: string, prefix: string): Promise<string> {
@@ -76,7 +80,7 @@ export async function createPedido(input: Omit<Pedido, "id" | "numeroPedido" | "
     createdBy: input.createdBy,
     createdByName: input.createdByName,
     createdByEmail: input.createdByEmail
-  } as AuditLog)
+  } satisfies AuditLogInsert)
 
   return { id: pedidoRef.id, numeroPedido }
 }
@@ -113,7 +117,7 @@ export async function emitirRemitoSalida(input: Omit<RemitoSalida, "id" | "numer
     createdBy: input.createdBy,
     createdByName: input.createdByName,
     createdByEmail: input.createdByEmail
-  } as AuditLog)
+  } satisfies AuditLogInsert)
 
   return { id: remitoRef.id, numero }
 }
@@ -153,22 +157,23 @@ export async function registrarTransporte(remitoSalidaId: string, pedidoId: stri
     createdBy: firmaTransportista.firmadoBy,
     createdByName: firmaTransportista.firmadoByName,
     createdByEmail: firmaTransportista.firmadoByEmail
-  } as AuditLog)
+  } satisfies AuditLogInsert)
 }
 
 export async function confirmarRecepcion(input: Omit<Recepcion, "id" | "numero" | "totales" | "createdAt">) {
   if (!db) throw new Error("Firestore no disponible")
+  const firestore = db
   const errors = validateRecepcion({ items: input.items, firma: input.firma })
   if (errors.length) throw new Error(errors.join(" | "))
 
-  const pedidoSnap = await getDoc(doc(db, COLLECTIONS.PEDIDOS, input.pedidoId))
+  const pedidoSnap = await getDoc(doc(firestore, COLLECTIONS.PEDIDOS, input.pedidoId))
   if (!pedidoSnap.exists()) throw new Error("Pedido no encontrado")
   const pedidoData = pedidoSnap.data() as Pedido
 
   const numero = await nextCounter("recepcion", "REC")
   const totales = calculateRecepcionTotales(input.items)
 
-  const recepcionRef = await addDoc(collection(db, COLLECTIONS.RECEPCIONES), {
+  const recepcionRef = await addDoc(collection(firestore, COLLECTIONS.RECEPCIONES), {
     ...input,
     pedidoNumero: input.pedidoNumero || pedidoData.numeroPedido,
     numero,
@@ -176,16 +181,16 @@ export async function confirmarRecepcion(input: Omit<Recepcion, "id" | "numero" 
     createdAt: serverTimestamp()
   })
 
-  await updateDoc(doc(db, COLLECTIONS.PEDIDOS, input.pedidoId), {
+  await updateDoc(doc(firestore, COLLECTIONS.PEDIDOS, input.pedidoId), {
     recepcionId: recepcionRef.id,
     estado: totales.cantidadPendiente > 0 ? "recibido" : "cerrado",
     updatedAt: serverTimestamp()
   })
 
-  const batch = writeBatch(db)
+  const batch = writeBatch(firestore)
 
   input.items.forEach((item) => {
-    const productRef = doc(db, COLLECTIONS.PRODUCTS, item.productId)
+    const productRef = doc(firestore, COLLECTIONS.PRODUCTS, item.productId)
     batch.update(productRef, {
       stockActual: increment(item.cantidadRecibida),
       updatedAt: serverTimestamp()
@@ -216,7 +221,7 @@ export async function confirmarRecepcion(input: Omit<Recepcion, "id" | "numero" 
     }))
 
   pendientes.forEach((pendiente) => {
-    const pendienteRef = doc(db, COLLECTIONS.PEDIDOS_PENDIENTES, pendiente.id)
+    const pendienteRef = doc(firestore, COLLECTIONS.PEDIDOS_PENDIENTES, pendiente.id)
     batch.set(pendienteRef, {
       ...pendiente,
       createdAt: serverTimestamp(),
@@ -254,7 +259,7 @@ export async function confirmarRecepcion(input: Omit<Recepcion, "id" | "numero" 
     updatedAt: new Date()
   }
 
-  const consolidadoRef = doc(db, COLLECTIONS.PEDIDOS_CONSOLIDADOS, input.pedidoId)
+  const consolidadoRef = doc(firestore, COLLECTIONS.PEDIDOS_CONSOLIDADOS, input.pedidoId)
   batch.set(consolidadoRef, {
     ...consolidado,
     createdAt: serverTimestamp(),
@@ -263,7 +268,7 @@ export async function confirmarRecepcion(input: Omit<Recepcion, "id" | "numero" 
 
   await batch.commit()
 
-  await addDoc(collection(db, COLLECTIONS.AUDIT_LOGS), {
+  await addDoc(collection(firestore, COLLECTIONS.AUDIT_LOGS), {
     entityType: "recepcion",
     entityId: recepcionRef.id,
     pedidoId: input.pedidoId,
@@ -273,7 +278,7 @@ export async function confirmarRecepcion(input: Omit<Recepcion, "id" | "numero" 
     createdBy: input.createdBy,
     createdByName: input.createdByName,
     createdByEmail: input.createdByEmail
-  } as AuditLog)
+  } satisfies AuditLogInsert)
 
   return { id: recepcionRef.id, numero }
 }

@@ -10,8 +10,8 @@
 
 import { initializeApp, getApps } from "firebase/app"
 import { getFirestore, collection, getDocs } from "firebase/firestore"
-import { detectIncompleteAssignments, IncompleteAssignment } from "../lib/assignment-utils"
-import { Horario } from "../lib/types"
+import { detectIncompleteAssignments, IncompleteAssignment } from "../../lib/assignment-utils"
+import { Horario } from "../../lib/types"
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
