@@ -298,7 +298,7 @@ export default function PedidosPage() {
   }
 
   const handleAbrirLogisticaV2 = () => {
-    router.push("/dashboard/documentos-logistica")
+    router.push("/dashboard/v2/pedidos")
   }
 
   const handleOpenCreate = () => {
@@ -554,6 +554,7 @@ export default function PedidosPage() {
                     observacionesRemito={observacionesRemito}
                     loadingRecepcion={loadingRecepcion}
                     onConfirmar={handleConfirmarRecepcion}
+                    legacyDisabled={flags.logisticsV2.enabled}
                   />
                 </div>
                 <div className={activeTab === "remitos" ? "block" : "hidden"}>
@@ -569,6 +570,7 @@ export default function PedidosPage() {
                     onCopyEnlacePublico={handleCopyEnlacePublico}
                     onRegistrarRecepcion={() => setActiveTab("recepcion")}
                     onDownloadRemito={descargarPDFRemito}
+                    legacyDisabled={flags.logisticsV2.enabled}
                   />
                 </div>
               </>

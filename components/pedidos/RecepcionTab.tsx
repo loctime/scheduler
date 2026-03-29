@@ -9,16 +9,23 @@ export interface RecepcionTabProps {
   observacionesRemito: string | null
   loadingRecepcion: boolean
   onConfirmar: (recepcion: any) => void | Promise<void>
+  legacyDisabled?: boolean
 }
 
 export function RecepcionTab({
   productosEnviados,
   observacionesRemito,
   loadingRecepcion,
-  onConfirmar
+  onConfirmar,
+  legacyDisabled = false
 }: RecepcionTabProps) {
   return (
     <div className="space-y-3 md:space-y-4">
+      {legacyDisabled && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          Recepción legacy deshabilitada. Usar flujo V2.
+        </div>
+      )}
       {loadingRecepcion ? (
         <div className="flex items-center justify-center h-64 md:h-96">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>

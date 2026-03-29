@@ -17,6 +17,7 @@ export interface RemitosTabProps {
   onCopyEnlacePublico: () => void
   onRegistrarRecepcion: () => void
   onDownloadRemito: (remito: Remito) => void
+  legacyDisabled?: boolean
 }
 
 export function RemitosTab({
@@ -30,10 +31,16 @@ export function RemitosTab({
   onGenerarEnlacePublico,
   onCopyEnlacePublico,
   onRegistrarRecepcion,
-  onDownloadRemito
+  onDownloadRemito,
+  legacyDisabled = false
 }: RemitosTabProps) {
   return (
     <div className="space-y-4">
+      {legacyDisabled && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          Remitos y recepciones legacy deshabilitados. Usar flujo V2.
+        </div>
+      )}
       {selectedPedido && (
         <div className="rounded-lg border bg-card">
           <div className="p-3 border-b border-border">
@@ -44,14 +51,14 @@ export function RemitosTab({
           </div>
           <div className="p-3 border-t border-border">
             <div className="flex flex-wrap gap-2">
-              {selectedPedido.estado === "creado" && productosAPedirCount > 0 && (
+              {selectedPedido.estado === "creado" && productosAPedirCount > 0 && !legacyDisabled && (
                 <Button onClick={onGenerarRemitoEnvio} size="sm">
                   <FileText className="h-4 w-4 mr-2" />
                   Generar Remito de Envío
                 </Button>
               )}
 
-              {selectedPedido.estado === "enviado" && !enlaceActivo && (
+              {selectedPedido.estado === "enviado" && !enlaceActivo && !legacyDisabled && (
                 <Button onClick={onGenerarEnlacePublico} size="sm" variant="outline">
                   <LinkIcon className="h-4 w-4 mr-2" />
                   Generar Enlace Público
@@ -65,7 +72,7 @@ export function RemitosTab({
                 </Button>
               )}
 
-              {(selectedPedido.estado === "enviado" || selectedPedido.estado === "recibido") && (
+              {(selectedPedido.estado === "enviado" || selectedPedido.estado === "recibido") && !legacyDisabled && (
                 <Button size="sm" onClick={onRegistrarRecepcion}>
                   <Package className="h-4 w-4 mr-2" />
                   Registrar Recepción

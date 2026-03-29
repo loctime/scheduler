@@ -1,394 +1,318 @@
-📦 BASE PATH
+BASE PATH
 /apps/horarios/
-1. 📁 products
+
+MODELO LOGICO Y COLECCIONES
+Pedido -> /apps/horarios/pedidos
+RemitoSalida (armado + transporte) -> /apps/horarios/remitos_salida
+Recepcion -> /apps/horarios/recepciones
+Consolidado -> /apps/horarios/pedidos_consolidados
+Pendientes -> /apps/horarios/pedidos_pendientes
+AuditLog -> /apps/horarios/audit_logs
+Counter -> /apps/horarios/counters
+Products -> /apps/horarios/products
+
+COLECCIONES
+/apps/horarios/products
+/apps/horarios/pedidos
+/apps/horarios/remitos_salida
+/apps/horarios/recepciones
+/apps/horarios/pedidos_consolidados
+/apps/horarios/pedidos_pendientes
+/apps/horarios/audit_logs
+/apps/horarios/counters
+
+1) products
 /apps/horarios/products/{productId}
-{
-  "id": "string",
-  "nombre": "string",
-  "unidad": "string",
-  "stockMinimo": 0,
-  "stockActual": 0,
-  "orden": 0,
+Campos
+id: string
+nombre: string
+unidad: string
+stockMinimo: number
+stockActual: number
+orden: number
+activo: boolean
+createdAt: timestamp
+updatedAt: timestamp
 
-  "activo": true,
-
-  "createdAt": "timestamp",
-  "updatedAt": "timestamp"
-}
-2. 📁 pedidos
+2) pedidos
 /apps/horarios/pedidos/{pedidoId}
-{
-  "id": "string",
-  "numeroPedido": "PED-000001",
+Campos
+id: string
+numeroPedido: string
+estado: string
+origen:
+  tipo: string
+  id: string
+  nombre: string
+destino:
+  tipo: string
+  id: string
+  nombre: string
+usaPendientes: boolean
+pedidoOrigenPendienteIds: string[]
+remitoSalidaId: string | null
+recepcionId: string | null
+observaciones: string
+items: PedidoItem[]
+totales:
+  items: number
+  cantidadPedida: number
+  cantidadPendienteFinal: number
+createdAt: timestamp
+createdBy: string
+createdByName: string
+createdByEmail: string
+updatedAt: timestamp
 
-  "estado": "pendiente", 
-  // pendiente | preparado | en_transporte | recibido | cerrado | cancelado
+PedidoItem
+itemId: string
+productId: string
+productNombre: string
+unidad: string
+stockMinimo: number
+stockActual: number
+cantidadPedida: number
+cantidadSugerida: number
+cantidadManual: number
+observaciones: string
 
-  "origen": {
-    "tipo": "fabrica", 
-    "id": "string",
-    "nombre": "string"
-  },
+Estado (pedido.estado)
+pendiente
+preparado
+en_transporte
+recibido
+cerrado
+cancelado
 
-  "destino": {
-    "tipo": "sucursal",
-    "id": "string",
-    "nombre": "string"
-  },
-
-  "usaPendientes": false,
-  "pedidoOrigenPendienteIds": [],
-
-  "remitoSalidaId": null,
-  "remitoTransporteId": null,
-  "recepcionId": null,
-
-  "observaciones": "",
-
-  "items": [
-    {
-      "itemId": "string",
-      "productId": "string",
-      "productNombre": "string",
-      "unidad": "string",
-
-      "stockMinimo": 0,
-      "stockActual": 0,
-
-      "cantidadPedida": 0,
-      "cantidadSugerida": 0,
-      "cantidadManual": 0,
-
-      "observaciones": ""
-    }
-  ],
-
-  "totales": {
-    "items": 0,
-    "cantidadPedida": 0,
-    "cantidadPendienteFinal": 0
-  },
-
-  "createdAt": "timestamp",
-  "createdBy": "userId",
-  "createdByName": "string",
-  "createdByEmail": "string",
-
-  "updatedAt": "timestamp"
-}
-3. 📁 remitos_salida (ARMADO)
+3) remitos_salida (ARMADO + TRANSPORTE)
 /apps/horarios/remitos_salida/{remitoSalidaId}
-{
-  "id": "string",
-  "numero": "RS-000001",
+Campos
+id: string
+numero: string
+pedidoId: string
+pedidoNumero: string
+estado: string
+origen:
+  id: string
+  nombre: string
+destino:
+  id: string
+  nombre: string
+items: RemitoSalidaItem[]
+totales:
+  cantidadPedida: number
+  cantidadPreparada: number
+  cantidadTransportada: number
+observaciones: string
+firmaEmisor:
+  firmado: boolean
+  firmadoAt: timestamp
+  firmadoBy: string
+  firmadoByName: string
+  firmadoByEmail: string
+  firmaData: string
+firmaTransportista:
+  firmado: boolean
+  firmadoAt: timestamp
+  firmadoBy: string
+  firmadoByName: string
+  firmadoByEmail: string
+  firmaData: string
+createdAt: timestamp
+createdBy: string
+createdByName: string
+createdByEmail: string
 
-  "pedidoId": "string",
-  "pedidoNumero": "PED-000001",
+RemitoSalidaItem
+itemId: string
+pedidoItemId: string
+productId: string
+productNombre: string
+unidad: string
+cantidadPedida: number
+cantidadPreparada: number
+cantidadTransportada: number
+estadoLinea: string
+motivo: string
+observaciones: string
 
-  "estado": "emitido", 
-  // emitido | anulado
+Estado (remitos_salida.estado)
+emitido
+en_transito
+entregado
+cerrado
+anulado
 
-  "origen": {
-    "id": "string",
-    "nombre": "string"
-  },
+EstadoLinea (remitos_salida.items.estadoLinea)
+ok
+parcial
+no_hay
+cancelado
 
-  "destino": {
-    "id": "string",
-    "nombre": "string"
-  },
-
-  "items": [
-    {
-      "itemId": "string",
-      "pedidoItemId": "string",
-
-      "productId": "string",
-      "productNombre": "string",
-      "unidad": "string",
-
-      "cantidadPedida": 0,
-      "cantidadPreparada": 0,
-
-      "estadoLinea": "ok",
-      // ok | parcial | no_hay | cancelado
-
-      "motivo": "",
-      "observaciones": ""
-    }
-  ],
-
-  "totales": {
-    "cantidadPedida": 0,
-    "cantidadPreparada": 0
-  },
-
-  "observaciones": "",
-
-  "firma": {
-    "firmado": true,
-    "firmadoAt": "timestamp",
-    "firmadoBy": "userId",
-    "firmadoByName": "string",
-    "firmadoByEmail": "string",
-    "firmaData": "string"
-  },
-
-  "createdAt": "timestamp",
-  "createdBy": "userId",
-  "createdByName": "string",
-  "createdByEmail": "string"
-}
-4. 📁 remitos_transporte (DELIVERY)
-/apps/horarios/remitos_transporte/{remitoTransporteId}
-{
-  "id": "string",
-  "numero": "RT-000001",
-
-  "pedidoId": "string",
-  "remitoSalidaId": "string",
-
-  "pedidoNumero": "PED-000001",
-  "remitoSalidaNumero": "RS-000001",
-
-  "estado": "emitido", 
-  // emitido | entregado | anulado
-
-  "transportista": {
-    "id": "string",
-    "nombre": "string",
-    "email": "string"
-  },
-
-  "items": [
-    {
-      "itemId": "string",
-      "pedidoItemId": "string",
-      "remitoSalidaItemId": "string",
-
-      "productId": "string",
-      "productNombre": "string",
-      "unidad": "string",
-
-      "cantidadPreparada": 0,
-      "cantidadTransportada": 0,
-
-      "estadoLinea": "ok",
-      // ok | parcial | no_cargado | ajustado | perdido
-
-      "motivo": "",
-      "observaciones": ""
-    }
-  ],
-
-  "totales": {
-    "cantidadPreparada": 0,
-    "cantidadTransportada": 0
-  },
-
-  "observaciones": "",
-
-  "firma": {
-    "firmado": true,
-    "firmadoAt": "timestamp",
-    "firmadoBy": "userId",
-    "firmadoByName": "string",
-    "firmadoByEmail": "string",
-    "firmaData": "string"
-  },
-
-  "createdAt": "timestamp",
-  "createdBy": "userId",
-  "createdByName": "string",
-  "createdByEmail": "string"
-}
-5. 📁 recepciones
+4) recepciones
 /apps/horarios/recepciones/{recepcionId}
-{
-  "id": "string",
-  "numero": "REC-000001",
+Campos
+id: string
+numero: string
+pedidoId: string
+remitoSalidaId: string
+pedidoNumero: string
+remitoSalidaNumero: string
+estado: string
+items: RecepcionItem[]
+totales:
+  cantidadRecibida: number
+  cantidadPendiente: number
+observaciones: string
+firma:
+  firmado: boolean
+  firmadoAt: timestamp
+  firmadoBy: string
+  firmadoByName: string
+  firmadoByEmail: string
+  firmaData: string
+createdAt: timestamp
+createdBy: string
+createdByName: string
+createdByEmail: string
 
-  "pedidoId": "string",
-  "remitoSalidaId": "string",
-  "remitoTransporteId": "string",
+RecepcionItem
+itemId: string
+pedidoItemId: string
+productId: string
+productNombre: string
+unidad: string
+cantidadPedida: number
+cantidadPreparada: number
+cantidadTransportada: number
+cantidadRecibida: number
+cantidadPendiente: number
+cantidadDevuelta: number
+cantidadDanada: number
+estadoLinea: string
+motivo: string
+observaciones: string
 
-  "pedidoNumero": "PED-000001",
-  "remitoSalidaNumero": "RS-000001",
-  "remitoTransporteNumero": "RT-000001",
+Estado (recepciones.estado)
+confirmada
+cerrada
+anulada
 
-  "estado": "confirmada", 
-  // confirmada | cerrada | anulada
+EstadoLinea (recepciones.items.estadoLinea)
+ok
+faltante
+no_esta
+danado
+devuelto
+excedente
+parcial
 
-  "items": [
-    {
-      "itemId": "string",
-      "pedidoItemId": "string",
-
-      "productId": "string",
-      "productNombre": "string",
-      "unidad": "string",
-
-      "cantidadPedida": 0,
-      "cantidadPreparada": 0,
-      "cantidadTransportada": 0,
-
-      "cantidadRecibida": 0,
-
-      "cantidadPendiente": 0,
-      "cantidadDevuelta": 0,
-      "cantidadDanada": 0,
-
-      "estadoLinea": "ok",
-      // ok | faltante | no_esta | danado | devuelto | excedente | parcial
-
-      "motivo": "",
-      "observaciones": ""
-    }
-  ],
-
-  "totales": {
-    "cantidadRecibida": 0,
-    "cantidadPendiente": 0
-  },
-
-  "observaciones": "",
-
-  "firma": {
-    "firmado": true,
-    "firmadoAt": "timestamp",
-    "firmadoBy": "userId",
-    "firmadoByName": "string",
-    "firmadoByEmail": "string",
-    "firmaData": "string"
-  },
-
-  "createdAt": "timestamp",
-  "createdBy": "userId",
-  "createdByName": "string",
-  "createdByEmail": "string"
-}
-6. 📁 pedidos_consolidados
+5) pedidos_consolidados (DERIVADO MATERIALIZADO)
 /apps/horarios/pedidos_consolidados/{pedidoId}
-{
-  "id": "pedidoId",
-  "pedidoId": "string",
-  "numeroPedido": "PED-000001",
+Campos
+id: string
+pedidoId: string
+numeroPedido: string
+estado: string
+refs:
+  remitoSalidaId: string
+  recepcionId: string
+resumen:
+  cantidadPedida: number
+  cantidadPreparada: number
+  cantidadTransportada: number
+  cantidadRecibida: number
+  cantidadPendiente: number
+items: ConsolidadoItem[]
+createdAt: timestamp
+updatedAt: timestamp
 
-  "estado": "recibido_completo",
-  // pendiente | preparado | en_transporte | recibido_parcial | recibido_completo | cerrado
+ConsolidadoItem
+productId: string
+productNombre: string
+cantidadPedida: number
+cantidadPreparada: number
+cantidadTransportada: number
+cantidadRecibida: number
+cantidadPendiente: number
+estadoFinal: string
 
-  "refs": {
-    "remitoSalidaId": "string",
-    "remitoTransporteId": "string",
-    "recepcionId": "string"
-  },
+Estado (pedidos_consolidados.estado)
+pendiente
+preparado
+en_transporte
+recibido_parcial
+recibido_completo
+cerrado
 
-  "resumen": {
-    "cantidadPedida": 0,
-    "cantidadPreparada": 0,
-    "cantidadTransportada": 0,
-    "cantidadRecibida": 0,
-    "cantidadPendiente": 0
-  },
-
-  "items": [
-    {
-      "productId": "string",
-      "productNombre": "string",
-
-      "cantidadPedida": 0,
-      "cantidadPreparada": 0,
-      "cantidadTransportada": 0,
-      "cantidadRecibida": 0,
-      "cantidadPendiente": 0,
-
-      "estadoFinal": "ok"
-    }
-  ],
-
-  "createdAt": "timestamp",
-  "updatedAt": "timestamp"
-}
-7. 📁 pedidos_pendientes
+6) pedidos_pendientes (DERIVADO MATERIALIZADO)
 /apps/horarios/pedidos_pendientes/{pendienteId}
+Campos
+id: string
+pedidoId: string
+pedidoNumero: string
+recepcionId: string
+productId: string
+productNombre: string
+unidad: string
+origenId: string
+origenNombre: string
+destinoId: string
+destinoNombre: string
+cantidadPendiente: number
+estado: string
+createdAt: timestamp
+updatedAt: timestamp
+resolvedAt: timestamp | null
+resolvedBy: string | null
+pedidoResolucionId: string | null
 
-👉 recomendado:
+Estado (pedidos_pendientes.estado)
+activo
+usado_en_nuevo_pedido
+resuelto
+cancelado
 
-{pedidoId}_{productId}
-{
-  "id": "string",
-
-  "pedidoId": "string",
-  "pedidoNumero": "PED-000001",
-
-  "recepcionId": "string",
-
-  "productId": "string",
-  "productNombre": "string",
-  "unidad": "string",
-
-  "origenId": "string",
-  "origenNombre": "string",
-
-  "destinoId": "string",
-  "destinoNombre": "string",
-
-  "cantidadPendiente": 0,
-
-  "estado": "activo",
-  // activo | usado_en_nuevo_pedido | resuelto | cancelado
-
-  "createdAt": "timestamp",
-  "updatedAt": "timestamp",
-
-  "resolvedAt": null,
-  "resolvedBy": null,
-  "pedidoResolucionId": null
-}
-8. 📁 audit_logs
+7) audit_logs
 /apps/horarios/audit_logs/{logId}
-{
-  "id": "string",
+Campos
+id: string
+entityType: string
+entityId: string
+pedidoId: string
+accion: string
+descripcion: string
+createdAt: timestamp
+createdBy: string
+createdByName: string
+createdByEmail: string
 
-  "entityType": "pedido",
-  // pedido | remito_salida | remito_transporte | recepcion | consolidado | pendiente
+EntityType
+pedido
+remito_salida
+recepcion
+consolidado
+pendiente
 
-  "entityId": "string",
-  "pedidoId": "string",
+Accion
+created
+updated
+signed
+confirmed
+cancelled
 
-  "accion": "created",
-  // created | updated | signed | confirmed | cancelled
-
-  "descripcion": "string",
-
-  "createdAt": "timestamp",
-
-  "createdBy": "userId",
-  "createdByName": "string",
-  "createdByEmail": "string"
-}
-9. 📁 counters
+8) counters
 /apps/horarios/counters/{counterId}
-{
-  "id": "pedido",
-  "prefix": "PED",
-  "nextNumber": 17,
-  "updatedAt": "timestamp"
-}
-🔥 REGLAS FINALES (NO NEGOCIABLES)
-1. NO borrar documentos
+Campos
+id: string
+prefix: string
+nextNumber: number
+updatedAt: timestamp
 
-Nunca borrar:
-
-remitos
-recepciones
-2. NO editar después de firmar
-
-Documento firmado = congelado
-
-3. stock solo en recepción
-product.stockActual += cantidadRecibida
-4. pendiente SIEMPRE
-pendiente = cantidadPedida - cantidadRecibida
-5. consolidado SIEMPRE automático
-6. firma SIEMPRE snapshot
+REGLAS
+1. No borrar documentos de remitos ni recepciones.
+2. Documento firmado no se edita.
+3. Stock se actualiza solo en recepci�n.
+4. Pendiente siempre se calcula como cantidadPedida - cantidadRecibida.
+5. Consolidado siempre autom�tico.
+6. Firma siempre snapshot.

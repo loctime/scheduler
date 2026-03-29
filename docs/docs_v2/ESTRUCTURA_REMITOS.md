@@ -1,297 +1,164 @@
-1. Estructura Firestore exacta
-Colecciones principales
+OBJETIVO
+Mantener una 鷑ica documentaci髇 coherente con el modelo simple actual sin entidad RemitoTransporte.
 
-Dentro de /apps/horarios/:
+RELACION LOGICA Y COLECCIONES
+Pedido -> /apps/horarios/pedidos
+RemitoSalida (armado + transporte) -> /apps/horarios/remitos_salida
+Recepcion -> /apps/horarios/recepciones
+Consolidado (derivado materializado) -> /apps/horarios/pedidos_consolidados
+Pendientes (derivado materializado) -> /apps/horarios/pedidos_pendientes
+AuditLog -> /apps/horarios/audit_logs
+Counter -> /apps/horarios/counters
+Products -> /apps/horarios/products
 
+COLECCIONES
 /apps/horarios/products
 /apps/horarios/pedidos
 /apps/horarios/remitos_salida
-/apps/horarios/remitos_transporte
 /apps/horarios/recepciones
 /apps/horarios/pedidos_consolidados
 /apps/horarios/pedidos_pendientes
-/apps/horarios/firmas_config
 /apps/horarios/audit_logs
 /apps/horarios/counters
-Qu茅 hace cada una
-products
 
-Ya existe o es equivalente a lo actual.
-Queda para:
+MODELO DE DOCUMENTOS
 
-cat谩logo
-stock m铆nimo
-unidad
-stock actual
-orden
-metadatos del producto
-pedidos
-
-Documento inicial.
-Representa lo que una sucursal pidi贸.
-
-remitos_salida
-
-Documento del armado.
-Lo crea quien prepara el pedido.
-
-remitos_transporte
-
-Documento del delivery.
-Representa lo que efectivamente sale transportado.
-
-recepciones
-
-Documento de recepci贸n final.
-Lo crea quien recibe.
-
-pedidos_consolidados
-
-Documento derivado, solo lectura.
-Resume pedido + salida + transporte + recepci贸n.
-
-pedidos_pendientes
-
-Saldo pendiente por pedido y producto.
-Sirve para arrastrar faltantes al pr贸ximo ciclo.
-
-firmas_config
-
-Configuraci贸n de firma del usuario.
-Ya tienen algo parecido; esto puede mapearse o reutilizarse.
-
-audit_logs
-
-Historial de eventos.
-No reemplaza documentos; registra acciones.
-
-counters
-
-Para numeraci贸n humana:
-
-PED-000001
-RS-000001
-RT-000001
-REC-000001
-2. Modelo de documentos
-A. /apps/horarios/pedidos/{pedidoId}
-
-Este es el documento base.
-
+A) /apps/horarios/pedidos/{pedidoId}
 Campos
 id
 numeroPedido
 estado
-origenTipo
-origenId
-origenNombre
-destinoTipo
-destinoId
-destinoNombre
+origen.tipo
+origen.id
+origen.nombre
+destino.tipo
+destino.id
+destino.nombre
 createdAt
 createdBy
 createdByName
 createdByEmail
 updatedAt
 observaciones
-stockSnapshotVersion opcional
-usaPendientes boolean
-pedidoOrigenPendienteIds []
+usaPendientes
+pedidoOrigenPendienteIds
+remitoSalidaId
+recepcionId
+items[]
 totales
-items []
-estado
 
-Valores:
-
+Estado
 pendiente
 preparado
 en_transporte
 recibido
 cerrado
 cancelado
+
 items[]
-
-Cada item debe llevar snapshot, no depender del producto vivo.
-
 itemId
 productId
-productNombreSnapshot
-unidadSnapshot
-stockMinimoSnapshot
-stockActualSnapshot
+productNombre
+unidad
+stockMinimo
+stockActual
 cantidadPedida
 cantidadSugerida
 cantidadManual
 observaciones
-totales
 
-Puede guardar algo simple:
-
-cantidadItems
-cantidadTotalPedida
-cantidadPendienteFinal
-B. /apps/horarios/remitos_salida/{remitoSalidaId}
-
-Documento del armado real.
-
+B) /apps/horarios/remitos_salida/{remitoSalidaId}
 Campos
 id
-numeroRemitoSalida
+numero
 pedidoId
-pedidoNumeroSnapshot
+pedidoNumero
 estado
-origenTipo
-origenId
-origenNombre
-destinoTipo
-destinoId
-destinoNombre
+origen.id
+origen.nombre
+destino.id
+destino.nombre
 createdAt
 createdBy
 createdByName
 createdByEmail
-observacionesGenerales
-firma
-totales
-items []
-estado
-emitido
-anulado
-firma
-
-Snapshot, no referencia viva:
-
-firmado
-firmadoAt
-firmadoBy
-firmadoByName
-firmadoByEmail
-firmaImageUrl o firmaData
-firmaTexto opcional
-items[]
-itemId
-pedidoItemId
-productId
-productNombreSnapshot
-unidadSnapshot
-cantidadPedida
-cantidadPreparada
-estadoLinea
-motivo
 observaciones
-estadoLinea
-ok
-parcial
-no_hay
-reemplazado
-cancelado
-C. /apps/horarios/remitos_transporte/{remitoTransporteId}
-
-Documento del delivery.
-
-Campos
-id
-numeroRemitoTransporte
-pedidoId
-remitoSalidaId
-pedidoNumeroSnapshot
-remitoSalidaNumeroSnapshot
-estado
-origenTipo
-origenId
-origenNombre
-destinoTipo
-destinoId
-destinoNombre
-transportistaId
-transportistaNombre
-transportistaEmail
-vehiculoId opcional
-vehiculoDescripcion opcional
-createdAt
-createdBy
-createdByName
-createdByEmail
-observacionesGenerales
-firma
 totales
-items []
-estado
+firmaEmisor
+firmaTransportista
+items[]
+
+Estado
 emitido
+en_transito
 entregado
+cerrado
 anulado
+
 items[]
 itemId
 pedidoItemId
-remitoSalidaItemId
 productId
-productNombreSnapshot
-unidadSnapshot
+productNombre
+unidad
+cantidadPedida
 cantidadPreparada
 cantidadTransportada
 estadoLinea
 motivo
 observaciones
-estadoLinea
+
+EstadoLinea
 ok
 parcial
-no_cargado
-ajustado
-perdido
-D. /apps/horarios/recepciones/{recepcionId}
+no_hay
+cancelado
 
-Documento de recepci贸n.
+firmaEmisor
+firmado
+firmadoAt
+firmadoBy
+firmadoByName
+firmadoByEmail
+firmaData
 
+firmaTransportista
+firmado
+firmadoAt
+firmadoBy
+firmadoByName
+firmadoByEmail
+firmaData
+
+C) /apps/horarios/recepciones/{recepcionId}
 Campos
 id
-numeroRecepcion
+numero
 pedidoId
 remitoSalidaId
-remitoTransporteId
-pedidoNumeroSnapshot
-remitoSalidaNumeroSnapshot
-remitoTransporteNumeroSnapshot
+pedidoNumero
+remitoSalidaNumero
 estado
-origenTipo
-origenId
-origenNombre
-destinoTipo
-destinoId
-destinoNombre
 createdAt
 createdBy
 createdByName
 createdByEmail
-observacionesGenerales
-firma
-evidencias []
+observaciones
 totales
-items []
-estado
+firma
+items[]
+
+Estado
 confirmada
 cerrada
 anulada
-evidencias[]
 
-Aunque hoy no las implementes, dej谩 el campo listo:
-
-evidenciaId
-tipo
-url
-comentario
-createdAt
-createdBy
 items[]
-
-Ac谩 est谩 la parte fuerte.
-
 itemId
 pedidoItemId
-remitoSalidaItemId
-remitoTransporteItemId
 productId
-productNombreSnapshot
-unidadSnapshot
+productNombre
+unidad
 cantidadPedida
 cantidadPreparada
 cantidadTransportada
@@ -302,8 +169,8 @@ cantidadDanada
 estadoLinea
 motivo
 observaciones
-evidencias []
-estadoLinea
+
+EstadoLinea
 ok
 faltante
 no_esta
@@ -311,13 +178,105 @@ danado
 devuelto
 excedente
 parcial
-rechazado
-regla importante
 
-cantidadPendiente debe salir de una cuenta clara:
+D) /apps/horarios/pedidos_consolidados/{pedidoId}
+Documento derivado materializado.
+Campos
+id
+pedidoId
+numeroPedido
+estado
+refs.remitoSalidaId
+refs.recepcionId
+resumen
+items[]
+createdAt
+updatedAt
 
-cantidadPendiente = max(0, cantidadPedida - cantidadRecibida)
+Estado
+pendiente
+preparado
+en_transporte
+recibido_parcial
+recibido_completo
+cerrado
 
-Si quer茅s ser m谩s estricto contra transporte:
+items[]
+productId
+productNombre
+cantidadPedida
+cantidadPreparada
+cantidadTransportada
+cantidadRecibida
+cantidadPendiente
+estadoFinal
 
-cantidadPendiente = max(0, cantidadTransportada - cantidadRecibida)
+E) /apps/horarios/pedidos_pendientes/{pendienteId}
+Documento derivado materializado.
+Campos
+id
+pedidoId
+pedidoNumero
+recepcionId
+productId
+productNombre
+unidad
+origenId
+origenNombre
+destinoId
+destinoNombre
+cantidadPendiente
+estado
+createdAt
+updatedAt
+resolvedAt
+resolvedBy
+pedidoResolucionId
+
+Estado
+activo
+usado_en_nuevo_pedido
+resuelto
+cancelado
+
+F) /apps/horarios/audit_logs/{logId}
+Campos
+id
+entityType
+entityId
+pedidoId
+accion
+descripcion
+createdAt
+createdBy
+createdByName
+createdByEmail
+
+entityType
+pedido
+remito_salida
+recepcion
+consolidado
+pendiente
+
+accion
+created
+updated
+signed
+confirmed
+cancelled
+
+G) /apps/horarios/counters/{counterId}
+Campos
+id
+prefix
+nextNumber
+updatedAt
+
+REGLAS
+1. No borrar documentos de remitos ni recepciones.
+2. Documento firmado no se edita.
+3. Stock se actualiza solo en recepci髇.
+4. Pendiente siempre se calcula como cantidadPedida - cantidadRecibida.
+5. Consolidado siempre autom醫ico y materializado.
+6. Firma siempre snapshot.
