@@ -24,6 +24,7 @@ const ROUTE_TO_PAGE_ID: Record<string, string> = {
   "/dashboard/devoluciones/nueva": "pedidos",
   "/dashboard/documentos-logistica": "pedidos",
   "/dashboard/stock-console": "pedidos",
+  "/dashboard/vencapp": "pedidos",
   "/dashboard/fabrica": "fabrica",
   "/dashboard/fabrica/historial": "fabrica",
   "/dashboard/empleados": "empleados",

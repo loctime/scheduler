@@ -72,6 +72,8 @@ export const COLLECTIONS = {
   CONFIG: getCollectionPath("config"),
   PEDIDOS: getCollectionPath("pedidos"),
   PRODUCTS: getCollectionPath("products"),
+  LOTS: getCollectionPath("lots"),
+  WAREHOUSE_ZONES: getCollectionPath("warehouse_zones"),
   STOCK_MOVIMIENTOS: getCollectionPath("stock_movimientos"),
   STOCK_ACTUAL: getCollectionPath("stock_actual"),
   REMITOS: getCollectionPath("remitos"),

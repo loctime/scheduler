@@ -240,6 +240,7 @@ export interface Producto {
   id: string
   pedidoId: string
   nombre: string
+  category?: "Bebidas" | "Insumos" | "Limpieza" | "Otro"
   aliases?: string[]
   stockMinimo?: number
   stockMinimoUnits?: number
@@ -368,6 +369,34 @@ export interface ConversacionGrupo {
   createdAt?: any
   updatedAt?: any
   activa: boolean
+}
+
+export interface Lot {
+  id: string
+  productId: string
+  quantity: number
+  expiryDate: string // YYYY-MM-DD
+  locationId?: string | null
+  note?: string
+  ownerId: string
+  userId: string
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface WarehouseZone {
+  id: string
+  name: string
+  type: "estante" | "heladera" | "freezer" | "sector"
+  x: number
+  y: number
+  width: number
+  height: number
+  parentId?: string | null
+  ownerId: string
+  userId: string
+  createdAt?: any
+  updatedAt?: any
 }
 
 export interface EmployeeFixedRule {
