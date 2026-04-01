@@ -7,49 +7,11 @@ import { auth, isFirebaseConfigured } from "@/lib/firebase"
 import { DataProvider, useData } from "@/contexts/data-context"
 import { StockProvider } from "@/contexts/stock-context"
 import { Loader2 } from "lucide-react"
+import { canUser } from "@/lib/permissions"
 
-// Mapeo de rutas a IDs de páginas
-const ROUTE_TO_PAGE_ID: Record<string, string> = {
-  "/dashboard": "horarios",
-  "/dashboard/horarios": "horarios",
-  "/dashboard/horarios-mensuales": "horarios", // Vista mensual también mapea a "horarios"
-  "/dashboard/tareas": "tareas",
-  "/dashboard/pedidos": "pedidos",
-  "/dashboard/v2/pedidos": "pedidos",
-  "/dashboard/v2/remitos-salida": "pedidos",
-  "/dashboard/v2/recepciones": "pedidos",
-  "/dashboard/remitos/nuevo": "pedidos",
-  "/dashboard/remitos/[id]": "pedidos",
-  "/dashboard/recepciones/nueva": "pedidos",
-  "/dashboard/devoluciones/nueva": "pedidos",
-  "/dashboard/documentos-logistica": "pedidos",
-  "/dashboard/stock-console": "pedidos",
-  "/dashboard/vencapp": "pedidos",
-  "/dashboard/fabrica": "fabrica",
-  "/dashboard/fabrica/historial": "fabrica",
-  "/dashboard/empleados": "empleados",
-  "/dashboard/turnos": "turnos",
-  "/dashboard/configuracion": "configuracion",
-  "/dashboard/gerente": "gerente",
-  "/dashboard/admin": "admin",
-}
-
-// Páginas permitidas para usuarios invitados (por defecto)
-const ALLOWED_PAGES_FOR_INVITED = ["/dashboard/pedidos"]
-
-// Páginas públicas (no requieren autenticación)
-// Solo la vista con companySlug es pública; la ruta base requiere auth
+// P??ginas p??blicas (no requieren autenticaci??n)
+// Solo la vista con companySlug es p??blica; la ruta base requiere auth
 const isPublicMensualPage = (path: string) => path.match(/^\/dashboard\/horarios-mensuales\/[^/]+$/)
-
-// Páginas que requieren rol específico
-const FACTORY_PAGES = ["/dashboard/fabrica", "/dashboard/fabrica/historial"]
-const MANAGER_PAGES = ["/dashboard/gerente"]
-const ADMIN_PAGES = ["/dashboard/admin"]
-function resolvePageId(pathname: string): string | undefined {
-  if (ROUTE_TO_PAGE_ID[pathname]) return ROUTE_TO_PAGE_ID[pathname]
-  if (pathname.startsWith("/dashboard/remitos/")) return "pedidos"
-  return undefined
-}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -58,14 +20,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
-    // Verificar si es una página pública
     const isPublicPage = isPublicMensualPage(pathname)
-    
+
     if (isPublicPage) {
       setLoading(false)
       return
     }
-    
+
     if (!isFirebaseConfigured() || !auth) {
       router.push("/")
       return
@@ -91,11 +52,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     )
   }
 
-  // Verificar si es una página pública
   const isPublicPage = isPublicMensualPage(pathname)
-  
   if (isPublicPage) {
-    // Para páginas públicas, renderizar sin DataProvider ni StockProvider
     return <>{children}</>
   }
 
@@ -114,13 +72,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   )
 }
 
-// Componente para proteger rutas según el role del usuario
-function ProtectedRoute({ 
-  children, 
-  user, 
-  pathname, 
-  router 
-}: { 
+function ProtectedRoute({
+  children,
+  user,
+  pathname,
+  router,
+}: {
   children: React.ReactNode
   user: any
   pathname: string
@@ -131,85 +88,18 @@ function ProtectedRoute({
 
   useEffect(() => {
     if (userData) {
-      const pageId = resolvePageId(pathname)
-      
-      // Verificar permisos basados en páginas accesibles si el usuario tiene permisos definidos
-      if (userData.permisos?.paginas && Array.isArray(userData.permisos.paginas) && userData.permisos.paginas.length > 0) {
-        // Si tiene permisos definidos, verificar que la página esté en la lista
-        if (pageId) {
-          let tienePermiso = false
-          
-          // Si el permiso es "horarios", verificar según el rol del usuario
-          if (userData.permisos.paginas.includes("horarios")) {
-            // Si el usuario es "invited" (creado por fábrica/sucursal), solo permitir vista mensual
-            if (userData.role === "invited") {
-              // Solo permitir acceso a vista mensual, bloquear vista de edición
-              if (pathname === "/dashboard/horarios-mensuales") {
-                tienePermiso = true
-              } else if (pathname === "/dashboard" || pathname === "/dashboard/horarios") {
-                // Bloquear acceso a la vista de edición para usuarios invited
-                tienePermiso = false
-              } else {
-                // Para otras páginas, verificar normalmente
-                tienePermiso = userData.permisos.paginas.includes(pageId)
-              }
-            } else {
-              // Si NO es "invited" (fue creado por gerente), permitir ambas vistas
-              tienePermiso = userData.permisos.paginas.includes(pageId)
-            }
-          } else {
-            // Si no tiene permiso de "horarios", verificar normalmente
-            tienePermiso = userData.permisos.paginas.includes(pageId)
-          }
-          
-          if (!tienePermiso) {
-            // Redirigir a la primera página permitida o a pedidos por defecto
-            const primeraPagina = userData.permisos.paginas[0]
-            // Buscar la ruta correspondiente a la primera página permitida
-            // Si es "horarios", preferir "/dashboard/horarios-mensuales" si está disponible
-            let rutaPermitida = "/dashboard/pedidos"
-            if (primeraPagina === "horarios") {
-              // Preferir vista mensual si el usuario tiene permiso de horarios
-              rutaPermitida = "/dashboard/horarios-mensuales"
-            } else {
-              for (const [ruta, id] of Object.entries(ROUTE_TO_PAGE_ID)) {
-                if (id === primeraPagina) {
-                  rutaPermitida = ruta
-                  break
-                }
-              }
-            }
-            router.push(rutaPermitida)
-            return
-          }
-        }
-        // Si no hay pageId pero tiene permisos, permitir acceso (puede ser una ruta no mapeada pero permitida)
-      } else {
-        // Lógica de permisos basada en roles (comportamiento anterior)
-        // Si el usuario es invitado y está intentando acceder a una página no permitida
-        if (userData.role === "invited" && !ALLOWED_PAGES_FOR_INVITED.includes(pathname)) {
-          router.push("/dashboard/pedidos")
-          return
-        }
-        // Si el usuario intenta acceder a páginas de fábrica sin ser factory
-        if (FACTORY_PAGES.some(page => pathname.startsWith(page)) && userData.role !== "factory") {
-          router.push("/dashboard/pedidos")
-          return
-        }
-        // Si el usuario intenta acceder a páginas de gerente sin ser manager
-        if (MANAGER_PAGES.some(page => pathname.startsWith(page)) && userData.role !== "manager") {
-          router.push("/dashboard")
-          return
-        }
-        // Si el usuario intenta acceder a páginas de admin sin ser admin
-        if (ADMIN_PAGES.some(page => pathname.startsWith(page)) && userData.role !== "admin") {
-          router.push("/dashboard")
-          return
-        }
+      const allowed = canUser(
+        { uid: user?.uid, role: userData.role, locationId: userData.locationId },
+        "ver_dashboard"
+      )
+
+      if (!allowed) {
+        router.push("/")
+        return
       }
       setChecking(false)
     }
-  }, [userData, pathname, router])
+  }, [userData, pathname, router, user])
 
   if (checking) {
     return (
@@ -221,5 +111,4 @@ function ProtectedRoute({
 
   return <>{children}</>
 }
-
 

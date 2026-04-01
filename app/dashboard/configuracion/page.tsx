@@ -6,6 +6,7 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import { Configuracion } from "@/lib/types"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { useData } from "@/contexts/data-context"
+import { canUser } from "@/lib/permissions"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -288,11 +289,9 @@ export default function ConfiguracionPage() {
           </CardContent>
         </Card>
 
-        {/* Configuraciones del calendario - Usuarios con rol factory/branch o con permiso 'horarios' */}
+        {/* Configuraciones del calendario - Usuarios con rol operador/admin o con permiso 'horarios' */}
         {(() => {
-          const permisoHorarios = userData?.permisos?.paginas?.includes("horarios") ?? false
-          const rolConAcceso = userData?.role === "factory" || userData?.role === "branch"
-          return permisoHorarios || rolConAcceso
+          return canUser({ uid: user?.uid, role: userData?.role, locationId: userData?.locationId }, "ver_admin")
         })() && (
           <>
             <Card>
@@ -774,8 +773,8 @@ export default function ConfiguracionPage() {
           </>
         )}
 
-        {(userData?.role === "admin" || userData?.role === "manager" || userData?.role === "branch" || userData?.role === "factory") ? (
-          <InvitationsCard user={user} />
+        {(canUser({ uid: user?.uid, role: userData?.role, locationId: userData?.locationId }, "ver_admin")) ? (
+          <InvitationsCard />
         ) : null}
 
         <div className="flex justify-end">
@@ -798,3 +797,4 @@ export default function ConfiguracionPage() {
     </DashboardLayout>
   )
 }
+

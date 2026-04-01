@@ -47,7 +47,7 @@ export function useImplicitFixedRules({
     
     const isDashboardPage = window.location.pathname.startsWith('/dashboard')
     const hasValidUser = user && user.uid
-    const isAdmin = user?.role === 'admin' || user?.role === 'manager'
+    const isAdmin = user?.role === 'admin'
     
     return isDashboardPage && hasValidUser && isAdmin
   }, [user])
@@ -170,7 +170,7 @@ export function useImplicitFixedRules({
         })
 
         // Verificar que el usuario tenga un rol válido
-        const validRoles = ['user', 'admin', 'maxdev', 'branch', 'factory', 'manager']
+        const validRoles = ['operador', 'admin', 'delivery']
         if (!userRole || !validRoles.includes(userRole)) {
           logger.error("[ImplicitFixedRules] Usuario sin rol válido", {
             userId,

@@ -190,9 +190,7 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
 
   const handleExportWeekImage = useCallback(async (weekStartDate: Date, weekEndDate: Date) => {
     const weekId = `schedule-week-${format(weekStartDate, "yyyy-MM-dd")}`
-    const ownerId = userData?.role === "invited" && userData?.ownerId 
-      ? userData.ownerId 
-      : userData?.uid
+    const ownerId = userData?.ownerId ? userData.ownerId : userData?.uid
     await exportImage(weekId, `horario-semana-${format(weekStartDate, "yyyy-MM-dd")}.png`, {
       nombreEmpresa: config?.nombreEmpresa,
       colorEmpresa: config?.colorEmpresa,
@@ -708,3 +706,4 @@ export default function ScheduleCalendar({ user: userProp }: ScheduleCalendarPro
     </>
   )
 }
+

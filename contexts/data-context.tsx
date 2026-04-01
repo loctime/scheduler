@@ -13,13 +13,10 @@ interface UserData {
   email?: string
   displayName?: string
   photoURL?: string
-  role?: string
+  role?: "operador" | "admin" | "delivery"
+  locationId?: string
   ownerId?: string
   grupoIds?: string[]
-  permisos?: {
-    paginas?: string[]
-    crearLinks?: boolean
-  }
 }
 
 interface DataContextType {
@@ -90,10 +87,10 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
           email: data.email || user.email,
           displayName: data.displayName || user.displayName,
           photoURL: data.photoURL || user.photoURL,
-          role: data.role || "user",
+          role: data.role || "operador",
+          locationId: data.locationId || data.location || data.ownerId || user.uid,
           ownerId: data.ownerId,
           grupoIds: data.grupoIds || [],
-          permisos: data.permisos,
         })
       } else {
         // Si no existe el documento, crear uno por defecto
@@ -102,7 +99,8 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
           email: user.email,
           displayName: user.displayName,
           photoURL: user.photoURL,
-          role: "user",
+          role: "operador",
+          locationId: user.uid,
           grupoIds: [],
         })
       }
@@ -114,7 +112,8 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
         email: user.email,
         displayName: user.displayName,
         photoURL: user.photoURL,
-        role: "user",
+        role: "operador",
+        locationId: user.uid,
         grupoIds: [],
       })
     }
@@ -234,10 +233,10 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
             email: data.email || user.email,
             displayName: data.displayName || user.displayName,
             photoURL: data.photoURL || user.photoURL,
-            role: data.role || "user",
+            role: data.role || "operador",
+            locationId: data.locationId || data.location || data.ownerId || user.uid,
             ownerId: data.ownerId,
             grupoIds: data.grupoIds || [],
-            permisos: data.permisos,
           })
         }
       },

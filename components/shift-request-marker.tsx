@@ -117,9 +117,7 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
   const handleSaveRequest = async (data: EmployeeRequestData) => {
     try {
       // Determinar el ownerId a usar
-      const ownerId = userData?.role === 'invited' && userData?.ownerId 
-        ? userData.ownerId 
-        : userData?.uid || '';
+      const ownerId = userData?.ownerId ? userData.ownerId : userData?.uid || '';
 
       // 🔥 DESACTIVADO: Employee requests completamente deshabilitados
       console.warn('🚫 [ShiftRequestMarker] Employee requests desactivados - no se guardará en Firestore')
@@ -160,10 +158,6 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
     try {
       // 🔥 DESACTIVADO: Employee requests completamente deshabilitados
       console.warn('🚫 [ShiftRequestMarker] deleteEmployeeRequest desactivado')
-      
-      // const ownerId = userData?.role === 'invited' && userData?.ownerId 
-      //   ? userData.ownerId 
-      //   : userData?.uid || '';
 
       // await deleteEmployeeRequest(scheduleId, employeeId, date, ownerId);
       
@@ -228,3 +222,5 @@ export const ShiftRequestMarker: React.FC<ShiftRequestMarkerProps> = ({
 };
 
 export default ShiftRequestMarker;
+
+

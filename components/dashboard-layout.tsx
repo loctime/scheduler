@@ -21,11 +21,12 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Factory, Shield, UserCog, MessageSquare, AlertTriangle, Package, CheckSquare, FileText } from "lucide-react"
+import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Shield, UserCog, MessageSquare, AlertTriangle, Package, CheckSquare, FileText } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useData } from "@/contexts/data-context"
+import { canUser } from "@/lib/permissions"
 
 interface DashboardLayoutProps {
   children: ReactNode
@@ -33,22 +34,20 @@ interface DashboardLayoutProps {
 }
 
 const navItems = [
-  { href: "/dashboard", label: "Horarios", icon: Calendar },
-  { href: "/dashboard/horarios-mensuales", label: "Vista Mensual", icon: CalendarDays },
-  { href: "/dashboard/empleados", label: "Empleados", icon: Users },
-  { href: "/dashboard/tareas", label: "Tareas", icon: CheckSquare },
-  { href: "/dashboard/pedidos", label: "Pedidos", icon: ShoppingCart },
-  { href: "/dashboard/remitos/nuevo", label: "Remitos V2", icon: Package, permission: "pedidos" },
-  { href: "/dashboard/recepciones/nueva", label: "Recepciones V2", icon: Package, permission: "pedidos" },
-  { href: "/dashboard/devoluciones/nueva", label: "Devoluciones V2", icon: Package, permission: "pedidos" },
-  { href: "/dashboard/documentos-logistica", label: "Docs Logistica", icon: FileText, permission: "pedidos" },
-  { href: "/dashboard/stock-console", label: "Stock Rápido", icon: Package, permission: "pedidos" },
-  { href: "/mensajeria", label: "Mensajería", icon: MessageSquare },
-  { href: "/dashboard/dias-especiales", label: "Días Especiales", icon: AlertTriangle, role: "admin" },
-  { href: "/dashboard/fabrica", label: "Fábrica", icon: Factory, role: "factory" },
-  { href: "/dashboard/gerente", label: "Gerente", icon: UserCog, role: "manager" },
-  { href: "/dashboard/admin", label: "Administración", icon: Shield, role: "admin" },
-  { href: "/dashboard/configuracion", label: "Configuración", icon: Settings },
+  { href: "/dashboard", label: "Horarios", icon: Calendar, action: "ver_admin" },
+  { href: "/dashboard/horarios-mensuales", label: "Vista Mensual", icon: CalendarDays, action: "ver_admin" },
+  { href: "/dashboard/empleados", label: "Empleados", icon: Users, action: "ver_admin" },
+  { href: "/dashboard/tareas", label: "Tareas", icon: CheckSquare, action: "ver_admin" },
+  { href: "/dashboard/pedidos", label: "Pedidos", icon: ShoppingCart, action: "ver_pedidos" },
+  { href: "/dashboard/remitos/nuevo", label: "Remitos V2", icon: Package, action: "recibir_pedido" },
+  { href: "/dashboard/recepciones/nueva", label: "Recepciones V2", icon: Package, action: "recibir_pedido" },
+  { href: "/dashboard/devoluciones/nueva", label: "Devoluciones V2", icon: Package, action: "recibir_pedido" },
+  { href: "/dashboard/documentos-logistica", label: "Docs Logistica", icon: FileText, action: "recibir_pedido" },
+  { href: "/dashboard/stock-console", label: "Stock Rapido", icon: Package, action: "editar_stock" },
+  { href: "/mensajeria", label: "Mensajeria", icon: MessageSquare, action: "ver_admin" },
+  { href: "/dashboard/dias-especiales", label: "Dias Especiales", icon: AlertTriangle, action: "ver_admin" },
+  { href: "/dashboard/admin", label: "Administracion", icon: Shield, action: "ver_admin" },
+  { href: "/dashboard/configuracion", label: "Configuracion", icon: Settings, action: "ver_admin" },
 ]
 
 export function DashboardLayout({ children, user }: DashboardLayoutProps) {
@@ -60,108 +59,11 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     if (!auth) return
     await signOut(auth)
   }
-
-  // Mapeo de .rutas a IDs de páginas (debe coincidir con el de layout.tsx)
-  const ROUTE_TO_PAGE_ID: Record<string, string> = {
-    "/dashboard": "horarios",
-    "/dashboard/horarios": "horarios",
-    "/dashboard/horarios-mensuales": "horarios",
-    "/dashboard/tareas": "tareas",
-    "/dashboard/pedidos": "pedidos",
-    "/dashboard/remitos/nuevo": "pedidos",
-    "/dashboard/remitos/[id]": "pedidos",
-    "/dashboard/recepciones/nueva": "pedidos",
-    "/dashboard/devoluciones/nueva": "pedidos",
-    "/dashboard/documentos-logistica": "pedidos",
-    "/dashboard/stock-console": "pedidos",
-    "/dashboard/fabrica": "fabrica",
-    "/dashboard/fabrica/historial": "fabrica",
-    "/dashboard/empleados": "empleados",
-    "/dashboard/turnos": "turnos",
-    "/dashboard/configuracion": "configuracion",
-    "/dashboard/gerente": "gerente",
-    "/dashboard/admin": "admin",
-    "/dashboard/dias-especiales": "admin", // Solo admin puede gestionar días especiales
-  }
-
-  // Filtrar navItems según el role del usuario y permisos
+    // Filtrar navItems segun acciones
   const navItemsFiltered = navItems.filter((item) => {
-    // Si el usuario tiene permisos definidos, verificar que la página esté permitida
-    if (userData?.permisos?.paginas && Array.isArray(userData.permisos.paginas) && userData.permisos.paginas.length > 0) {
-      const pageId = ROUTE_TO_PAGE_ID[item.href]
-      // Si la ruta no está mapeada (como /mensajeria), NO permitirla cuando hay permisos definidos
-      if (!pageId) {
-        // Excluir mensajería y otras rutas no mapeadas cuando hay permisos definidos
-        return false
-      }
-      
-      // Si el permiso es "horarios", verificar según el rol del usuario
-      if (userData.permisos.paginas.includes("horarios")) {
-        // Si el usuario es "invited" (creado por fábrica/sucursal), solo permitir vista mensual
-        if (userData.role === "invited") {
-          // Solo permitir "/dashboard/horarios-mensuales", excluir "/dashboard" y "/dashboard/horarios"
-          if (item.href === "/dashboard/horarios-mensuales") {
-            // Continuar con las otras verificaciones
-          } else if (item.href === "/dashboard" || item.href === "/dashboard/horarios") {
-            // Excluir la vista de edición de horarios para usuarios invited
-            return false
-          } else {
-            // Para otras páginas, verificar normalmente
-            if (!userData.permisos.paginas.includes(pageId)) {
-              return false
-            }
-          }
-        } else {
-          // Si NO es "invited" (fue creado por gerente), permitir ambas vistas
-          const tienePermiso = userData.permisos.paginas.includes(pageId)
-          if (!tienePermiso) {
-            return false
-          }
-        }
-      } else {
-        // Si no tiene permiso de "horarios", verificar normalmente
-        const tienePermiso = userData.permisos.paginas.includes(pageId)
-        if (!tienePermiso) {
-          return false
-        }
-      }
-      // Si pasa la verificación de permisos, continuar con las otras verificaciones
-    }
-    
-    // Si el usuario es invitado y NO tiene permisos definidos, solo mostrar Pedidos
-    if (userData?.role === "invited" && (!userData?.permisos?.paginas || !Array.isArray(userData.permisos.paginas) || userData.permisos.paginas.length === 0)) {
-      return item.href === "/dashboard/pedidos"
-    }
-    
-    // Si el item requiere un permiso específico, verificar que el usuario lo tenga
-    if ((item as any).permission) {
-      const tienePermiso = userData?.permisos?.paginas?.includes((item as any).permission)
-      if (!tienePermiso) {
-        return false
-      }
-    }
-    
-    // Si el item requiere un rol específico, verificar que el usuario lo tenga
-    // PERO si el usuario tiene permisos definidos y tiene el permiso para esa página, permitirla
-    if ((item as any).role) {
-      const pageId = ROUTE_TO_PAGE_ID[item.href]
-      // Si tiene permisos definidos y tiene el permiso para esta página, permitirla aunque no tenga el rol
-      if (userData?.permisos?.paginas && Array.isArray(userData.permisos.paginas) && pageId && userData.permisos.paginas.includes(pageId)) {
-        // Permitir porque tiene el permiso
-      } else if (userData?.role !== (item as any).role) {
-        // No tiene el rol requerido ni el permiso, bloquear
-        return false
-      }
-    }
-    // Usuarios normales ven todas las páginas (excepto las que requieren roles específicos)
-    return true
+    if (!item.action) return true
+    return canUser({ uid: user?.uid, role: userData?.role, locationId: userData?.locationId }, item.action)
   })
-  
-  // Debug: mostrar permisos en consola
-  if (userData?.permisos?.paginas) {
-    console.log("🔐 Permisos del usuario:", userData.permisos.paginas)
-    console.log("📋 Items filtrados:", navItemsFiltered.map(item => item.href))
-  }
 
   const NavContent = ({ onItemClick }: { onItemClick?: () => void }) => (
     <div className="flex flex-col gap-1 md:flex-row">
@@ -262,4 +164,5 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     </div>
   )
 }
+
 

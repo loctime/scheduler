@@ -2,21 +2,17 @@
 
 export interface InvitacionLink {
   id: string
-  token: string // Token único para el link
-  ownerId: string // ID del usuario que creó el link
+  token: string // Token unico para el link
+  ownerId: string // ID del usuario que creo el link
   activo: boolean
   usado: boolean
-  usadoPor?: string // ID del usuario que usó el link
-  usadoPorEmail?: string // Email del usuario que usó el link
-  usadoEn?: any // Timestamp de cuando se usó
+  usadoPor?: string // ID del usuario que uso el link
+  usadoPorEmail?: string // Email del usuario que uso el link
+  usadoEn?: any // Timestamp de cuando se uso
   createdAt?: any
-  expiresAt?: any // Opcional: fecha de expiración
-  role?: "branch" | "factory" | "admin" | "invited" | "manager" | "delivery" // Rol que se asignará al usuario que use el link
-  grupoId?: string // ID del grupo al que pertenecerá el usuario (para links creados por manager)
-  permisos?: {
-    paginas?: string[] // Páginas accesibles: "horarios", "pedidos", "fabrica", "empleados", "turnos", "configuracion"
-    crearLinks?: boolean // Permiso para crear links de colaborador
-  }
+  expiresAt?: any // Opcional: fecha de expiracion
+  role?: "operador" | "admin" | "delivery" // Rol que se asignara al usuario que use el link
+  locationId?: string
 }
 
 export interface Group {
@@ -24,7 +20,7 @@ export interface Group {
   nombre: string // Nombre del grupo (ej: "Grupo Norte", "Grupo Sur")
   managerId: string // ID del usuario gerente del grupo
   managerEmail?: string // Email del gerente (para referencia)
-  userIds: string[] // IDs de usuarios del grupo (branch, factory)
+  userIds: string[] // IDs de usuarios del grupo (operador)
   createdAt?: any
   updatedAt?: any
 }
@@ -359,7 +355,7 @@ export interface MensajeGrupo {
 
 export interface ConversacionGrupo {
   id: string
-  tipo: "grupo" | "directo" | "rol" // grupo = entre grupos, directo = entre usuarios, rol = por rol (factory, branch)
+  tipo: "grupo" | "directo" | "rol" // grupo = entre grupos, directo = entre usuarios, rol = por rol (operador/admin/delivery)
   participantes: string[] // IDs de grupos o usuarios según el tipo
   nombresParticipantes?: string[] // Nombres para mostrar
   ultimoMensaje?: string
@@ -413,3 +409,8 @@ export interface EmployeeFixedRule {
   createdAt: any
   updatedAt: any
 }
+
+
+
+
+

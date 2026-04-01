@@ -85,7 +85,7 @@ export function GroupsTable({
                 const manager = users.find(u => u.id === grupo.managerId)
                 const usuariosGrupo = users.filter(u => grupo.userIds.includes(u.id))
                 const usuariosDisponibles = users
-                  .filter(u => (u.role === "branch" || u.role === "factory" || !u.role))
+                  .filter(u => (u.role === "operador" || !u.role))
                   .filter(u => !grupo.userIds.includes(u.id))
                   .filter(u => u.id !== grupo.managerId)
                 const seleccionados = usuariosSeleccionados[grupo.id] || []
@@ -259,4 +259,5 @@ export function GroupsTable({
     </Card>
   )
 }
+
 

@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
+import { canUser } from "@/lib/permissions"
 import { useData } from "@/contexts/data-context"
 import { confirmarMovimientos } from "@/src/services/stock/movimientosService"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
@@ -54,8 +55,8 @@ export function useStockConsole(user: any) {
   const { toast } = useToast()
   const { userData } = useData()
   
-  // Validar permisos: si no tiene "pedidos", no permitir acceso
-  const tienePermisoPedidos = userData?.permisos?.paginas?.includes("pedidos")
+  // Validar permisos: si no tiene acceso a editar stock
+  const puedeEditarStock = canUser({ uid: user?.uid, role: userData?.role, locationId: userData?.locationId }, "editar_stock")
   
   // Estado local aislado
   const [state, setState] = useState<StockConsoleState>({
@@ -89,7 +90,7 @@ export function useStockConsole(user: any) {
     if (!user || !db) return
     
     // Validar permisos antes de cargar datos
-    if (!tienePermisoPedidos) {
+    if (!puedeEditarStock) {
       if (mountedRef.current) {
         setPedidosLoading(false)
       }
@@ -186,7 +187,7 @@ export function useStockConsole(user: any) {
         })
       }
     }
-  }, [user, ownerId, toast, tienePermisoPedidos])
+  }, [user, ownerId, toast, puedeEditarStock])
 
   // Cargar productos del pedido seleccionado con cache
   const loadProductos = useCallback(async () => {
@@ -200,7 +201,7 @@ export function useStockConsole(user: any) {
     }
     
     // Validar permisos antes de cargar datos
-    if (!tienePermisoPedidos) {
+    if (!puedeEditarStock) {
       if (mountedRef.current) {
         setProductosLoading(false)
       }
@@ -293,7 +294,7 @@ export function useStockConsole(user: any) {
         })
       }
     }
-  }, [user, state.selectedPedidoId, ownerId, toast, tienePermisoPedidos])
+  }, [user, state.selectedPedidoId, ownerId, toast, puedeEditarStock])
 
   // Listener para stock en tiempo real con cache
   useEffect(() => {
@@ -302,7 +303,7 @@ export function useStockConsole(user: any) {
     if (!ownerId) return
     
     // Validar permisos antes de configurar listener
-    if (!tienePermisoPedidos) {
+    if (!puedeEditarStock) {
       return
     }
 
@@ -366,7 +367,7 @@ export function useStockConsole(user: any) {
     )
 
     return () => unsubscribe()
-  }, [state.selectedPedidoId, user, ownerId, tienePermisoPedidos])
+  }, [state.selectedPedidoId, user, ownerId, puedeEditarStock])
 
   // Inicialización: re-ejecutar cuando ownerId esté disponible (p. ej. userData del colaborador cargada)
   useEffect(() => {
@@ -572,7 +573,7 @@ export function useStockConsole(user: any) {
   // Confirmar movimientos
   const confirmarMovimientos = useCallback(async (): Promise<boolean> => {
     // Validar permisos antes de ejecutar cualquier operación
-    if (!tienePermisoPedidos) {
+    if (!puedeEditarStock) {
       toast({
         title: "Acceso denegado",
         description: "No tienes permisos para ejecutar movimientos de stock",
@@ -644,7 +645,7 @@ export function useStockConsole(user: any) {
       
       return false
     }
-  }, [movimientosPendientes, ownerId, user, toast, totalProductos, tienePermisoPedidos])
+  }, [movimientosPendientes, ownerId, user, toast, totalProductos, puedeEditarStock])
 
   return {
     // Estado

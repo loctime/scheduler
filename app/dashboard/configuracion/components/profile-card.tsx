@@ -326,18 +326,14 @@ export function ProfileCard() {
           <span>Rol:</span>
           <Badge variant="outline" className="uppercase">
             {(() => {
-              const role = userData?.role || "user"
+              const role = userData?.role || "operador"
               switch (role) {
                 case "admin":
                   return "Administrador"
-                case "manager":
-                  return "Gerente"
-                case "factory":
-                  return "Fábrica"
-                case "branch":
-                  return "Sucursal"
-                case "invited":
-                  return "Invitado"
+                case "operador":
+                  return "Operador"
+                case "delivery":
+                  return "Delivery"
                 default:
                   return role
               }
@@ -638,7 +634,7 @@ export function ProfileCard() {
           )}
         </div>
 
-        {userData?.role === "invited" && (
+        {userData?.role === "delivery" && (
           <>
             <Separator />
             <div className="space-y-2">

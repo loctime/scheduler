@@ -6,7 +6,7 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
 
-export type UserRole = "branch" | "factory" | "admin" | "invited" | "manager"
+export type UserRole = "operador" | "admin" | "delivery"
 
 export interface UserData {
   id: string
@@ -15,7 +15,8 @@ export interface UserData {
   displayName?: string
   photoURL?: string
   role?: UserRole
-  ownerId?: string // Para usuarios invitados
+  ownerId?: string
+  locationId?: string
   grupoIds?: string[] // IDs de grupos a los que pertenece (puede estar en mÃºltiples grupos)
   createdAt?: any
   updatedAt?: any
@@ -39,7 +40,7 @@ export function useAdminUsers(user: any) {
         ...doc.data(),
       })) as UserData[]
       
-      // Ordenar por fecha de creaciÃ³n descendente
+      // Ordenar por fecha de creacion descendente
       usersData.sort((a, b) => {
         const aTime = a.createdAt?.toDate()?.getTime() || 0
         const bTime = b.createdAt?.toDate()?.getTime() || 0
@@ -81,11 +82,6 @@ export function useAdminUsers(user: any) {
         updatedAt: serverTimestamp(),
       }
 
-      // Si se cambia a un rol que no es "invited", eliminar ownerId
-      if (nuevoRol !== "invited") {
-        updateData.ownerId = null
-      }
-
       await updateDoc(userRef, updateData)
       
       toast({
@@ -101,6 +97,48 @@ export function useAdminUsers(user: any) {
       toast({
         title: "Error",
         description: error.message || "No se pudo cambiar el rol del usuario",
+        variant: "destructive",
+      })
+      return false
+    }
+  }, [user, toast, loadUsers])
+
+  // Actualizar locationId de un usuario
+  const actualizarLocationId = useCallback(async (userId: string, locationId: string) => {
+    if (!db || !user) return false
+
+    try {
+      const userRef = doc(db, COLLECTIONS.USERS, userId)
+      const userDoc = await getDoc(userRef)
+      
+      if (!userDoc.exists()) {
+        toast({
+          title: "Error",
+          description: "El usuario no existe",
+          variant: "destructive",
+        })
+        return false
+      }
+
+      const updateData: any = {
+        locationId: locationId || null,
+        updatedAt: serverTimestamp(),
+      }
+
+      await updateDoc(userRef, updateData)
+      
+      toast({
+        title: "Ubicación actualizada",
+        description: "La ubicación del usuario fue actualizada",
+      })
+
+      await loadUsers()
+      return true
+    } catch (error: any) {
+      logger.error("Error al actualizar locationId:", error)
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo actualizar la ubicación",
         variant: "destructive",
       })
       return false
@@ -168,9 +206,17 @@ export function useAdminUsers(user: any) {
     users,
     loading,
     cambiarRol,
+    actualizarLocationId,
     eliminarUsuario,
     buscarUsuarioPorEmail,
     recargarUsuarios: loadUsers,
   }
 }
+
+
+
+
+
+
+
 

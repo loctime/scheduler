@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react"
 import Link from "next/link"
 import { useData } from "@/contexts/data-context"
+import { canUser } from "@/lib/permissions"
 import { useStockConsole } from "@/hooks/use-stock-console"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
@@ -65,7 +66,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
   const { toast } = useToast()
 
   // Validar permisos antes de renderizar la página
-  const tienePermisoPedidos = userData?.permisos?.paginas?.includes("pedidos")
+  const puedeVerStock = canUser({ uid: user?.uid, role: userData?.role, locationId: userData?.locationId }, "ver_stock")
 
   // Detectar si estamos corriendo como PWA
   const [isPWA, setIsPWA] = useState(false)
@@ -516,7 +517,7 @@ export function StockConsoleContent({ companySlug }: StockConsoleContentProps = 
   }, [focusCell, moveProductByKeyboard, productosOrdenados.length])
 
   // Si no tiene permisos, mostrar mensaje de acceso denegado (después de todos los hooks)
-  if (!tienePermisoPedidos) {
+  if (!puedeVerStock) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center p-8">

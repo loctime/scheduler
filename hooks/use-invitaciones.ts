@@ -18,10 +18,8 @@ export function useInvitaciones(user: any, userData?: { grupoIds?: string[] } | 
 
   // Crear nuevo link de invitación
   const crearLinkInvitacion = async (
-    role?: "branch" | "factory" | "admin" | "invited" | "manager" | "delivery",
-    grupoId?: string,
-    permisos?: { paginas?: string[]; crearLinks?: boolean }
-  ) => {
+    role?: "operador" | "admin" | "delivery",
+    locationId?: string) => {
     if (!user || !db) return null
 
     try {
@@ -35,11 +33,10 @@ export function useInvitaciones(user: any, userData?: { grupoIds?: string[] } | 
       }
 
       // En Horarios, las invitaciones siempre son para colaboradores
-      linkData.role = "invited"
+      linkData.role = role || "operador"
 
-      // Si se especifican permisos, agregarlos al link
-      if (permisos) {
-        linkData.permisos = permisos
+      if (locationId) {
+        linkData.locationId = locationId
       }
 
       const linkRef = await addDoc(collection(db, COLLECTIONS.INVITACIONES), linkData)
@@ -50,8 +47,7 @@ export function useInvitaciones(user: any, userData?: { grupoIds?: string[] } | 
         ownerId: user.uid,
         activo: true,
         usado: false,
-        role: "invited",
-        permisos: permisos,
+        role: role || "operador"
       }
 
       await cargarLinks()

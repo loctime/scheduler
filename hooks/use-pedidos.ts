@@ -28,6 +28,7 @@ import {
 } from "@/lib/unidades-utils"
 import { useData } from "@/contexts/data-context"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
+import { canUser } from "@/lib/permissions"
 
 const DEFAULT_FORMAT = "{nombre} ({cantidad})"
 
@@ -59,6 +60,18 @@ export function usePedidos(user: any) {
   const ownerId = useMemo(
     () => getOwnerIdForActor(user, userData),
     [user, userData]
+  )
+  const canCrearPedido = useMemo(
+    () => canUser({ uid: user?.uid, role: userData?.role, locationId: userData?.locationId }, "crear_pedido"),
+    [user?.uid, userData?.role, userData?.locationId]
+  )
+  const canEditarPedido = useMemo(
+    () => canUser({ uid: user?.uid, role: userData?.role, locationId: userData?.locationId }, "editar_pedido"),
+    [user?.uid, userData?.role, userData?.locationId]
+  )
+  const canEditarProductos = useMemo(
+    () => canUser({ uid: user?.uid, role: userData?.role, locationId: userData?.locationId }, "editar_producto"),
+    [user?.uid, userData?.role, userData?.locationId]
   )
 
   // Cargar pedidos
@@ -151,6 +164,10 @@ export function usePedidos(user: any) {
   // Corregir orden de productos sin orden - función separada, solo se llama explícitamente
   const fixProductsOrder = useCallback(async (): Promise<boolean> => {
     if (!db || !selectedPedido || products.length === 0) return false
+    if (!canEditarProductos) {
+      toast({ title: "Error", description: "No tienes permisos para editar productos", variant: "destructive" })
+      return false
+    }
 
     try {
       if (!ownerId || !user?.uid) return false
@@ -189,11 +206,15 @@ export function usePedidos(user: any) {
       logger.error("Error al corregir orden de productos:", error)
       return false
     }
-  }, [db, selectedPedido, products, ownerId, user, loadProducts])
+  }, [db, selectedPedido, products, ownerId, user, loadProducts, canEditarProductos, toast])
 
   // Corregir unidad de productos sin unidad - función separada, solo se llama explícitamente
   const fixProductsUnit = useCallback(async (): Promise<boolean> => {
     if (!db || !selectedPedido || products.length === 0) return false
+    if (!canEditarProductos) {
+      toast({ title: "Error", description: "No tienes permisos para editar productos", variant: "destructive" })
+      return false
+    }
 
     try {
       if (!ownerId || !user?.uid) return false
@@ -223,7 +244,7 @@ export function usePedidos(user: any) {
       logger.error("Error al corregir unidad de productos:", error)
       return false
     }
-  }, [db, selectedPedido, products, ownerId, user, loadProducts])
+  }, [db, selectedPedido, products, ownerId, user, loadProducts, canEditarProductos, toast])
 
   // Inicialización
   useEffect(() => {
@@ -286,10 +307,8 @@ export function usePedidos(user: any) {
   // Crear pedido
   const createPedido = useCallback(async (nombre: string, stockMinimoDefault: number, formatoSalida: string) => {
     if (!db || !user) return null
-    
-    // Los usuarios invitados no pueden crear pedidos
-    if (userData?.role === "invited") {
-      toast({ title: "Error", description: "Los usuarios invitados no pueden crear pedidos", variant: "destructive" })
+    if (!canCrearPedido) {
+      toast({ title: "Error", description: "No tienes permisos para crear pedidos", variant: "destructive" })
       return null
     }
     
@@ -335,11 +354,15 @@ export function usePedidos(user: any) {
       toast({ title: "Error", description: "No se pudo crear el pedido", variant: "destructive" })
       return null
     }
-  }, [user, userData, ownerId, toast])
+  }, [user, userData, ownerId, toast, canCrearPedido])
 
   // Actualizar pedido
   const updatePedido = useCallback(async (nombre: string, stockMinimoDefault: number, formatoSalida: string, mensajePrevio?: string, sheetUrl?: string) => {
     if (!db || !selectedPedido) return false
+    if (!canEditarPedido) {
+      toast({ title: "Error", description: "No tienes permisos para editar pedidos", variant: "destructive" })
+      return false
+    }
 
     try {
       if (!ownerId) {
@@ -380,11 +403,15 @@ export function usePedidos(user: any) {
       toast({ title: "Error", description: "No se pudo actualizar", variant: "destructive" })
       return false
     }
-  }, [selectedPedido, ownerId, user, toast])
+  }, [selectedPedido, ownerId, user, toast, canEditarPedido])
 
   // Eliminar pedido
   const deletePedido = useCallback(async () => {
     if (!db || !selectedPedido) return false
+    if (!canEditarPedido) {
+      toast({ title: "Error", description: "No tienes permisos para eliminar pedidos", variant: "destructive" })
+      return false
+    }
 
     try {
       if (!ownerId) {
@@ -416,11 +443,15 @@ export function usePedidos(user: any) {
       toast({ title: "Error", description: "No se pudo eliminar", variant: "destructive" })
       return false
     }
-  }, [selectedPedido, products, pedidos, toast, ownerId])
+  }, [selectedPedido, products, pedidos, toast, ownerId, canEditarPedido])
 
   // Importar productos
   const importProducts = useCallback(async (text: string) => {
     if (!db || !user || !selectedPedido) return false
+    if (!canEditarProductos) {
+      toast({ title: "Error", description: "No tienes permisos para editar productos", variant: "destructive" })
+      return false
+    }
 
     const lines = text.split("\n").filter(line => line.trim())
     const nombres = lines.map(line => {
@@ -498,12 +529,16 @@ export function usePedidos(user: any) {
       toast({ title: "Error", description: "No se pudo importar", variant: "destructive" })
       return false
     }
-  }, [user, ownerId, selectedPedido, products, loadProducts, toast])
+  }, [user, ownerId, selectedPedido, products, loadProducts, toast, canEditarProductos])
 
   // Actualizar producto
   const updateProduct = useCallback(async (productId: string, field: string, value: string) => {
     if (!db) return false
     if (!ownerId) return false
+    if (!canEditarProductos) {
+      toast({ title: "Error", description: "No tienes permisos para editar productos", variant: "destructive" })
+      return false
+    }
 
     try {
       const product = products.find((item) => item.id === productId)
@@ -564,7 +599,7 @@ export function usePedidos(user: any) {
       toast({ title: "Error", description: "No se pudo actualizar", variant: "destructive" })
       return false
     }
-  }, [loadProducts, ownerId, products, user, toast])
+  }, [loadProducts, ownerId, products, user, toast, canEditarProductos])
 
   // Crear producto individual
   const createProduct = useCallback(async (
@@ -575,6 +610,10 @@ export function usePedidos(user: any) {
     cantidadPorPack?: number
   ) => {
     if (!db || !user || !selectedPedido) return null
+    if (!canEditarProductos) {
+      toast({ title: "Error", description: "No tienes permisos para editar productos", variant: "destructive" })
+      return null
+    }
 
     if (!nombre.trim()) {
       toast({ title: "Error", description: "El nombre es requerido", variant: "destructive" })
@@ -629,11 +668,15 @@ export function usePedidos(user: any) {
       toast({ title: "Error", description: "No se pudo crear el producto", variant: "destructive" })
       return null
     }
-  }, [user, ownerId, selectedPedido, products, loadProducts, toast])
+  }, [user, ownerId, selectedPedido, products, loadProducts, toast, canEditarProductos])
 
   // Eliminar producto
   const deleteProduct = useCallback(async (productId: string) => {
     if (!db) return false
+    if (!canEditarProductos) {
+      toast({ title: "Error", description: "No tienes permisos para editar productos", variant: "destructive" })
+      return false
+    }
     
     try {
       await deleteDoc(doc(db, COLLECTIONS.PRODUCTS, productId))
@@ -650,11 +693,15 @@ export function usePedidos(user: any) {
       toast({ title: "Error", variant: "destructive" })
       return false
     }
-  }, [loadProducts, toast])
+  }, [loadProducts, toast, canEditarProductos])
 
   // Limpiar stock
   const clearStock = useCallback(async () => {
     if (!db || !ownerId || !user?.uid) return false
+    if (!canEditarProductos) {
+      toast({ title: "Error", description: "No tienes permisos para editar productos", variant: "destructive" })
+      return false
+    }
 
     try {
       const dbInstance = db // TypeScript ahora sabe que db no es undefined
@@ -683,12 +730,16 @@ export function usePedidos(user: any) {
       toast({ title: "Error", description: "No se pudo limpiar el stock", variant: "destructive" })
       return false
     }
-  }, [db, ownerId, products, toast, user])
+  }, [db, ownerId, products, toast, user, canEditarProductos])
 
   // Actualizar orden de productos
   const updateProductsOrder = useCallback(async (newOrder: string[]) => {
     if (!db) return false
     if (!ownerId) return false
+    if (!canEditarProductos) {
+      toast({ title: "Error", description: "No tienes permisos para editar productos", variant: "destructive" })
+      return false
+    }
 
     try {
       const dbInstance = db // TypeScript ahora sabe que db no es undefined
@@ -723,7 +774,7 @@ export function usePedidos(user: any) {
       await loadProducts()
       return false
     }
-  }, [db, ownerId, user, loadProducts, toast])
+  }, [db, ownerId, user, loadProducts, toast, canEditarProductos])
 
   // Generar texto del pedido (usa placeholders {cantidad}, {cantidadUnidades}, {cantidadPacks}, {unidad})
   const generarTextoPedido = useCallback((): string => {
@@ -751,6 +802,10 @@ export function usePedidos(user: any) {
   ) => {
     if (!db) return false
     if (!ownerId) return false
+    if (!canEditarPedido) {
+      toast({ title: "Error", description: "No tienes permisos para editar pedidos", variant: "destructive" })
+      return false
+    }
 
     try {
       const updateData: any = {
@@ -793,7 +848,7 @@ export function usePedidos(user: any) {
       })
       return false
     }
-  }, [ownerId, user, selectedPedido, toast])
+  }, [ownerId, user, selectedPedido, toast, canEditarPedido])
 
   // Actualizar remito de envío
   const updateRemitoEnvio = useCallback(async (
@@ -802,6 +857,10 @@ export function usePedidos(user: any) {
   ) => {
     if (!db) return false
     if (!ownerId) return false
+    if (!canEditarPedido) {
+      toast({ title: "Error", description: "No tienes permisos para editar pedidos", variant: "destructive" })
+      return false
+    }
 
     try {
       // Primero escribir en Firestore - solo actualizar estado local si la escritura es exitosa
@@ -828,7 +887,7 @@ export function usePedidos(user: any) {
       // No actualizar estado local - el listener de onSnapshot mantendrá el estado correcto
       return false
     }
-  }, [ownerId, user, selectedPedido])
+  }, [ownerId, user, selectedPedido, toast, canEditarPedido])
 
   // Actualizar enlace público
   const updateEnlacePublico = useCallback(async (
@@ -837,6 +896,10 @@ export function usePedidos(user: any) {
   ) => {
     if (!db) return false
     if (!ownerId) return false
+    if (!canEditarPedido) {
+      toast({ title: "Error", description: "No tienes permisos para editar pedidos", variant: "destructive" })
+      return false
+    }
 
     try {
       // Primero escribir en Firestore - solo actualizar estado local si la escritura es exitosa
@@ -863,7 +926,7 @@ export function usePedidos(user: any) {
       // No actualizar estado local - el listener de onSnapshot mantendrá el estado correcto
       return false
     }
-  }, [ownerId, user, selectedPedido])
+  }, [ownerId, user, selectedPedido, toast, canEditarPedido])
 
   return {
     // Estado
@@ -899,3 +962,12 @@ export function usePedidos(user: any) {
     fixProductsUnit,
   }
 }
+
+
+
+
+
+
+
+
+

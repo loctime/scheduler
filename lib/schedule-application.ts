@@ -27,7 +27,7 @@ export interface ScheduleApplicationService {
 
 class ScheduleApplication implements ScheduleApplicationService {
   private resolveOwnerId(user: any): string {
-    if (user?.role === "invited" && user?.ownerId) return user.ownerId
+    if (user?.ownerId) return user.ownerId
     return user?.ownerId || user?.uid || ""
   }
 

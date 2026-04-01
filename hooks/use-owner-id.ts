@@ -2,7 +2,7 @@ import { useData } from "@/contexts/data-context"
 
 /**
  * Hook unificado para obtener el ownerId correcto
- * Regla: Si role === "invited" → usar userData.ownerId, caso contrario → usar user.uid
+ * Regla: si existe userData.ownerId, usarlo; si no, usar user.uid
  */
 export function useOwnerId(): string | null {
   const { userData, user } = useData()
@@ -16,7 +16,5 @@ export function useOwnerId(): string | null {
 export function getOwnerIdForActor(user: any, userData: any): string | null {
   if (!userData || !user) return null
 
-  return userData.role === "invited" && userData.ownerId
-    ? userData.ownerId
-    : user.uid
+  return userData.ownerId || user.uid
 }

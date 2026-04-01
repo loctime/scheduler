@@ -105,7 +105,7 @@ export function ConversationsList({
   }
 
   const handleCreateWithFactory = async () => {
-    // Buscar grupo de fábrica o usuarios con rol factory
+    // Buscar grupo de fabrica
     const grupoFabrica = groups.find(g => {
       const nombreLower = g.nombre.toLowerCase()
       return nombreLower.includes("fábrica") || 
@@ -116,7 +116,7 @@ export function ConversationsList({
     if (grupoFabrica) {
       await handleCreateWithGroup(grupoFabrica.id)
     } else {
-      // Si no hay grupo de fábrica, buscar usuarios con rol factory
+      // Si no hay grupo de fabrica, mostrar mensaje
       // Por ahora, solo mostramos un mensaje
       console.log("No se encontró grupo de fábrica")
     }
@@ -236,7 +236,7 @@ export function ConversationsList({
           )}
 
           {/* Botón para crear conversación con fábrica */}
-          {userData?.role === "branch" && (
+          {(userData?.role === "operador" || userData?.role === "admin") && (
             <div className="mt-4 p-2 border-t">
               <div className="text-sm font-medium mb-2">Nueva conversación</div>
               <Button
@@ -353,4 +353,5 @@ export function ConversationsList({
     </div>
   )
 }
+
 

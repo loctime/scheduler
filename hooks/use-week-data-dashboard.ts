@@ -59,7 +59,7 @@ export function useWeekDataDashboard(weekId: string | null): UseWeekDataDashboar
         console.log("🔧 [useWeekDataDashboard] No week data found - creating basic document in dashboard")
         
         // Verificar si el usuario puede crear documentos
-        const canCreate = userData?.role !== 'invited' // Los invitados no pueden crear
+        const canCreate = userData?.role !== "delivery" // Los invitados no pueden crear
         
         if (canCreate) {
           console.log("🔧 [useWeekDataDashboard] Creating basic document (user has permission)")

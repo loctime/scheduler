@@ -64,7 +64,7 @@ export function useFabricaPedidos(user: any) {
     }
   }, [db, user, userData, groups, loadingGroups])
 
-  // Obtener los grupos del usuario factory y extraer userIds de sucursales del mismo grupo
+  // Obtener los grupos del usuario y extraer userIds de sucursales del mismo grupo
   const userIdsDelGrupo = useMemo(() => {
     // Primero buscar grupos donde el usuario está (ya sea por grupoIds o por userIds en el grupo)
     const gruposDelUsuario = groups.filter(grupo => {
@@ -80,14 +80,14 @@ export function useFabricaPedidos(user: any) {
     })
     
     if (gruposDelUsuario.length === 0) {
-      logger.warn("[FABRICA] Usuario factory no está en ningún grupo", { 
+      logger.warn("[FABRICA] Usuario no está en ningún grupo", { 
         userData,
         gruposDisponibles: groups.map(g => ({ id: g.id, nombre: g.nombre, userIds: g.userIds }))
       })
       return []
     }
     
-    logger.info("[FABRICA] Grupos del usuario factory:", { 
+    logger.info("[FABRICA] Grupos del usuario:", { 
       grupoIds: userData?.grupoIds,
       gruposEncontrados: gruposDelUsuario.map(g => ({ id: g.id, nombre: g.nombre, userIds: g.userIds }))
     })
@@ -96,7 +96,7 @@ export function useFabricaPedidos(user: any) {
     const userIds = new Set<string>()
     gruposDelUsuario.forEach(grupo => {
       grupo.userIds.forEach(userId => {
-        // No incluir al usuario factory mismo
+        // No incluir al usuario mismo
         if (userId !== user?.uid) {
           userIds.add(userId)
         }
@@ -200,10 +200,10 @@ export function useFabricaPedidos(user: any) {
         setLoading(true)
       }
       
-      // Si el usuario es "invited" y tiene userIdsDelGrupo, filtrar por esos userIds
-      // Si no, cargar todos los pedidos (para factory/manager)
+      // Si el usuario tiene grupos asignados y tiene userIdsDelGrupo, filtrar por esos userIds
+      // Si es admin, cargar todos los pedidos
       let pedidosQuery;
-      if (userData?.role === "invited" && userIdsDelGrupo.length > 0) {
+      if (userIdsDelGrupo.length > 0) {
         // Firestore limita el operador "in" a 10 elementos, así que si hay más, cargamos todos
         if (userIdsDelGrupo.length <= 10) {
           pedidosQuery = query(
@@ -218,13 +218,18 @@ export function useFabricaPedidos(user: any) {
             where("estado", "in", ["creado", "processing"])
           )
         }
-      } else {
-        // Para factory/manager, cargar todos los pedidos
-        pedidosQuery = query(
-          collection(db, COLLECTIONS.PEDIDOS),
-          where("estado", "in", ["creado", "processing"])
-        )
-      }
+      } else if (userData?.role === "admin") {
+          pedidosQuery = query(
+            collection(db, COLLECTIONS.PEDIDOS),
+            where("estado", "in", ["creado", "processing"])
+          )
+        } else {
+          pedidosQuery = query(
+            collection(db, COLLECTIONS.PEDIDOS),
+            where("estado", "in", ["creado", "processing"]),
+            where("ownerId", "==", "__none__")
+          )
+        }
       
       const snapshot = await getDocs(pedidosQuery)
       const pedidosData = snapshot.docs.map((doc) => ({
@@ -314,9 +319,9 @@ export function useFabricaPedidos(user: any) {
           total: pedidosFiltrados.length,
           pedidos: pedidosFiltrados.map(p => ({ id: p.id, nombre: p.nombre, ownerId: p.ownerId }))
         })
-      } else if (userData?.role === "factory") {
-        // Si el usuario factory no tiene grupos asignados, no mostrar ningún pedido
-        logger.warn("[FABRICA] Usuario factory sin grupos asignados, no se mostrarán pedidos")
+      } else if (userIdsDelGrupo.length === 0 && userData?.role !== "admin") {
+        // Si el usuario no tiene grupos asignados, no mostrar ningún pedido
+        logger.warn("[FABRICA] Usuario sin grupos asignados, no se mostrarán pedidos")
         pedidosFiltrados = []
       }
 
@@ -447,8 +452,8 @@ export function useFabricaPedidos(user: any) {
           }
           return coincide
         })
-      } else if (userData?.role === "factory") {
-        // Si el usuario factory no tiene grupos asignados, no mostrar ningún pedido
+      } else if (userIdsDelGrupo.length === 0 && userData?.role !== "admin") {
+        // Si el usuario no tiene grupos asignados, no mostrar ningún pedido
         pedidosFiltrados = []
       }
 
@@ -471,18 +476,24 @@ export function useFabricaPedidos(user: any) {
     }
 
     // Configurar listener en tiempo real para pedidos
-    // Si el usuario es "invited" y tiene userIdsDelGrupo, filtrar por esos userIds
+    // Si el usuario tiene grupos asignados y tiene userIdsDelGrupo, filtrar por esos userIds
     let pedidosQuery;
-    if (userData?.role === "invited" && userIdsDelGrupo.length > 0 && userIdsDelGrupo.length <= 10) {
+    if (userIdsDelGrupo.length > 0 && userIdsDelGrupo.length <= 10) {
       pedidosQuery = query(
         collection(db, COLLECTIONS.PEDIDOS),
         where("estado", "in", ["creado", "processing"]),
         where("ownerId", "in", userIdsDelGrupo.slice(0, 10))
       )
-    } else {
+    } else if (userData?.role === "admin") {
       pedidosQuery = query(
         collection(db, COLLECTIONS.PEDIDOS),
         where("estado", "in", ["creado", "processing"])
+      )
+    } else {
+      pedidosQuery = query(
+        collection(db, COLLECTIONS.PEDIDOS),
+        where("estado", "in", ["creado", "processing"]),
+        where("ownerId", "==", "__none__")
       )
     }
 
@@ -645,3 +656,12 @@ export function useFabricaPedidos(user: any) {
     sucursalesDelGrupo, // Lista de sucursales del grupo con nombres de empresa
   }
 }
+
+
+
+
+
+
+
+
+

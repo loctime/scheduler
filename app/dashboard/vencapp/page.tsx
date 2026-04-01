@@ -1,6 +1,7 @@
 "use client"
 
 import { useData } from "@/contexts/data-context"
+import { canUser } from "@/lib/permissions"
 import { Card, CardContent } from "@/components/ui/card"
 import { LoginForm } from "@/components/login-form"
 import { VencAppShell } from "@/components/vencapp/VencAppShell"
@@ -20,8 +21,8 @@ export default function VencAppPage() {
     )
   }
 
-  const tienePermisoPedidos = userData?.permisos?.paginas?.includes("pedidos")
-  if (!tienePermisoPedidos) {
+  const puedeVerStock = canUser({ uid: user?.uid, role: userData?.role, locationId: userData?.locationId }, "ver_stock")
+  if (!puedeVerStock) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center px-4">
         <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
