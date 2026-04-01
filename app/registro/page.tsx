@@ -21,7 +21,6 @@ function RegistroContent() {
   const [loading, setLoading] = useState(false)
   const [validating, setValidating] = useState(true)
   const [tokenValid, setTokenValid] = useState(false)
-  const [ownerId, setOwnerId] = useState<string | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -33,7 +32,6 @@ function RegistroContent() {
       try {
         const result = await validarTokenInvitacion(token)
         setTokenValid(result.tokenValid)
-        setOwnerId(result.ownerId)
         if (!result.tokenValid) {
           toast({
             title: "Link inválido",

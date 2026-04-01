@@ -1,31 +1,35 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useInvitaciones } from "@/hooks/use-invitaciones"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
 
-const ROLES = ["operador", "admin", "delivery"] as const
+const ROLES_BASE = ["operador", "delivery"] as const
+const ROLES_ADMIN = ["operador", "delivery", "admin"] as const
 
-type Role = (typeof ROLES)[number]
+type Role = (typeof ROLES_ADMIN)[number]
 
 export function InvitationsCard() {
   const { user, userData } = useData()
   const { toast } = useToast()
   const { links, loading, crearLinkInvitacion } = useInvitaciones(user, userData)
   const [rolSeleccionado, setRolSeleccionado] = useState<Role>("operador")
-  const [locationId, setLocationId] = useState("")
   const [creando, setCreando] = useState(false)
 
   const handleCreate = async () => {
     if (!user) return
+    const fixedLocationId = userData?.locationId || ""
+    if (!fixedLocationId.trim()) {
+      toast({ title: "Error", description: "LocationId es obligatorio.", variant: "destructive" })
+      return
+    }
     setCreando(true)
     try {
-      const link = await crearLinkInvitacion(rolSeleccionado, locationId.trim() || undefined)
+      const link = await crearLinkInvitacion(rolSeleccionado, fixedLocationId.trim())
       if (link?.token) {
         navigator.clipboard.writeText(link.token).catch(() => null)
         toast({ title: "Link creado", description: "Token copiado al portapapeles" })
@@ -35,13 +39,15 @@ export function InvitationsCard() {
     }
   }
 
+  const rolesDisponibles = userData?.role === "admin" ? ROLES_ADMIN : ROLES_BASE
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Invitaciones</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Rol</label>
             <Select value={rolSeleccionado} onValueChange={(value) => setRolSeleccionado(value as Role)}>
@@ -49,17 +55,13 @@ export function InvitationsCard() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ROLES.map((rol) => (
+                {rolesDisponibles.map((rol) => (
                   <SelectItem key={rol} value={rol}>
                     {rol}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">LocationId</label>
-            <Input value={locationId} onChange={(e) => setLocationId(e.target.value)} placeholder="Opcional" />
           </div>
           <div className="flex items-end">
             <Button onClick={handleCreate} disabled={creando || !user} className="w-full">
@@ -79,7 +81,7 @@ export function InvitationsCard() {
             <div key={link.id} className="rounded-md border p-3 text-sm">
               <div className="font-medium">Token: {link.token}</div>
               <div className="text-xs text-muted-foreground">
-                Rol: {link.role || "operador"} {link.locationId ? ` - Location: ${link.locationId}` : ""}
+                Rol: {link.role} - Location: {link.locationId}
               </div>
             </div>
           ))}
@@ -88,4 +90,3 @@ export function InvitationsCard() {
     </Card>
   )
 }
-

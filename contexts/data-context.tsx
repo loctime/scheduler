@@ -1,7 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react"
-import { collection, query, orderBy, onSnapshot, getDocs, where, doc, getDoc } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, getDocs, where, doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { Empleado, Turno } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
@@ -82,16 +82,25 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
       if (userDoc.exists()) {
         const data = userDoc.data()
         
+        const nextRole = data.role === "invited" ? "operador" : (data.role || "operador")
+        const nextLocationId = data.locationId || data.location || data.ownerId || user.uid
         setUserData({
           uid: data.uid || user.uid,
           email: data.email || user.email,
           displayName: data.displayName || user.displayName,
           photoURL: data.photoURL || user.photoURL,
-          role: data.role || "operador",
-          locationId: data.locationId || data.location || data.ownerId || user.uid,
+          role: nextRole,
+          locationId: nextLocationId,
           ownerId: data.ownerId,
           grupoIds: data.grupoIds || [],
         })
+        if (data.role === "invited") {
+          updateDoc(userRef, {
+            role: "operador",
+            locationId: nextLocationId,
+            updatedAt: serverTimestamp(),
+          }).catch(() => null)
+        }
       } else {
         // Si no existe el documento, crear uno por defecto
         setUserData({
@@ -228,16 +237,25 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
       (userDoc) => {
         if (userDoc.exists()) {
           const data = userDoc.data()
+          const nextRole = data.role === "invited" ? "operador" : (data.role || "operador")
+          const nextLocationId = data.locationId || data.location || data.ownerId || user.uid
           setUserData({
             uid: data.uid || user.uid,
             email: data.email || user.email,
             displayName: data.displayName || user.displayName,
             photoURL: data.photoURL || user.photoURL,
-            role: data.role || "operador",
-            locationId: data.locationId || data.location || data.ownerId || user.uid,
+            role: nextRole,
+            locationId: nextLocationId,
             ownerId: data.ownerId,
             grupoIds: data.grupoIds || [],
           })
+          if (data.role === "invited") {
+            updateDoc(userRef, {
+              role: "operador",
+              locationId: nextLocationId,
+              updatedAt: serverTimestamp(),
+            }).catch(() => null)
+          }
         }
       },
       (error) => {

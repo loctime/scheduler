@@ -3,16 +3,13 @@
 export interface InvitacionLink {
   id: string
   token: string // Token unico para el link
-  ownerId: string // ID del usuario que creo el link
-  activo: boolean
-  usado: boolean
-  usadoPor?: string // ID del usuario que uso el link
-  usadoPorEmail?: string // Email del usuario que uso el link
-  usadoEn?: any // Timestamp de cuando se uso
+  createdBy: string // ID del usuario que creo el link
+  role: "operador" | "admin" | "delivery" // Rol asignado al usuario que use el link
+  locationId: string
   createdAt?: any
-  expiresAt?: any // Opcional: fecha de expiracion
-  role?: "operador" | "admin" | "delivery" // Rol que se asignara al usuario que use el link
-  locationId?: string
+  usedBy?: string // ID del usuario que uso el link
+  usedByEmail?: string // Email del usuario que uso el link
+  usedAt?: any // Timestamp de cuando se uso
 }
 
 export interface Group {
