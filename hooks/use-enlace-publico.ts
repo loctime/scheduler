@@ -211,6 +211,11 @@ export function useEnlacePublico(user: any) {
 
       await setDoc(doc(db, COLLECTIONS.ENLACES_PUBLICOS, idSimple), enlaceData)
 
+      await updateDoc(doc(db, COLLECTIONS.PEDIDOS, pedidoId), {
+        enlacePublicoId: idSimple,
+        updatedAt: serverTimestamp(),
+      })
+
       const nuevoEnlace: EnlacePublico = {
         id: idSimple,
         ...enlaceData,
@@ -233,7 +238,7 @@ export function useEnlacePublico(user: any) {
     } finally {
       setLoading(false)
     }
-  }, [user, toast])
+  }, [user, toast, ownerId])
 
   // Obtener enlace público por ID
   const obtenerEnlacePublico = useCallback(async (

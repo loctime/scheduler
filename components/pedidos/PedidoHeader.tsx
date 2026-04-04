@@ -3,7 +3,7 @@
 import { useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Pencil, Check, X, Cog, RotateCcw, Upload, FileText, Trash2 } from "lucide-react"
+import { Pencil, Check, X, Cog, Upload, FileText, Trash2 } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -47,7 +47,6 @@ export interface PedidoHeaderProps {
   onCancelEditSheetUrl: () => void
   onSheetUrlKeyDown: (e: React.KeyboardEvent) => void
   onFormatChange: (format: string) => void
-  onReiniciarPedido: () => void
   onImportClick: () => void
   onFacturaImportClick: () => void
   onDeleteClick: () => void
@@ -82,7 +81,6 @@ export function PedidoHeader({
   onCancelEditSheetUrl,
   onSheetUrlKeyDown,
   onFormatChange,
-  onReiniciarPedido,
   onImportClick,
   onFacturaImportClick,
   onDeleteClick,
@@ -153,17 +151,6 @@ export function PedidoHeader({
         )}
 
         <div className="flex gap-1 shrink-0 ml-auto">
-          {selectedPedido.estado === "enviado" && (
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8 text-amber-600 hover:text-amber-700"
-              onClick={onReiniciarPedido}
-              title="Reiniciar pedido (volver a estado 'creado' y eliminar remito de envío)"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-          )}
           <Button
             variant={showConfig ? "default" : "outline"}
             size="icon"

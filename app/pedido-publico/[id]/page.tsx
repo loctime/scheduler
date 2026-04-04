@@ -12,7 +12,7 @@ import { ConfirmarEnvioDialog, ConfirmarEdicionDialog } from "@/components/pedid
 import { Package, Loader2 } from "lucide-react"
 import { logger } from "@/lib/logger"
 import type { Pedido, Producto, EnlacePublico, Configuracion } from "@/lib/types"
-import { generarNumeroRemito, crearRemitoEnvioDesdeDisponibles } from "@/lib/remito-utils"
+import { generarNumeroRemito, crearRemitoEnvioDesdeDisponibles } from "@/lib/remito-enlace-publico"
 import { logStockAction } from "@/lib/services/stockLogService"
 
 export default function PedidoPublicoPage() {
