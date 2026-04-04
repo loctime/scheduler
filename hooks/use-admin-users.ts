@@ -128,8 +128,8 @@ export function useAdminUsers(user: any) {
       await updateDoc(userRef, updateData)
       
       toast({
-        title: "Ubicación actualizada",
-        description: "La ubicación del usuario fue actualizada",
+        title: "UbicaciÃ³n actualizada",
+        description: "La ubicaciÃ³n del usuario fue actualizada",
       })
 
       await loadUsers()
@@ -138,7 +138,7 @@ export function useAdminUsers(user: any) {
       logger.error("Error al actualizar locationId:", error)
       toast({
         title: "Error",
-        description: error.message || "No se pudo actualizar la ubicación",
+        description: error.message || "No se pudo actualizar la ubicaciÃ³n",
         variant: "destructive",
       })
       return false
