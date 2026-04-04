@@ -97,5 +97,8 @@ export const COLLECTIONS = {
   CONVERSACIONES: getCollectionPath("conversaciones"),
   MENSAJES: getCollectionPath("mensajes"),
   EMPLOYEE_FIXED_RULES: getCollectionPath("employee_fixed_rules"),
+  PEDIDOS_FABRICA: getCollectionPath("pedidos_fabrica"),
+  REMITOS_LOG: getCollectionPath("remitos_log"),
+  RECEPCIONES_LOG: getCollectionPath("recepciones_log"),
 } as const
 

@@ -1,7 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
@@ -21,33 +21,57 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Shield, UserCog, MessageSquare, AlertTriangle, Package, CheckSquare, FileText } from "lucide-react"
+import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Shield, UserCog, MessageSquare, AlertTriangle, Package, CheckSquare, FileText, ShoppingBag, Factory, ClipboardCheck } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useData } from "@/contexts/data-context"
-import { canUser } from "@/lib/permissions"
+import { canUser, type UserAction } from "@/lib/permissions"
 
 interface DashboardLayoutProps {
   children: ReactNode
   user: any
 }
 
-const navItems = [
-  { href: "/dashboard", label: "Horarios", icon: Calendar, action: "ver_admin" },
-  { href: "/dashboard/horarios-mensuales", label: "Vista Mensual", icon: CalendarDays, action: "ver_admin" },
-  { href: "/dashboard/empleados", label: "Empleados", icon: Users, action: "ver_admin" },
-  { href: "/dashboard/tareas", label: "Tareas", icon: CheckSquare, action: "ver_admin" },
-  { href: "/dashboard/pedidos", label: "Pedidos", icon: ShoppingCart, action: "ver_pedidos" },
-  { href: "/dashboard/remitos/nuevo", label: "Remitos V2", icon: Package, action: "recibir_pedido" },
-  { href: "/dashboard/recepciones/nueva", label: "Recepciones V2", icon: Package, action: "recibir_pedido" },
-  { href: "/dashboard/devoluciones/nueva", label: "Devoluciones V2", icon: Package, action: "recibir_pedido" },
-  { href: "/dashboard/documentos-logistica", label: "Docs Logistica", icon: FileText, action: "recibir_pedido" },
-  { href: "/dashboard/stock-console", label: "Stock Rapido", icon: Package, action: "editar_stock" },
-  { href: "/mensajeria", label: "Mensajeria", icon: MessageSquare, action: "ver_admin" },
-  { href: "/dashboard/dias-especiales", label: "Dias Especiales", icon: AlertTriangle, action: "ver_admin" },
-  { href: "/dashboard/admin", label: "Administracion", icon: Shield, action: "ver_admin" },
-  { href: "/dashboard/configuracion", label: "Configuracion", icon: Settings, action: "ver_admin" },
+const navGroups = [
+  {
+    id: "operativa",
+    label: "Operativa",
+    icon: Calendar,
+    items: [
+      { href: "/dashboard", label: "Horarios", icon: Calendar, action: "ver_admin" },
+      { href: "/dashboard/horarios-mensuales", label: "Vista Mensual", icon: CalendarDays, action: "ver_admin" },
+      { href: "/dashboard/empleados", label: "Empleados", icon: Users, action: "ver_admin" },
+      { href: "/dashboard/tareas", label: "Tareas", icon: CheckSquare, action: "ver_admin" },
+      { href: "/dashboard/dias-especiales", label: "Dias Especiales", icon: AlertTriangle, action: "ver_admin" },
+    ],
+  },
+  {
+    id: "logistica",
+    label: "Logística",
+    icon: Package,
+    items: [
+      { href: "/dashboard/pedidos", label: "Pedidos", icon: ShoppingCart, action: "ver_pedidos" },
+      { href: "/dashboard/pedir", label: "Pedir (logística)", icon: ShoppingBag, action: "crear_pedido" },
+      { href: "/dashboard/logistica-fabrica", label: "Fábrica interna", icon: Factory, action: "ver_admin" },
+      { href: "/dashboard/recepciones", label: "Recepciones internas", icon: ClipboardCheck, action: "recibir_pedido" },
+      { href: "/dashboard/remitos/nuevo", label: "Remitos V2", icon: Package, action: "recibir_pedido" },
+      { href: "/dashboard/recepciones/nueva", label: "Recepciones V2", icon: Package, action: "recibir_pedido" },
+      { href: "/dashboard/devoluciones/nueva", label: "Devoluciones V2", icon: Package, action: "recibir_pedido" },
+      { href: "/dashboard/documentos-logistica", label: "Docs Logistica", icon: FileText, action: "recibir_pedido" },
+      { href: "/dashboard/stock-console", label: "Stock Rapido", icon: Package, action: "editar_stock" },
+    ],
+  },
+  {
+    id: "sistema",
+    label: "Sistema",
+    icon: Settings,
+    items: [
+      { href: "/mensajeria", label: "Mensajeria", icon: MessageSquare, action: "ver_admin" },
+      { href: "/dashboard/admin", label: "Administracion", icon: Shield, action: "ver_admin" },
+      { href: "/dashboard/configuracion", label: "Configuracion", icon: Settings, action: "ver_admin" },
+    ],
+  },
 ]
 
 export function DashboardLayout({ children, user }: DashboardLayoutProps) {
@@ -59,15 +83,35 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     if (!auth) return
     await signOut(auth)
   }
-    // Filtrar navItems segun acciones
-  const navItemsFiltered = navItems.filter((item) => {
-    if (!item.action) return true
-    return canUser({ uid: user?.uid, role: userData?.role, locationId: userData?.locationId }, item.action)
-  })
 
-  const NavContent = ({ onItemClick }: { onItemClick?: () => void }) => (
+  // Filtrar grupos y sus items segun acciones
+  const navGroupsFiltered = navGroups.map(group => ({
+    ...group,
+    items: group.items.filter((item) => {
+      if (!item.action) return true
+      return canUser(
+        { uid: user?.uid, role: userData?.role, locationId: userData?.locationId },
+        item.action as UserAction
+      )
+    })
+  })).filter(group => group.items.length > 0)
+
+  // Determinar grupo activo basado en el pathname
+  const activeGroupId = navGroupsFiltered.find(group => 
+    group.items.some(item => pathname === item.href)
+  )?.id || navGroupsFiltered[0]?.id
+
+  const [manualActiveGroupId, setManualActiveGroupId] = useState<string | null>(null)
+  const currentGroupId = manualActiveGroupId || activeGroupId
+
+  // Resetear el grupo manual cuando cambia el activeGroupId (navegación real)
+  useEffect(() => {
+    setManualActiveGroupId(null)
+  }, [activeGroupId])
+
+  const NavContent = ({ onItemClick, items }: { onItemClick?: () => void, items: any[] }) => (
     <div className="flex flex-col gap-1 md:flex-row">
-      {navItemsFiltered.map((item) => {
+      {items.map((item) => {
         const Icon = item.icon
         const isActive = pathname === item.href
         return (
@@ -88,6 +132,29 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     </div>
   )
 
+  const CategoryNav = ({ activeId, onSelect }: { activeId: string, onSelect: (id: string) => void }) => (
+    <div className="flex gap-1 overflow-x-auto pb-0">
+      {navGroupsFiltered.map((group) => {
+        const Icon = group.icon
+        const isActive = group.id === activeId
+        return (
+          <Button
+            key={group.id}
+            variant="ghost"
+            onClick={() => onSelect(group.id)}
+            className={cn(
+              "flex items-center gap-2 rounded-none border-b-2 border-transparent px-4 py-3 text-muted-foreground hover:bg-transparent hover:text-foreground",
+              isActive && "border-primary text-foreground font-bold",
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            <span className="text-sm uppercase tracking-wider">{group.label}</span>
+          </Button>
+        )
+      })}
+    </div>
+  )
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
@@ -102,7 +169,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
                   <span className="sr-only">Abrir menú</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[280px] sm:w-[300px]">
+              <SheetContent side="left" className="w-[280px] sm:w-[300px] overflow-y-auto">
                 <SheetHeader>
                   <div className="flex items-center gap-2 pb-4">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
@@ -111,7 +178,14 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
                     <SheetTitle className="text-lg font-bold">Menú</SheetTitle>
                   </div>
                 </SheetHeader>
-                <NavContent onItemClick={() => setMobileMenuOpen(false)} />
+                <div className="space-y-6">
+                  {navGroupsFiltered.map(group => (
+                    <div key={group.id}>
+                      <h3 className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{group.label}</h3>
+                      <NavContent items={group.items} onItemClick={() => setMobileMenuOpen(false)} />
+                    </div>
+                  ))}
+                </div>
               </SheetContent>
             </Sheet>
 
@@ -151,9 +225,12 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
           </DropdownMenu>
         </div>
 
-        {/* Navigation - Desktop only */}
+        {/* Navigation - Desktop only - Double Navbar */}
         <nav className="hidden border-t border-border bg-card px-6 md:block">
-          <NavContent />
+          <CategoryNav activeId={currentGroupId} onSelect={setManualActiveGroupId} />
+          <div className="border-t border-border/50">
+            <NavContent items={navGroupsFiltered.find(g => g.id === currentGroupId)?.items || []} />
+          </div>
         </nav>
       </header>
 
