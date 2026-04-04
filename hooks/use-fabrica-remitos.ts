@@ -10,7 +10,9 @@ import {
   getDoc,
   onSnapshot,
 } from "firebase/firestore"
-import { db, COLLECTIONS } from "@/lib/firebase"
+import { db, COLLECTIONS, getCollectionPath } from "@/lib/firebase"
+
+const LEGACY_REMITOS_PATH = getCollectionPath("remitos")
 import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
 import { Remito, Pedido } from "@/lib/types"
@@ -89,7 +91,7 @@ export function useFabricaRemitos(user: any) {
       // Nota: Firestore requiere índice compuesto para múltiples where + orderBy
       // Por ahora, cargar todos los remitos de tipo recepcion y filtrar en cliente
       const remitosQuery = query(
-        collection(db, COLLECTIONS.REMITOS),
+        collection(db, LEGACY_REMITOS_PATH),
         where("tipo", "==", "recepcion")
       )
 
@@ -129,7 +131,7 @@ export function useFabricaRemitos(user: any) {
 
     // Configurar listener en tiempo real
     const remitosQuery = query(
-      collection(db, COLLECTIONS.REMITOS),
+      collection(db, LEGACY_REMITOS_PATH),
       where("tipo", "==", "recepcion")
     )
 

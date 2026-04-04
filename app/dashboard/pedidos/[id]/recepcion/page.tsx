@@ -13,7 +13,9 @@ import { useEnlacePublico } from "@/hooks/use-enlace-publico"
 import { RecepcionForm } from "@/components/pedidos/recepcion-form"
 import { crearRemitoRecepcion, eliminarRemitosAnteriores } from "@/lib/remito-utils"
 import type { Remito, Pedido, Producto } from "@/lib/types"
-import { db, COLLECTIONS } from "@/lib/firebase"
+import { db, COLLECTIONS, getCollectionPath } from "@/lib/firebase"
+
+const LEGACY_RECEPCIONES_PATH = getCollectionPath("recepciones")
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import type { Recepcion } from "@/lib/types"
@@ -326,7 +328,7 @@ export default function RecepcionPage() {
       if (remito && db) {
         // Actualizar recepción con remito ID
         const { updateDoc } = await import("firebase/firestore")
-        await updateDoc(doc(db, COLLECTIONS.RECEPCIONES, recepcion.id), {
+        await updateDoc(doc(db, LEGACY_RECEPCIONES_PATH, recepcion.id), {
           remitoId: remito.id,
         })
 

@@ -1,6 +1,6 @@
 import { db } from "@/lib/firebase"
 import { doc, getDoc, getDocs, collection, query, where, runTransaction, serverTimestamp } from "firebase/firestore"
-import { WeekVersioningService } from "@/lib/week-versioning-service-new"
+import { WeekVersioningService } from "@/lib/week-versioning-service-fixed"
 
 /**
  * Script de migración segura del sistema de semanas al nuevo versionado

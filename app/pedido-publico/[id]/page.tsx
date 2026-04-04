@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
-import { db, COLLECTIONS } from "@/lib/firebase"
+import { db, COLLECTIONS, getCollectionPath } from "@/lib/firebase"
+
+const LEGACY_REMITOS_PATH = getCollectionPath("remitos")
 import { doc, getDoc, collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore"
 import { useEnlacePublico } from "@/hooks/use-enlace-publico"
 import { EnlacePublicoForm } from "@/components/pedidos/enlace-publico-form"
@@ -144,7 +146,7 @@ export default function PedidoPublicoPage() {
     try {
       // Eliminar el remito de envío si existe
       if (pedido.remitoEnvioId) {
-        await deleteDoc(doc(db, COLLECTIONS.REMITOS, pedido.remitoEnvioId))
+        await deleteDoc(doc(db, LEGACY_REMITOS_PATH, pedido.remitoEnvioId))
       }
 
       // Volver el estado del pedido a "creado"
@@ -256,7 +258,7 @@ export default function PedidoPublicoPage() {
       console.log("Productos en datos a guardar:", remitoParaGuardar.productos)
       console.log("Cantidad de productos a guardar:", remitoParaGuardar.productos?.length || 0)
       
-      const remitoRef = await addDoc(collection(db, COLLECTIONS.REMITOS), remitoParaGuardar)
+      const remitoRef = await addDoc(collection(db, LEGACY_REMITOS_PATH), remitoParaGuardar)
       console.log("✓ Remito creado:", remitoRef.id)
       
       // Verificar que se guardó correctamente leyendo el documento

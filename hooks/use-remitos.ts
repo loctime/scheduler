@@ -11,7 +11,10 @@ import {
   getDoc,
   serverTimestamp,
 } from "firebase/firestore"
-import { db, COLLECTIONS } from "@/lib/firebase"
+import { db, COLLECTIONS, getCollectionPath } from "@/lib/firebase"
+
+// TODO: limpiar cuando pedidos de grupo migren a remitos_log / logistica-service.
+const LEGACY_REMITOS_PATH = getCollectionPath("remitos")
 import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
 import { Remito } from "@/lib/types"
@@ -49,7 +52,7 @@ export function useRemitos(user: any) {
       const numero = await generarNumeroRemito(db, COLLECTIONS, nombre || "PEDIDO")
 
       // Crear remito en Firestore
-      const remitoRef = await addDoc(collection(db, COLLECTIONS.REMITOS), {
+      const remitoRef = await addDoc(collection(db, LEGACY_REMITOS_PATH), {
         ...remitoData,
         ownerId,
         userId: user.uid,
@@ -114,7 +117,7 @@ export function useRemitos(user: any) {
       // Obtener remitos filtrando por pedidoId y userId
       // Si el remito no tiene userId (creado sin autenticación), usar el userId del pedido
       const remitosQuery = query(
-        collection(db, COLLECTIONS.REMITOS),
+        collection(db, LEGACY_REMITOS_PATH),
         where("pedidoId", "==", pedidoId),
         where("ownerId", "==", ownerId)
       )
@@ -143,7 +146,7 @@ export function useRemitos(user: any) {
     if (!db) return null
 
     try {
-      const remitoDoc = await getDoc(doc(db, COLLECTIONS.REMITOS, remitoId))
+      const remitoDoc = await getDoc(doc(db, LEGACY_REMITOS_PATH, remitoId))
       if (!remitoDoc.exists()) return null
       return {
         id: remitoDoc.id,

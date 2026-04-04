@@ -10,8 +10,8 @@ export interface PedidosTabsProps {
   setActiveTab: (tab: PedidosTabId) => void
   selectedPedido: { estado?: string } | null
   remitosCount: number
-  showV2Shortcut?: boolean
-  onOpenV2?: () => void
+  showPedirInsumosShortcut?: boolean
+  onOpenPedirInsumos?: () => void
 }
 
 export function PedidosTabs({
@@ -19,8 +19,8 @@ export function PedidosTabs({
   setActiveTab,
   selectedPedido,
   remitosCount,
-  showV2Shortcut = false,
-  onOpenV2
+  showPedirInsumosShortcut = false,
+  onOpenPedirInsumos
 }: PedidosTabsProps) {
   const showRecepcionTab =
     selectedPedido?.estado === "enviado" || selectedPedido?.estado === "recibido"
@@ -65,15 +65,15 @@ export function PedidosTabs({
           <span className="sm:hidden">Rec.</span>
         </Button>
       )}
-      {showV2Shortcut && (
+      {showPedirInsumosShortcut && (
         <Button
           variant="ghost"
           size="sm"
           className="h-7 sm:h-8 px-1.5 sm:px-3 rounded-none border-b-2 border-transparent text-[11px] sm:text-sm font-medium flex-1 sm:flex-initial"
-          onClick={onOpenV2}
+          onClick={onOpenPedirInsumos}
         >
-          <span className="hidden sm:inline">Logistica V2</span>
-          <span className="sm:hidden">V2</span>
+          <span className="hidden sm:inline">Pedir insumos</span>
+          <span className="sm:hidden">Pedir</span>
         </Button>
       )}
     </div>

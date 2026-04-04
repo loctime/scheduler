@@ -1,5 +1,7 @@
 "use client"
 
+// TODO: revisar si se puede reemplazar por stock-ubicaciones-service (Provider sigue usado en app/dashboard/layout.tsx y pedidos).
+
 import { createContext, useContext, useCallback, useEffect, useMemo, useState } from "react"
 import {
   collection,

@@ -17,7 +17,9 @@ import { usePedidoRecepcion } from "@/hooks/pedidos/use-pedido-recepcion"
 import { usePedidoEnlaces } from "@/hooks/pedidos/use-pedido-enlaces"
 import { usePedidoRemitos } from "@/hooks/pedidos/use-pedido-remitos"
 import { usePedidoActions } from "@/hooks/pedidos/use-pedido-actions"
-import { db, COLLECTIONS } from "@/lib/firebase"
+import { db, COLLECTIONS, getCollectionPath } from "@/lib/firebase"
+
+const LEGACY_REMITOS_PATH = getCollectionPath("remitos")
 import { doc, serverTimestamp, getDoc, updateDoc, deleteDoc, deleteField } from "firebase/firestore"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import { PedidosSidebar } from "@/components/pedidos/pedidos-sidebar"
@@ -212,7 +214,7 @@ export default function PedidosPage() {
     try {
       if (selectedPedido.remitoEnvioId) {
         try {
-          await deleteDoc(doc(db, COLLECTIONS.REMITOS, selectedPedido.remitoEnvioId))
+          await deleteDoc(doc(db, LEGACY_REMITOS_PATH, selectedPedido.remitoEnvioId))
         } catch (deleteError: any) {
           console.error("Error al eliminar remito (continuando de todas formas):", deleteError)
         }
@@ -297,8 +299,8 @@ export default function PedidosPage() {
     toast({ title: "Pedido y enlace copiados", description: "El pedido y el enlace se han copiado al portapapeles" })
   }
 
-  const handleAbrirLogisticaV2 = () => {
-    router.push("/dashboard/v2/pedidos")
+  const handleAbrirPedirInsumos = () => {
+    router.push("/dashboard/pedir")
   }
 
   const handleOpenCreate = () => {
@@ -507,8 +509,8 @@ export default function PedidosPage() {
                     setActiveTab={setActiveTab}
                     selectedPedido={selectedPedido}
                     remitosCount={remitosList.length}
-                    showV2Shortcut={flags.logisticsV2.enabled}
-                    onOpenV2={handleAbrirLogisticaV2}
+                    showPedirInsumosShortcut={flags.logisticsV2.enabled}
+                    onOpenPedirInsumos={handleAbrirPedirInsumos}
                   />
 
                   {products.length > 0 && (

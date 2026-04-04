@@ -2,6 +2,10 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import type { Remito, Pedido, Producto } from "./types"
 import { esModoPack, unidadesToPacks, packsToUnidades } from "./unidades-utils"
+import { getCollectionPath } from "./firebase"
+
+// TODO: limpiar cuando el flujo de grupos/pedidos legacy migre por completo a logistica-service (remitos_log / recepciones_log).
+const LEGACY_REMITOS_COLLECTION = getCollectionPath("remitos")
 
 /**
  * Normaliza el nombre del pedido para usar en la numeración de remitos
@@ -30,7 +34,7 @@ export async function generarNumeroRemito(
   try {
     const { collection, query, orderBy, limit, getDocs, where } = await import("firebase/firestore")
     const prefijo = normalizarNombrePedido(nombrePedido)
-    const remitosRef = collection(db, COLLECTIONS.REMITOS)
+    const remitosRef = collection(db, LEGACY_REMITOS_COLLECTION)
     
     // Buscar el último remito de este tipo de pedido
     const q = query(
@@ -435,7 +439,7 @@ export async function eliminarRemitosAnteriores(
 ): Promise<void> {
   try {
     const { collection, query, where, getDocs, deleteDoc } = await import("firebase/firestore")
-    const remitosRef = collection(db, COLLECTIONS.REMITOS)
+    const remitosRef = collection(db, LEGACY_REMITOS_COLLECTION)
     
     // Buscar todos los remitos del pedido (no podemos usar != en Firestore fácilmente)
     const q = query(

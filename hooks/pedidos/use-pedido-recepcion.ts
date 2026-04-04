@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
-import { db, COLLECTIONS } from "@/lib/firebase"
+import { db, COLLECTIONS, getCollectionPath } from "@/lib/firebase"
+
+const LEGACY_RECEPCIONES_PATH = getCollectionPath("recepciones")
 import { useToast } from "@/hooks/use-toast"
 import type { Remito, Recepcion } from "@/lib/types"
 import { crearRemitoRecepcion } from "@/lib/remito-utils"
@@ -286,7 +288,7 @@ export function usePedidoRecepcion(params: UsePedidoRecepcionParams) {
       const remito = await crearRemito(remitoData, (selectedPedido as any).nombre)
 
       if (remito && db) {
-        await updateDoc(doc(db, COLLECTIONS.RECEPCIONES, recepcion.id), {
+        await updateDoc(doc(db, LEGACY_RECEPCIONES_PATH, recepcion.id), {
           remitoId: remito.id
         })
 

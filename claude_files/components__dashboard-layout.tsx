@@ -21,7 +21,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Shield, UserCog, MessageSquare, AlertTriangle, Package, CheckSquare, FileText, ShoppingBag, Factory, ClipboardCheck, BookMarked, Warehouse } from "lucide-react"
+import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Shield, MessageSquare, AlertTriangle, Package, CheckSquare, ShoppingBag, Factory, ClipboardCheck, BookMarked, Warehouse } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -52,16 +52,12 @@ const navGroups = [
     icon: Package,
     items: [
       { href: "/dashboard/pedidos", label: "Pedidos", icon: ShoppingCart, action: "ver_pedidos" },
-      { href: "/dashboard/pedir", label: "Pedir (logística)", icon: ShoppingBag, action: "crear_pedido" },
-      { href: "/dashboard/logistica-fabrica", label: "Fábrica interna", icon: Factory, action: "ver_admin" },
-      { href: "/dashboard/recepciones", label: "Recepciones internas", icon: ClipboardCheck, action: "recibir_pedido" },
+      { href: "/dashboard/pedir", label: "Pedir insumos", icon: ShoppingBag, action: "crear_pedido" },
+      { href: "/dashboard/logistica-fabrica", label: "Fábrica", icon: Factory, action: "ver_admin" },
+      { href: "/dashboard/recepciones", label: "Recepciones", icon: ClipboardCheck, action: "recibir_pedido" },
       { href: "/dashboard/catalogo", label: "Catálogo", icon: BookMarked, action: "ver_admin" },
       { href: "/dashboard/mi-stock", label: "Mi stock", icon: Warehouse, action: "editar_stock" },
-      { href: "/dashboard/remitos/nuevo", label: "Remitos V2", icon: Package, action: "recibir_pedido" },
-      { href: "/dashboard/recepciones/nueva", label: "Recepciones V2", icon: Package, action: "recibir_pedido" },
-      { href: "/dashboard/devoluciones/nueva", label: "Devoluciones V2", icon: Package, action: "recibir_pedido" },
-      { href: "/dashboard/documentos-logistica", label: "Docs Logistica", icon: FileText, action: "recibir_pedido" },
-      { href: "/dashboard/stock-console", label: "Stock Rapido", icon: Package, action: "editar_stock" },
+      { href: "/dashboard/stock-console", label: "Stock rápido (PWA)", icon: Package, action: "editar_stock" },
     ],
   },
   {

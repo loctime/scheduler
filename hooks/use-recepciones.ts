@@ -9,7 +9,10 @@ import {
   getDocs,
   serverTimestamp,
 } from "firebase/firestore"
-import { db, COLLECTIONS } from "@/lib/firebase"
+import { db, COLLECTIONS, getCollectionPath } from "@/lib/firebase"
+
+// TODO: limpiar cuando pedidos de grupo migren a recepciones_log / logistica-service.
+const LEGACY_RECEPCIONES_PATH = getCollectionPath("recepciones")
 import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
 import { Recepcion } from "@/lib/types"
@@ -70,7 +73,7 @@ export function useRecepciones(user: any) {
         recepcionDataLimpio.observaciones = recepcionData.observaciones.trim()
       }
       
-      const recepcionRef = await addDoc(collection(db, COLLECTIONS.RECEPCIONES), recepcionDataLimpio)
+      const recepcionRef = await addDoc(collection(db, LEGACY_RECEPCIONES_PATH), recepcionDataLimpio)
 
       const nuevaRecepcion: Recepcion = {
         id: recepcionRef.id,
@@ -105,7 +108,7 @@ export function useRecepciones(user: any) {
 
     try {
       const recepcionesQuery = query(
-        collection(db, COLLECTIONS.RECEPCIONES),
+        collection(db, LEGACY_RECEPCIONES_PATH),
         where("pedidoId", "==", pedidoId),
         where("ownerId", "==", ownerId)
       )

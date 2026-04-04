@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { db, COLLECTIONS } from "@/lib/firebase"
+import { db, COLLECTIONS, getCollectionPath } from "@/lib/firebase"
+
+const LEGACY_REMITOS_PATH = getCollectionPath("remitos")
 import { doc, getDoc, collection, query, where, getDocs, updateDoc, serverTimestamp, addDoc } from "firebase/firestore"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
@@ -172,7 +174,7 @@ export default function FabricaPedidoDetailPage() {
         createdAt: serverTimestamp(),
       }
 
-      const remitoRef = await addDoc(collection(db, COLLECTIONS.REMITOS), remitoParaGuardar)
+      const remitoRef = await addDoc(collection(db, LEGACY_REMITOS_PATH), remitoParaGuardar)
 
       // Actualizar pedido: estado "enviado", fechaEnvio, y vincular remito
       await updateDoc(doc(db, COLLECTIONS.PEDIDOS, pedido.id), {

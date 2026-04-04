@@ -12,7 +12,9 @@ import { Package, Loader2, Clock, CheckCircle2, FileText, ChevronDown, ChevronUp
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import { db, COLLECTIONS } from "@/lib/firebase"
+import { db, COLLECTIONS, getCollectionPath } from "@/lib/firebase"
+
+const LEGACY_REMITOS_PATH = getCollectionPath("remitos")
 import { doc, getDoc, collection, query, where, getDocs, updateDoc, serverTimestamp, addDoc } from "firebase/firestore"
 import type { Pedido, Producto, EnlacePublico, Configuracion, Remito } from "@/lib/types"
 import { FabricaPedidoForm } from "@/components/fabrica/pedido-form"
@@ -303,7 +305,7 @@ export default function FabricaPage() {
         createdAt: serverTimestamp(),
       }
 
-      const remitoRef = await addDoc(collection(db, COLLECTIONS.REMITOS), remitoParaGuardar)
+      const remitoRef = await addDoc(collection(db, LEGACY_REMITOS_PATH), remitoParaGuardar)
 
       // Actualizar pedido: estado "enviado", fechaEnvio, y vincular remito
       await updateDoc(doc(db, COLLECTIONS.PEDIDOS, pedido.id), {
