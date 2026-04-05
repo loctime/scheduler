@@ -1,11 +1,10 @@
-export type GrupoCatalogo = {
+export interface GrupoCatalogo {
   id: string
   nombre: string
-  destinoLocationId: string
-  destinoNombre: string
   ownerId: string
   createdBy: string
   createdAt?: unknown
+  despachadores: Array<{ locationId: string; locationName: string }>
 }
 
 export type CatalogoProducto = {

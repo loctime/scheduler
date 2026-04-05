@@ -13,8 +13,10 @@ import {
   where,
 } from "firebase/firestore"
 import { DashboardLayout } from "@/components/dashboard-layout"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -47,15 +49,46 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { FolderTree, Loader2, Package, Plus, Trash2 } from "lucide-react"
 
-type DestinoUsuario = {
+type UbicacionCatalogo = {
   locationId: string
   locationName: string
 }
+
+function normalizeDespachadoresGrupo(
+  x: Record<string, unknown>
+): Array<{ locationId: string; locationName: string }> {
+  const raw = x.despachadores
+  if (Array.isArray(raw)) {
+    const out: Array<{ locationId: string; locationName: string }> = []
+    for (const item of raw) {
+      if (!item || typeof item !== "object") continue
+      const o = item as Record<string, unknown>
+      const locationId = String(o.locationId ?? "").trim()
+      const locationName = typeof o.locationName === "string" ? o.locationName.trim() : ""
+      if (locationId && locationName) out.push({ locationId, locationName })
+    }
+    return out
+  }
+  const legacyId = String(x.destinoLocationId ?? "").trim()
+  const legacyName = typeof x.destinoNombre === "string" ? x.destinoNombre.trim() : ""
+  if (legacyId && legacyName) {
+    return [{ locationId: legacyId, locationName: legacyName }]
+  }
+  return []
+}
+
+const FILTRO_TODOS_LOS_GRUPOS = "__all__"
 
 export default function CatalogoAdminPage() {
   const { user, userData } = useData()
   const { toast } = useToast()
   const ownerId = useMemo(() => getOwnerIdForActor(user, userData), [user, userData])
+
+  /** Dueño del espacio + uid actual: los links de invitación guardan `ownerId` = quien creó el link, no siempre el tenant raíz. */
+  const ownerIdsParaUsuarios = useMemo(() => {
+    if (!ownerId || !user?.uid) return null
+    return [...new Set([ownerId, user.uid])]
+  }, [ownerId, user?.uid])
 
   const puede = useMemo(
     () => canUser({ uid: user?.uid, role: userData?.role, locationId: userData?.locationId }, "ver_admin"),
@@ -64,15 +97,17 @@ export default function CatalogoAdminPage() {
 
   const [pedidos, setPedidos] = useState<Pedido[]>([])
   const [gruposCatalogo, setGruposCatalogo] = useState<GrupoCatalogo[]>([])
-  const [destinosUsuarios, setDestinosUsuarios] = useState<DestinoUsuario[]>([])
+  const [ubicaciones, setUbicaciones] = useState<UbicacionCatalogo[]>([])
   const [items, setItems] = useState<CatalogoProducto[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
   const [nuevoGrupoNombre, setNuevoGrupoNombre] = useState("")
-  const [nuevoGrupoDestinoLocationId, setNuevoGrupoDestinoLocationId] = useState("")
+  const [nuevoGrupoDespachadoresIds, setNuevoGrupoDespachadoresIds] = useState<string[]>([])
   const [creandoGrupo, setCreandoGrupo] = useState(false)
   const [eliminandoGrupoId, setEliminandoGrupoId] = useState<string | null>(null)
+
+  const [filtroGrupoCatalogoId, setFiltroGrupoCatalogoId] = useState("")
 
   const [editId, setEditId] = useState<string | null>(null)
   const [nombre, setNombre] = useState("")
@@ -101,11 +136,10 @@ export default function CatalogoAdminPage() {
         return {
           id: d.id,
           nombre: String(x.nombre ?? ""),
-          destinoLocationId: String(x.destinoLocationId ?? ""),
-          destinoNombre: String(x.destinoNombre ?? ""),
           ownerId: String(x.ownerId ?? ""),
           createdBy: String(x.createdBy ?? ""),
           createdAt: x.createdAt,
+          despachadores: normalizeDespachadoresGrupo(x),
         }
       })
       list.sort((a, b) => a.nombre.localeCompare(b.nombre))
@@ -115,50 +149,56 @@ export default function CatalogoAdminPage() {
   }, [ownerId])
 
   useEffect(() => {
-    if (!db || !ownerId || !user?.uid) {
-      setDestinosUsuarios([])
+    if (!db || !ownerIdsParaUsuarios?.length) {
+      setUbicaciones([])
       return
     }
     const firestore = db
-    const uid = user.uid
-    const uq = query(collection(firestore, COLLECTIONS.USERS), where("ownerId", "==", ownerId))
+    const ids = ownerIdsParaUsuarios
+    const uq =
+      ids.length === 1
+        ? query(collection(firestore, COLLECTIONS.USERS), where("ownerId", "==", ids[0]!))
+        : query(collection(firestore, COLLECTIONS.USERS), where("ownerId", "in", ids))
+
+    const mergeUsuarioDoc = (
+      byLocation: Map<string, UbicacionCatalogo>,
+      d: { id: string; data: () => Record<string, unknown> }
+    ) => {
+      const x = d.data()
+      const locName = typeof x.locationName === "string" ? x.locationName.trim() : ""
+      if (!locName) return
+      const locationId = String(x.locationId ?? x.location ?? x.ownerId ?? d.id)
+      if (!byLocation.has(locationId)) {
+        byLocation.set(locationId, { locationId, locationName: locName })
+      }
+    }
+
     const unsub = onSnapshot(
       uq,
-      async (snap) => {
-        try {
-          const byLocation = new Map<string, DestinoUsuario>()
-          snap.docs.forEach((d) => {
-            const x = d.data() as Record<string, unknown>
-            const locName = typeof x.locationName === "string" ? x.locationName.trim() : ""
-            if (!locName) return
-            const locationId = String(x.locationId ?? x.location ?? x.ownerId ?? d.id)
-            if (!byLocation.has(locationId)) {
-              byLocation.set(locationId, { locationId, locationName: locName })
-            }
-          })
-          const adminSnap = await getDoc(doc(firestore, COLLECTIONS.USERS, uid))
-          if (adminSnap.exists()) {
-            const x = adminSnap.data() as Record<string, unknown>
-            const locName = typeof x.locationName === "string" ? x.locationName.trim() : ""
-            if (locName) {
-              const locationId = String(x.locationId ?? x.location ?? x.ownerId ?? uid)
-              if (!byLocation.has(locationId)) {
-                byLocation.set(locationId, { locationId, locationName: locName })
+      (snap) => {
+        void (async () => {
+          try {
+            const byLocation = new Map<string, UbicacionCatalogo>()
+            snap.docs.forEach((d) => mergeUsuarioDoc(byLocation, d))
+            if (user?.uid) {
+              const selfSnap = await getDoc(doc(firestore, COLLECTIONS.USERS, user.uid))
+              if (selfSnap.exists()) {
+                mergeUsuarioDoc(byLocation, { id: selfSnap.id, data: () => selfSnap.data() as Record<string, unknown> })
               }
             }
+            const rows = [...byLocation.values()].sort((a, b) =>
+              a.locationName.localeCompare(b.locationName)
+            )
+            setUbicaciones(rows)
+          } catch {
+            setUbicaciones([])
           }
-          const rows = [...byLocation.values()].sort((a, b) =>
-            a.locationName.localeCompare(b.locationName)
-          )
-          setDestinosUsuarios(rows)
-        } catch {
-          setDestinosUsuarios([])
-        }
+        })()
       },
-      () => setDestinosUsuarios([])
+      () => setUbicaciones([])
     )
     return () => unsub()
-  }, [ownerId, user?.uid])
+  }, [ownerIdsParaUsuarios, user?.uid])
 
   useEffect(() => {
     if (!db || !ownerId) {
@@ -219,6 +259,11 @@ export default function CatalogoAdminPage() {
     [grupoNombre, pedidoNombre]
   )
 
+  const itemsFiltrados = useMemo(() => {
+    if (!filtroGrupoCatalogoId) return items
+    return items.filter((row) => row.grupoCatalogoId === filtroGrupoCatalogoId)
+  }, [items, filtroGrupoCatalogoId])
+
   useEffect(() => {
     if (editId !== "new") return
     setGrupoCatalogoId((prev) => (prev ? prev : gruposCatalogo[0]?.id ?? ""))
@@ -242,6 +287,13 @@ export default function CatalogoAdminPage() {
     setCategoria(row.categoria ?? "")
   }
 
+  const toggleDespachadorNuevoGrupo = (locationId: string, checked: boolean) => {
+    setNuevoGrupoDespachadoresIds((prev) => {
+      if (checked) return prev.includes(locationId) ? prev : [...prev, locationId]
+      return prev.filter((id) => id !== locationId)
+    })
+  }
+
   const crearGrupo = async () => {
     if (!db || !ownerId || !user?.uid) return
     const nombreTrim = nuevoGrupoNombre.trim()
@@ -249,31 +301,34 @@ export default function CatalogoAdminPage() {
       toast({ title: "Indicá el nombre del grupo", variant: "destructive" })
       return
     }
-    if (!nuevoGrupoDestinoLocationId) {
+    if (nuevoGrupoDespachadoresIds.length === 0) {
       toast({
-        title: "Elegí un destino",
-        description: "Necesitás al menos un usuario vinculado con nombre de ubicación.",
+        title: "Elegí al menos un despachador",
+        description: "Marcá una o más ubicaciones como despachadores del grupo.",
         variant: "destructive",
       })
       return
     }
-    const dest = destinosUsuarios.find((d) => d.locationId === nuevoGrupoDestinoLocationId)
-    if (!dest) {
-      toast({ title: "Destino inválido", variant: "destructive" })
+    const despachadores: Array<{ locationId: string; locationName: string }> = []
+    for (const id of nuevoGrupoDespachadoresIds) {
+      const u = ubicaciones.find((x) => x.locationId === id)
+      if (u) despachadores.push({ locationId: u.locationId, locationName: u.locationName })
+    }
+    if (despachadores.length === 0) {
+      toast({ title: "Ubicaciones inválidas", variant: "destructive" })
       return
     }
     setCreandoGrupo(true)
     try {
       await addDoc(collection(db, COLLECTIONS.GRUPOS_CATALOGO), {
         nombre: nombreTrim,
-        destinoLocationId: dest.locationId,
-        destinoNombre: dest.locationName,
         ownerId,
         createdBy: user.uid,
         createdAt: serverTimestamp(),
+        despachadores,
       })
       setNuevoGrupoNombre("")
-      setNuevoGrupoDestinoLocationId("")
+      setNuevoGrupoDespachadoresIds([])
       toast({ title: "Grupo creado" })
     } catch (e) {
       toast({
@@ -388,8 +443,8 @@ export default function CatalogoAdminPage() {
               <div>
                 <CardTitle>Grupos</CardTitle>
                 <CardDescription>
-                  Agrupá productos por destino (ubicación con nombre). Los pedidos del sistema siguen usando su propia
-                  colección; acá definís grupos solo para el catálogo.
+                  Cada grupo une varios despachadores (ubicaciones con nombre). Los pedidos del sistema siguen en su
+                  colección; estos grupos son solo para organizar el catálogo.
                 </CardDescription>
               </div>
             </div>
@@ -400,7 +455,7 @@ export default function CatalogoAdminPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nombre</TableHead>
-                    <TableHead>Destino</TableHead>
+                    <TableHead>Despachadores</TableHead>
                     <TableHead className="w-[100px]" />
                   </TableRow>
                 </TableHeader>
@@ -408,7 +463,19 @@ export default function CatalogoAdminPage() {
                   {gruposCatalogo.map((g) => (
                     <TableRow key={g.id}>
                       <TableCell className="font-medium">{g.nombre}</TableCell>
-                      <TableCell>{g.destinoNombre || g.destinoLocationId}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {g.despachadores.length > 0 ? (
+                            g.despachadores.map((d) => (
+                              <Badge key={d.locationId} variant="secondary">
+                                {d.locationName}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-sm text-muted-foreground">—</span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Button
                           type="button"
@@ -445,31 +512,34 @@ export default function CatalogoAdminPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Destino</Label>
-                <Select
-                  value={nuevoGrupoDestinoLocationId || undefined}
-                  onValueChange={setNuevoGrupoDestinoLocationId}
-                  disabled={destinosUsuarios.length === 0}
-                >
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={
-                        destinosUsuarios.length === 0
-                          ? "Sin ubicaciones con nombre (configuración → invitaciones)"
-                          : "Elegí ubicación"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {destinosUsuarios.map((d) => (
-                      <SelectItem key={d.locationId} value={d.locationId}>
-                        {d.locationName}
-                      </SelectItem>
+                <Label>Despachadores</Label>
+                {ubicaciones.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No hay usuarios con nombre de ubicación. Configuralos en invitaciones o perfiles.
+                  </p>
+                ) : (
+                  <div className="rounded-md border p-3 space-y-3 max-h-48 overflow-y-auto">
+                    {ubicaciones.map((u) => (
+                      <label
+                        key={u.locationId}
+                        className="flex items-center gap-2 text-sm cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={nuevoGrupoDespachadoresIds.includes(u.locationId)}
+                          onCheckedChange={(v) =>
+                            toggleDespachadorNuevoGrupo(u.locationId, v === true)
+                          }
+                        />
+                        <span>{u.locationName}</span>
+                      </label>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </div>
+                )}
               </div>
-              <Button onClick={() => void crearGrupo()} disabled={creandoGrupo}>
+              <Button
+                onClick={() => void crearGrupo()}
+                disabled={creandoGrupo || ubicaciones.length === 0}
+              >
                 {creandoGrupo ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Crear grupo
               </Button>
@@ -495,7 +565,29 @@ export default function CatalogoAdminPage() {
               Nuevo producto
             </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 max-w-xs">
+              <Label className="shrink-0">Filtrar por grupo</Label>
+              <Select
+                value={filtroGrupoCatalogoId ? filtroGrupoCatalogoId : FILTRO_TODOS_LOS_GRUPOS}
+                onValueChange={(v) =>
+                  setFiltroGrupoCatalogoId(v === FILTRO_TODOS_LOS_GRUPOS ? "" : v)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos los grupos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={FILTRO_TODOS_LOS_GRUPOS}>Todos los grupos</SelectItem>
+                  {gruposCatalogo.map((g) => (
+                    <SelectItem key={g.id} value={g.id}>
+                      {g.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {loading ? (
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -514,7 +606,7 @@ export default function CatalogoAdminPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((row) => (
+                  {itemsFiltrados.map((row) => (
                     <TableRow key={row.id}>
                       <TableCell className="font-medium">{row.nombre}</TableCell>
                       <TableCell>{row.unidad}</TableCell>
@@ -554,7 +646,7 @@ export default function CatalogoAdminPage() {
                 <Input value={unidad} onChange={(e) => setUnidad(e.target.value || "U")} />
               </div>
               <div className="space-y-2">
-                <Label>Grupo</Label>
+                <Label>Grupo del catálogo</Label>
                 <Select value={grupoCatalogoId} onValueChange={setGrupoCatalogoId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Elegí grupo del catálogo" />
