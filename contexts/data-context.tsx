@@ -1,8 +1,10 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
+import { signOut } from "firebase/auth"
 import { collection, query, orderBy, onSnapshot, getDocs, where, doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
-import { db, COLLECTIONS } from "@/lib/firebase"
+import { auth, db, COLLECTIONS } from "@/lib/firebase"
 import { Empleado, Turno } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
@@ -32,13 +34,32 @@ interface DataContextType {
 
 export const DataContext = createContext<DataContextType | undefined>(undefined)
 
+const CUENTA_DESACTIVADA_MSG = "Tu cuenta fue desactivada. Contactá al administrador."
+const SESSION_KEY_CUENTA_DESACTIVADA = "horarios_cuenta_desactivada"
+
 export function DataProvider({ children, user }: { children: React.ReactNode; user: any }) {
+  const router = useRouter()
   const [employees, setEmployees] = useState<Empleado[]>([])
   const [shifts, setShifts] = useState<Turno[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const { toast } = useToast()
+
+  const cerrarSesionCuentaDesactivada = useCallback(() => {
+    try {
+      sessionStorage.setItem(SESSION_KEY_CUENTA_DESACTIVADA, CUENTA_DESACTIVADA_MSG)
+    } catch {
+      /* ignore */
+    }
+    if (auth) {
+      signOut(auth)
+        .catch(() => null)
+        .finally(() => router.replace("/"))
+    } else {
+      router.replace("/")
+    }
+  }, [router])
 
   // Cache en localStorage
   const CACHE_KEY_EMPLOYEES = "horarios_employees_cache"
@@ -81,7 +102,12 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
       
       if (userDoc.exists()) {
         const data = userDoc.data()
-        
+
+        if (data.disabled === true) {
+          cerrarSesionCuentaDesactivada()
+          return
+        }
+
         const nextRole = data.role === "invited" ? "operador" : (data.role || "operador")
         const nextLocationId = data.locationId || data.location || data.ownerId || user.uid
         setUserData({
@@ -126,7 +152,7 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
         grupoIds: [],
       })
     }
-  }, [user])
+  }, [user, cerrarSesionCuentaDesactivada])
 
   const refreshEmployees = useCallback(async () => {
     if (!user || !db) return
@@ -237,6 +263,12 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
       (userDoc) => {
         if (userDoc.exists()) {
           const data = userDoc.data()
+
+          if (data.disabled === true) {
+            cerrarSesionCuentaDesactivada()
+            return
+          }
+
           const nextRole = data.role === "invited" ? "operador" : (data.role || "operador")
           const nextLocationId = data.locationId || data.location || data.ownerId || user.uid
           setUserData({
@@ -266,7 +298,7 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
     return () => {
       unsubscribeUser()
     }
-  }, [user, loadUserData])
+  }, [user, loadUserData, cerrarSesionCuentaDesactivada])
 
   useEffect(() => {
     if (!user || !db || !userData) {

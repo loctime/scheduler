@@ -8,6 +8,7 @@ import { LoginForm } from "@/components/login-form"
 import { FirebaseConfigNotice } from "@/components/firebase-config-notice"
 import { Loader2 } from "lucide-react"
 import { usePwaInstall } from "@/hooks/usePwaInstall"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Download, X, Share2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
@@ -19,11 +20,14 @@ function sanitizeRedirectPath(path: string | null): string | null {
   return path
 }
 
+const SESSION_KEY_CUENTA_DESACTIVADA = "horarios_cuenta_desactivada"
+
 function HomePageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const { canInstall, isStandalone, isIOS, install, dismiss } = usePwaInstall()
+  const { toast } = useToast()
 
   const redirectTarget = useMemo(() => {
     return sanitizeRedirectPath(searchParams.get("redirect"))
@@ -44,6 +48,19 @@ function HomePageContent() {
 
     return () => unsubscribe()
   }, [router, redirectTarget])
+
+  useEffect(() => {
+    if (loading) return
+    try {
+      const msg = sessionStorage.getItem(SESSION_KEY_CUENTA_DESACTIVADA)
+      if (msg) {
+        sessionStorage.removeItem(SESSION_KEY_CUENTA_DESACTIVADA)
+        toast({ title: msg, variant: "destructive" })
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [loading, toast])
 
   if (!isFirebaseConfigured()) {
     return <FirebaseConfigNotice />

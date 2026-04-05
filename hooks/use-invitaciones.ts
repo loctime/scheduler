@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { collection, addDoc, query, where, getDocs, doc, serverTimestamp, getDoc, deleteDoc } from "firebase/firestore"
+import { collection, addDoc, query, where, getDocs, doc, serverTimestamp, getDoc, deleteDoc, updateDoc } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { InvitacionLink } from "@/lib/types"
@@ -118,6 +118,32 @@ export function useInvitaciones(user: any, userData?: { role?: "operador" | "adm
     }
   }
 
+  const desactivarUsuario = async (userId: string) => {
+    if (!db || !user) return
+    try {
+      await updateDoc(doc(db, COLLECTIONS.USERS, userId), {
+        disabled: true,
+        updatedAt: serverTimestamp(),
+      })
+      const invQ = query(collection(db, COLLECTIONS.INVITACIONES), where("createdBy", "==", user.uid))
+      const invSnap = await getDocs(invQ)
+      const aBorrar = invSnap.docs.filter((d) => (d.data() as InvitacionLink).usedBy === userId)
+      await Promise.all(aBorrar.map((d) => deleteDoc(d.ref)))
+      await cargarLinks()
+      toast({
+        title: "Cuenta desactivada",
+        description: "El usuario ya no puede acceder a la aplicación.",
+      })
+    } catch (error: any) {
+      console.error("Error desactivando usuario:", error)
+      toast({
+        title: "Error",
+        description: error?.message || "No se pudo desactivar la cuenta",
+        variant: "destructive",
+      })
+    }
+  }
+
   const eliminarLink = async (linkId: string, eliminarUsuario: boolean = false) => {
     if (!db) return
 
@@ -181,6 +207,7 @@ export function useInvitaciones(user: any, userData?: { role?: "operador" | "adm
     loading,
     crearLinkInvitacion,
     eliminarLink,
+    desactivarUsuario,
     cargarLinks,
   }
 }
