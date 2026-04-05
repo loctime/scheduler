@@ -173,31 +173,48 @@ export default function CatalogoAdminPage() {
       }
     }
 
+    let cancelled = false
+    let loadGen = 0
+
     const unsub = onSnapshot(
       uq,
       (snap) => {
+        const myGen = ++loadGen
         void (async () => {
-          try {
-            const byLocation = new Map<string, UbicacionCatalogo>()
-            snap.docs.forEach((d) => mergeUsuarioDoc(byLocation, d))
-            if (user?.uid) {
+          const byLocation = new Map<string, UbicacionCatalogo>()
+          snap.docs.forEach((d) => mergeUsuarioDoc(byLocation, d))
+
+          if (user?.uid && !cancelled && myGen === loadGen) {
+            try {
               const selfSnap = await getDoc(doc(firestore, COLLECTIONS.USERS, user.uid))
+              if (cancelled || myGen !== loadGen) return
               if (selfSnap.exists()) {
-                mergeUsuarioDoc(byLocation, { id: selfSnap.id, data: () => selfSnap.data() as Record<string, unknown> })
+                mergeUsuarioDoc(byLocation, {
+                  id: selfSnap.id,
+                  data: () => selfSnap.data() as Record<string, unknown>,
+                })
               }
+            } catch {
+              /* merge del propio usuario es opcional; no invalidar el resto */
             }
-            const rows = [...byLocation.values()].sort((a, b) =>
-              a.locationName.localeCompare(b.locationName)
-            )
-            setUbicaciones(rows)
-          } catch {
-            setUbicaciones([])
           }
+
+          if (cancelled || myGen !== loadGen) return
+          const rows = [...byLocation.values()].sort((a, b) =>
+            a.locationName.localeCompare(b.locationName)
+          )
+          setUbicaciones(rows)
         })()
       },
-      () => setUbicaciones([])
+      (err) => {
+        console.warn("[catalogo] ubicaciones listener:", err)
+      }
     )
-    return () => unsub()
+    return () => {
+      cancelled = true
+      loadGen += 1
+      unsub()
+    }
   }, [ownerIdsParaUsuarios, user?.uid])
 
   useEffect(() => {

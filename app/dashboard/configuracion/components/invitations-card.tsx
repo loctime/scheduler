@@ -86,11 +86,7 @@ export function InvitationsCard() {
 
   const handleCreate = async () => {
     if (!user) return
-    const fixedLocationId = userData?.locationId || ""
-    if (!fixedLocationId.trim()) {
-      toast({ title: "Error", description: "LocationId es obligatorio.", variant: "destructive" })
-      return
-    }
+    const fixedLocationId = `loc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
     setCreando(true)
     try {
       const link = await crearLinkInvitacion(rolSeleccionado, fixedLocationId.trim())
