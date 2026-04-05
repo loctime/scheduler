@@ -39,11 +39,11 @@ const navGroups = [
     label: "Operativa",
     icon: Calendar,
     items: [
-      { href: "/dashboard", label: "Horarios", icon: Calendar, action: "ver_admin" },
-      { href: "/dashboard/horarios-mensuales", label: "Vista Mensual", icon: CalendarDays, action: "ver_admin" },
-      { href: "/dashboard/empleados", label: "Empleados", icon: Users, action: "ver_admin" },
-      { href: "/dashboard/tareas", label: "Tareas", icon: CheckSquare, action: "ver_admin" },
-      { href: "/dashboard/dias-especiales", label: "Dias Especiales", icon: AlertTriangle, action: "ver_admin" },
+      { href: "/dashboard", label: "Horarios", icon: Calendar },
+      { href: "/dashboard/horarios-mensuales", label: "Vista Mensual", icon: CalendarDays },
+      { href: "/dashboard/empleados", label: "Empleados", icon: Users },
+      { href: "/dashboard/tareas", label: "Tareas", icon: CheckSquare },
+      { href: "/dashboard/dias-especiales", label: "Dias Especiales", icon: AlertTriangle, action: "ver_admin"},
     ],
   },
   {
@@ -51,7 +51,7 @@ const navGroups = [
     label: "Logística",
     icon: Package,
     items: [
-      { href: "/dashboard/pedidos", label: "Pedidos", icon: ShoppingCart, action: "ver_pedidos" },
+      { href: "/dashboard/pedidos", label: "Stock", icon: ShoppingCart, action: "ver_pedidos" },
       { href: "/dashboard/pedir", label: "Pedir insumos", icon: ShoppingBag, action: "crear_pedido" },
       { href: "/dashboard/logistica-fabrica", label: "Fábrica", icon: Factory, action: "ver_admin" },
       { href: "/dashboard/recepciones", label: "Recepciones", icon: ClipboardCheck, action: "recibir_pedido" },
@@ -65,9 +65,9 @@ const navGroups = [
     label: "Sistema",
     icon: Settings,
     items: [
-      { href: "/mensajeria", label: "Mensajeria", icon: MessageSquare, action: "ver_admin" },
+      { href: "/mensajeria", label: "Mensajeria", icon: MessageSquare },
       { href: "/dashboard/admin", label: "Administracion", icon: Shield, action: "ver_admin" },
-      { href: "/dashboard/configuracion", label: "Configuracion", icon: Settings, action: "ver_admin" },
+      { href: "/dashboard/configuracion", label: "Configuracion", icon: Settings },
     ],
   },
 ]
