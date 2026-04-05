@@ -1,7 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useMemo } from "react"
+import { getDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -17,7 +19,9 @@ import {
 import { useInvitaciones } from "@/hooks/use-invitaciones"
 import { useToast } from "@/hooks/use-toast"
 import { useData } from "@/contexts/data-context"
-import { Copy, Trash2, UserX } from "lucide-react"
+import { db, COLLECTIONS } from "@/lib/firebase"
+import { cn } from "@/lib/utils"
+import { Copy, Trash2, UserX, Pencil, Check, X } from "lucide-react"
 import type { InvitacionLink } from "@/lib/types"
 
 const ROLES_BASE = ["operador", "delivery"] as const
@@ -44,6 +48,41 @@ export function InvitationsCard() {
     usedBy: string
     email: string
   } | null>(null)
+  const [locationNamesByUserId, setLocationNamesByUserId] = useState<Record<string, string>>({})
+  const [editingLocationUserId, setEditingLocationUserId] = useState<string | null>(null)
+  const [locationEditDraft, setLocationEditDraft] = useState("")
+  const [guardandoUbicacion, setGuardandoUbicacion] = useState(false)
+
+  const usedByIdsKey = useMemo(() => {
+    const ids = [...new Set(links.map((l) => l.usedBy).filter(Boolean))] as string[]
+    return ids.sort().join("|")
+  }, [links])
+
+  useEffect(() => {
+    if (!db || loading) return
+    const firestore = db
+    if (!usedByIdsKey) {
+      setLocationNamesByUserId({})
+      return
+    }
+    const userIds = usedByIdsKey.split("|")
+    let cancelled = false
+    ;(async () => {
+      const entries = await Promise.all(
+        userIds.map(async (uid) => {
+          const snap = await getDoc(doc(firestore, COLLECTIONS.USERS, uid))
+          const data = snap.exists() ? (snap.data() as { locationName?: string }) : null
+          const raw = typeof data?.locationName === "string" ? data.locationName : ""
+          return [uid, raw] as const
+        })
+      )
+      if (cancelled) return
+      setLocationNamesByUserId(Object.fromEntries(entries))
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [loading, usedByIdsKey])
 
   const handleCreate = async () => {
     if (!user) return
@@ -75,6 +114,41 @@ export function InvitationsCard() {
       setConfirmDesactivar(null)
     } finally {
       setDesactivando(false)
+    }
+  }
+
+  const iniciarEdicionUbicacion = (userId: string) => {
+    setEditingLocationUserId(userId)
+    setLocationEditDraft(locationNamesByUserId[userId] ?? "")
+  }
+
+  const cancelarEdicionUbicacion = () => {
+    setEditingLocationUserId(null)
+    setLocationEditDraft("")
+  }
+
+  const guardarUbicacion = async (userId: string) => {
+    if (!db) return
+    const firestore = db
+    const valor = locationEditDraft.trim()
+    setGuardandoUbicacion(true)
+    try {
+      await updateDoc(doc(firestore, COLLECTIONS.USERS, userId), {
+        locationName: valor,
+        updatedAt: serverTimestamp(),
+      })
+      setLocationNamesByUserId((prev) => ({ ...prev, [userId]: valor }))
+      setEditingLocationUserId(null)
+      setLocationEditDraft("")
+      toast({ title: "Ubicación guardada" })
+    } catch (e: unknown) {
+      toast({
+        title: "Error",
+        description: e instanceof Error ? e.message : "No se pudo guardar la ubicación",
+        variant: "destructive",
+      })
+    } finally {
+      setGuardandoUbicacion(false)
     }
   }
 
@@ -155,13 +229,74 @@ export function InvitationsCard() {
                   </div>
                 )}
                 {usada && (
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-                      <Badge className="w-fit border-transparent bg-emerald-600 text-white hover:bg-emerald-600">
-                        Vinculado
-                      </Badge>
-                      <span className="truncate text-sm font-medium">{link.usedByEmail ?? "—"}</span>
-                      <span className="text-xs text-muted-foreground">Rol: {link.role}</span>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex min-w-0 flex-1 flex-col gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge className="w-fit border-transparent bg-emerald-600 text-white hover:bg-emerald-600">
+                          Vinculado
+                        </Badge>
+                        <span className="truncate text-sm font-medium">{link.usedByEmail ?? "—"}</span>
+                        <span className="text-xs text-muted-foreground">Rol: {link.role}</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="text-muted-foreground">Ubicación:</span>
+                        {editingLocationUserId === link.usedBy ? (
+                          <>
+                            <Input
+                              value={locationEditDraft}
+                              onChange={(e) => setLocationEditDraft(e.target.value)}
+                              className="h-8 max-w-[220px] text-sm"
+                              disabled={guardandoUbicacion}
+                              placeholder="Sin nombre de ubicación"
+                              autoFocus
+                            />
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="outline"
+                              className="size-8 shrink-0"
+                              disabled={guardandoUbicacion}
+                              onClick={() => guardarUbicacion(link.usedBy!)}
+                              aria-label="Guardar ubicación"
+                            >
+                              <Check className="size-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="size-8 shrink-0"
+                              disabled={guardandoUbicacion}
+                              onClick={cancelarEdicionUbicacion}
+                              aria-label="Cancelar edición"
+                            >
+                              <X className="size-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <span
+                              className={cn(
+                                "rounded-md px-1.5 py-0.5",
+                                !(locationNamesByUserId[link.usedBy!] ?? "").trim() &&
+                                  "text-muted-foreground italic"
+                              )}
+                            >
+                              {`[ ${(locationNamesByUserId[link.usedBy!] ?? "").trim() || "Sin nombre de ubicación"} ]`}
+                            </span>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="size-8 shrink-0 text-muted-foreground"
+                              onClick={() => iniciarEdicionUbicacion(link.usedBy!)}
+                              aria-label="Editar nombre de ubicación"
+                            >
+                              <Pencil className="size-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
                     <Button
                       type="button"

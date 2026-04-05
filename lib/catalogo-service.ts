@@ -15,6 +15,7 @@ export type ActualizarCatalogoChanges = Partial<{
   unidad: string
   categoria: string | null
   pedidoId: string
+  grupoCatalogoId: string | null
   stockMinimo: number
   orden: number
 }>
@@ -23,7 +24,8 @@ export async function crearProductoCatalogo(input: {
   ownerId: string
   nombre: string
   unidad: string
-  pedidoId: string
+  pedidoId?: string
+  grupoCatalogoId?: string
   stockMinimo?: number
   categoria?: string
   orden?: number
@@ -33,11 +35,15 @@ export async function crearProductoCatalogo(input: {
   if (!input.nombre.trim()) return { ok: false, error: "El nombre es obligatorio" }
 
   try {
+    const pedidoId = input.pedidoId ?? ""
     const ref = await addDoc(collection(db, COLLECTIONS.CATALOGO), {
       ownerId: input.ownerId,
       nombre: input.nombre.trim(),
       unidad: input.unidad.trim() || "U",
-      pedidoId: input.pedidoId,
+      pedidoId,
+      ...(input.grupoCatalogoId?.trim()
+        ? { grupoCatalogoId: input.grupoCatalogoId.trim() }
+        : {}),
       stockMinimo: input.stockMinimo ?? 0,
       ...(input.categoria?.trim() ? { categoria: input.categoria.trim() } : {}),
       orden: input.orden ?? 0,
@@ -79,6 +85,12 @@ export async function actualizarProductoCatalogo(
           : changes.categoria.trim()
     }
     if (changes.pedidoId !== undefined) payload.pedidoId = changes.pedidoId
+    if (changes.grupoCatalogoId !== undefined) {
+      payload.grupoCatalogoId =
+        changes.grupoCatalogoId === null || changes.grupoCatalogoId === ""
+          ? deleteField()
+          : changes.grupoCatalogoId.trim()
+    }
     if (changes.stockMinimo !== undefined) payload.stockMinimo = Math.max(0, Math.floor(changes.stockMinimo))
     if (changes.orden !== undefined) payload.orden = Math.floor(changes.orden)
 

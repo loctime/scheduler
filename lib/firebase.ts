@@ -87,6 +87,7 @@ export const COLLECTIONS = {
   REMITOS_LOG: getCollectionPath("remitos_log"),
   RECEPCIONES_LOG: getCollectionPath("recepciones_log"),
   CATALOGO: getCollectionPath("catalogo"),
+  GRUPOS_CATALOGO: getCollectionPath("grupos_catalogo"),
   STOCK_UBICACIONES: getCollectionPath("stock_ubicaciones"),
   STOCK_MOVEMENTS: getCollectionPath("stock_movements"),
 } as const
