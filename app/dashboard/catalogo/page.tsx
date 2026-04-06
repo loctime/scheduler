@@ -45,7 +45,7 @@ type UbicacionCatalogo = {
   locationName: string
 }
 
-type TableMode = "vista" | "editar" | "excel"
+type TableMode = "editar" | "excel"
 
 type GrupoCatalogoUI = GrupoCatalogo & {
   productosIds: string[]
@@ -126,7 +126,7 @@ export default function CatalogoAdminPage() {
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
   const [bulkTsv, setBulkTsv] = useState("")
   const [importandoMasivo, setImportandoMasivo] = useState(false)
-  const [tableMode, setTableMode] = useState<TableMode>("vista")
+  const [tableMode, setTableMode] = useState<TableMode>("editar")
   const [editingRowId, setEditingRowId] = useState<string | null>(null)
   const [editingValues, setEditingValues] = useState<Record<string, string>>({})
   const [activeTab, setActiveTab] = useState<"grupos" | "productos">("grupos")
@@ -1016,59 +1016,31 @@ export default function CatalogoAdminPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <CardTitle>Catálogo de productos</CardTitle>
                   <div className="flex flex-wrap items-center gap-2">
-                    {tableMode === "vista" ? (
-                      <>
-                        <Button variant="outline" onClick={() => setTableMode("editar")}>
-                          Editar
-                        </Button>
-                        <Button variant="outline" onClick={() => setTableMode("excel")}>
-                          Modo Excel
-                        </Button>
-                      </>
-                    ) : null}
                     {tableMode === "editar" ? (
-                      <>
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setTableMode("vista")
-                            setEditingRowId(null)
-                          }}
-                        >
-                          Vista
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setTableMode("excel")
-                            setEditingRowId(null)
-                          }}
-                        >
-                          Modo Excel
-                        </Button>
-                      </>
-                    ) : null}
-                    {tableMode === "excel" ? (
-                      <>
-                        <Button variant="outline" onClick={() => setTableMode("vista")}>
-                          Vista
-                        </Button>
-                        <Button variant="outline" onClick={() => setTableMode("editar")}>
-                          Modo Editar
-                        </Button>
-                      </>
-                    ) : null}
-                    {tableMode !== "vista" ? (
                       <Button
                         variant="outline"
                         onClick={() => {
-                          nuevaFilaNombreRef.current?.focus()
+                          setTableMode("excel")
+                          setEditingRowId(null)
                         }}
                       >
-                        <Plus className="mr-1 h-4 w-4" />
-                        Nuevo producto
+                        Modo Excel
                       </Button>
                     ) : null}
+                    {tableMode === "excel" ? (
+                      <Button variant="outline" onClick={() => setTableMode("editar")}>
+                        Modo Editar
+                      </Button>
+                    ) : null}
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        nuevaFilaNombreRef.current?.focus()
+                      }}
+                    >
+                      <Plus className="mr-1 h-4 w-4" />
+                      Nuevo producto
+                    </Button>
                     <Button variant="outline" onClick={() => setBulkDialogOpen(true)}>
                       Pegar desde Excel
                     </Button>
@@ -1108,7 +1080,7 @@ export default function CatalogoAdminPage() {
                         <th className="px-2 py-2 text-left font-medium">Equivalencia</th>
                         <th className="px-2 py-2 text-left font-medium">Proveedor</th>
                         <th className="px-2 py-2 text-left font-medium">Activo</th>
-                        {tableMode !== "vista" ? <th className="px-2 py-2 text-left font-medium">Acciones</th> : null}
+                        <th className="px-2 py-2 text-left font-medium">Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1117,9 +1089,6 @@ export default function CatalogoAdminPage() {
                         return (
                           <tr key={row.id} className="border-b hover:bg-muted/20">
                             <td className="px-2 py-1">
-                              {tableMode === "vista" ? (
-                                <span>{row.nombre}</span>
-                              ) : null}
                               {tableMode === "excel" ? (
                                 <input
                                   data-row={index}
@@ -1147,7 +1116,6 @@ export default function CatalogoAdminPage() {
                               ) : null}
                             </td>
                             <td className="px-2 py-1">
-                              {tableMode === "vista" ? <span>{row.unidad}</span> : null}
                               {tableMode === "excel" ? (
                                 <input
                                   data-row={index}
@@ -1175,7 +1143,6 @@ export default function CatalogoAdminPage() {
                               ) : null}
                             </td>
                             <td className="px-2 py-1">
-                              {tableMode === "vista" ? <span>{row.unidadAlternativa ?? "-"}</span> : null}
                               {tableMode === "excel" ? (
                                 <input
                                   data-row={index}
@@ -1207,7 +1174,6 @@ export default function CatalogoAdminPage() {
                               ) : null}
                             </td>
                             <td className="px-2 py-1">
-                              {tableMode === "vista" ? <span>{row.factorConversion ?? "-"}</span> : null}
                               {tableMode === "excel" ? (
                                 <input
                                   data-row={index}
@@ -1240,7 +1206,6 @@ export default function CatalogoAdminPage() {
                             </td>
                             <td className="px-2 py-1 text-muted-foreground">{equivalenciaTexto(row)}</td>
                             <td className="px-2 py-1">
-                              {tableMode === "vista" ? <span>{row.proveedor ?? "-"}</span> : null}
                               {tableMode === "excel" ? (
                                 <input
                                   data-row={index}
@@ -1272,86 +1237,82 @@ export default function CatalogoAdminPage() {
                             <td className="px-2 py-1">
                               <Switch
                                 checked={row.activo}
-                                disabled={tableMode === "vista"}
                                 onCheckedChange={(v) => void onToggleActivo(row.id, v)}
                               />
                             </td>
-                            {tableMode !== "vista" ? (
-                              <td className="px-2 py-1">
-                                <div className="flex items-center gap-1">
-                                  {tableMode === "editar" ? (
-                                    <>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => {
-                                          setEditingRowId(row.id)
-                                          setEditingValues({
-                                            nombre: row.nombre,
-                                            unidad: row.unidad,
-                                            unidadAlternativa: row.unidadAlternativa ?? "",
-                                            factorConversion: row.factorConversion ? String(row.factorConversion) : "",
-                                            proveedor: row.proveedor ?? "",
-                                          })
-                                        }}
-                                      >
-                                        <Pencil className="h-4 w-4" />
-                                      </Button>
-                                      {isEditingRow ? (
-                                        <>
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => {
-                                              void guardarCampoProducto(row, {
-                                                nombre: (editingValues.nombre ?? "").trim() || row.nombre,
-                                                unidad: (editingValues.unidad ?? "").trim() || "u",
-                                                unidadAlternativa:
-                                                  (editingValues.unidadAlternativa ?? "").trim() || null,
-                                                factorConversion: parseFactor(editingValues.factorConversion ?? ""),
-                                                proveedor: (editingValues.proveedor ?? "").trim() || null,
-                                              }).then(() => {
-                                                setEditingRowId(null)
-                                              })
-                                            }}
-                                          >
-                                            <span aria-hidden>✓</span>
-                                          </Button>
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => {
+                            <td className="px-2 py-1">
+                              <div className="flex items-center gap-1">
+                                {tableMode === "editar" ? (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => {
+                                        setEditingRowId(row.id)
+                                        setEditingValues({
+                                          nombre: row.nombre,
+                                          unidad: row.unidad,
+                                          unidadAlternativa: row.unidadAlternativa ?? "",
+                                          factorConversion: row.factorConversion ? String(row.factorConversion) : "",
+                                          proveedor: row.proveedor ?? "",
+                                        })
+                                      }}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    {isEditingRow ? (
+                                      <>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => {
+                                            void guardarCampoProducto(row, {
+                                              nombre: (editingValues.nombre ?? "").trim() || row.nombre,
+                                              unidad: (editingValues.unidad ?? "").trim() || "u",
+                                              unidadAlternativa:
+                                                (editingValues.unidadAlternativa ?? "").trim() || null,
+                                              factorConversion: parseFactor(editingValues.factorConversion ?? ""),
+                                              proveedor: (editingValues.proveedor ?? "").trim() || null,
+                                            }).then(() => {
                                               setEditingRowId(null)
-                                            }}
-                                          >
-                                            <span aria-hidden>✗</span>
-                                          </Button>
-                                        </>
-                                      ) : null}
-                                    </>
-                                  ) : null}
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-destructive"
-                                    disabled={eliminandoProductoId === row.id}
-                                    onClick={() => void eliminarProducto(row)}
-                                  >
-                                    {eliminandoProductoId === row.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <span aria-hidden>✕</span>
-                                    )}
-                                  </Button>
-                                </div>
-                              </td>
-                            ) : null}
+                                            })
+                                          }}
+                                        >
+                                          <span aria-hidden>✓</span>
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => {
+                                            setEditingRowId(null)
+                                          }}
+                                        >
+                                          <span aria-hidden>✗</span>
+                                        </Button>
+                                      </>
+                                    ) : null}
+                                  </>
+                                ) : null}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive"
+                                  disabled={eliminandoProductoId === row.id}
+                                  onClick={() => void eliminarProducto(row)}
+                                >
+                                  {eliminandoProductoId === row.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <span aria-hidden>✕</span>
+                                  )}
+                                </Button>
+                              </div>
+                            </td>
                           </tr>
                         )
                       })}
 
-                      {tableMode !== "vista" ? (
-                        <tr className="border-b bg-muted/30">
+                      <tr className="border-b bg-muted/30">
                         <td className="px-2 py-1">
                           <input
                             ref={nuevaFilaNombreRef}
@@ -1415,8 +1376,7 @@ export default function CatalogoAdminPage() {
                             {creandoProducto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                           </Button>
                         </td>
-                        </tr>
-                      ) : null}
+                      </tr>
                     </tbody>
                   </table>
                 </div>
