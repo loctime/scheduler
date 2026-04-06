@@ -45,6 +45,8 @@ type UbicacionCatalogo = {
   locationName: string
 }
 
+type TableMode = "vista" | "editar" | "excel"
+
 type GrupoCatalogoUI = GrupoCatalogo & {
   productosIds: string[]
 }
@@ -124,6 +126,10 @@ export default function CatalogoAdminPage() {
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
   const [bulkTsv, setBulkTsv] = useState("")
   const [importandoMasivo, setImportandoMasivo] = useState(false)
+  const [tableMode, setTableMode] = useState<TableMode>("vista")
+  const [editingRowId, setEditingRowId] = useState<string | null>(null)
+  const [editingValues, setEditingValues] = useState<Record<string, string>>({})
+  const [activeTab, setActiveTab] = useState<"grupos" | "productos">("grupos")
 
   const nuevaFilaNombreRef = useRef<HTMLInputElement | null>(null)
   const xlsxInputRef = useRef<HTMLInputElement | null>(null)
@@ -660,6 +666,48 @@ export default function CatalogoAdminPage() {
     XLSX.writeFile(wb, "catalogo-productos.xlsx")
   }
 
+  const columnasExcel = ["nombre", "unidad", "unidadAlternativa", "factorConversion", "proveedor"] as const
+
+  const focusCell = (row: number, col: string) => {
+    const el = document.querySelector<HTMLInputElement>(`[data-row="${row}"][data-col="${col}"]`)
+    el?.focus()
+    el?.select()
+  }
+
+  const handleExcelKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    rowIndex: number,
+    col: (typeof columnasExcel)[number]
+  ) => {
+    const colIndex = columnasExcel.indexOf(col)
+    if (e.key === "ArrowUp") {
+      e.preventDefault()
+      if (rowIndex > 0) focusCell(rowIndex - 1, col)
+      return
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault()
+      if (rowIndex < items.length - 1) focusCell(rowIndex + 1, col)
+      return
+    }
+    if (e.key === "ArrowLeft") {
+      e.preventDefault()
+      if (colIndex > 0) focusCell(rowIndex, columnasExcel[colIndex - 1])
+      return
+    }
+    if (e.key === "ArrowRight") {
+      e.preventDefault()
+      if (colIndex < columnasExcel.length - 1) focusCell(rowIndex, columnasExcel[colIndex + 1])
+      return
+    }
+    if (e.key === "Enter") {
+      e.preventDefault()
+      const target = e.currentTarget
+      target.blur()
+      if (rowIndex < items.length - 1) focusCell(rowIndex + 1, col)
+    }
+  }
+
   if (!puede) {
     return (
       <DashboardLayout user={user}>
@@ -676,30 +724,32 @@ export default function CatalogoAdminPage() {
   return (
     <DashboardLayout user={user}>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-        <div className="flex items-center gap-3">
-          <Package className="h-8 w-8" />
-          <div>
-            <h1 className="text-2xl font-semibold">Catálogo</h1>
-            <p className="text-sm text-muted-foreground">
-              Gestioná grupos de pedido y productos del catálogo en tiempo real.
-            </p>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "grupos" | "productos")} className="gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3">
+              <Package className="h-8 w-8 shrink-0" />
+              <h1 className="text-2xl font-semibold">Catálogo</h1>
+              <p className="text-sm text-muted-foreground">
+                Todos los productos y sus grupos de pedido.
+              </p>
+            </div>
+            <div className="flex-1 flex justify-center">
+              <TabsList>
+                <TabsTrigger value="grupos">Grupos</TabsTrigger>
+                <TabsTrigger value="productos">Productos</TabsTrigger>
+              </TabsList>
+            </div>
+            <Button
+              className="ml-auto"
+              disabled={activeTab !== "grupos"}
+              onClick={() => setShowNuevoGrupoForm((prev) => !prev)}
+            >
+              <Plus className="mr-1 h-4 w-4" />
+              Nuevo grupo
+            </Button>
           </div>
-        </div>
-
-        <Tabs defaultValue="grupos" className="gap-4">
-          <TabsList>
-            <TabsTrigger value="grupos">Grupos de pedido</TabsTrigger>
-            <TabsTrigger value="productos">Catálogo de productos</TabsTrigger>
-          </TabsList>
 
           <TabsContent value="grupos" className="space-y-4">
-            <div className="flex justify-end">
-              <Button onClick={() => setShowNuevoGrupoForm((prev) => !prev)}>
-                <Plus className="mr-1 h-4 w-4" />
-                Nuevo grupo
-              </Button>
-            </div>
-
             {gruposCatalogo.map((g) => {
               const open = openGroupIds[g.id] === true
               const productosAsignados = g.productosIds
@@ -966,15 +1016,59 @@ export default function CatalogoAdminPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <CardTitle>Catálogo de productos</CardTitle>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        nuevaFilaNombreRef.current?.focus()
-                      }}
-                    >
-                      <Plus className="mr-1 h-4 w-4" />
-                      Nuevo producto
-                    </Button>
+                    {tableMode === "vista" ? (
+                      <>
+                        <Button variant="outline" onClick={() => setTableMode("editar")}>
+                          Editar
+                        </Button>
+                        <Button variant="outline" onClick={() => setTableMode("excel")}>
+                          Modo Excel
+                        </Button>
+                      </>
+                    ) : null}
+                    {tableMode === "editar" ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setTableMode("vista")
+                            setEditingRowId(null)
+                          }}
+                        >
+                          Vista
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setTableMode("excel")
+                            setEditingRowId(null)
+                          }}
+                        >
+                          Modo Excel
+                        </Button>
+                      </>
+                    ) : null}
+                    {tableMode === "excel" ? (
+                      <>
+                        <Button variant="outline" onClick={() => setTableMode("vista")}>
+                          Vista
+                        </Button>
+                        <Button variant="outline" onClick={() => setTableMode("editar")}>
+                          Modo Editar
+                        </Button>
+                      </>
+                    ) : null}
+                    {tableMode !== "vista" ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          nuevaFilaNombreRef.current?.focus()
+                        }}
+                      >
+                        <Plus className="mr-1 h-4 w-4" />
+                        Nuevo producto
+                      </Button>
+                    ) : null}
                     <Button variant="outline" onClick={() => setBulkDialogOpen(true)}>
                       Pegar desde Excel
                     </Button>
@@ -1014,96 +1108,250 @@ export default function CatalogoAdminPage() {
                         <th className="px-2 py-2 text-left font-medium">Equivalencia</th>
                         <th className="px-2 py-2 text-left font-medium">Proveedor</th>
                         <th className="px-2 py-2 text-left font-medium">Activo</th>
-                        <th className="px-2 py-2 text-left font-medium">Acciones</th>
+                        {tableMode !== "vista" ? <th className="px-2 py-2 text-left font-medium">Acciones</th> : null}
                       </tr>
                     </thead>
                     <tbody>
-                      {items.map((row) => (
-                        <tr key={row.id} className="border-b hover:bg-muted/20">
-                          <td className="px-2 py-1">
-                            <input
-                              defaultValue={row.nombre}
-                              className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
-                              onBlur={(e) => {
-                                const value = e.target.value.trim()
-                                if (!value || value === row.nombre) return
-                                void guardarCampoProducto(row, { nombre: value })
-                              }}
-                            />
-                          </td>
-                          <td className="px-2 py-1">
-                            <input
-                              defaultValue={row.unidad}
-                              className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
-                              onBlur={(e) => {
-                                const value = e.target.value.trim() || "u"
-                                if (value === (row.unidad || "u")) return
-                                void guardarCampoProducto(row, { unidad: value })
-                              }}
-                            />
-                          </td>
-                          <td className="px-2 py-1">
-                            <input
-                              defaultValue={row.unidadAlternativa ?? ""}
-                              placeholder="opcional"
-                              className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
-                              onBlur={(e) => {
-                                const value = e.target.value.trim()
-                                const current = row.unidadAlternativa?.trim() ?? ""
-                                if (value === current) return
-                                void guardarCampoProducto(row, { unidadAlternativa: value || null })
-                              }}
-                            />
-                          </td>
-                          <td className="px-2 py-1">
-                            <input
-                              defaultValue={row.factorConversion ?? ""}
-                              placeholder="opcional"
-                              className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
-                              onBlur={(e) => {
-                                const next = parseFactor(e.target.value)
-                                const current = row.factorConversion ?? null
-                                if (next === current) return
-                                void guardarCampoProducto(row, { factorConversion: next })
-                              }}
-                            />
-                          </td>
-                          <td className="px-2 py-1 text-muted-foreground">{equivalenciaTexto(row)}</td>
-                          <td className="px-2 py-1">
-                            <input
-                              defaultValue={row.proveedor ?? ""}
-                              placeholder="opcional"
-                              className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
-                              onBlur={(e) => {
-                                const value = e.target.value.trim()
-                                const current = row.proveedor?.trim() ?? ""
-                                if (value === current) return
-                                void guardarCampoProducto(row, { proveedor: value || null })
-                              }}
-                            />
-                          </td>
-                          <td className="px-2 py-1">
-                            <Switch checked={row.activo} onCheckedChange={(v) => void onToggleActivo(row.id, v)} />
-                          </td>
-                          <td className="px-2 py-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive"
-                              disabled={eliminandoProductoId === row.id}
-                              onClick={() => void eliminarProducto(row)}
-                            >
-                              {eliminandoProductoId === row.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <span aria-hidden>✕</span>
-                              )}
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
+                      {items.map((row, index) => {
+                        const isEditingRow = tableMode === "editar" && editingRowId === row.id
+                        return (
+                          <tr key={row.id} className="border-b hover:bg-muted/20">
+                            <td className="px-2 py-1">
+                              {tableMode === "vista" ? (
+                                <span>{row.nombre}</span>
+                              ) : null}
+                              {tableMode === "excel" ? (
+                                <input
+                                  data-row={index}
+                                  data-col="nombre"
+                                  defaultValue={row.nombre}
+                                  className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                                  onKeyDown={(e) => handleExcelKeyDown(e, index, "nombre")}
+                                  onBlur={(e) => {
+                                    const value = e.target.value.trim()
+                                    if (!value || value === row.nombre) return
+                                    void guardarCampoProducto(row, { nombre: value })
+                                  }}
+                                />
+                              ) : null}
+                              {tableMode === "editar" ? (
+                                isEditingRow ? (
+                                  <input
+                                    value={editingValues.nombre ?? ""}
+                                    className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                                    onChange={(e) => setEditingValues((prev) => ({ ...prev, nombre: e.target.value }))}
+                                  />
+                                ) : (
+                                  <span>{row.nombre}</span>
+                                )
+                              ) : null}
+                            </td>
+                            <td className="px-2 py-1">
+                              {tableMode === "vista" ? <span>{row.unidad}</span> : null}
+                              {tableMode === "excel" ? (
+                                <input
+                                  data-row={index}
+                                  data-col="unidad"
+                                  defaultValue={row.unidad}
+                                  className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                                  onKeyDown={(e) => handleExcelKeyDown(e, index, "unidad")}
+                                  onBlur={(e) => {
+                                    const value = e.target.value.trim() || "u"
+                                    if (value === (row.unidad || "u")) return
+                                    void guardarCampoProducto(row, { unidad: value })
+                                  }}
+                                />
+                              ) : null}
+                              {tableMode === "editar" ? (
+                                isEditingRow ? (
+                                  <input
+                                    value={editingValues.unidad ?? ""}
+                                    className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                                    onChange={(e) => setEditingValues((prev) => ({ ...prev, unidad: e.target.value }))}
+                                  />
+                                ) : (
+                                  <span>{row.unidad}</span>
+                                )
+                              ) : null}
+                            </td>
+                            <td className="px-2 py-1">
+                              {tableMode === "vista" ? <span>{row.unidadAlternativa ?? "-"}</span> : null}
+                              {tableMode === "excel" ? (
+                                <input
+                                  data-row={index}
+                                  data-col="unidadAlternativa"
+                                  defaultValue={row.unidadAlternativa ?? ""}
+                                  placeholder="opcional"
+                                  className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                                  onKeyDown={(e) => handleExcelKeyDown(e, index, "unidadAlternativa")}
+                                  onBlur={(e) => {
+                                    const value = e.target.value.trim()
+                                    const current = row.unidadAlternativa?.trim() ?? ""
+                                    if (value === current) return
+                                    void guardarCampoProducto(row, { unidadAlternativa: value || null })
+                                  }}
+                                />
+                              ) : null}
+                              {tableMode === "editar" ? (
+                                isEditingRow ? (
+                                  <input
+                                    value={editingValues.unidadAlternativa ?? ""}
+                                    className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                                    onChange={(e) =>
+                                      setEditingValues((prev) => ({ ...prev, unidadAlternativa: e.target.value }))
+                                    }
+                                  />
+                                ) : (
+                                  <span>{row.unidadAlternativa ?? "-"}</span>
+                                )
+                              ) : null}
+                            </td>
+                            <td className="px-2 py-1">
+                              {tableMode === "vista" ? <span>{row.factorConversion ?? "-"}</span> : null}
+                              {tableMode === "excel" ? (
+                                <input
+                                  data-row={index}
+                                  data-col="factorConversion"
+                                  defaultValue={row.factorConversion ?? ""}
+                                  placeholder="opcional"
+                                  className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                                  onKeyDown={(e) => handleExcelKeyDown(e, index, "factorConversion")}
+                                  onBlur={(e) => {
+                                    const next = parseFactor(e.target.value)
+                                    const current = row.factorConversion ?? null
+                                    if (next === current) return
+                                    void guardarCampoProducto(row, { factorConversion: next })
+                                  }}
+                                />
+                              ) : null}
+                              {tableMode === "editar" ? (
+                                isEditingRow ? (
+                                  <input
+                                    value={editingValues.factorConversion ?? ""}
+                                    className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                                    onChange={(e) =>
+                                      setEditingValues((prev) => ({ ...prev, factorConversion: e.target.value }))
+                                    }
+                                  />
+                                ) : (
+                                  <span>{row.factorConversion ?? "-"}</span>
+                                )
+                              ) : null}
+                            </td>
+                            <td className="px-2 py-1 text-muted-foreground">{equivalenciaTexto(row)}</td>
+                            <td className="px-2 py-1">
+                              {tableMode === "vista" ? <span>{row.proveedor ?? "-"}</span> : null}
+                              {tableMode === "excel" ? (
+                                <input
+                                  data-row={index}
+                                  data-col="proveedor"
+                                  defaultValue={row.proveedor ?? ""}
+                                  placeholder="opcional"
+                                  className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                                  onKeyDown={(e) => handleExcelKeyDown(e, index, "proveedor")}
+                                  onBlur={(e) => {
+                                    const value = e.target.value.trim()
+                                    const current = row.proveedor?.trim() ?? ""
+                                    if (value === current) return
+                                    void guardarCampoProducto(row, { proveedor: value || null })
+                                  }}
+                                />
+                              ) : null}
+                              {tableMode === "editar" ? (
+                                isEditingRow ? (
+                                  <input
+                                    value={editingValues.proveedor ?? ""}
+                                    className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                                    onChange={(e) => setEditingValues((prev) => ({ ...prev, proveedor: e.target.value }))}
+                                  />
+                                ) : (
+                                  <span>{row.proveedor ?? "-"}</span>
+                                )
+                              ) : null}
+                            </td>
+                            <td className="px-2 py-1">
+                              <Switch
+                                checked={row.activo}
+                                disabled={tableMode === "vista"}
+                                onCheckedChange={(v) => void onToggleActivo(row.id, v)}
+                              />
+                            </td>
+                            {tableMode !== "vista" ? (
+                              <td className="px-2 py-1">
+                                <div className="flex items-center gap-1">
+                                  {tableMode === "editar" ? (
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => {
+                                          setEditingRowId(row.id)
+                                          setEditingValues({
+                                            nombre: row.nombre,
+                                            unidad: row.unidad,
+                                            unidadAlternativa: row.unidadAlternativa ?? "",
+                                            factorConversion: row.factorConversion ? String(row.factorConversion) : "",
+                                            proveedor: row.proveedor ?? "",
+                                          })
+                                        }}
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                      {isEditingRow ? (
+                                        <>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => {
+                                              void guardarCampoProducto(row, {
+                                                nombre: (editingValues.nombre ?? "").trim() || row.nombre,
+                                                unidad: (editingValues.unidad ?? "").trim() || "u",
+                                                unidadAlternativa:
+                                                  (editingValues.unidadAlternativa ?? "").trim() || null,
+                                                factorConversion: parseFactor(editingValues.factorConversion ?? ""),
+                                                proveedor: (editingValues.proveedor ?? "").trim() || null,
+                                              }).then(() => {
+                                                setEditingRowId(null)
+                                              })
+                                            }}
+                                          >
+                                            <span aria-hidden>✓</span>
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => {
+                                              setEditingRowId(null)
+                                            }}
+                                          >
+                                            <span aria-hidden>✗</span>
+                                          </Button>
+                                        </>
+                                      ) : null}
+                                    </>
+                                  ) : null}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive"
+                                    disabled={eliminandoProductoId === row.id}
+                                    onClick={() => void eliminarProducto(row)}
+                                  >
+                                    {eliminandoProductoId === row.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <span aria-hidden>✕</span>
+                                    )}
+                                  </Button>
+                                </div>
+                              </td>
+                            ) : null}
+                          </tr>
+                        )
+                      })}
 
-                      <tr className="border-b bg-muted/30">
+                      {tableMode !== "vista" ? (
+                        <tr className="border-b bg-muted/30">
                         <td className="px-2 py-1">
                           <input
                             ref={nuevaFilaNombreRef}
@@ -1167,7 +1415,8 @@ export default function CatalogoAdminPage() {
                             {creandoProducto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                           </Button>
                         </td>
-                      </tr>
+                        </tr>
+                      ) : null}
                     </tbody>
                   </table>
                 </div>
