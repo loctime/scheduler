@@ -4,7 +4,7 @@ import { useState } from "react"
 import { deleteDoc, doc, updateDoc } from "firebase/firestore"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Input } from "@/components/ui/input"
@@ -185,45 +185,43 @@ export function GrupoCard({
 
   return (
     <Collapsible open={open} onOpenChange={onOpenChange}>
-      <Card>
-        <CardHeader className="py-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <CollapsibleTrigger asChild>
-              <button type="button" className="flex min-w-[260px] flex-1 items-center gap-2 text-left">
-                {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                <span className="font-medium">{grupo.nombre}</span>
-              </button>
-            </CollapsibleTrigger>
+      <Card className="py-0 gap-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-1">
+        <CollapsibleTrigger asChild>
+          <button type="button" className="flex min-w-[260px] flex-1 items-center gap-2 text-left">
+            {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            <span className="font-medium">{grupo.nombre}</span>
+          </button>
+        </CollapsibleTrigger>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {grupo.despachadores.map((d) => (
-                <Badge key={d.locationId} className="bg-green-100 text-green-800 hover:bg-green-100">
-                  {d.locationName}
-                </Badge>
-              ))}
-              <Badge variant="secondary">{grupo.productosIds.length} productos</Badge>
-              <Button variant="ghost" size="icon" onClick={iniciarEdicion}>
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-destructive"
-                disabled={isEliminando}
-                onClick={() => void eliminarGrupo()}
-              >
-                {isEliminando ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
+        <div className="flex flex-wrap items-center gap-2">
+          {grupo.despachadores.map((d) => (
+            <Badge key={d.locationId} className="bg-green-100 text-green-800 hover:bg-green-100">
+              {d.locationName}
+            </Badge>
+          ))}
+          <Badge variant="secondary">{grupo.productosIds.length} productos</Badge>
+          <Button variant="ghost" size="icon" onClick={iniciarEdicion}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-destructive"
+            disabled={isEliminando}
+            onClick={() => void eliminarGrupo()}
+          >
+            {isEliminando ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </div>
 
         <CollapsibleContent>
-          <CardContent className="space-y-4 pt-0">
+        <CardContent className="space-y-3 px-3 pb-3 pt-0">
             {isEditing ? (
               <div className="rounded-md border p-4 space-y-4">
                 <div className="space-y-2">

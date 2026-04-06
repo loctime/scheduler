@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import * as XLSX from "xlsx"
 import { deleteDoc, doc, updateDoc } from "firebase/firestore"
 import { Button } from "@/components/ui/button"
@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Download, Loader2, Pencil, Plus, Upload } from "lucide-react"
 
 type TableMode = "editar" | "excel"
+type SortKey = "nombre" | "unidad" | "unidadAlternativa" | "factorConversion" | "resultado" | "proveedor" | "activo"
 
 const columnasExcel = ["nombre", "unidad", "unidadAlternativa", "factorConversion", "proveedor"] as const
 
@@ -40,6 +41,7 @@ export function ProductosTable({ items, ownerId, userId, loadingItems, groupById
   const [editingRowId, setEditingRowId] = useState<string | null>(null)
   const [editingValues, setEditingValues] = useState<Record<string, string>>({})
   const [excelDraft, setExcelDraft] = useState<Record<string, Record<string, string>>>({})
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: "asc" | "desc" } | null>(null)
 
   const [nuevoProductoNombre, setNuevoProductoNombre] = useState("")
   const [nuevoProductoUnidad, setNuevoProductoUnidad] = useState("u")
@@ -261,6 +263,51 @@ export function ProductosTable({ items, ownerId, userId, loadingItems, groupById
     }
   }
 
+  const sortedItems = useMemo(() => {
+    if (!sortConfig) return items
+    const rows = [...items]
+    const dir = sortConfig.direction === "asc" ? 1 : -1
+    const getValue = (row: CatalogoProducto) => {
+      switch (sortConfig.key) {
+        case "nombre":
+          return row.nombre ?? ""
+        case "unidad":
+          return row.unidad ?? ""
+        case "unidadAlternativa":
+          return row.unidadAlternativa ?? ""
+        case "factorConversion":
+          return row.factorConversion ?? -1
+        case "resultado":
+          return calcularEquivalencia(row.nombre, row.unidad || "u", row.unidadAlternativa, row.factorConversion)
+        case "proveedor":
+          return row.proveedor ?? ""
+        case "activo":
+          return row.activo ? 1 : 0
+      }
+    }
+    rows.sort((a, b) => {
+      const av = getValue(a)
+      const bv = getValue(b)
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir
+      return String(av).localeCompare(String(bv), "es", { sensitivity: "base" }) * dir
+    })
+    return rows
+  }, [items, sortConfig])
+
+  const toggleSort = (key: SortKey) => {
+    setSortConfig((prev) => {
+      if (prev?.key === key) {
+        return { key, direction: prev.direction === "asc" ? "desc" : "asc" }
+      }
+      return { key, direction: "asc" }
+    })
+  }
+
+  const sortIndicator = (key: SortKey) => {
+    if (sortConfig?.key !== key) return "↕"
+    return sortConfig.direction === "asc" ? "↑" : "↓"
+  }
+
   return (
     <>
       {loadingItems ? (
@@ -343,18 +390,62 @@ export function ProductosTable({ items, ownerId, userId, loadingItems, groupById
             <table className="w-full min-w-[980px] border-collapse text-sm">
               <thead className="bg-muted/50 text-muted-foreground">
                 <tr className="border-b">
-                  <th className="px-2 py-2 text-left font-medium">Nombre</th>
-                  <th className="px-2 py-2 text-left font-medium">Unidad base</th>
-                  <th className="px-2 py-2 text-left font-medium">Bulto.</th>
-                  <th className="px-2 py-2 text-left font-medium">Cantidad</th>
-                  <th className="px-2 py-2 text-left font-medium">Resultado</th>
-                  <th className="px-2 py-2 text-left font-medium">Proveedor</th>
-                  <th className="px-2 py-2 text-left font-medium">Activo</th>
+                  <th className="px-2 py-2 text-left font-medium">
+                    <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleSort("nombre")}>
+                      Nombre <span className="text-xs text-muted-foreground">{sortIndicator("nombre")}</span>
+                    </button>
+                  </th>
+                  <th className="px-2 py-2 text-left font-medium">
+                    <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleSort("unidad")}>
+                      Unidad base <span className="text-xs text-muted-foreground">{sortIndicator("unidad")}</span>
+                    </button>
+                  </th>
+                  <th className="px-2 py-2 text-left font-medium">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1"
+                      onClick={() => toggleSort("unidadAlternativa")}
+                    >
+                      Bulto. <span className="text-xs text-muted-foreground">{sortIndicator("unidadAlternativa")}</span>
+                    </button>
+                  </th>
+                  <th className="px-2 py-2 text-left font-medium">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1"
+                      onClick={() => toggleSort("factorConversion")}
+                    >
+                      Cantidad <span className="text-xs text-muted-foreground">{sortIndicator("factorConversion")}</span>
+                    </button>
+                  </th>
+                  <th className="px-2 py-2 text-left font-medium">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1"
+                      onClick={() => toggleSort("resultado")}
+                    >
+                      Resultado <span className="text-xs text-muted-foreground">{sortIndicator("resultado")}</span>
+                    </button>
+                  </th>
+                  <th className="px-2 py-2 text-left font-medium">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1"
+                      onClick={() => toggleSort("proveedor")}
+                    >
+                      Proveedor <span className="text-xs text-muted-foreground">{sortIndicator("proveedor")}</span>
+                    </button>
+                  </th>
+                  <th className="px-2 py-2 text-left font-medium">
+                    <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleSort("activo")}>
+                      Activo <span className="text-xs text-muted-foreground">{sortIndicator("activo")}</span>
+                    </button>
+                  </th>
                   <th className="px-2 py-2 text-left font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {items.map((row, index) => {
+                {sortedItems.map((row, index) => {
                   const isEditingRow = tableMode === "editar" && editingRowId === row.id
                   const draft = excelDraft[row.id]
                   const equivalencia = isEditingRow
