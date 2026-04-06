@@ -129,6 +129,7 @@ export default function CatalogoAdminPage() {
   const [tableMode, setTableMode] = useState<TableMode>("editar")
   const [editingRowId, setEditingRowId] = useState<string | null>(null)
   const [editingValues, setEditingValues] = useState<Record<string, string>>({})
+  const [excelDraft, setExcelDraft] = useState<Record<string, Record<string, string>>>({})
   const [activeTab, setActiveTab] = useState<"grupos" | "productos">("grupos")
 
   const nuevaFilaNombreRef = useRef<HTMLInputElement | null>(null)
@@ -1105,6 +1106,7 @@ export default function CatalogoAdminPage() {
                     <tbody>
                       {items.map((row, index) => {
                         const isEditingRow = tableMode === "editar" && editingRowId === row.id
+                        const draft = excelDraft[row.id]
                         const equivalencia = isEditingRow
                           ? calcularEquivalencia(
                               (editingValues.nombre ?? row.nombre).trim() || row.nombre,
@@ -1112,12 +1114,19 @@ export default function CatalogoAdminPage() {
                               (editingValues.unidadAlternativa ?? "").trim() || undefined,
                               parseFactor(editingValues.factorConversion ?? "") ?? undefined
                             )
-                          : calcularEquivalencia(
-                              row.nombre,
-                              row.unidad || "u",
-                              row.unidadAlternativa,
-                              row.factorConversion
-                            )
+                          : tableMode === "excel"
+                            ? calcularEquivalencia(
+                                draft?.nombre ?? row.nombre,
+                                draft?.unidad ?? row.unidad ?? "u",
+                                draft?.unidadAlternativa ?? row.unidadAlternativa,
+                                parseFactor(draft?.factorConversion ?? "") ?? row.factorConversion
+                              )
+                            : calcularEquivalencia(
+                                row.nombre,
+                                row.unidad || "u",
+                                row.unidadAlternativa,
+                                row.factorConversion
+                              )
                         return (
                           <tr key={row.id} className="border-b hover:bg-muted/20">
                             <td className="px-2 py-1">
@@ -1125,13 +1134,25 @@ export default function CatalogoAdminPage() {
                                 <input
                                   data-row={index}
                                   data-col="nombre"
-                                  defaultValue={row.nombre}
+                                  value={excelDraft[row.id]?.nombre ?? row.nombre}
                                   className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                                  onChange={(e) =>
+                                    setExcelDraft((prev) => ({
+                                      ...prev,
+                                      [row.id]: { ...prev[row.id], nombre: e.target.value },
+                                    }))
+                                  }
                                   onKeyDown={(e) => handleExcelKeyDown(e, index, "nombre")}
                                   onBlur={(e) => {
                                     const value = e.target.value.trim()
-                                    if (!value || value === row.nombre) return
-                                    void guardarCampoProducto(row, { nombre: value })
+                                    if (value && value !== row.nombre) {
+                                      void guardarCampoProducto(row, { nombre: value })
+                                    }
+                                    setExcelDraft((prev) => {
+                                      const next = { ...prev }
+                                      delete next[row.id]
+                                      return next
+                                    })
                                   }}
                                 />
                               ) : null}
@@ -1152,13 +1173,25 @@ export default function CatalogoAdminPage() {
                                 <input
                                   data-row={index}
                                   data-col="unidad"
-                                  defaultValue={row.unidad}
+                                  value={excelDraft[row.id]?.unidad ?? row.unidad}
                                   className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                                  onChange={(e) =>
+                                    setExcelDraft((prev) => ({
+                                      ...prev,
+                                      [row.id]: { ...prev[row.id], unidad: e.target.value },
+                                    }))
+                                  }
                                   onKeyDown={(e) => handleExcelKeyDown(e, index, "unidad")}
                                   onBlur={(e) => {
                                     const value = e.target.value.trim() || "u"
-                                    if (value === (row.unidad || "u")) return
-                                    void guardarCampoProducto(row, { unidad: value })
+                                    if (value !== (row.unidad || "u")) {
+                                      void guardarCampoProducto(row, { unidad: value })
+                                    }
+                                    setExcelDraft((prev) => {
+                                      const next = { ...prev }
+                                      delete next[row.id]
+                                      return next
+                                    })
                                   }}
                                 />
                               ) : null}
@@ -1179,15 +1212,27 @@ export default function CatalogoAdminPage() {
                                 <input
                                   data-row={index}
                                   data-col="unidadAlternativa"
-                                  defaultValue={row.unidadAlternativa ?? ""}
+                                  value={excelDraft[row.id]?.unidadAlternativa ?? (row.unidadAlternativa ?? "")}
                                   placeholder="opcional"
                                   className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                                  onChange={(e) =>
+                                    setExcelDraft((prev) => ({
+                                      ...prev,
+                                      [row.id]: { ...prev[row.id], unidadAlternativa: e.target.value },
+                                    }))
+                                  }
                                   onKeyDown={(e) => handleExcelKeyDown(e, index, "unidadAlternativa")}
                                   onBlur={(e) => {
                                     const value = e.target.value.trim()
                                     const current = row.unidadAlternativa?.trim() ?? ""
-                                    if (value === current) return
-                                    void guardarCampoProducto(row, { unidadAlternativa: value || null })
+                                    if (value !== current) {
+                                      void guardarCampoProducto(row, { unidadAlternativa: value || null })
+                                    }
+                                    setExcelDraft((prev) => {
+                                      const next = { ...prev }
+                                      delete next[row.id]
+                                      return next
+                                    })
                                   }}
                                 />
                               ) : null}
@@ -1211,18 +1256,35 @@ export default function CatalogoAdminPage() {
                                   <input
                                     data-row={index}
                                     data-col="factorConversion"
-                                    defaultValue={row.factorConversion ?? ""}
+                                    value={
+                                      excelDraft[row.id]?.factorConversion ??
+                                      (row.factorConversion ? String(row.factorConversion) : "")
+                                    }
                                     placeholder="opcional"
                                     className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                                    onChange={(e) =>
+                                      setExcelDraft((prev) => ({
+                                        ...prev,
+                                        [row.id]: { ...prev[row.id], factorConversion: e.target.value },
+                                      }))
+                                    }
                                     onKeyDown={(e) => handleExcelKeyDown(e, index, "factorConversion")}
                                     onBlur={(e) => {
                                       const next = parseFactor(e.target.value)
                                       const current = row.factorConversion ?? null
-                                      if (next === current) return
-                                      void guardarCampoProducto(row, { factorConversion: next })
+                                      if (next !== current) {
+                                        void guardarCampoProducto(row, { factorConversion: next })
+                                      }
+                                      setExcelDraft((prev) => {
+                                        const nextDraft = { ...prev }
+                                        delete nextDraft[row.id]
+                                        return nextDraft
+                                      })
                                     }}
                                   />
-                                  <span className="text-xs text-muted-foreground">{row.unidad || "u"}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {excelDraft[row.id]?.unidad ?? row.unidad ?? "u"}
+                                  </span>
                                 </div>
                               ) : null}
                               {tableMode === "editar" ? (
@@ -1398,7 +1460,14 @@ export default function CatalogoAdminPage() {
                             }}
                           />
                         </td>
-                        <td className="px-2 py-1 text-muted-foreground">—</td>
+                        <td className="px-2 py-1 text-muted-foreground">
+                          {calcularEquivalencia(
+                            nuevoProductoNombre.trim() || "producto",
+                            nuevoProductoUnidad.trim() || "u",
+                            nuevoProductoUnidadAlt.trim() || undefined,
+                            parseFactor(nuevoProductoFactor) ?? undefined
+                          )}
+                        </td>
                         <td className="px-2 py-1">
                           <input
                             value={nuevoProductoProveedor}
