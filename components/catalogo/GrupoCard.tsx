@@ -56,8 +56,17 @@ export function GrupoCard({
 
   const getDiasEnvioDisplay = (diasIds?: number[]) => {
     if (!diasIds || diasIds.length === 0) return null
-    return diasIds
-      .map(id => Number(id))  // Convertir int64 a number normal
+    
+    // Convertir int64 a numbers normales
+    const diasNormales = diasIds.map(id => Number(id))
+    
+    // Si son todos los días (0-6), mostrar "Todos los días"
+    if (diasNormales.length === 7) {
+      return "Todos los días"
+    }
+    
+    // Sino, mostrar los días individuales
+    return diasNormales
       .sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
       .map((id) => dias.find((d) => d.value === id)?.label)
       .join(", ")
@@ -224,25 +233,21 @@ export function GrupoCard({
         </CollapsibleTrigger>
 
         <div className="flex flex-wrap items-center gap-2">
-          {grupo.diasEnvio && grupo.diasEnvio.length > 0 && (
-            <Badge variant="outline" className="text-xs">
-              {grupo.diasEnvio.length === 7 
-                ? "Todos los días" 
-                : grupo.diasEnvio
-                    .map(id => Number(id))  // Convertir int64 a number normal
-                    .sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
-                    .map((id) => dias.find((d) => d.value === id)?.label)
-                    .join(", ")
-              }
-            </Badge>
-          )}
           {grupo.despachadores.map((d) => (
             <Badge key={d.locationId} className="bg-green-100 text-green-800 hover:bg-green-100">
               {d.locationName}
             </Badge>
           ))}
           <Badge variant="secondary">{grupo.productosIds.length} productos</Badge>
-          <Button variant="ghost" size="icon" onClick={iniciarEdicion}>
+          <Button variant="ghost" size="icon" onClick={() => {
+            if (isEditing) {
+              setIsEditing(false)
+              onOpenChange(false)
+            } else {
+              onOpenChange(true)
+              iniciarEdicion()
+            }
+          }}>
             <Pencil className="h-4 w-4" />
           </Button>
           <Button
@@ -324,7 +329,10 @@ export function GrupoCard({
                     {isGuardandoEdicion ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
                     Guardar
                   </Button>
-                  <Button variant="outline" onClick={() => setIsEditing(false)}>
+                  <Button variant="outline" onClick={() => {
+                    setIsEditing(false)
+                    onOpenChange(false)
+                  }}>
                     Cancelar
                   </Button>
                 </div>
