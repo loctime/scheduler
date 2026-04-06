@@ -471,11 +471,14 @@ export default function CatalogoAdminPage() {
     return value
   }
 
-  const equivalenciaTexto = (row: CatalogoProducto) => {
-    const unidadAlt = row.unidadAlternativa?.trim()
-    const factor = row.factorConversion
-    if (!unidadAlt || typeof factor !== "number" || !Number.isFinite(factor) || factor <= 0) return "sin conversión"
-    return `1 ${unidadAlt} = ${factor} ${row.unidad || "u"}`
+  function calcularEquivalencia(
+    nombre: string,
+    unidad: string,
+    unidadAlt: string | undefined,
+    factor: number | undefined
+  ): string {
+    if (!unidadAlt?.trim() || !factor || factor <= 0) return "—"
+    return `1 ${unidadAlt} = ${factor} ${unidad} de ${nombre}`
   }
 
   const guardarCampoProducto = async (
@@ -1016,22 +1019,38 @@ export default function CatalogoAdminPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <CardTitle>Catálogo de productos</CardTitle>
                   <div className="flex flex-wrap items-center gap-2">
-                    {tableMode === "editar" ? (
-                      <Button
-                        variant="outline"
-                        onClick={() => {
+                    <button
+                      type="button"
+                      aria-label="Cambiar modo de tabla"
+                      onClick={() => {
+                        if (tableMode === "editar") {
                           setTableMode("excel")
                           setEditingRowId(null)
-                        }}
+                        } else {
+                          setTableMode("editar")
+                        }
+                      }}
+                      className="group inline-flex min-w-[170px] items-center rounded-md border bg-muted/40 p-1"
+                    >
+                      <span
+                        className={
+                          tableMode === "editar"
+                            ? "w-1/2 rounded-sm bg-blue-600 px-3 py-1.5 text-center text-sm font-medium text-white shadow-sm transition-all"
+                            : "w-1/2 px-3 py-1.5 text-center text-sm text-muted-foreground transition-all group-hover:text-foreground"
+                        }
                       >
-                        Modo Excel
-                      </Button>
-                    ) : null}
-                    {tableMode === "excel" ? (
-                      <Button variant="outline" onClick={() => setTableMode("editar")}>
-                        Modo Editar
-                      </Button>
-                    ) : null}
+                        Editar
+                      </span>
+                      <span
+                        className={
+                          tableMode === "excel"
+                            ? "w-1/2 rounded-sm bg-blue-600 px-3 py-1.5 text-center text-sm font-medium text-white shadow-sm transition-all"
+                            : "w-1/2 px-3 py-1.5 text-center text-sm text-muted-foreground transition-all group-hover:text-foreground"
+                        }
+                      >
+                        Excel
+                      </span>
+                    </button>
                     <Button
                       variant="outline"
                       onClick={() => {
@@ -1075,9 +1094,9 @@ export default function CatalogoAdminPage() {
                       <tr className="border-b">
                         <th className="px-2 py-2 text-left font-medium">Nombre</th>
                         <th className="px-2 py-2 text-left font-medium">Unidad base</th>
-                        <th className="px-2 py-2 text-left font-medium">Unidad alt.</th>
-                        <th className="px-2 py-2 text-left font-medium">Factor</th>
-                        <th className="px-2 py-2 text-left font-medium">Equivalencia</th>
+                        <th className="px-2 py-2 text-left font-medium">Bulto.</th>
+                        <th className="px-2 py-2 text-left font-medium">Cantidad</th>
+                        <th className="px-2 py-2 text-left font-medium">Resultado</th>
                         <th className="px-2 py-2 text-left font-medium">Proveedor</th>
                         <th className="px-2 py-2 text-left font-medium">Activo</th>
                         <th className="px-2 py-2 text-left font-medium">Acciones</th>
@@ -1086,6 +1105,19 @@ export default function CatalogoAdminPage() {
                     <tbody>
                       {items.map((row, index) => {
                         const isEditingRow = tableMode === "editar" && editingRowId === row.id
+                        const equivalencia = isEditingRow
+                          ? calcularEquivalencia(
+                              (editingValues.nombre ?? row.nombre).trim() || row.nombre,
+                              (editingValues.unidad ?? row.unidad).trim() || "u",
+                              (editingValues.unidadAlternativa ?? "").trim() || undefined,
+                              parseFactor(editingValues.factorConversion ?? "") ?? undefined
+                            )
+                          : calcularEquivalencia(
+                              row.nombre,
+                              row.unidad || "u",
+                              row.unidadAlternativa,
+                              row.factorConversion
+                            )
                         return (
                           <tr key={row.id} className="border-b hover:bg-muted/20">
                             <td className="px-2 py-1">
@@ -1175,36 +1207,44 @@ export default function CatalogoAdminPage() {
                             </td>
                             <td className="px-2 py-1">
                               {tableMode === "excel" ? (
-                                <input
-                                  data-row={index}
-                                  data-col="factorConversion"
-                                  defaultValue={row.factorConversion ?? ""}
-                                  placeholder="opcional"
-                                  className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
-                                  onKeyDown={(e) => handleExcelKeyDown(e, index, "factorConversion")}
-                                  onBlur={(e) => {
-                                    const next = parseFactor(e.target.value)
-                                    const current = row.factorConversion ?? null
-                                    if (next === current) return
-                                    void guardarCampoProducto(row, { factorConversion: next })
-                                  }}
-                                />
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    data-row={index}
+                                    data-col="factorConversion"
+                                    defaultValue={row.factorConversion ?? ""}
+                                    placeholder="opcional"
+                                    className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                                    onKeyDown={(e) => handleExcelKeyDown(e, index, "factorConversion")}
+                                    onBlur={(e) => {
+                                      const next = parseFactor(e.target.value)
+                                      const current = row.factorConversion ?? null
+                                      if (next === current) return
+                                      void guardarCampoProducto(row, { factorConversion: next })
+                                    }}
+                                  />
+                                  <span className="text-xs text-muted-foreground">{row.unidad || "u"}</span>
+                                </div>
                               ) : null}
                               {tableMode === "editar" ? (
                                 isEditingRow ? (
-                                  <input
-                                    value={editingValues.factorConversion ?? ""}
-                                    className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
-                                    onChange={(e) =>
-                                      setEditingValues((prev) => ({ ...prev, factorConversion: e.target.value }))
-                                    }
-                                  />
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      value={editingValues.factorConversion ?? ""}
+                                      className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                                      onChange={(e) =>
+                                        setEditingValues((prev) => ({ ...prev, factorConversion: e.target.value }))
+                                      }
+                                    />
+                                    <span className="text-xs text-muted-foreground">
+                                      {(editingValues.unidad ?? row.unidad).trim() || "u"}
+                                    </span>
+                                  </div>
                                 ) : (
-                                  <span>{row.factorConversion ?? "-"}</span>
+                                  <span>{row.factorConversion ?? "—"}</span>
                                 )
                               ) : null}
                             </td>
-                            <td className="px-2 py-1 text-muted-foreground">{equivalenciaTexto(row)}</td>
+                            <td className="px-2 py-1 text-muted-foreground">{equivalencia}</td>
                             <td className="px-2 py-1">
                               {tableMode === "excel" ? (
                                 <input
@@ -1358,7 +1398,7 @@ export default function CatalogoAdminPage() {
                             }}
                           />
                         </td>
-                        <td className="px-2 py-1 text-muted-foreground">sin conversión</td>
+                        <td className="px-2 py-1 text-muted-foreground">—</td>
                         <td className="px-2 py-1">
                           <input
                             value={nuevoProductoProveedor}
