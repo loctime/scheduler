@@ -13,6 +13,9 @@ import { syncStockSnapshotsFromCatalogo } from "@/lib/stock-ubicaciones-service"
 export type ActualizarCatalogoChanges = Partial<{
   nombre: string
   unidad: string
+  unidadAlternativa: string | null
+  factorConversion: number | null
+  proveedor: string | null
   categoria: string | null
   pedidoId: string
   grupoCatalogoId: string | null
@@ -24,6 +27,9 @@ export async function crearProductoCatalogo(input: {
   ownerId: string
   nombre: string
   unidad: string
+  unidadAlternativa?: string
+  factorConversion?: number
+  proveedor?: string
   pedidoId?: string
   grupoCatalogoId?: string
   stockMinimo?: number
@@ -40,6 +46,11 @@ export async function crearProductoCatalogo(input: {
       ownerId: input.ownerId,
       nombre: input.nombre.trim(),
       unidad: input.unidad.trim() || "U",
+      ...(input.unidadAlternativa?.trim() ? { unidadAlternativa: input.unidadAlternativa.trim() } : {}),
+      ...(typeof input.factorConversion === "number" && Number.isFinite(input.factorConversion) && input.factorConversion > 0
+        ? { factorConversion: input.factorConversion }
+        : {}),
+      ...(input.proveedor?.trim() ? { proveedor: input.proveedor.trim() } : {}),
       pedidoId,
       ...(input.grupoCatalogoId?.trim()
         ? { grupoCatalogoId: input.grupoCatalogoId.trim() }
@@ -83,6 +94,26 @@ export async function actualizarProductoCatalogo(
         changes.categoria === null || changes.categoria === ""
           ? deleteField()
           : changes.categoria.trim()
+    }
+    if (changes.unidadAlternativa !== undefined) {
+      payload.unidadAlternativa =
+        changes.unidadAlternativa === null || changes.unidadAlternativa === ""
+          ? deleteField()
+          : changes.unidadAlternativa.trim()
+    }
+    if (changes.factorConversion !== undefined) {
+      payload.factorConversion =
+        changes.factorConversion === null ||
+        !Number.isFinite(changes.factorConversion) ||
+        changes.factorConversion <= 0
+          ? deleteField()
+          : changes.factorConversion
+    }
+    if (changes.proveedor !== undefined) {
+      payload.proveedor =
+        changes.proveedor === null || changes.proveedor === ""
+          ? deleteField()
+          : changes.proveedor.trim()
     }
     if (changes.pedidoId !== undefined) payload.pedidoId = changes.pedidoId
     if (changes.grupoCatalogoId !== undefined) {

@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import * as XLSX from "xlsx"
 import {
   addDoc,
   collection,
@@ -22,6 +23,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { useData } from "@/contexts/data-context"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { canUser } from "@/lib/permissions"
@@ -29,7 +38,7 @@ import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import type { CatalogoProducto, GrupoCatalogo } from "@/lib/catalogo-types"
 import { actualizarProductoCatalogo, crearProductoCatalogo, toggleProductoActivo } from "@/lib/catalogo-service"
 import { useToast } from "@/hooks/use-toast"
-import { ChevronDown, ChevronRight, Loader2, Package, Pencil, Plus, Trash2 } from "lucide-react"
+import { ChevronDown, ChevronRight, Download, Loader2, Package, Pencil, Plus, Trash2, Upload } from "lucide-react"
 
 type UbicacionCatalogo = {
   locationId: string
@@ -88,8 +97,6 @@ export default function CatalogoAdminPage() {
   const [loadingItems, setLoadingItems] = useState(true)
 
   const [openGroupIds, setOpenGroupIds] = useState<Record<string, boolean>>({})
-  const [openProductIds, setOpenProductIds] = useState<Record<string, boolean>>({})
-
   const [showNuevoGrupoForm, setShowNuevoGrupoForm] = useState(false)
   const [nuevoGrupoNombre, setNuevoGrupoNombre] = useState("")
   const [nuevoGrupoDespachadoresIds, setNuevoGrupoDespachadoresIds] = useState<string[]>([])
@@ -108,16 +115,18 @@ export default function CatalogoAdminPage() {
   const [guardandoSelectorGrupoId, setGuardandoSelectorGrupoId] = useState<string | null>(null)
 
   const [nuevoProductoNombre, setNuevoProductoNombre] = useState("")
-  const [nuevoProductoUnidad, setNuevoProductoUnidad] = useState("U")
-  const [nuevoProductoStockMinimo, setNuevoProductoStockMinimo] = useState("0")
+  const [nuevoProductoUnidad, setNuevoProductoUnidad] = useState("u")
+  const [nuevoProductoUnidadAlt, setNuevoProductoUnidadAlt] = useState("")
+  const [nuevoProductoFactor, setNuevoProductoFactor] = useState("")
+  const [nuevoProductoProveedor, setNuevoProductoProveedor] = useState("")
   const [creandoProducto, setCreandoProducto] = useState(false)
-
-  const [editandoProductoId, setEditandoProductoId] = useState<string | null>(null)
-  const [editProductoNombre, setEditProductoNombre] = useState("")
-  const [editProductoUnidad, setEditProductoUnidad] = useState("U")
-  const [editProductoStockMinimo, setEditProductoStockMinimo] = useState("0")
-  const [guardandoProductoId, setGuardandoProductoId] = useState<string | null>(null)
   const [eliminandoProductoId, setEliminandoProductoId] = useState<string | null>(null)
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
+  const [bulkTsv, setBulkTsv] = useState("")
+  const [importandoMasivo, setImportandoMasivo] = useState(false)
+
+  const nuevaFilaNombreRef = useRef<HTMLInputElement | null>(null)
+  const xlsxInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     if (!db || !ownerId) {
@@ -137,6 +146,15 @@ export default function CatalogoAdminPage() {
             ownerId: String(x.ownerId ?? ""),
             nombre: String(x.nombre ?? ""),
             unidad: String(x.unidad ?? "U"),
+            unidadAlternativa:
+              typeof x.unidadAlternativa === "string" && x.unidadAlternativa.trim()
+                ? x.unidadAlternativa.trim()
+                : undefined,
+            factorConversion:
+              typeof x.factorConversion === "number" && Number.isFinite(x.factorConversion) && x.factorConversion > 0
+                ? x.factorConversion
+                : undefined,
+            proveedor: typeof x.proveedor === "string" && x.proveedor.trim() ? x.proveedor.trim() : undefined,
             categoria: x.categoria ? String(x.categoria) : undefined,
             pedidoId: String(x.pedidoId ?? ""),
             grupoCatalogoId: x.grupoCatalogoId ? String(x.grupoCatalogoId) : undefined,
@@ -441,42 +459,26 @@ export default function CatalogoAdminPage() {
     }
   }
 
-  const abrirEdicionProducto = (row: CatalogoProducto) => {
-    setEditandoProductoId(row.id)
-    setEditProductoNombre(row.nombre)
-    setEditProductoUnidad(row.unidad || "U")
-    setEditProductoStockMinimo(String(row.stockMinimo ?? 0))
-    setOpenProductIds((prev) => ({ ...prev, [row.id]: true }))
+  const parseFactor = (raw: string): number | null => {
+    const value = Number(raw.replace(",", ".").trim())
+    if (!Number.isFinite(value) || value <= 0) return null
+    return value
   }
 
-  const guardarProducto = async () => {
-    if (!ownerId || !editandoProductoId) return
-    const nombreTrim = editProductoNombre.trim()
-    if (!nombreTrim) {
-      toast({ title: "Indicá el nombre", variant: "destructive" })
-      return
-    }
-    setGuardandoProductoId(editandoProductoId)
-    try {
-      const res = await actualizarProductoCatalogo(
-        editandoProductoId,
-        {
-          nombre: nombreTrim,
-          unidad: editProductoUnidad.trim() || "U",
-          stockMinimo: Math.max(0, Math.floor(Number(editProductoStockMinimo) || 0)),
-          pedidoId: "",
-        },
-        ownerId
-      )
-      if (!res.ok) {
-        toast({ title: "Error", description: res.error, variant: "destructive" })
-        return
-      }
-      toast({ title: "Producto actualizado" })
-      setEditandoProductoId(null)
-    } finally {
-      setGuardandoProductoId(null)
-    }
+  const equivalenciaTexto = (row: CatalogoProducto) => {
+    const unidadAlt = row.unidadAlternativa?.trim()
+    const factor = row.factorConversion
+    if (!unidadAlt || typeof factor !== "number" || !Number.isFinite(factor) || factor <= 0) return "sin conversión"
+    return `1 ${unidadAlt} = ${factor} ${row.unidad || "u"}`
+  }
+
+  const guardarCampoProducto = async (
+    row: CatalogoProducto,
+    changes: Parameters<typeof actualizarProductoCatalogo>[1]
+  ) => {
+    if (!ownerId) return
+    const res = await actualizarProductoCatalogo(row.id, { ...changes, pedidoId: "" }, ownerId)
+    if (!res.ok) toast({ title: "Error", description: res.error, variant: "destructive" })
   }
 
   const crearProducto = async () => {
@@ -491,9 +493,12 @@ export default function CatalogoAdminPage() {
       const res = await crearProductoCatalogo({
         ownerId,
         nombre: nombreTrim,
-        unidad: nuevoProductoUnidad.trim() || "U",
+        unidad: nuevoProductoUnidad.trim() || "u",
+        unidadAlternativa: nuevoProductoUnidadAlt.trim() || undefined,
+        factorConversion: parseFactor(nuevoProductoFactor) ?? undefined,
+        proveedor: nuevoProductoProveedor.trim() || undefined,
         pedidoId: "",
-        stockMinimo: Math.max(0, Math.floor(Number(nuevoProductoStockMinimo) || 0)),
+        stockMinimo: 0,
         user: { uid: user.uid },
       })
       if (!res.ok || !res.catalogoId) {
@@ -502,8 +507,10 @@ export default function CatalogoAdminPage() {
       }
       toast({ title: "Producto creado" })
       setNuevoProductoNombre("")
-      setNuevoProductoUnidad("U")
-      setNuevoProductoStockMinimo("0")
+      setNuevoProductoUnidad("u")
+      setNuevoProductoUnidadAlt("")
+      setNuevoProductoFactor("")
+      setNuevoProductoProveedor("")
     } catch (e) {
       toast({
         title: "Error",
@@ -544,6 +551,113 @@ export default function CatalogoAdminPage() {
     if (!ownerId) return
     const res = await toggleProductoActivo(id, activo, ownerId)
     if (!res.ok) toast({ title: "Error", description: res.error, variant: "destructive" })
+  }
+
+  const crearDesdeFilas = async (
+    rows: Array<{
+      nombre: string
+      unidad: string
+      unidadAlternativa?: string
+      factorConversion?: number
+      proveedor?: string
+    }>
+  ) => {
+    if (!ownerId || !user?.uid) return
+    if (!rows.length) {
+      toast({ title: "No hay filas válidas para importar", variant: "destructive" })
+      return
+    }
+    setImportandoMasivo(true)
+    try {
+      let creados = 0
+      for (const row of rows) {
+        const res = await crearProductoCatalogo({
+          ownerId,
+          nombre: row.nombre,
+          unidad: row.unidad || "u",
+          unidadAlternativa: row.unidadAlternativa,
+          factorConversion: row.factorConversion,
+          proveedor: row.proveedor,
+          pedidoId: "",
+          stockMinimo: 0,
+          user: { uid: user.uid },
+        })
+        if (res.ok) creados += 1
+      }
+      toast({ title: `Importación completada: ${creados} producto(s)` })
+    } finally {
+      setImportandoMasivo(false)
+    }
+  }
+
+  const parsearTsv = (text: string) => {
+    const rows = text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => line.split("\t"))
+      .map((cols) => {
+        const nombre = (cols[0] ?? "").trim()
+        const unidad = (cols[1] ?? "").trim() || "u"
+        const unidadAlternativa = (cols[2] ?? "").trim()
+        const factorConversion = parseFactor(cols[3] ?? "")
+        const proveedor = (cols[4] ?? "").trim()
+        if (!nombre) return null
+        return {
+          nombre,
+          unidad,
+          unidadAlternativa: unidadAlternativa || undefined,
+          factorConversion: factorConversion ?? undefined,
+          proveedor: proveedor || undefined,
+        }
+      })
+      .filter((row): row is NonNullable<typeof row> => Boolean(row))
+    return rows
+  }
+
+  const importarDesdeXlsx = async (file: File) => {
+    const data = await file.arrayBuffer()
+    const wb = XLSX.read(data, { type: "array" })
+    const firstSheet = wb.Sheets[wb.SheetNames[0] ?? ""]
+    if (!firstSheet) {
+      toast({ title: "Archivo sin hojas válidas", variant: "destructive" })
+      return
+    }
+    const matrix = XLSX.utils.sheet_to_json<(string | number | null)[]>(firstSheet, { header: 1 })
+    const rows = matrix
+      .filter((cols) => Array.isArray(cols) && cols.some((v) => String(v ?? "").trim() !== ""))
+      .map((cols) => {
+        const nombre = String(cols[0] ?? "").trim()
+        const unidad = String(cols[1] ?? "").trim() || "u"
+        const unidadAlternativa = String(cols[2] ?? "").trim()
+        const factorConversion = parseFactor(String(cols[3] ?? ""))
+        const proveedor = String(cols[4] ?? "").trim()
+        if (!nombre) return null
+        return {
+          nombre,
+          unidad,
+          unidadAlternativa: unidadAlternativa || undefined,
+          factorConversion: factorConversion ?? undefined,
+          proveedor: proveedor || undefined,
+        }
+      })
+      .filter((row): row is NonNullable<typeof row> => Boolean(row))
+    await crearDesdeFilas(rows)
+  }
+
+  const exportarXlsx = () => {
+    const rows = items.map((row) => ({
+      nombre: row.nombre,
+      unidadBase: row.unidad ?? "",
+      unidadAlt: row.unidadAlternativa ?? "",
+      factor: row.factorConversion ?? "",
+      proveedor: row.proveedor ?? "",
+      activo: row.activo ? "sí" : "no",
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Catalogo")
+    XLSX.writeFile(wb, "catalogo-productos.xlsx")
   }
 
   if (!puede) {
@@ -847,142 +961,253 @@ export default function CatalogoAdminPage() {
               </div>
             ) : null}
 
-            {items.map((row) => {
-              const open = openProductIds[row.id] === true
-              return (
-                <Collapsible
-                  key={row.id}
-                  open={open}
-                  onOpenChange={(next) => setOpenProductIds((prev) => ({ ...prev, [row.id]: next }))}
-                >
-                  <Card>
-                    <CardHeader className="py-3">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <CollapsibleTrigger asChild>
-                          <button
-                            type="button"
-                            className="flex min-w-[260px] flex-1 items-center gap-2 text-left"
-                          >
-                            {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                            <span className="font-medium">{row.nombre}</span>
-                            <Badge variant="outline">{row.unidad}</Badge>
-                            <Badge variant="secondary">Stock mín: {row.stockMinimo}</Badge>
-                          </button>
-                        </CollapsibleTrigger>
-
-                        <div className="flex items-center gap-2">
-                          <Switch checked={row.activo} onCheckedChange={(v) => void onToggleActivo(row.id, v)} />
-                          <Button variant="ghost" size="icon" onClick={() => abrirEdicionProducto(row)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive"
-                            disabled={eliminandoProductoId === row.id}
-                            onClick={() => void eliminarProducto(row)}
-                          >
-                            {eliminandoProductoId === row.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-
-                    <CollapsibleContent>
-                      <CardContent className="space-y-3 pt-0">
-                        {editandoProductoId === row.id ? (
-                          <>
-                            <div className="grid gap-3 sm:grid-cols-3">
-                              <div className="space-y-2">
-                                <Label>Nombre</Label>
-                                <Input
-                                  value={editProductoNombre}
-                                  onChange={(e) => setEditProductoNombre(e.target.value)}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Unidad</Label>
-                                <Input
-                                  value={editProductoUnidad}
-                                  onChange={(e) => setEditProductoUnidad(e.target.value)}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Stock mínimo</Label>
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  value={editProductoStockMinimo}
-                                  onChange={(e) => setEditProductoStockMinimo(e.target.value)}
-                                />
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                disabled={guardandoProductoId === row.id}
-                                onClick={() => void guardarProducto()}
-                              >
-                                {guardandoProductoId === row.id ? (
-                                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                                ) : null}
-                                Guardar
-                              </Button>
-                              <Button variant="outline" onClick={() => setEditandoProductoId(null)}>
-                                Cancelar
-                              </Button>
-                            </div>
-                          </>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">
-                            Presioná editar para modificar este producto inline.
-                          </p>
-                        )}
-                      </CardContent>
-                    </CollapsibleContent>
-                  </Card>
-                </Collapsible>
-              )
-            })}
-
             <Card>
-              <CardHeader>
-                <CardTitle>Agregar producto</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid gap-3 sm:grid-cols-4">
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label>Nombre</Label>
-                    <Input
-                      value={nuevoProductoNombre}
-                      onChange={(e) => setNuevoProductoNombre(e.target.value)}
-                      placeholder="Nombre del producto"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Unidad</Label>
-                    <Input value={nuevoProductoUnidad} onChange={(e) => setNuevoProductoUnidad(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Stock mínimo</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={nuevoProductoStockMinimo}
-                      onChange={(e) => setNuevoProductoStockMinimo(e.target.value)}
-                    />
+              <CardHeader className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle>Catálogo de productos</CardTitle>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        nuevaFilaNombreRef.current?.focus()
+                      }}
+                    >
+                      <Plus className="mr-1 h-4 w-4" />
+                      Nuevo producto
+                    </Button>
+                    <Button variant="outline" onClick={() => setBulkDialogOpen(true)}>
+                      Pegar desde Excel
+                    </Button>
+                    <Button variant="outline" onClick={() => xlsxInputRef.current?.click()}>
+                      <Upload className="mr-1 h-4 w-4" />
+                      Importar .xlsx
+                    </Button>
+                    <Button variant="outline" onClick={exportarXlsx}>
+                      <Download className="mr-1 h-4 w-4" />
+                      Exportar .xlsx
+                    </Button>
                   </div>
                 </div>
+              </CardHeader>
+              <CardContent>
+                <input
+                  ref={xlsxInputRef}
+                  type="file"
+                  accept=".xlsx"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    void importarDesdeXlsx(file)
+                    e.currentTarget.value = ""
+                  }}
+                />
 
-                <Button disabled={creandoProducto} onClick={() => void crearProducto()}>
-                  {creandoProducto ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
-                  Agregar
-                </Button>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[980px] border-collapse text-sm">
+                    <thead className="bg-muted/50 text-muted-foreground">
+                      <tr className="border-b">
+                        <th className="px-2 py-2 text-left font-medium">Nombre</th>
+                        <th className="px-2 py-2 text-left font-medium">Unidad base</th>
+                        <th className="px-2 py-2 text-left font-medium">Unidad alt.</th>
+                        <th className="px-2 py-2 text-left font-medium">Factor</th>
+                        <th className="px-2 py-2 text-left font-medium">Equivalencia</th>
+                        <th className="px-2 py-2 text-left font-medium">Proveedor</th>
+                        <th className="px-2 py-2 text-left font-medium">Activo</th>
+                        <th className="px-2 py-2 text-left font-medium">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((row) => (
+                        <tr key={row.id} className="border-b hover:bg-muted/20">
+                          <td className="px-2 py-1">
+                            <input
+                              defaultValue={row.nombre}
+                              className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                              onBlur={(e) => {
+                                const value = e.target.value.trim()
+                                if (!value || value === row.nombre) return
+                                void guardarCampoProducto(row, { nombre: value })
+                              }}
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <input
+                              defaultValue={row.unidad}
+                              className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                              onBlur={(e) => {
+                                const value = e.target.value.trim() || "u"
+                                if (value === (row.unidad || "u")) return
+                                void guardarCampoProducto(row, { unidad: value })
+                              }}
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <input
+                              defaultValue={row.unidadAlternativa ?? ""}
+                              placeholder="opcional"
+                              className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                              onBlur={(e) => {
+                                const value = e.target.value.trim()
+                                const current = row.unidadAlternativa?.trim() ?? ""
+                                if (value === current) return
+                                void guardarCampoProducto(row, { unidadAlternativa: value || null })
+                              }}
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <input
+                              defaultValue={row.factorConversion ?? ""}
+                              placeholder="opcional"
+                              className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                              onBlur={(e) => {
+                                const next = parseFactor(e.target.value)
+                                const current = row.factorConversion ?? null
+                                if (next === current) return
+                                void guardarCampoProducto(row, { factorConversion: next })
+                              }}
+                            />
+                          </td>
+                          <td className="px-2 py-1 text-muted-foreground">{equivalenciaTexto(row)}</td>
+                          <td className="px-2 py-1">
+                            <input
+                              defaultValue={row.proveedor ?? ""}
+                              placeholder="opcional"
+                              className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                              onBlur={(e) => {
+                                const value = e.target.value.trim()
+                                const current = row.proveedor?.trim() ?? ""
+                                if (value === current) return
+                                void guardarCampoProducto(row, { proveedor: value || null })
+                              }}
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <Switch checked={row.activo} onCheckedChange={(v) => void onToggleActivo(row.id, v)} />
+                          </td>
+                          <td className="px-2 py-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive"
+                              disabled={eliminandoProductoId === row.id}
+                              onClick={() => void eliminarProducto(row)}
+                            >
+                              {eliminandoProductoId === row.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <span aria-hidden>✕</span>
+                              )}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+
+                      <tr className="border-b bg-muted/30">
+                        <td className="px-2 py-1">
+                          <input
+                            ref={nuevaFilaNombreRef}
+                            value={nuevoProductoNombre}
+                            placeholder="Nombre"
+                            className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                            onChange={(e) => setNuevoProductoNombre(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void crearProducto()
+                            }}
+                          />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input
+                            value={nuevoProductoUnidad}
+                            placeholder="kg, L, u"
+                            className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                            onChange={(e) => setNuevoProductoUnidad(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void crearProducto()
+                            }}
+                          />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input
+                            value={nuevoProductoUnidadAlt}
+                            placeholder="horma, caja..."
+                            className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                            onChange={(e) => setNuevoProductoUnidadAlt(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void crearProducto()
+                            }}
+                          />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input
+                            value={nuevoProductoFactor}
+                            placeholder="1.5"
+                            className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                            onChange={(e) => setNuevoProductoFactor(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void crearProducto()
+                            }}
+                          />
+                        </td>
+                        <td className="px-2 py-1 text-muted-foreground">sin conversión</td>
+                        <td className="px-2 py-1">
+                          <input
+                            value={nuevoProductoProveedor}
+                            placeholder="Proveedor"
+                            className="w-full rounded border-none bg-transparent px-1 py-1 text-sm outline-none focus:bg-blue-50"
+                            onChange={(e) => setNuevoProductoProveedor(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void crearProducto()
+                            }}
+                          />
+                        </td>
+                        <td className="px-2 py-1 text-muted-foreground">-</td>
+                        <td className="px-2 py-1">
+                          <Button size="icon" disabled={creandoProducto} onClick={() => void crearProducto()}>
+                            {creandoProducto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                          </Button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </CardContent>
             </Card>
+
+            <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Pegar desde Excel</DialogTitle>
+                  <DialogDescription>
+                    Pegá filas TSV (tabuladas) con columnas: nombre, unidad base, unidad alt., factor, proveedor.
+                  </DialogDescription>
+                </DialogHeader>
+                <textarea
+                  value={bulkTsv}
+                  onChange={(e) => setBulkTsv(e.target.value)}
+                  className="min-h-[220px] w-full rounded-md border bg-background p-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="Harina\tkg\thorma\t1.5\tMolinos SA"
+                />
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setBulkDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    disabled={importandoMasivo}
+                    onClick={() => {
+                      const rows = parsearTsv(bulkTsv)
+                      void crearDesdeFilas(rows).then(() => {
+                        setBulkDialogOpen(false)
+                        setBulkTsv("")
+                      })
+                    }}
+                  >
+                    {importandoMasivo ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                    Importar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
         </Tabs>
       </div>

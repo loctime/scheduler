@@ -12,6 +12,9 @@ export type CatalogoProducto = {
   ownerId: string
   nombre: string
   unidad: string
+  unidadAlternativa?: string
+  factorConversion?: number
+  proveedor?: string
   categoria?: string
   pedidoId: string
   /** Grupo del catálogo (Firestore `grupos_catalogo`); sustituye al selector basado en pedidos. */
