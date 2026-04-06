@@ -13,6 +13,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -35,6 +42,8 @@ interface PedidoFormDialogProps {
   description: string
   name: string
   onNameChange: (value: string) => void
+  diasEnvio?: number[]
+  onDiasEnvioChange?: (value: number[]) => void
   onSubmit: () => void
   submitLabel: string
 }
@@ -46,9 +55,30 @@ export function PedidoFormDialog({
   description,
   name,
   onNameChange,
+  diasEnvio = [],
+  onDiasEnvioChange,
   onSubmit,
   submitLabel,
 }: PedidoFormDialogProps) {
+  const dias = [
+    { value: 1, label: "L" },
+    { value: 2, label: "M" },
+    { value: 3, label: "X" },
+    { value: 4, label: "J" },
+    { value: 5, label: "V" },
+    { value: 6, label: "S" },
+    { value: 0, label: "D" },
+  ]
+
+  const toggleDia = (dia: number, checked: boolean) => {
+    if (!onDiasEnvioChange) return
+    if (checked) {
+      onDiasEnvioChange([...diasEnvio, dia])
+    } else {
+      onDiasEnvioChange(diasEnvio.filter((d) => d !== dia))
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -70,6 +100,23 @@ export function PedidoFormDialog({
                 }
               }}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Día de envío</Label>
+            <div className="flex flex-wrap gap-3">
+              {dias.map((d) => (
+                <label key={d.value} className="flex items-center gap-1.5 text-sm cursor-pointer group">
+                  <Checkbox
+                    checked={diasEnvio.includes(d.value)}
+                    onCheckedChange={(checked) => toggleDia(d.value, checked === true)}
+                  />
+                  <span className="font-medium group-hover:text-primary transition-colors">
+                    {d.label}
+                  </span>
+                </label>
+              ))}
+            </div>
           </div>
         </div>
         <DialogFooter>

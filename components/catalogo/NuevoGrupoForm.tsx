@@ -33,9 +33,20 @@ export function NuevoGrupoForm({
   const { toast } = useToast()
 
   const [nombre, setNombre] = useState("")
+  const [diasEnvio, setDiasEnvio] = useState<number[]>([])
   const [despachadoresIds, setDespachadoresIds] = useState<string[]>([])
   const [productosIds, setProductosIds] = useState<string[]>([])
   const [creando, setCreando] = useState(false)
+
+  const dias = [
+    { value: 1, label: "LUNES" },
+    { value: 2, label: "MARTES" },
+    { value: 3, label: "MIERCOLES" },
+    { value: 4, label: "JUEVES" },
+    { value: 5, label: "VIERNES" },
+    { value: 6, label: "SABADO" },
+    { value: 0, label: "DOMINGO" },
+  ]
 
   const toggleId = (
     setter: React.Dispatch<React.SetStateAction<string[]>>,
@@ -80,6 +91,7 @@ export function NuevoGrupoForm({
         createdAt: serverTimestamp(),
         despachadores,
         productosIds,
+        diasEnvio,
       })
       const productById = new Map(items.map((p) => [p.id, p]))
       const syncRes = await updateGroupProductsMembership(ref.id, productosIds, [], ownerId, productById)
@@ -114,6 +126,25 @@ export function NuevoGrupoForm({
         <div className="space-y-2">
           <Label>Nombre del grupo</Label>
           <Input value={nombre} onChange={(e) => setNombre(e.target.value)} />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Día de envío</Label>
+          <div className="flex flex-wrap gap-3">
+            {dias.map((d) => (
+              <label key={d.value} className="flex items-center gap-1.5 text-sm cursor-pointer group">
+                <Checkbox
+                  checked={diasEnvio.includes(d.value)}
+                  onCheckedChange={(checked) =>
+                    toggleId(setDiasEnvio as any, d.value as any, checked === true)
+                  }
+                />
+                <span className="font-medium group-hover:text-primary transition-colors">
+                  {d.label}
+                </span>
+              </label>
+            ))}
+          </div>
         </div>
 
         <div className="space-y-2">

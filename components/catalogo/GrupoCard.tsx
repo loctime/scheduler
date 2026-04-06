@@ -39,9 +39,28 @@ export function GrupoCard({
 
   const [isEditing, setIsEditing] = useState(false)
   const [editNombre, setEditNombre] = useState("")
+  const [editDiasEnvio, setEditDiasEnvio] = useState<number[]>([])
   const [editDespachadoresIds, setEditDespachadoresIds] = useState<string[]>([])
   const [editProductosIds, setEditProductosIds] = useState<string[]>([])
   const [isGuardandoEdicion, setIsGuardandoEdicion] = useState(false)
+
+  const dias = [
+    { value: 1, label: "L" },
+    { value: 2, label: "M" },
+    { value: 3, label: "X" },
+    { value: 4, label: "J" },
+    { value: 5, label: "V" },
+    { value: 6, label: "S" },
+    { value: 0, label: "D" },
+  ]
+
+  const getDiasEnvioDisplay = (diasIds?: number[]) => {
+    if (!diasIds || diasIds.length === 0) return null
+    return diasIds
+      .sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
+      .map((id) => dias.find((d) => d.value === id)?.label)
+      .join(", ")
+  }
 
   const [selectorOpen, setSelectorOpen] = useState(false)
   const [selectorProductosIds, setSelectorProductosIds] = useState<string[]>([])
@@ -68,6 +87,7 @@ export function GrupoCard({
 
   const iniciarEdicion = () => {
     setEditNombre(grupo.nombre)
+    setEditDiasEnvio(grupo.diasEnvio || [])
     setEditDespachadoresIds(grupo.despachadores.map((d) => d.locationId))
     setEditProductosIds(grupo.productosIds)
     setIsEditing(true)
@@ -92,6 +112,7 @@ export function GrupoCard({
         nombre: nombreTrim,
         despachadores,
         productosIds: editProductosIds,
+        diasEnvio: editDiasEnvio,
       })
       const syncRes = await updateGroupProductsMembership(
         grupo.id,
@@ -190,7 +211,14 @@ export function GrupoCard({
         <CollapsibleTrigger asChild>
           <button type="button" className="flex min-w-[260px] flex-1 items-center gap-2 text-left">
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            <span className="font-medium">{grupo.nombre}</span>
+            <div className="flex flex-col">
+              <span className="font-medium">{grupo.nombre}</span>
+              {grupo.diasEnvio && grupo.diasEnvio.length > 0 && (
+                <span className="text-[10px] text-muted-foreground">
+                  Envío: {getDiasEnvioDisplay(grupo.diasEnvio)}
+                </span>
+              )}
+            </div>
           </button>
         </CollapsibleTrigger>
 
@@ -227,6 +255,24 @@ export function GrupoCard({
                 <div className="space-y-2">
                   <Label>Nombre del grupo</Label>
                   <Input value={editNombre} onChange={(e) => setEditNombre(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Día de envío</Label>
+                  <div className="flex flex-wrap gap-3">
+                    {dias.map((d) => (
+                      <label key={d.value} className="flex items-center gap-1.5 text-sm cursor-pointer group">
+                        <Checkbox
+                          checked={editDiasEnvio.includes(d.value)}
+                          onCheckedChange={(checked) =>
+                            toggleId(setEditDiasEnvio as any, d.value as any, checked === true)
+                          }
+                        />
+                        <span className="font-medium group-hover:text-primary transition-colors">
+                          {d.label}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Despachadores</Label>

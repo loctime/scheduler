@@ -5,6 +5,7 @@ export interface GrupoCatalogo {
   createdBy: string
   createdAt?: unknown
   despachadores: Array<{ locationId: string; locationName: string }>
+  diasEnvio?: number[]
 }
 
 export type GrupoCatalogoUI = GrupoCatalogo & {

@@ -437,7 +437,7 @@ export function usePedidos(user: any) {
   }, [products, stockActual])
 
   // Crear pedido
-  const createPedido = useCallback(async (nombre: string, stockMinimoDefault: number, formatoSalida: string) => {
+  const createPedido = useCallback(async (nombre: string, stockMinimoDefault: number, formatoSalida: string, diasEnvio?: number[]) => {
     if (!db || !user) return null
     if (!canCrearPedido) {
       toast({ title: "Error", description: "No tienes permisos para crear pedidos", variant: "destructive" })
@@ -459,6 +459,7 @@ export function usePedidos(user: any) {
         nombre: nombre.trim(),
         stockMinimoDefault,
         formatoSalida: formatoSalida || DEFAULT_FORMAT,
+        diasEnvio: diasEnvio || [],
         estado: "creado",
         ownerId,
         userId: user.uid,
@@ -471,6 +472,7 @@ export function usePedidos(user: any) {
         nombre: nombre.trim(),
         stockMinimoDefault,
         formatoSalida: formatoSalida || DEFAULT_FORMAT,
+        diasEnvio: diasEnvio,
         estado: "creado",
         ownerId,
         userId: user.uid,
@@ -489,7 +491,14 @@ export function usePedidos(user: any) {
   }, [user, userData, ownerId, toast, canCrearPedido])
 
   // Actualizar pedido
-  const updatePedido = useCallback(async (nombre: string, stockMinimoDefault: number, formatoSalida: string, mensajePrevio?: string, sheetUrl?: string) => {
+  const updatePedido = useCallback(async (
+    nombre: string,
+    stockMinimoDefault: number,
+    formatoSalida: string,
+    mensajePrevio?: string,
+    sheetUrl?: string,
+    diasEnvio?: number[]
+  ) => {
     if (!db || !selectedPedido) return false
     if (!canEditarPedido) {
       toast({ title: "Error", description: "No tienes permisos para editar pedidos", variant: "destructive" })
@@ -509,6 +518,7 @@ export function usePedidos(user: any) {
         formatoSalida: formatoSalida || DEFAULT_FORMAT,
         mensajePrevio: mensajePrevio ?? selectedPedido.mensajePrevio ?? null,
         sheetUrl: sheetUrl !== undefined ? (sheetUrl.trim() || null) : selectedPedido.sheetUrl ?? null,
+        diasEnvio: diasEnvio !== undefined ? diasEnvio : selectedPedido.diasEnvio || [],
         ownerId,
         userId: user?.uid ?? selectedPedido.userId,
         updatedAt: serverTimestamp(),
@@ -522,7 +532,8 @@ export function usePedidos(user: any) {
         stockMinimoDefault, 
         formatoSalida,
         mensajePrevio: mensajePrevio ?? selectedPedido.mensajePrevio,
-        sheetUrl: sheetUrl !== undefined ? (sheetUrl.trim() || undefined) : selectedPedido.sheetUrl
+        sheetUrl: sheetUrl !== undefined ? (sheetUrl.trim() || undefined) : selectedPedido.sheetUrl,
+        diasEnvio: diasEnvio !== undefined ? diasEnvio : selectedPedido.diasEnvio
       }
       setPedidos(prev => prev.map(p => p.id === selectedPedido.id ? updatedPedido : p))
       setSelectedPedido(updatedPedido)

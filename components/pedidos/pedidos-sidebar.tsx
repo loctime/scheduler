@@ -18,6 +18,23 @@ export function PedidosSidebar({
   onSelectPedido, 
   onCreatePedido 
 }: PedidosSidebarProps) {
+  const getDiasEnvioDisplay = (diasIds?: number[]) => {
+    if (!diasIds || diasIds.length === 0) return null
+    const dias = [
+      { value: 1, label: "L" },
+      { value: 2, label: "M" },
+      { value: 3, label: "X" },
+      { value: 4, label: "J" },
+      { value: 5, label: "V" },
+      { value: 6, label: "S" },
+      { value: 0, label: "D" },
+    ]
+    return diasIds
+      .sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
+      .map((id) => dias.find((d) => d.value === id)?.label)
+      .join(", ")
+  }
+
   // En móvil: selector horizontal compacto
   // En desktop: sidebar vertical
   return (
@@ -43,13 +60,21 @@ export function PedidosSidebar({
                     key={pedido.id}
                     onClick={() => onSelectPedido(pedido)}
                     className={cn(
-                      "flex-shrink-0 px-2 py-1 rounded text-xs font-medium transition-colors",
+                      "flex-shrink-0 px-2 py-1 rounded text-xs font-medium transition-colors text-left",
                       selectedPedido?.id === pedido.id 
                         ? "bg-primary text-primary-foreground" 
                         : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                     )}
                   >
-                    {pedido.nombre}
+                    <div>{pedido.nombre}</div>
+                    {pedido.diasEnvio && pedido.diasEnvio.length > 0 && (
+                      <div className={cn(
+                        "text-[9px] opacity-80",
+                        selectedPedido?.id === pedido.id ? "text-primary-foreground" : "text-muted-foreground"
+                      )}>
+                        Envío: {getDiasEnvioDisplay(pedido.diasEnvio)}
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
@@ -94,6 +119,14 @@ export function PedidosSidebar({
                   )}
                 >
                   <div className="truncate">{pedido.nombre}</div>
+                  {pedido.diasEnvio && pedido.diasEnvio.length > 0 && (
+                    <div className={cn(
+                      "text-[9px] truncate",
+                      selectedPedido?.id === pedido.id ? "text-accent-foreground/80" : "text-muted-foreground/80"
+                    )}>
+                      Envío: {getDiasEnvioDisplay(pedido.diasEnvio)}
+                    </div>
+                  )}
                 </button>
               ))}
             </div>

@@ -227,6 +227,7 @@ export interface Pedido {
   destinoDefault?: string
   createdAt?: any
   updatedAt?: any
+  diasEnvio?: number[]
 }
 
 export interface Producto {

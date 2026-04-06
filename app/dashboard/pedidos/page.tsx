@@ -108,6 +108,7 @@ export default function PedidosPage() {
   const [clearDialogOpen, setClearDialogOpen] = useState(false)
   const [confirmarNuevoEnlaceOpen, setConfirmarNuevoEnlaceOpen] = useState(false)
   const [formName, setFormName] = useState("")
+  const [formDiasEnvio, setFormDiasEnvio] = useState<number[]>([])
   const [importText, setImportText] = useState("")
 
   const [isEditingName, setIsEditingName] = useState(false)
@@ -153,13 +154,15 @@ export default function PedidosPage() {
 
   const handleOpenCreate = () => {
     setFormName("")
+    setFormDiasEnvio([])
     setCreatePedidoOpen(true)
   }
   const handleCreatePedido = async () => {
-    const result = await createPedido(formName, 1, DEFAULT_FORMAT)
+    const result = await createPedido(formName, 1, DEFAULT_FORMAT, formDiasEnvio)
     if (result) {
       setCreatePedidoOpen(false)
       setFormName("")
+      setFormDiasEnvio([])
     }
   }
   const handleDeletePedido = async () => {
@@ -209,6 +212,18 @@ export default function PedidosPage() {
   const handleFormatChange = async (newFormat: string) => {
     if (!selectedPedido || newFormat === selectedPedido.formatoSalida) return
     await updatePedido(selectedPedido.nombre, selectedPedido.stockMinimoDefault, newFormat)
+  }
+
+  const handleUpdateDiaEnvio = async (dias: number[]) => {
+    if (!selectedPedido) return
+    await updatePedido(
+      selectedPedido.nombre,
+      selectedPedido.stockMinimoDefault,
+      selectedPedido.formatoSalida,
+      selectedPedido.mensajePrevio,
+      selectedPedido.sheetUrl,
+      dias
+    )
   }
 
   const handleStartEditMensaje = () => {
@@ -420,11 +435,12 @@ export default function PedidosPage() {
                       onStartEditSheetUrl={handleStartEditSheetUrl}
                       onSaveSheetUrl={handleSaveSheetUrl}
                       onCancelEditSheetUrl={handleCancelEditSheetUrl}
-                      onSheetUrlKeyDown={handleSheetUrlKeyDown}
-                      onFormatChange={handleFormatChange}
-                      onImportClick={() => setImportDialogOpen(true)}
-                      onFacturaImportClick={() => setFacturaImportOpen(true)}
-                      onDeleteClick={() => setDeletePedidoDialogOpen(true)}
+        onSheetUrlKeyDown={handleSheetUrlKeyDown}
+        onFormatChange={handleFormatChange}
+        onDiasEnvioChange={handleUpdateDiaEnvio}
+        onImportClick={() => setImportDialogOpen(true)}
+        onFacturaImportClick={() => setFacturaImportOpen(true)}
+        onDeleteClick={() => setDeletePedidoDialogOpen(true)}
                       nameInputRef={nameInputRef}
                       mensajeInputRef={mensajeInputRef}
                       sheetUrlInputRef={sheetUrlInputRef}
@@ -471,6 +487,8 @@ export default function PedidosPage() {
         description="Ingresa un nombre para el nuevo pedido"
         name={formName}
         onNameChange={setFormName}
+        diasEnvio={formDiasEnvio}
+        onDiasEnvioChange={setFormDiasEnvio}
         onSubmit={handleCreatePedido}
         submitLabel="Crear Pedido"
       />

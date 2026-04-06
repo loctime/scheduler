@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Pencil, Check, X, Cog, Upload, FileText, Trash2 } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Pedido } from "@/lib/types"
@@ -47,6 +54,7 @@ export interface PedidoHeaderProps {
   onCancelEditSheetUrl: () => void
   onSheetUrlKeyDown: (e: React.KeyboardEvent) => void
   onFormatChange: (format: string) => void
+  onDiasEnvioChange: (dias: number[]) => void
   onImportClick: () => void
   onFacturaImportClick: () => void
   onDeleteClick: () => void
@@ -81,6 +89,7 @@ export function PedidoHeader({
   onCancelEditSheetUrl,
   onSheetUrlKeyDown,
   onFormatChange,
+  onDiasEnvioChange,
   onImportClick,
   onFacturaImportClick,
   onDeleteClick,
@@ -88,6 +97,25 @@ export function PedidoHeader({
   mensajeInputRef,
   sheetUrlInputRef
 }: PedidoHeaderProps) {
+  const dias = [
+    { value: 1, label: "L" },
+    { value: 2, label: "M" },
+    { value: 3, label: "X" },
+    { value: 4, label: "J" },
+    { value: 5, label: "V" },
+    { value: 6, label: "S" },
+    { value: 0, label: "D" },
+  ]
+
+  const toggleDia = (dia: number, checked: boolean) => {
+    const current = selectedPedido?.diasEnvio || []
+    if (checked) {
+      onDiasEnvioChange([...current, dia])
+    } else {
+      onDiasEnvioChange(current.filter((d) => d !== dia))
+    }
+  }
+
   useEffect(() => {
     if (isEditingName && nameInputRef.current) {
       nameInputRef.current.focus()
@@ -295,6 +323,25 @@ export function PedidoHeader({
                   {selectedPedido.sheetUrl || "Sin configurar"}
                 </div>
               )}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+              Día de envío
+            </label>
+            <div className="mt-1 flex flex-wrap gap-2.5">
+              {dias.map((d) => (
+                <label key={d.value} className="flex items-center gap-1.5 text-xs cursor-pointer group">
+                  <Checkbox
+                    checked={(selectedPedido?.diasEnvio || []).includes(d.value)}
+                    onCheckedChange={(checked) => toggleDia(d.value, checked === true)}
+                  />
+                  <span className="font-medium group-hover:text-primary transition-colors">
+                    {d.label}
+                  </span>
+                </label>
+              ))}
             </div>
           </div>
         </div>
