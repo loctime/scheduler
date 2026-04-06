@@ -7,6 +7,15 @@ export interface GrupoCatalogo {
   despachadores: Array<{ locationId: string; locationName: string }>
 }
 
+export type GrupoCatalogoUI = GrupoCatalogo & {
+  productosIds: string[]
+}
+
+export type UbicacionCatalogo = {
+  locationId: string
+  locationName: string
+}
+
 export type CatalogoProducto = {
   id: string
   ownerId: string
