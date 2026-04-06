@@ -118,13 +118,10 @@ export function NuevoGrupoForm({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Nuevo grupo</CardTitle>
-        <CardDescription>Definí nombre, despachadores y productos iniciales.</CardDescription>
-      </CardHeader>
+      
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label>Nombre del grupo</Label>
+        <div className="flex items-center gap-2">
+          <Label className="min-w-32">Nombre del grupo</Label>
           <Input value={nombre} onChange={(e) => setNombre(e.target.value)} />
         </div>
 

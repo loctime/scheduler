@@ -34,6 +34,7 @@ export function useGruposCatalogo(ownerId: string | null): {
             createdAt: x.createdAt,
             despachadores: normalizeDespachadoresGrupo(x),
             productosIds: normalizeProductosIds(x.productosIds),
+            diasEnvio: x.diasEnvio as number[] || undefined,
           }
         })
         list.sort((a, b) => a.nombre.localeCompare(b.nombre))

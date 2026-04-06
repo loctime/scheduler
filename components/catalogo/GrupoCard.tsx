@@ -45,18 +45,19 @@ export function GrupoCard({
   const [isGuardandoEdicion, setIsGuardandoEdicion] = useState(false)
 
   const dias = [
-    { value: 1, label: "L" },
-    { value: 2, label: "M" },
-    { value: 3, label: "X" },
-    { value: 4, label: "J" },
-    { value: 5, label: "V" },
-    { value: 6, label: "S" },
-    { value: 0, label: "D" },
+    { value: 1, label: "LUNES" },
+    { value: 2, label: "MARTES" },
+    { value: 3, label: "MIERCOLES" },
+    { value: 4, label: "JUEVES" },
+    { value: 5, label: "VIERNES" },
+    { value: 6, label: "SABADO" },
+    { value: 0, label: "DOMINGO" },
   ]
 
   const getDiasEnvioDisplay = (diasIds?: number[]) => {
     if (!diasIds || diasIds.length === 0) return null
     return diasIds
+      .map(id => Number(id))  // Convertir int64 a number normal
       .sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
       .map((id) => dias.find((d) => d.value === id)?.label)
       .join(", ")
@@ -87,7 +88,7 @@ export function GrupoCard({
 
   const iniciarEdicion = () => {
     setEditNombre(grupo.nombre)
-    setEditDiasEnvio(grupo.diasEnvio || [])
+    setEditDiasEnvio((grupo.diasEnvio || []).map(id => Number(id)))
     setEditDespachadoresIds(grupo.despachadores.map((d) => d.locationId))
     setEditProductosIds(grupo.productosIds)
     setIsEditing(true)
@@ -223,6 +224,18 @@ export function GrupoCard({
         </CollapsibleTrigger>
 
         <div className="flex flex-wrap items-center gap-2">
+          {grupo.diasEnvio && grupo.diasEnvio.length > 0 && (
+            <Badge variant="outline" className="text-xs">
+              {grupo.diasEnvio.length === 7 
+                ? "Todos los días" 
+                : grupo.diasEnvio
+                    .map(id => Number(id))  // Convertir int64 a number normal
+                    .sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
+                    .map((id) => dias.find((d) => d.value === id)?.label)
+                    .join(", ")
+              }
+            </Badge>
+          )}
           {grupo.despachadores.map((d) => (
             <Badge key={d.locationId} className="bg-green-100 text-green-800 hover:bg-green-100">
               {d.locationName}
