@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { useData } from "@/contexts/data-context"
 import { useLogistica } from "@/hooks/use-logistica"
 import { useGruposCatalogo } from "@/hooks/use-grupos-catalogo"
+import { useUbicacionesCatalogo } from "@/hooks/use-ubicaciones-catalogo"
 import { useToast } from "@/hooks/use-toast"
 import { canUser } from "@/lib/permissions"
 import { db, COLLECTIONS } from "@/lib/firebase"
@@ -264,7 +265,8 @@ function buildAutoPedidosPorOperador(
   destinoLocationId: string,
   destinoNombre: string,
   stockFilas: StockUbicacion[],
-  pedidosGrupo: PedidoFabrica[]
+  pedidosGrupo: PedidoFabrica[],
+  nombrePorLocationId: Map<string, string>
 ): PedidoFabrica[] {
   const pedidoCantidadByOrigenProducto = new Map<string, number>()
   for (const p of pedidosGrupo) {
@@ -304,7 +306,7 @@ function buildAutoPedidosPorOperador(
       id: `auto_${grupoPedidoId}_${origenLocationId}`,
       ownerId: "",
       origenLocationId,
-      origenNombre: origenLocationId,
+      origenNombre: nombrePorLocationId.get(origenLocationId) ?? origenLocationId,
       destinoLocationId,
       destinoNombre,
       grupoPedidoId,
@@ -332,6 +334,20 @@ export default function LogisticaFabricaPage() {
   const { toast } = useToast()
   const { pedidosRaw, remitosRaw, crearRemito, marcarEnCamino, tomarPedido, loading, ownerId } = useLogistica(user)
   const { gruposCatalogo } = useGruposCatalogo(ownerId)
+  const ownerIdsParaUsuarios = useMemo(() => {
+    if (!ownerId) return null
+    return [ownerId]
+  }, [ownerId])
+
+  const { ubicaciones } = useUbicacionesCatalogo(ownerIdsParaUsuarios)
+
+  const nombrePorLocationId = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const u of ubicaciones) {
+      m.set(u.locationId, u.locationName)
+    }
+    return m
+  }, [ubicaciones])
 
   const puede = useMemo(
     () => canUser({ uid: user?.uid, role: userData?.role, locationId: userData?.locationId }, "ver_logistica"),
@@ -419,11 +435,12 @@ export default function LogisticaFabricaPage() {
         despachadorLocationId,
         despachadorLocationId,
         stockFilas,
-        pedidosGrupo
+        pedidosGrupo,
+        nombrePorLocationId
       )
       return { grupo, pedidos: pedidosGrupo, autoPedidos }
     })
-  }, [gruposVisibles, pedidosRaw, stockFilas, despachadorLocationId])
+  }, [gruposVisibles, pedidosRaw, stockFilas, despachadorLocationId, nombrePorLocationId])
 
   // ── despachar state ────────────────────────────────────────────────────────
   const [abierto, setAbierto] = useState<string | null>(null)

@@ -379,70 +379,55 @@ export default function MiStockPage() {
   }, [itemsPedido, hoyIdx])
 
   // ── enviar pedido ───────────────────────────────────────────────────────────
-  const [modalPedido, setModalPedido] = useState(false)
   const [enviandoPedido, setEnviandoPedido] = useState(false)
 
-  const enviarPedido = async () => {
+  const enviarPedidoGrupo = async (grupo: GrupoCatalogoUI, rows: StockUbicacion[]) => {
     if (!db || !ownerId || !user) return
     setEnviandoPedido(true)
     try {
-      let enviados = 0
-      for (const { grupo, filas: rows } of itemsPedido) {
-        const items = rows.map((f) => ({
-          productoId: f.catalogoId,
-          productoNombre: f.nombre,
-          cantidadSugerida: f.stockMinimo - f.stockActual,
-          cantidadPedida: f.stockMinimo - f.stockActual,
-        }))
+      const items = rows.map((f) => ({
+        productoId: f.catalogoId,
+        productoNombre: f.nombre,
+        cantidadSugerida: f.stockMinimo - f.stockActual,
+        cantidadPedida: f.stockMinimo - f.stockActual,
+      }))
 
-        const pedidoExistente = pedidoActivoPorGrupo.get(grupo.id)
+      const pedidoExistente = pedidoActivoPorGrupo.get(grupo.id)
 
-        if (pedidoExistente?.estado === "en_preparacion" || pedidoExistente?.estado === "despachado") {
-          toast({
-            title: `"${grupo.nombre}" ya está en preparación o fue despachado. No se puede editar.`,
-            variant: "destructive",
-          })
-          continue
-        }
-
-        if (pedidoExistente?.estado === "enviado") {
-          await actualizarItemsPedido(pedidoExistente.id, items)
-        } else {
-          await addDoc(collection(db, COLLECTIONS.PEDIDOS_FABRICA), {
-            ownerId,
-            origenLocationId: locationId,
-            origenNombre: (userData as any)?.locationName || userData?.displayName || locationId,
-            destinoLocationId: grupo.despachadores[0]?.locationId ?? "",
-            destinoNombre: grupo.despachadores[0]?.locationName ?? "",
-            grupoPedidoId: grupo.id,
-            grupoPedidoNombre: grupo.nombre,
-            estado: "enviado",
-            esPendiente: false,
-            controlado: true,
-            items,
-            creadoEn: serverTimestamp(),
-            creadoPor: user.uid,
-            creadoPorEmail: user.email ?? "",
-            actualizadoEn: serverTimestamp(),
-          })
-        }
-        enviados++
+      if (pedidoExistente?.estado === "en_preparacion" || pedidoExistente?.estado === "despachado") {
+        toast({ title: `"${grupo.nombre}" ya está en preparación o fue despachado.`, variant: "destructive" })
+        return
       }
-      if (enviados > 0) {
-        toast({ title: "Pedido enviado", description: `${enviados} grupo(s) enviado(s).` })
+
+      if (pedidoExistente?.estado === "enviado") {
+        await actualizarItemsPedido(pedidoExistente.id, items)
+        toast({ title: `Pedido de "${grupo.nombre}" actualizado.` })
+      } else {
+        await addDoc(collection(db, COLLECTIONS.PEDIDOS_FABRICA), {
+          ownerId,
+          origenLocationId: locationId,
+          origenNombre: (userData as any)?.locationName || userData?.displayName || locationId,
+          destinoLocationId: grupo.despachadores[0]?.locationId ?? "",
+          destinoNombre: grupo.despachadores[0]?.locationName ?? "",
+          grupoPedidoId: grupo.id,
+          grupoPedidoNombre: grupo.nombre,
+          estado: "enviado",
+          esPendiente: false,
+          controlado: true,
+          items,
+          creadoEn: serverTimestamp(),
+          creadoPor: user.uid,
+          creadoPorEmail: user.email ?? "",
+          actualizadoEn: serverTimestamp(),
+        })
+        toast({ title: `Pedido de "${grupo.nombre}" enviado.` })
       }
-      setModalPedido(false)
     } catch (e) {
       toast({ title: "Error al enviar pedido", description: e instanceof Error ? e.message : "Error desconocido", variant: "destructive" })
     } finally {
       setEnviandoPedido(false)
     }
   }
-
-  const todoBloqueado = itemsPedido.length > 0 && itemsPedido.every(({ grupo }) => {
-    const p = pedidoActivoPorGrupo.get(grupo.id)
-    return p?.estado === "en_preparacion" || p?.estado === "despachado"
-  })
 
   // ── sin permiso ─────────────────────────────────────────────────────────────
   if (!puede) {
@@ -659,6 +644,7 @@ export default function MiStockPage() {
               <>
                 {itemsPedido.map(({ grupo, filas: rows }) => {
                   const pedidoActivo = pedidoActivoPorGrupo.get(grupo.id)
+                  const bloqueado = pedidoActivo?.estado === "en_preparacion" || pedidoActivo?.estado === "despachado"
                   return (
                     <Card key={grupo.id}>
                       <CardContent className="pt-4 pb-3 px-4 space-y-2">
@@ -690,16 +676,18 @@ export default function MiStockPage() {
                             <Badge className="bg-gray-100 text-gray-600 border border-gray-200">Despachado</Badge>
                           )}
                         </div>
+                        <Button
+                          className="w-full mt-2"
+                          disabled={bloqueado || enviandoPedido}
+                          onClick={() => void enviarPedidoGrupo(grupo, rows)}
+                        >
+                          {enviandoPedido ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                          {bloqueado ? "En preparación" : "Confirmar y enviar"}
+                        </Button>
                       </CardContent>
                     </Card>
                   )
                 })}
-
-                <div className="flex justify-end pt-2">
-                  <Button onClick={() => setModalPedido(true)} disabled={todoBloqueado}>
-                    Confirmar y enviar pedido
-                  </Button>
-                </div>
               </>
             )}
           </TabsContent>
@@ -764,38 +752,6 @@ export default function MiStockPage() {
                 disabled={!!desactivandoId}
               >
                 {desactivandoId ? <Loader2 className="h-4 w-4 animate-spin" /> : "Desactivar"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* ── modal confirmar pedido ── */}
-        <Dialog open={modalPedido} onOpenChange={setModalPedido}>
-          <DialogContent className="max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Confirmar pedido</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 text-sm">
-              {itemsPedido.map(({ grupo, filas: rows }) => (
-                <div key={grupo.id}>
-                  <p className="font-semibold mb-1">{grupo.nombre}</p>
-                  <ul className="space-y-0.5 pl-2">
-                    {rows.map((f) => (
-                      <li key={f.id} className="flex justify-between">
-                        <span className="text-muted-foreground">{f.nombre}</span>
-                        <span className="tabular-nums font-medium">× {f.stockMinimo - f.stockActual}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setModalPedido(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={() => void enviarPedido()} disabled={enviandoPedido}>
-                {enviandoPedido ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enviar pedido"}
               </Button>
             </DialogFooter>
           </DialogContent>
