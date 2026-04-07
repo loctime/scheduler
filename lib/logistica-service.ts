@@ -98,8 +98,8 @@ export async function crearRemito(input: {
   if (!db) {
     return { ok: false, error: "Firestore no está disponible" }
   }
-  if (!canUser(input.user, "ver_admin")) {
-    return { ok: false, error: "Solo administración puede crear remitos de logística" }
+  if (!canUser(input.user, "crear_pedido")) {
+    return { ok: false, error: "No tenés permiso para crear remitos" }
   }
   if (!input.items.length) {
     return { ok: false, error: "El remito debe incluir al menos un ítem" }

@@ -338,7 +338,7 @@ export default function MiStockPage() {
         await addDoc(collection(db, COLLECTIONS.PEDIDOS_FABRICA), {
           ownerId,
           origenLocationId: locationId,
-          origenNombre: locationId,
+          origenNombre: userData?.displayName || userData?.email || locationId,
           destinoLocationId: grupo.despachadores[0]?.locationId ?? "",
           destinoNombre: grupo.despachadores[0]?.locationName ?? "",
           grupoPedidoId: grupo.id,

@@ -20,9 +20,202 @@ import type { PedidoFabrica, RemitoLogItem } from "@/lib/logistica-types"
 import type { StockUbicacion } from "@/lib/stock-ubicaciones-types"
 import { ChevronDown, ChevronRight, Factory, Loader2, Truck } from "lucide-react"
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
+// Cambio 1 - Estado de vista
+type VistaType = "tarjetas" | "tabla"
 
-const HOY = new Date().getDay() // 0=domingo … 6=sábado
+// Cambio 2 - Componente OperarioCardView (vista tarjetas)
+function OperarioCardView({
+  pedido,
+  cantSend,
+  comentSend,
+  obsRemito,
+  procesando,
+  onCantChange,
+  onComentChange,
+  onObsChange,
+  onDespachar,
+}: {
+  pedido: PedidoFabrica
+  cantSend: Record<string, number>
+  comentSend: Record<string, string>
+  obsRemito: string
+  procesando: boolean
+  onCantChange: (productoId: string, val: number) => void
+  onComentChange: (productoId: string, val: string) => void
+  onObsChange: (val: string) => void
+  onDespachar: () => void
+}) {
+  const [expandido, setExpandido] = useState(false)
+  const esControlado = pedido.controlado === true
+
+  return (
+    <div className="bg-muted/50 rounded-lg p-3 space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h4 className="font-medium">{pedido.origenNombre}</h4>
+        {esControlado ? (
+          <Badge className="bg-green-50 text-green-800 border border-green-200">Controlado</Badge>
+        ) : (
+          <Badge className="bg-amber-50 text-amber-800 border border-amber-200">Automático</Badge>
+        )}
+      </div>
+
+      {/* Lista de items como pills */}
+      <div className="flex flex-wrap gap-1">
+        {pedido.items.map((item) => (
+          <span
+            key={item.productoId}
+            className="inline-block px-2 py-1 text-xs bg-background border rounded-md"
+          >
+            {item.productoNombre} × {item.cantidadPedida}
+          </span>
+        ))}
+      </div>
+
+      {/* Botón de despachar */}
+      <Button
+        onClick={() => setExpandido(!expandido)}
+        variant="outline"
+        size="sm"
+        className="w-full"
+      >
+        {expandido ? "Cancelar" : "Despachar"}
+      </Button>
+
+      {/* Contenido expandido */}
+      {expandido && (
+        <div className="space-y-3 pt-3 border-t">
+          {pedido.items.map((item) => (
+            <div key={item.productoId} className="space-y-2">
+              <div className="text-sm font-medium">{item.productoNombre}</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">Cantidad a enviar</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={cantSend[item.productoId] ?? item.cantidadPedida}
+                    onChange={(e) =>
+                      onCantChange(item.productoId, Math.max(0, Math.floor(Number(e.target.value) || 0)))
+                    }
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Comentario</Label>
+                  <Input
+                    placeholder="Opcional"
+                    value={comentSend[item.productoId] ?? ""}
+                    onChange={(e) => onComentChange(item.productoId, e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <div>
+            <Label className="text-xs">Observación del remito</Label>
+            <Textarea
+              rows={2}
+              value={obsRemito}
+              onChange={(e) => onObsChange(e.target.value)}
+              placeholder="Observaciones del remito..."
+            />
+          </div>
+
+          <Button onClick={onDespachar} disabled={procesando} className="w-full">
+            {procesando ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            Crear remito y despachar
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Cambio 2 - Componente GrupoTablaView (vista tabla)
+function GrupoTablaView({ pedidos }: { pedidos: PedidoFabrica[] }) {
+  // Recolectar todos los productos únicos
+  const todosProductos = useMemo(() => {
+    const productosMap = new Map<string, string>()
+    pedidos.forEach((pedido) => {
+      pedido.items.forEach((item) => {
+        if (!productosMap.has(item.productoId)) {
+          productosMap.set(item.productoId, item.productoNombre)
+        }
+      })
+    })
+    return Array.from(productosMap.entries()).map(([id, nombre]) => ({ id, nombre }))
+  }, [pedidos])
+
+  // Calcular totales por fila
+  const totalesPorProducto = useMemo(() => {
+    const totales: Record<string, number> = {}
+    todosProductos.forEach(({ id }) => {
+      totales[id] = 0
+      pedidos.forEach((pedido) => {
+        const item = pedido.items.find((i) => i.productoId === id)
+        if (item) {
+          totales[id] += item.cantidadPedida
+        }
+      })
+    })
+    return totales
+  }, [todosProductos, pedidos])
+
+  if (pedidos.length === 0) {
+    return <p className="text-sm text-muted-foreground">Sin pedidos para mostrar</p>
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr>
+            <th className="text-left p-2 border bg-muted">Producto</th>
+            {pedidos.map((pedido) => (
+              <th key={pedido.id} className="text-left p-2 border bg-muted min-w-[120px]">
+                <div className="flex flex-col gap-1">
+                  <span>{pedido.origenNombre}</span>
+                  {pedido.controlado ? (
+                    <Badge className="bg-green-50 text-green-800 border border-green-200 text-xs">
+                      Controlado
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-amber-50 text-amber-800 border border-amber-200 text-xs">
+                      Automático
+                    </Badge>
+                  )}
+                </div>
+              </th>
+            ))}
+            <th className="text-left p-2 border bg-muted font-semibold text-blue-600">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {todosProductos.map(({ id, nombre }) => (
+            <tr key={id}>
+              <td className="p-2 border font-medium">{nombre}</td>
+              {pedidos.map((pedido) => {
+                const item = pedido.items.find((i) => i.productoId === id)
+                return (
+                  <td key={pedido.id} className="p-2 border text-center">
+                    {item ? item.cantidadPedida : " - "}
+                  </td>
+                )
+              })}
+              <td className="p-2 border text-center font-semibold text-blue-600">
+                {totalesPorProducto[id]}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
+const HOY = new Date().getDay() // 0=domingo ... 6=sábado
 
 function buildAutoPedido(
   grupoId: string,
@@ -60,93 +253,20 @@ function buildAutoPedido(
   }
 }
 
-// ─── pedido row ───────────────────────────────────────────────────────────────
-
-function PedidoRow({
-  pedido,
-  abierto,
-  cantSend,
-  comentSend,
-  obsRemito,
-  procesando,
-  onToggle,
-  onCantChange,
-  onComentChange,
-  onObsChange,
-  onDespachar,
-}: {
-  pedido: PedidoFabrica
-  abierto: boolean
-  cantSend: Record<string, number>
-  comentSend: Record<string, string>
-  obsRemito: string
-  procesando: boolean
-  onToggle: () => void
-  onCantChange: (productoId: string, val: number) => void
-  onComentChange: (productoId: string, val: string) => void
-  onObsChange: (val: string) => void
-  onDespachar: () => void
-}) {
-  const esControlado = pedido.controlado === true
-  return (
-    <div className="rounded-md border border-border">
-      <button
-        type="button"
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50"
-        onClick={onToggle}
-      >
-        {abierto ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
-        <span className="font-medium flex-1">{pedido.origenNombre || pedido.grupoPedidoNombre}</span>
-        {esControlado ? (
-          <Badge variant="default" className="text-xs">✅ Controlado</Badge>
-        ) : (
-          <Badge variant="secondary" className="text-xs">⚠️ Automático</Badge>
-        )}
-        {pedido.esPendiente && <Badge variant="outline" className="text-xs">PENDIENTE</Badge>}
-      </button>
-      {abierto && (
-        <div className="border-t border-border px-3 py-3 space-y-4">
-          {pedido.items.map((it) => (
-            <div key={it.productoId} className="grid gap-2 sm:grid-cols-2">
-              <div>
-                <div className="font-medium text-sm">{it.productoNombre}</div>
-                <div className="text-xs text-muted-foreground">Pedido: {it.cantidadPedida}</div>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs">Cantidad a enviar</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={cantSend[it.productoId] ?? it.cantidadPedida}
-                  onChange={(e) =>
-                    onCantChange(it.productoId, Math.max(0, Math.floor(Number(e.target.value) || 0)))
-                  }
-                />
-                <Input
-                  placeholder="Comentario (opcional)"
-                  value={comentSend[it.productoId] ?? ""}
-                  onChange={(e) => onComentChange(it.productoId, e.target.value)}
-                />
-              </div>
-            </div>
-          ))}
-          <div>
-            <Label className="text-xs">Observación del remito</Label>
-            <Textarea rows={2} value={obsRemito} onChange={(e) => onObsChange(e.target.value)} />
-          </div>
-          <Button onClick={onDespachar} disabled={procesando}>
-            {procesando ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Crear remito y despachar
-          </Button>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ─── main page ────────────────────────────────────────────────────────────────
 
+// Helper para formatear días de envío
+const DIAS_SEMANA = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
+
+function formatDiasEnvio(dias?: number[]): string {
+  if (!dias || dias.length === 0) return "No definidos"
+  return dias.map(d => DIAS_SEMANA[d]).join(", ")
+}
+
 export default function LogisticaFabricaPage() {
+  // Cambio 1 - Estado de vista
+  const [vista, setVista] = useState<VistaType>("tarjetas")
+  
   const { user, userData } = useData()
   const { toast } = useToast()
   const { pedidosRaw, remitosRaw, crearRemito, marcarEnCamino, loading, ownerId } = useLogistica(user)
@@ -329,6 +449,26 @@ export default function LogisticaFabricaPage() {
     toast({ title: "Remito en camino" })
   }
 
+  // Estado para grupos colapsables
+  const [gruposAbiertos, setGruposAbiertos] = useState<Record<string, boolean>>({})
+
+  const toggleGrupo = (grupoId: string) => {
+    setGruposAbiertos((prev) => ({ ...prev, [grupoId]: !prev[grupoId] }))
+  }
+
+  // Inicializar grupos abiertos por defecto
+  useEffect(() => {
+    const inicial: Record<string, boolean> = {}
+    gruposVisibles.forEach((grupo) => {
+      if (!(grupo.id in gruposAbiertos)) {
+        inicial[grupo.id] = true
+      }
+    })
+    if (Object.keys(inicial).length > 0) {
+      setGruposAbiertos(prev => ({ ...prev, ...inicial }))
+    }
+  }, [gruposVisibles])
+
   // ── render ─────────────────────────────────────────────────────────────────
   if (!puede) {
     return (
@@ -362,68 +502,124 @@ export default function LogisticaFabricaPage() {
             <TabsTrigger value="activos">Remitos activos</TabsTrigger>
           </TabsList>
 
-          {/* ── tab pedidos de hoy ── */}
+          {/* Tab pedidos de hoy - NUEVA ESTRUCTURA */}
           <TabsContent value="pedidos" className="space-y-4 mt-4">
-            {loading && (
-              <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Sincronizando…
+            {/* Header con toggle de vista */}
+            <div className="flex items-center justify-between">
+              <div>
+                {loading && (
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Sincronizando...
+                  </div>
+                )}
+                {!loading && gruposVisibles.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No hay grupos asignados a tu despacho para hoy.
+                  </p>
+                )}
               </div>
-            )}
-            {!loading && gruposVisibles.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                No hay grupos asignados a tu despacho para hoy.
-              </p>
-            )}
+              
+              {/* Toggle de vista */}
+              <div className="flex gap-1">
+                <Button
+                  variant={vista === "tarjetas" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setVista("tarjetas")}
+                >
+                  Tarjetas
+                </Button>
+                <Button
+                  variant={vista === "tabla" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setVista("tabla")}
+                >
+                  Tabla
+                </Button>
+              </div>
+            </div>
+
+            {/* Grupos colapsables */}
             {pedidosDeHoy.map(({ grupo, pedidos, autoPedido }) => {
               const todosLosPedidos: PedidoFabrica[] = [
                 ...pedidos,
                 ...(autoPedido ? [autoPedido] : []),
               ]
+              const estaAbierto = gruposAbiertos[grupo.id] ?? true
+
               return (
                 <Card key={grupo.id}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">{grupo.nombre}</CardTitle>
-                    <CardDescription>
-                      {pedidos.length === 0
-                        ? "Sin pedidos confirmados — mostrando pedido automático"
-                        : `${pedidos.length} pedido(s)`}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {todosLosPedidos.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        Sin pedidos ni diferencias de stock para este grupo.
-                      </p>
-                    ) : (
-                      todosLosPedidos.map((p) => (
-                        <PedidoRow
-                          key={p.id}
-                          pedido={p}
-                          abierto={abierto === p.id}
-                          cantSend={cantSend[p.id] ?? {}}
-                          comentSend={comentSend[p.id] ?? {}}
-                          obsRemito={obsRemito[p.id] ?? ""}
-                          procesando={procesando === p.id}
-                          onToggle={() => togglePedido(p)}
-                          onCantChange={(pid, val) =>
-                            setCantSend((s) => ({ ...s, [p.id]: { ...(s[p.id] ?? {}), [pid]: val } }))
-                          }
-                          onComentChange={(pid, val) =>
-                            setComentSend((s) => ({ ...s, [p.id]: { ...(s[p.id] ?? {}), [pid]: val } }))
-                          }
-                          onObsChange={(val) => setObsRemito((s) => ({ ...s, [p.id]: val }))}
-                          onDespachar={() => void despachar(p)}
-                        />
-                      ))
-                    )}
-                  </CardContent>
+                  {/* Header clickeable del grupo */}
+                  <button
+                    type="button"
+                    className="w-full text-left"
+                    onClick={() => toggleGrupo(grupo.id)}
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-base">{grupo.nombre}</CardTitle>
+                          <CardDescription>
+                            {pedidos.length === 0
+                              ? "Sin pedidos confirmados - mostrando pedido automático"
+                              : `${pedidos.length} pedido(s)`}
+                          </CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">
+                            Días: {formatDiasEnvio(grupo.diasEnvio)}
+                          </span>
+                          {estaAbierto ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </div>
+                      </div>
+                    </CardHeader>
+                  </button>
+
+                  {/* Cuerpo del grupo */}
+                  {estaAbierto && (
+                    <CardContent className="space-y-4">
+                      {todosLosPedidos.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          Sin pedidos ni diferencias de stock
+                        </p>
+                      ) : vista === "tarjetas" ? (
+                        // Vista tarjetas
+                        <div className="grid gap-3">
+                          {todosLosPedidos.map((pedido) => (
+                            <OperarioCardView
+                              key={pedido.id}
+                              pedido={pedido}
+                              cantSend={cantSend[pedido.id] ?? {}}
+                              comentSend={comentSend[pedido.id] ?? {}}
+                              obsRemito={obsRemito[pedido.id] ?? ""}
+                              procesando={procesando === pedido.id}
+                              onCantChange={(productoId: string, val: number) =>
+                                setCantSend((s) => ({ ...s, [pedido.id]: { ...(s[pedido.id] ?? {}), [productoId]: val } }))
+                              }
+                              onComentChange={(productoId: string, val: string) =>
+                                setComentSend((s) => ({ ...s, [pedido.id]: { ...(s[pedido.id] ?? {}), [productoId]: val } }))
+                              }
+                              onObsChange={(val: string) => setObsRemito((s) => ({ ...s, [pedido.id]: val }))}
+                              onDespachar={() => void despachar(pedido)}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        // Vista tabla
+                        <GrupoTablaView pedidos={todosLosPedidos} />
+                      )}
+                    </CardContent>
+                  )}
                 </Card>
               )
             })}
           </TabsContent>
 
-          {/* ── tab remitos activos (sin cambios) ── */}
+          {/* Tab remitos activos (sin cambios) */}
           <TabsContent value="activos" className="space-y-6 mt-4">
             <div>
               <h3 className="text-sm font-semibold flex items-center gap-2 mb-2">
