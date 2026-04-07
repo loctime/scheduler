@@ -24,6 +24,7 @@ const SOURCE_DIRS = [
   "components",
   "contexts",
   "docs",
+  "hooks",
   "lib",
   "src",
   "styles",

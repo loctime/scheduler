@@ -39,6 +39,7 @@ export async function inicializarStockUbicacion(input: {
   locationId: string
   stockMinimo?: number
   orden?: number
+  grupoCatalogoId?: string
   userId: string
 }): Promise<{ ok: boolean; stockId?: string; error?: string }> {
   if (!db) return { ok: false, error: "Firestore no está disponible" }
@@ -78,6 +79,7 @@ export async function inicializarStockUbicacion(input: {
       stockActual: 0,
       stockMinimo: input.stockMinimo ?? minCat,
       orden: input.orden ?? ordenCat,
+      ...(input.grupoCatalogoId ? { grupoCatalogoId: input.grupoCatalogoId } : {}),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       updatedBy: input.userId,
@@ -221,6 +223,118 @@ export async function getStockUbicacion(
   const snap = await getDoc(sRef)
   if (!snap.exists()) return 0
   return stockActualFromData(snap.data() as Record<string, unknown>)
+}
+
+export async function setStockMinimoUbicacion(input: {
+  ownerId: string
+  catalogoId: string
+  locationId: string
+  minimo: number
+  user: { uid: string }
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!db) return { ok: false, error: "Firestore no está disponible" }
+  const firestore = db
+  const sRef = stockUbicacionRef(firestore, input.ownerId, input.catalogoId, input.locationId)
+  const val = Math.max(0, Math.floor(input.minimo))
+
+  try {
+    const snap = await getDoc(sRef)
+    if (!snap.exists()) {
+      return { ok: false, error: "No hay stock registrado para este producto en tu ubicación." }
+    }
+    const data = snap.data() as Record<string, unknown>
+    if (data.ownerId !== input.ownerId) {
+      return { ok: false, error: "Sin permiso para modificar este registro" }
+    }
+
+    await updateDoc(sRef, {
+      stockMinimo: val,
+      updatedAt: serverTimestamp(),
+      updatedBy: input.user.uid,
+    })
+    return { ok: true }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Error al actualizar stock mínimo"
+    return { ok: false, error: message }
+  }
+}
+
+export async function inicializarGrupoCompleto(input: {
+  ownerId: string
+  grupoCatalogoId: string
+  productos: Array<{ id: string; nombre: string; unidad: string; pedidoId: string; stockMinimo: number; orden: number }>
+  locationId: string
+  userId: string
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!db) return { ok: false, error: "Firestore no está disponible" }
+  const firestore = db
+
+  try {
+    // Verificar cuáles ya existen para no sobreescribir
+    const ids = input.productos.map((p) => stockUbicacionDocId(input.ownerId, p.id, input.locationId))
+    const refs = ids.map((id) => doc(firestore, COLLECTIONS.STOCK_UBICACIONES, id))
+    const snaps = await Promise.all(refs.map((r) => getDoc(r)))
+    const existentes = new Set(snaps.filter((s) => s.exists()).map((s) => s.id))
+
+    const nuevos = input.productos.filter(
+      (p) => !existentes.has(stockUbicacionDocId(input.ownerId, p.id, input.locationId))
+    )
+    if (nuevos.length === 0) return { ok: true }
+
+    const batch = writeBatch(firestore)
+    for (const p of nuevos) {
+      const id = stockUbicacionDocId(input.ownerId, p.id, input.locationId)
+      const sRef = doc(firestore, COLLECTIONS.STOCK_UBICACIONES, id)
+      batch.set(sRef, {
+        ownerId: input.ownerId,
+        catalogoId: p.id,
+        locationId: input.locationId,
+        nombre: p.nombre,
+        unidad: p.unidad,
+        pedidoId: p.pedidoId,
+        stockActual: 0,
+        stockMinimo: p.stockMinimo,
+        orden: p.orden,
+        grupoCatalogoId: input.grupoCatalogoId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        updatedBy: input.userId,
+      })
+    }
+    await batch.commit()
+    return { ok: true }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Error al inicializar grupo"
+    return { ok: false, error: message }
+  }
+}
+
+export async function desactivarGrupo(input: {
+  ownerId: string
+  grupoCatalogoId: string
+  locationId: string
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!db) return { ok: false, error: "Firestore no está disponible" }
+  const firestore = db
+
+  try {
+    const q = query(
+      collection(firestore, COLLECTIONS.STOCK_UBICACIONES),
+      where("ownerId", "==", input.ownerId),
+      where("locationId", "==", input.locationId),
+      where("grupoCatalogoId", "==", input.grupoCatalogoId)
+    )
+    const snap = await getDocs(q)
+    if (snap.empty) return { ok: true }
+
+    const batch = writeBatch(firestore)
+    snap.docs.forEach((d) => batch.delete(d.ref))
+    await batch.commit()
+    return { ok: true }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Error al desactivar grupo"
+    return { ok: false, error: message }
+  }
 }
 
 /** Sincroniza snapshots de nombre/unidad/pedidoId desde el catálogo hacia todas las filas de stock */

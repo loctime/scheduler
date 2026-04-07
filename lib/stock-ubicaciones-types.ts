@@ -9,6 +9,7 @@ export type StockUbicacion = {
   stockActual: number
   stockMinimo: number
   orden: number
+  grupoCatalogoId?: string
   createdAt?: unknown
   updatedAt?: unknown
   updatedBy: string
