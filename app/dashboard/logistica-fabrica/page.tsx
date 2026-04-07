@@ -433,11 +433,12 @@ export default function LogisticaFabricaPage() {
         (p) => p.grupoPedidoId === grupo.id && 
              (p.estado === "despachado" || p.estado === "recibido")
       )
+      const despachadorNombre = nombrePorLocationId.get(despachadorLocationId) ?? despachadorLocationId
       const autoPedidos = buildAutoPedidosPorOperador(
         grupo.id,
         grupo.nombre,
         despachadorLocationId,
-        despachadorLocationId,
+        despachadorNombre,
         stockFilas,
         [...pedidosGrupo, ...pedidosGestionados],
         nombrePorLocationId
@@ -502,9 +503,9 @@ export default function LogisticaFabricaPage() {
     setProcesando(id)
     const res = await crearRemito({
       origenLocationId: pedido.destinoLocationId,
-      origenNombre: pedido.destinoNombre,
+      origenNombre: nombrePorLocationId.get(pedido.destinoLocationId) ?? pedido.destinoNombre,
       destinoLocationId: pedido.origenLocationId,
-      destinoNombre: pedido.origenNombre,
+      destinoNombre: nombrePorLocationId.get(pedido.origenLocationId) ?? pedido.origenNombre,
       ...(esAuto ? {} : { pedidoFabricaId: id }),
       items,
       observacion: obsRemito[id]?.trim() || undefined,
