@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { collection, onSnapshot, query, where } from "firebase/firestore"
+import { addDoc, collection, onSnapshot, query, serverTimestamp, where } from "firebase/firestore"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -30,6 +30,8 @@ function OperarioCardView({
   comentSend,
   obsRemito,
   procesando,
+  onAceptar,
+  aceptando,
   onCantChange,
   onComentChange,
   onObsChange,
@@ -41,6 +43,8 @@ function OperarioCardView({
   comentSend: Record<string, string>
   obsRemito: string
   procesando: boolean
+  onAceptar?: () => void
+  aceptando?: boolean
   onCantChange: (productoId: string, val: number) => void
   onComentChange: (productoId: string, val: string) => void
   onObsChange: (val: string) => void
@@ -50,6 +54,7 @@ function OperarioCardView({
   const [expandido, setExpandido] = useState(false)
   const esControlado = pedido.controlado === true
   const esAuto = pedido.id.startsWith("auto_")
+  const sinConfirmar = esAuto && typeof onAceptar === "function"
 
   return (
     <div className="bg-muted/50 rounded-lg p-3 space-y-3">
@@ -60,7 +65,9 @@ function OperarioCardView({
           {pedido.estado === "en_preparacion" && (
             <Badge className="bg-blue-50 text-blue-800 border border-blue-200">En preparación</Badge>
           )}
-          {esControlado ? (
+          {sinConfirmar ? (
+            <Badge className="bg-yellow-50 text-yellow-800 border border-yellow-200">Sin confirmar</Badge>
+          ) : esControlado ? (
             <Badge className="bg-green-50 text-green-800 border border-green-200">Controlado</Badge>
           ) : (
             <Badge className="bg-amber-50 text-amber-800 border border-amber-200">Automático</Badge>
@@ -92,18 +99,22 @@ function OperarioCardView({
         </Button>
       )}
 
+      {sinConfirmar && onAceptar && (
+        <Button onClick={onAceptar} disabled={aceptando === true} variant="outline" size="sm" className="w-full">
+          {aceptando ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+          Aceptar como está
+        </Button>
+      )}
+
       {/* Botón de despachar */}
-      <Button
-        onClick={() => setExpandido(!expandido)}
-        variant="outline"
-        size="sm"
-        className="w-full"
-      >
-        {expandido ? "Cancelar" : "Despachar"}
-      </Button>
+      {!sinConfirmar && (
+        <Button onClick={() => setExpandido(!expandido)} variant="outline" size="sm" className="w-full">
+          {expandido ? "Cancelar" : "Despachar"}
+        </Button>
+      )}
 
       {/* Contenido expandido */}
-      {expandido && (
+      {!sinConfirmar && expandido && (
         <div className="space-y-3 pt-3 border-t">
           {pedido.items.map((item) => (
             <div key={item.productoId} className="space-y-2">
@@ -237,42 +248,6 @@ function GrupoTablaView({ pedidos }: { pedidos: PedidoFabrica[] }) {
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const HOY = new Date().getDay() // 0=domingo ... 6=sábado
 
-function buildAutoPedido(
-  grupoId: string,
-  grupoNombre: string,
-  despachadorLocationId: string,
-  despachadorNombre: string,
-  stockFilas: StockUbicacion[]
-): PedidoFabrica | null {
-  const items = stockFilas
-    .filter((f) => f.grupoCatalogoId === grupoId && f.stockMinimo > 0 && f.stockActual < f.stockMinimo)
-    .map((f) => ({
-      productoId: f.catalogoId,
-      productoNombre: f.nombre,
-      cantidadSugerida: f.stockMinimo - f.stockActual,
-      cantidadPedida: f.stockMinimo - f.stockActual,
-    }))
-  if (items.length === 0) return null
-  return {
-    id: `auto_${grupoId}`,
-    ownerId: "",
-    origenLocationId: "",
-    origenNombre: "Automático",
-    destinoLocationId: despachadorLocationId,
-    destinoNombre: despachadorNombre,
-    grupoPedidoId: grupoId,
-    grupoPedidoNombre: grupoNombre,
-    estado: "enviado",
-    esPendiente: false,
-    controlado: false,
-    items,
-    creadoEn: null,
-    creadoPor: "",
-    creadoPorEmail: "",
-    actualizadoEn: null,
-  }
-}
-
 // ─── main page ────────────────────────────────────────────────────────────────
 
 // Helper para formatear días de envío
@@ -281,6 +256,72 @@ const DIAS_SEMANA = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
 function formatDiasEnvio(dias?: number[]): string {
   if (!dias || dias.length === 0) return "No definidos"
   return dias.map(d => DIAS_SEMANA[d]).join(", ")
+}
+
+function buildAutoPedidosPorOperador(
+  grupoPedidoId: string,
+  grupoPedidoNombre: string,
+  destinoLocationId: string,
+  destinoNombre: string,
+  stockFilas: StockUbicacion[],
+  pedidosGrupo: PedidoFabrica[]
+): PedidoFabrica[] {
+  const pedidoCantidadByOrigenProducto = new Map<string, number>()
+  for (const p of pedidosGrupo) {
+    const origenId = p.origenLocationId
+    for (const it of p.items) {
+      const k = `${origenId}::${it.productoId}`
+      pedidoCantidadByOrigenProducto.set(k, (pedidoCantidadByOrigenProducto.get(k) ?? 0) + (it.cantidadPedida ?? 0))
+    }
+  }
+
+  const itemsByOrigen = new Map<string, PedidoFabrica["items"]>()
+  for (const fila of stockFilas) {
+    if (fila.grupoCatalogoId !== grupoPedidoId) continue
+    const faltante = Math.max(0, Math.floor((fila.stockMinimo ?? 0) - (fila.stockActual ?? 0)))
+    if (faltante <= 0) continue
+
+    const origenLocationId = fila.locationId
+    const k = `${origenLocationId}::${fila.catalogoId}`
+    const yaPedido = pedidoCantidadByOrigenProducto.get(k) ?? 0
+    const cantidad = Math.max(0, faltante - yaPedido)
+    if (cantidad <= 0) continue
+
+    const list = itemsByOrigen.get(origenLocationId) ?? []
+    list.push({
+      productoId: fila.catalogoId,
+      productoNombre: fila.nombre,
+      cantidadSugerida: cantidad,
+      cantidadPedida: cantidad,
+    })
+    itemsByOrigen.set(origenLocationId, list)
+  }
+
+  const out: PedidoFabrica[] = []
+  itemsByOrigen.forEach((items, origenLocationId) => {
+    if (!items.length) return
+    out.push({
+      id: `auto_${grupoPedidoId}_${origenLocationId}`,
+      ownerId: "",
+      origenLocationId,
+      origenNombre: origenLocationId,
+      destinoLocationId,
+      destinoNombre,
+      grupoPedidoId,
+      grupoPedidoNombre,
+      estado: "enviado",
+      esPendiente: false,
+      controlado: false,
+      items,
+      creadoEn: null,
+      creadoPor: "",
+      creadoPorEmail: "",
+      actualizadoEn: null,
+    })
+  })
+
+  out.sort((a, b) => a.origenNombre.localeCompare(b.origenNombre))
+  return out
 }
 
 export default function LogisticaFabricaPage() {
@@ -369,21 +410,20 @@ export default function LogisticaFabricaPage() {
   const pedidosDeHoy = useMemo(() => {
     return gruposVisibles.map((grupo) => {
       const pedidosGrupo = pedidosRaw.filter(
-        (p) => p.grupoPedidoId === grupo.id && (p.estado === "enviado" || p.estado === "en_preparacion")
+        (p) => p.grupoPedidoId === grupo.id && 
+             (p.estado === "enviado" || p.estado === "en_preparacion")
       )
-      const hayControlado = pedidosGrupo.some((p) => p.controlado === true)
-      const autoPedido = hayControlado
-        ? null
-        : buildAutoPedido(
-            grupo.id,
-            grupo.nombre,
-            despachadorLocationId,
-            userData?.locationId ?? "",
-            stockFilas
-          )
-      return { grupo, pedidos: pedidosGrupo, autoPedido }
+      const autoPedidos = buildAutoPedidosPorOperador(
+        grupo.id,
+        grupo.nombre,
+        despachadorLocationId,
+        despachadorLocationId,
+        stockFilas,
+        pedidosGrupo
+      )
+      return { grupo, pedidos: pedidosGrupo, autoPedidos }
     })
-  }, [gruposVisibles, pedidosRaw, stockFilas, despachadorLocationId, userData?.locationId])
+  }, [gruposVisibles, pedidosRaw, stockFilas, despachadorLocationId])
 
   // ── despachar state ────────────────────────────────────────────────────────
   const [abierto, setAbierto] = useState<string | null>(null)
@@ -391,6 +431,7 @@ export default function LogisticaFabricaPage() {
   const [comentSend, setComentSend] = useState<Record<string, Record<string, string>>>({})
   const [obsRemito, setObsRemito] = useState<Record<string, string>>({})
   const [procesando, setProcesando] = useState<string | null>(null)
+  const [aceptando, setAceptando] = useState<string | null>(null)
 
   const togglePedido = (pedido: PedidoFabrica) => {
     const id = pedido.id
@@ -456,6 +497,39 @@ export default function LogisticaFabricaPage() {
     setObsRemito((s) => ({ ...s, [id]: "" }))
   }
 
+  const aceptarAutoPedido = async (pedido: PedidoFabrica) => {
+    if (!db || !ownerId || !user) return
+    setAceptando(pedido.id)
+    try {
+      await addDoc(collection(db, COLLECTIONS.PEDIDOS_FABRICA), {
+        ownerId,
+        origenLocationId: pedido.origenLocationId,
+        origenNombre: pedido.origenNombre,
+        destinoLocationId: pedido.destinoLocationId,
+        destinoNombre: pedido.destinoNombre,
+        grupoPedidoId: pedido.grupoPedidoId,
+        grupoPedidoNombre: pedido.grupoPedidoNombre,
+        estado: "enviado",
+        esPendiente: false,
+        controlado: false,
+        items: pedido.items,
+        creadoEn: serverTimestamp(),
+        creadoPor: user.uid,
+        creadoPorEmail: user.email ?? "",
+        actualizadoEn: serverTimestamp(),
+      })
+      toast({ title: "Pedido aceptado", description: "El pedido automático fue registrado." })
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: e instanceof Error ? e.message : "Error desconocido",
+        variant: "destructive",
+      })
+    } finally {
+      setAceptando(null)
+    }
+  }
+
   // ── remitos ────────────────────────────────────────────────────────────────
   const remitosEnCamino = useMemo(() => remitosRaw.filter((r) => r.estado === "en_camino"), [remitosRaw])
   const remitosPreparados = useMemo(() => remitosRaw.filter((r) => r.estado === "preparado"), [remitosRaw])
@@ -502,6 +576,21 @@ export default function LogisticaFabricaPage() {
       </DashboardLayout>
     )
   }
+
+  console.log(
+    "stockFilas:",
+    stockFilas.length,
+    stockFilas.map((f) => ({
+      grupoCatalogoId: f.grupoCatalogoId,
+      locationId: f.locationId,
+      stockActual: f.stockActual,
+      stockMinimo: f.stockMinimo,
+    }))
+  )
+  console.log(
+    "autoPedidos calculados:",
+    pedidosDeHoy.map((p) => ({ grupo: p.grupo.nombre, auto: p.autoPedidos.length }))
+  )
 
   return (
     <DashboardLayout user={user}>
@@ -560,10 +649,10 @@ export default function LogisticaFabricaPage() {
             </div>
 
             {/* Grupos colapsables */}
-            {pedidosDeHoy.map(({ grupo, pedidos, autoPedido }) => {
+            {pedidosDeHoy.map(({ grupo, pedidos, autoPedidos }) => {
               const todosLosPedidos: PedidoFabrica[] = [
                 ...pedidos,
-                ...(autoPedido ? [autoPedido] : []),
+                ...autoPedidos,
               ]
               const estaAbierto = gruposAbiertos[grupo.id] ?? true
 
@@ -580,9 +669,11 @@ export default function LogisticaFabricaPage() {
                         <div>
                           <CardTitle className="text-base">{grupo.nombre}</CardTitle>
                           <CardDescription>
-                            {pedidos.length === 0
-                              ? "Sin pedidos confirmados - mostrando pedido automático"
-                              : `${pedidos.length} pedido(s)`}
+                            {pedidos.length === 0 && autoPedidos.length === 0
+                              ? "Sin pedidos ni diferencias de stock"
+                              : pedidos.length === 0
+                              ? `${autoPedidos.length} sin confirmar`
+                              : `${pedidos.length} confirmado(s)${autoPedidos.length > 0 ? ` · ${autoPedidos.length} sin confirmar` : ""}`}
                           </CardDescription>
                         </div>
                         <div className="flex items-center gap-2">
@@ -629,6 +720,8 @@ export default function LogisticaFabricaPage() {
                                 if (!res.ok) toast({ title: "Error", description: res.error, variant: "destructive" })
                                 else toast({ title: "Pedido tomado", description: "El pedido está en preparación." })
                               })}
+                              onAceptar={pedido.id.startsWith("auto_") ? () => void aceptarAutoPedido(pedido) : undefined}
+                              aceptando={aceptando === pedido.id}
                             />
                           ))}
                         </div>
