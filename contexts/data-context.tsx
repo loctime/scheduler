@@ -246,59 +246,14 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
     }
   }, [user, userData, toast])
 
-  // Cargar datos del usuario primero y configurar listener en tiempo real
+  // Cargar datos del usuario (solo carga inicial, sin listener en tiempo real)
   useEffect(() => {
     if (!user || !db) {
       setUserData(null)
       return
     }
-    
-    // Cargar datos iniciales
     loadUserData()
-    
-    // Configurar listener en tiempo real para el documento del usuario
-    const userRef = doc(db, COLLECTIONS.USERS, user.uid)
-    const unsubscribeUser = onSnapshot(
-      userRef,
-      (userDoc) => {
-        if (userDoc.exists()) {
-          const data = userDoc.data()
-
-          if (data.disabled === true) {
-            cerrarSesionCuentaDesactivada()
-            return
-          }
-
-          const nextRole = data.role === "invited" ? "operador" : (data.role || "operador")
-          const nextLocationId = data.locationId || data.location || data.ownerId || user.uid
-          setUserData({
-            uid: data.uid || user.uid,
-            email: data.email || user.email,
-            displayName: data.displayName || user.displayName,
-            photoURL: data.photoURL || user.photoURL,
-            role: nextRole,
-            locationId: nextLocationId,
-            ownerId: data.ownerId,
-            grupoIds: data.grupoIds || [],
-          })
-          if (data.role === "invited") {
-            updateDoc(userRef, {
-              role: "operador",
-              locationId: nextLocationId,
-              updatedAt: serverTimestamp(),
-            }).catch(() => null)
-          }
-        }
-      },
-      (error) => {
-        console.error("Error en listener de usuario:", error)
-      }
-    )
-    
-    return () => {
-      unsubscribeUser()
-    }
-  }, [user, loadUserData, cerrarSesionCuentaDesactivada])
+  }, [user, loadUserData])
 
   useEffect(() => {
     if (!user || !db || !userData) {

@@ -19,7 +19,17 @@ service cloud.firestore {
       allow write: if false;
     }
     
+    match /apps/horarios/pedidos_fabrica/{docId} {
+      allow read: if isAuth() && resource.data.ownerId != null && horariosCanActFor(resource.data.ownerId);
+      allow write: if false;
+    }
+    
     match /apps/horarios/remitos_salida/{docId} {
+      allow read: if isAuth() && resource.data.ownerId != null && horariosCanActFor(resource.data.ownerId);
+      allow write: if false;
+    }
+    
+    match /apps/horarios/remitos_log/{docId} {
       allow read: if isAuth() && resource.data.ownerId != null && horariosCanActFor(resource.data.ownerId);
       allow write: if false;
     }

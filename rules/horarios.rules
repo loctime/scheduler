@@ -656,3 +656,4 @@ match /apps/horarios/recepciones/{docId} {
   allow create: if isAuth();
   allow update, delete: if false;
 }
+

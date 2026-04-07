@@ -53,7 +53,7 @@ const navGroups = [
     items: [
       { href: "/dashboard/pedidos", label: "Stock", icon: ShoppingCart, action: "ver_pedidos" },
       { href: "/dashboard/pedir", label: "Pedir insumos", icon: ShoppingBag, action: "crear_pedido" },
-      { href: "/dashboard/logistica-fabrica", label: "Fábrica", icon: Factory, action: "ver_admin" },
+      { href: "/dashboard/logistica-fabrica", label: "Fábrica", icon: Factory, action: "ver_logistica" },
       { href: "/dashboard/recepciones", label: "Recepciones", icon: ClipboardCheck, action: "recibir_pedido" },
       { href: "/dashboard/catalogo", label: "Catálogo", icon: BookMarked, action: "ver_admin" },
       { href: "/dashboard/mi-stock", label: "Mi stock", icon: Warehouse, action: "editar_stock" },

@@ -11,6 +11,7 @@ export type UserAction =
   | "ver_productos"
   | "editar_producto"
   | "ver_admin"
+  | "ver_logistica"
   | "ver_asignaciones_delivery"
   | "actualizar_estado_delivery"
 

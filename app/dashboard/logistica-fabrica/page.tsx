@@ -153,7 +153,7 @@ export default function LogisticaFabricaPage() {
   const { gruposCatalogo } = useGruposCatalogo(ownerId)
 
   const puede = useMemo(
-    () => canUser({ uid: user?.uid, role: userData?.role, locationId: userData?.locationId }, "ver_admin"),
+    () => canUser({ uid: user?.uid, role: userData?.role, locationId: userData?.locationId }, "ver_logistica"),
     [user?.uid, userData?.role, userData?.locationId]
   )
 
@@ -168,6 +168,18 @@ export default function LogisticaFabricaPage() {
         (g.diasEnvio?.includes(HOY) ?? false)
     )
   }, [gruposCatalogo, despachadorLocationId])
+
+  // DEBUG: Temporary console logs to identify which filter is failing
+  console.log("despachadorLocationId:", despachadorLocationId)
+  console.log("HOY:", HOY)
+  console.log("detalle grupos:", gruposCatalogo.map(g => ({
+    nombre: g.nombre,
+    despachadores: g.despachadores,
+    diasEnvio: g.diasEnvio,
+    incluyeHoy: g.diasEnvio?.includes(HOY),
+    matchDespachador: g.despachadores.some(d => d.locationId === despachadorLocationId)
+  })))
+  console.log("gruposVisibles:", gruposVisibles.length)
 
   const gruposVisiblesIds = useMemo(() => gruposVisibles.map((g) => g.id), [gruposVisibles])
 
