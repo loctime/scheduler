@@ -8,7 +8,7 @@ export type PedidoFabrica = {
   destinoNombre: string
   grupoPedidoId: string
   grupoPedidoNombre: string
-  estado: "borrador" | "enviado" | "despachado" | "recibido" | "cancelado"
+  estado: "borrador" | "enviado" | "en_preparacion" | "despachado" | "recibido" | "cancelado"
   esPendiente: boolean
   controlado?: boolean
   pedidoOrigenId?: string

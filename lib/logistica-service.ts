@@ -162,8 +162,8 @@ export async function crearRemito(input: {
         if (pd.ownerId !== input.ownerId) {
           throw new Error("El pedido no pertenece a tu espacio de trabajo")
         }
-        if (pd.estado !== "enviado") {
-          throw new Error("Solo se pueden despachar pedidos en estado «enviado»")
+        if (pd.estado !== "enviado" && pd.estado !== "en_preparacion") {
+          throw new Error("Solo se pueden despachar pedidos en estado «enviado» o «en preparación»")
         }
       }
 
@@ -473,5 +473,48 @@ export async function marcarEnCamino(input: {
   } catch (e) {
     const message = e instanceof Error ? e.message : "Error al actualizar el remito"
     return { ok: false, error: message }
+  }
+}
+
+export async function tomarPedido(input: {
+  pedidoId: string
+  ownerId: string
+  user: LogisticaActor
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!db) return { ok: false, error: "Firestore no está disponible" }
+  if (!canUser(input.user, "crear_pedido")) return { ok: false, error: "No tenés permiso" }
+  try {
+    const ref = doc(db, COLLECTIONS.PEDIDOS_FABRICA, input.pedidoId)
+    const snap = await getDoc(ref)
+    if (!snap.exists()) return { ok: false, error: "Pedido no encontrado" }
+    const data = snap.data() as Record<string, unknown>
+    if (data.ownerId !== input.ownerId) return { ok: false, error: "El pedido no pertenece a tu espacio de trabajo" }
+    if (data.estado !== "enviado") return { ok: false, error: "Solo se pueden tomar pedidos en estado «enviado»" }
+    await updateDoc(ref, { estado: "en_preparacion", actualizadoEn: serverTimestamp() })
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Error al tomar el pedido" }
+  }
+}
+
+export async function actualizarItemsPedido(input: {
+  pedidoId: string
+  ownerId: string
+  items: PedidoFabricaItem[]
+  user: LogisticaActor
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!db) return { ok: false, error: "Firestore no está disponible" }
+  if (!canUser(input.user, "crear_pedido")) return { ok: false, error: "No tenés permiso" }
+  try {
+    const ref = doc(db, COLLECTIONS.PEDIDOS_FABRICA, input.pedidoId)
+    const snap = await getDoc(ref)
+    if (!snap.exists()) return { ok: false, error: "Pedido no encontrado" }
+    const data = snap.data() as Record<string, unknown>
+    if (data.ownerId !== input.ownerId) return { ok: false, error: "El pedido no pertenece a tu espacio de trabajo" }
+    if (data.estado !== "enviado") return { ok: false, error: "No se puede editar un pedido que ya fue tomado o despachado" }
+    await updateDoc(ref, { items: input.items, actualizadoEn: serverTimestamp() })
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Error al actualizar el pedido" }
   }
 }

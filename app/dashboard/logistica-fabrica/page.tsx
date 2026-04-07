@@ -34,6 +34,7 @@ function OperarioCardView({
   onComentChange,
   onObsChange,
   onDespachar,
+  onTomarPedido,
 }: {
   pedido: PedidoFabrica
   cantSend: Record<string, number>
@@ -44,20 +45,27 @@ function OperarioCardView({
   onComentChange: (productoId: string, val: string) => void
   onObsChange: (val: string) => void
   onDespachar: () => void
+  onTomarPedido: () => void
 }) {
   const [expandido, setExpandido] = useState(false)
   const esControlado = pedido.controlado === true
+  const esAuto = pedido.id.startsWith("auto_")
 
   return (
     <div className="bg-muted/50 rounded-lg p-3 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h4 className="font-medium">{pedido.origenNombre}</h4>
-        {esControlado ? (
-          <Badge className="bg-green-50 text-green-800 border border-green-200">Controlado</Badge>
-        ) : (
-          <Badge className="bg-amber-50 text-amber-800 border border-amber-200">Automático</Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {pedido.estado === "en_preparacion" && (
+            <Badge className="bg-blue-50 text-blue-800 border border-blue-200">En preparación</Badge>
+          )}
+          {esControlado ? (
+            <Badge className="bg-green-50 text-green-800 border border-green-200">Controlado</Badge>
+          ) : (
+            <Badge className="bg-amber-50 text-amber-800 border border-amber-200">Automático</Badge>
+          )}
+        </div>
       </div>
 
       {/* Lista de items como pills */}
@@ -71,6 +79,18 @@ function OperarioCardView({
           </span>
         ))}
       </div>
+
+      {/* Botón Tomar pedido */}
+      {!esAuto && pedido.estado === "enviado" && (
+        <Button
+          onClick={onTomarPedido}
+          variant="outline"
+          size="sm"
+          className="w-full"
+        >
+          Tomar pedido
+        </Button>
+      )}
 
       {/* Botón de despachar */}
       <Button
@@ -269,7 +289,7 @@ export default function LogisticaFabricaPage() {
   
   const { user, userData } = useData()
   const { toast } = useToast()
-  const { pedidosRaw, remitosRaw, crearRemito, marcarEnCamino, loading, ownerId } = useLogistica(user)
+  const { pedidosRaw, remitosRaw, crearRemito, marcarEnCamino, tomarPedido, loading, ownerId } = useLogistica(user)
   const { gruposCatalogo } = useGruposCatalogo(ownerId)
 
   const puede = useMemo(
@@ -349,7 +369,7 @@ export default function LogisticaFabricaPage() {
   const pedidosDeHoy = useMemo(() => {
     return gruposVisibles.map((grupo) => {
       const pedidosGrupo = pedidosRaw.filter(
-        (p) => p.grupoPedidoId === grupo.id && p.estado === "enviado"
+        (p) => p.grupoPedidoId === grupo.id && (p.estado === "enviado" || p.estado === "en_preparacion")
       )
       const hayControlado = pedidosGrupo.some((p) => p.controlado === true)
       const autoPedido = hayControlado
@@ -605,6 +625,10 @@ export default function LogisticaFabricaPage() {
                               }
                               onObsChange={(val: string) => setObsRemito((s) => ({ ...s, [pedido.id]: val }))}
                               onDespachar={() => void despachar(pedido)}
+                              onTomarPedido={() => void tomarPedido(pedido.id).then(res => {
+                                if (!res.ok) toast({ title: "Error", description: res.error, variant: "destructive" })
+                                else toast({ title: "Pedido tomado", description: "El pedido está en preparación." })
+                              })}
                             />
                           ))}
                         </div>

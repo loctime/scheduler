@@ -5,12 +5,14 @@ import { collection, onSnapshot, query, where } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { useData } from "@/contexts/data-context"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
-import type { PedidoFabrica, RemitoLog } from "@/lib/logistica-types"
+import type { PedidoFabrica, PedidoFabricaItem, RemitoLog } from "@/lib/logistica-types"
 import {
+  actualizarItemsPedido as actualizarItemsPedidoSvc,
   confirmarRecepcion as confirmarRecepcionSvc,
   crearPedidoFabrica as crearPedidoFabricaSvc,
   crearRemito as crearRemitoSvc,
   marcarEnCamino as marcarEnCaminoSvc,
+  tomarPedido as tomarPedidoSvc,
 } from "@/lib/logistica-service"
 import type { PermissionUser } from "@/lib/permissions"
 
@@ -183,6 +185,22 @@ export function useLogistica(user: { uid?: string; email?: string | null } | nul
     [ownerId, actor]
   )
 
+  const tomarPedido = useCallback(
+    async (pedidoId: string) => {
+      if (!ownerId) return { ok: false as const, error: "Sin espacio de trabajo" }
+      return tomarPedidoSvc({ pedidoId, ownerId, user: actor })
+    },
+    [ownerId, actor]
+  )
+
+  const actualizarItemsPedido = useCallback(
+    async (pedidoId: string, items: PedidoFabricaItem[]) => {
+      if (!ownerId) return { ok: false as const, error: "Sin espacio de trabajo" }
+      return actualizarItemsPedidoSvc({ pedidoId, ownerId, items, user: actor })
+    },
+    [ownerId, actor]
+  )
+
   return {
     pedidosPropios,
     pedidosParaMi,
@@ -194,6 +212,8 @@ export function useLogistica(user: { uid?: string; email?: string | null } | nul
     crearRemito,
     confirmarRecepcion,
     marcarEnCamino,
+    tomarPedido,
+    actualizarItemsPedido,
     loading,
     ownerId,
     isAdmin,

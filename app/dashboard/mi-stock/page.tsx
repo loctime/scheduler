@@ -27,8 +27,10 @@ import { canUser } from "@/lib/permissions"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import { useGruposCatalogo } from "@/hooks/use-grupos-catalogo"
 import { useCatalogoProductos } from "@/hooks/use-catalogo-productos"
+import { useLogistica } from "@/hooks/use-logistica"
 import type { StockUbicacion } from "@/lib/stock-ubicaciones-types"
 import type { GrupoCatalogoUI } from "@/lib/catalogo-types"
+import type { PedidoFabrica } from "@/lib/logistica-types"
 import {
   desactivarGrupo,
   inicializarGrupoCompleto,
@@ -125,6 +127,7 @@ export default function MiStockPage() {
 
   const { gruposCatalogo } = useGruposCatalogo(ownerId)
   const { items: catalogoProductos } = useCatalogoProductos(ownerId)
+  const { actualizarItemsPedido } = useLogistica(user)
 
   // ── stock rows ──────────────────────────────────────────────────────────────
   const [filas, setFilas] = useState<StockUbicacion[]>([])
@@ -170,6 +173,53 @@ export default function MiStockPage() {
     return () => unsub()
   }, [ownerId, locationId])
 
+  // ── pedidos activos de esta ubicación ───────────────────────────────────────
+  const [pedidosActivos, setPedidosActivos] = useState<PedidoFabrica[]>([])
+
+  useEffect(() => {
+    if (!db || !ownerId || !locationId) {
+      setPedidosActivos([])
+      return
+    }
+    const q = query(
+      collection(db, COLLECTIONS.PEDIDOS_FABRICA),
+      where("ownerId", "==", ownerId),
+      where("origenLocationId", "==", locationId)
+    )
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setPedidosActivos(
+          snap.docs.map((d) => {
+            const x = d.data() as Record<string, unknown>
+            return {
+              id: d.id,
+              ownerId: String(x.ownerId ?? ""),
+              origenLocationId: String(x.origenLocationId ?? ""),
+              origenNombre: String(x.origenNombre ?? ""),
+              destinoLocationId: String(x.destinoLocationId ?? ""),
+              destinoNombre: String(x.destinoNombre ?? ""),
+              grupoPedidoId: String(x.grupoPedidoId ?? ""),
+              grupoPedidoNombre: String(x.grupoPedidoNombre ?? ""),
+              estado: x.estado as PedidoFabrica["estado"],
+              esPendiente: Boolean(x.esPendiente),
+              controlado: x.controlado === true,
+              pedidoOrigenId: x.pedidoOrigenId ? String(x.pedidoOrigenId) : undefined,
+              items: (x.items as PedidoFabrica["items"]) ?? [],
+              observacion: x.observacion ? String(x.observacion) : undefined,
+              creadoEn: x.creadoEn,
+              creadoPor: String(x.creadoPor ?? ""),
+              creadoPorEmail: String(x.creadoPorEmail ?? ""),
+              actualizadoEn: x.actualizadoEn,
+            }
+          })
+        )
+      },
+      () => setPedidosActivos([])
+    )
+    return () => unsub()
+  }, [ownerId, locationId])
+
   // ── derived ─────────────────────────────────────────────────────────────────
   const gruposActivadosIds = useMemo(
     () => new Set(filas.map((f) => f.grupoCatalogoId).filter(Boolean) as string[]),
@@ -195,6 +245,14 @@ export default function MiStockPage() {
     }
     return m
   }, [filas])
+
+  const pedidoActivoPorGrupo = useMemo(() => {
+    const m = new Map<string, PedidoFabrica>()
+    for (const p of pedidosActivos) {
+      if (!m.has(p.grupoPedidoId)) m.set(p.grupoPedidoId, p)
+    }
+    return m
+  }, [pedidosActivos])
 
   // ── grupos abiertos (colapsables) ───────────────────────────────────────────
   const [gruposAbiertos, setGruposAbiertos] = useState<Set<string>>(new Set())
@@ -328,6 +386,7 @@ export default function MiStockPage() {
     if (!db || !ownerId || !user) return
     setEnviandoPedido(true)
     try {
+      let enviados = 0
       for (const { grupo, filas: rows } of itemsPedido) {
         const items = rows.map((f) => ({
           productoId: f.catalogoId,
@@ -335,25 +394,43 @@ export default function MiStockPage() {
           cantidadSugerida: f.stockMinimo - f.stockActual,
           cantidadPedida: f.stockMinimo - f.stockActual,
         }))
-        await addDoc(collection(db, COLLECTIONS.PEDIDOS_FABRICA), {
-          ownerId,
-          origenLocationId: locationId,
-          origenNombre: (userData as any)?.locationName || userData?.displayName || locationId,
-          destinoLocationId: grupo.despachadores[0]?.locationId ?? "",
-          destinoNombre: grupo.despachadores[0]?.locationName ?? "",
-          grupoPedidoId: grupo.id,
-          grupoPedidoNombre: grupo.nombre,
-          estado: "enviado",
-          esPendiente: false,
-          controlado: true,
-          items,
-          creadoEn: serverTimestamp(),
-          creadoPor: user.uid,
-          creadoPorEmail: user.email ?? "",
-          actualizadoEn: serverTimestamp(),
-        })
+
+        const pedidoExistente = pedidoActivoPorGrupo.get(grupo.id)
+
+        if (pedidoExistente?.estado === "en_preparacion" || pedidoExistente?.estado === "despachado") {
+          toast({
+            title: `"${grupo.nombre}" ya está en preparación o fue despachado. No se puede editar.`,
+            variant: "destructive",
+          })
+          continue
+        }
+
+        if (pedidoExistente?.estado === "enviado") {
+          await actualizarItemsPedido(pedidoExistente.id, items)
+        } else {
+          await addDoc(collection(db, COLLECTIONS.PEDIDOS_FABRICA), {
+            ownerId,
+            origenLocationId: locationId,
+            origenNombre: (userData as any)?.locationName || userData?.displayName || locationId,
+            destinoLocationId: grupo.despachadores[0]?.locationId ?? "",
+            destinoNombre: grupo.despachadores[0]?.locationName ?? "",
+            grupoPedidoId: grupo.id,
+            grupoPedidoNombre: grupo.nombre,
+            estado: "enviado",
+            esPendiente: false,
+            controlado: true,
+            items,
+            creadoEn: serverTimestamp(),
+            creadoPor: user.uid,
+            creadoPorEmail: user.email ?? "",
+            actualizadoEn: serverTimestamp(),
+          })
+        }
+        enviados++
       }
-      toast({ title: "Pedido enviado", description: `${itemsPedido.length} grupo(s) enviado(s).` })
+      if (enviados > 0) {
+        toast({ title: "Pedido enviado", description: `${enviados} grupo(s) enviado(s).` })
+      }
       setModalPedido(false)
     } catch (e) {
       toast({ title: "Error al enviar pedido", description: e instanceof Error ? e.message : "Error desconocido", variant: "destructive" })
@@ -361,6 +438,11 @@ export default function MiStockPage() {
       setEnviandoPedido(false)
     }
   }
+
+  const todoBloqueado = itemsPedido.length > 0 && itemsPedido.every(({ grupo }) => {
+    const p = pedidoActivoPorGrupo.get(grupo.id)
+    return p?.estado === "en_preparacion" || p?.estado === "despachado"
+  })
 
   // ── sin permiso ─────────────────────────────────────────────────────────────
   if (!puede) {
@@ -575,29 +657,46 @@ export default function MiStockPage() {
               </Card>
             ) : (
               <>
-                {itemsPedido.map(({ grupo, filas: rows }) => (
-                  <Card key={grupo.id}>
-                    <CardContent className="pt-4 pb-3 px-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium text-sm">{grupo.nombre}</p>
-                        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                          automático
-                        </span>
-                      </div>
-                      <div className="space-y-1">
-                        {rows.map((f) => (
-                          <div key={f.id} className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">{f.nombre}</span>
-                            <span className="font-medium tabular-nums">× {f.stockMinimo - f.stockActual}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                {itemsPedido.map(({ grupo, filas: rows }) => {
+                  const pedidoActivo = pedidoActivoPorGrupo.get(grupo.id)
+                  return (
+                    <Card key={grupo.id}>
+                      <CardContent className="pt-4 pb-3 px-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium text-sm">{grupo.nombre}</p>
+                          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                            automático
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          {rows.map((f) => (
+                            <div key={f.id} className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">{f.nombre}</span>
+                              <span className="font-medium tabular-nums">× {f.stockMinimo - f.stockActual}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="pt-1">
+                          {!pedidoActivo && (
+                            <Badge className="bg-yellow-50 text-yellow-800 border border-yellow-200">Sin confirmar</Badge>
+                          )}
+                          {pedidoActivo?.estado === "enviado" && (
+                            <Badge className="bg-green-50 text-green-800 border border-green-200">Enviado · pendiente de tomar</Badge>
+                          )}
+                          {pedidoActivo?.estado === "en_preparacion" && (
+                            <Badge className="bg-blue-50 text-blue-800 border border-blue-200">En preparación · no editable</Badge>
+                          )}
+                          {pedidoActivo?.estado === "despachado" && (
+                            <Badge className="bg-gray-100 text-gray-600 border border-gray-200">Despachado</Badge>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
 
                 <div className="flex justify-end pt-2">
-                  <Button onClick={() => setModalPedido(true)}>
+                  <Button onClick={() => setModalPedido(true)} disabled={todoBloqueado}>
                     Confirmar y enviar pedido
                   </Button>
                 </div>
