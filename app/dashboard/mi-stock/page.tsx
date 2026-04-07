@@ -370,16 +370,34 @@ export default function MiStockPage() {
     (d) => d.getDate() === hoy.getDate() && d.getMonth() === hoy.getMonth()
   )
 
-  // Días con pedidos asignados: si hay itemsPedido, marcamos hoy
-  // (en el futuro esto podría venir de los días de envío del grupo)
-  const diasConPedido = useMemo(() => {
-    const s = new Set<number>()
-    if (itemsPedido.length > 0 && hoyIdx >= 0) s.add(hoyIdx)
-    return s
-  }, [itemsPedido, hoyIdx])
+  const gruposPorDia = useMemo(() => {
+    const m = new Map<number, string[]>()
+    for (let i = 0; i < 7; i++) m.set(i, [])
+    for (const grupo of gruposActivados) {
+      const diasJS = grupo.diasEnvio ?? []
+      for (const diaJS of diasJS) {
+        const idx = diaJS === 0 ? 6 : diaJS - 1
+        m.get(idx)?.push(grupo.nombre)
+      }
+    }
+    return m
+  }, [gruposActivados])
 
   // ── enviar pedido ───────────────────────────────────────────────────────────
   const [enviandoPedido, setEnviandoPedido] = useState(false)
+  const [confirmandoActualizar, setConfirmandoActualizar] = useState<string | null>(null)
+
+  function hayDiferencias(pedido: PedidoFabrica, rows: StockUbicacion[]): boolean {
+    const rowsActivas = rows.filter((f) => f.stockMinimo > 0 && f.stockActual < f.stockMinimo)
+    if (pedido.items.length !== rowsActivas.length) return true
+    for (const row of rows) {
+      if (row.stockMinimo <= 0 || row.stockActual >= row.stockMinimo) continue
+      const cantidadNueva = row.stockMinimo - row.stockActual
+      const itemExistente = pedido.items.find((i) => i.productoId === row.catalogoId)
+      if (!itemExistente || itemExistente.cantidadPedida !== cantidadNueva) return true
+    }
+    return false
+  }
 
   const enviarPedidoGrupo = async (grupo: GrupoCatalogoUI, rows: StockUbicacion[]) => {
     if (!db || !ownerId || !user) return
@@ -600,15 +618,12 @@ export default function MiStockPage() {
             <div className="grid grid-cols-7 gap-1.5">
               {semana.map((dia, idx) => {
                 const esHoy = idx === hoyIdx
-                const tienePedido = diasConPedido.has(idx)
                 return (
                   <div
                     key={idx}
                     className={cn(
-                      "flex flex-col items-center rounded-lg border py-2 px-1 text-center",
-                      esHoy
-                        ? "border-foreground bg-muted/50"
-                        : "border-border"
+                      "flex flex-col items-center rounded-lg border py-2 px-1 text-center min-h-[72px]",
+                      esHoy ? "border-foreground bg-muted/50" : "border-border"
                     )}
                   >
                     <span className="text-[10px] font-medium text-muted-foreground">{DIAS_CORTOS[idx]}</span>
@@ -618,10 +633,13 @@ export default function MiStockPage() {
                     )}>
                       {dia.getDate()}
                     </span>
-                    <div className={cn(
-                      "mt-1.5 h-1.5 w-1.5 rounded-full",
-                      tienePedido ? "bg-foreground" : "bg-transparent"
-                    )} />
+                    <div className="mt-1 flex flex-col gap-0.5 w-full">
+                      {(gruposPorDia.get(idx) ?? []).map((nombre, i) => (
+                        <span key={i} className="text-[9px] leading-tight text-muted-foreground bg-muted rounded px-1 truncate">
+                          {nombre}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )
               })}
@@ -644,7 +662,6 @@ export default function MiStockPage() {
               <>
                 {itemsPedido.map(({ grupo, filas: rows }) => {
                   const pedidoActivo = pedidoActivoPorGrupo.get(grupo.id)
-                  const bloqueado = pedidoActivo?.estado === "en_preparacion" || pedidoActivo?.estado === "despachado"
                   return (
                     <Card key={grupo.id}>
                       <CardContent className="pt-4 pb-3 px-4 space-y-2">
@@ -676,14 +693,81 @@ export default function MiStockPage() {
                             <Badge className="bg-gray-100 text-gray-600 border border-gray-200">Despachado</Badge>
                           )}
                         </div>
-                        <Button
-                          className="w-full mt-2"
-                          disabled={bloqueado || enviandoPedido}
-                          onClick={() => void enviarPedidoGrupo(grupo, rows)}
-                        >
-                          {enviandoPedido ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                          {bloqueado ? "En preparación" : "Confirmar y enviar"}
-                        </Button>
+                        {(() => {
+                          const bloqueado = pedidoActivo?.estado === "en_preparacion" || pedidoActivo?.estado === "despachado"
+                          const enviado = pedidoActivo?.estado === "enviado"
+                          const tieneCambios = enviado && pedidoActivo ? hayDiferencias(pedidoActivo, rows) : false
+
+                          if (bloqueado) {
+                            return (
+                              <Button className="w-full mt-2" disabled variant="outline">
+                                {pedidoActivo?.estado === "en_preparacion" ? "En preparación" : "Despachado"}
+                              </Button>
+                            )
+                          }
+
+                          if (enviado && !tieneCambios) {
+                            return (
+                              <Button className="w-full mt-2" disabled variant="outline">
+                                Pedido enviado
+                              </Button>
+                            )
+                          }
+
+                          if (enviado && tieneCambios) {
+                            return (
+                              <>
+                                <Button
+                                  className="w-full mt-2"
+                                  variant="outline"
+                                  onClick={() => setConfirmandoActualizar(grupo.id)}
+                                  disabled={enviandoPedido}
+                                >
+                                  Actualizar pedido
+                                </Button>
+                                <Dialog
+                                  open={confirmandoActualizar === grupo.id}
+                                  onOpenChange={(o) => !o && setConfirmandoActualizar(null)}
+                                >
+                                  <DialogContent>
+                                    <DialogHeader>
+                                      <DialogTitle>Actualizar pedido</DialogTitle>
+                                      <DialogDescription>
+                                        Ya enviaste un pedido para "{grupo.nombre}". ¿Querés actualizarlo con las nuevas cantidades?
+                                      </DialogDescription>
+                                    </DialogHeader>
+                                    <DialogFooter>
+                                      <Button variant="outline" onClick={() => setConfirmandoActualizar(null)}>
+                                        Cancelar
+                                      </Button>
+                                      <Button
+                                        onClick={() => {
+                                          setConfirmandoActualizar(null)
+                                          void enviarPedidoGrupo(grupo, rows)
+                                        }}
+                                        disabled={enviandoPedido}
+                                      >
+                                        {enviandoPedido ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                        Sí, actualizar
+                                      </Button>
+                                    </DialogFooter>
+                                  </DialogContent>
+                                </Dialog>
+                              </>
+                            )
+                          }
+
+                          return (
+                            <Button
+                              className="w-full mt-2"
+                              onClick={() => void enviarPedidoGrupo(grupo, rows)}
+                              disabled={enviandoPedido}
+                            >
+                              {enviandoPedido ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                              Confirmar y enviar
+                            </Button>
+                          )
+                        })()}
                       </CardContent>
                     </Card>
                   )
