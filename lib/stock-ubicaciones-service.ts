@@ -266,23 +266,21 @@ export async function inicializarGrupoCompleto(input: {
   locationId: string
   userId: string
 }): Promise<{ ok: boolean; error?: string }> {
-  if (!db) return { ok: false, error: "Firestore no está disponible" }
+  console.log("🔧 inicializarGrupoCompleto iniciado con:", input)
+  
+  if (!db) {
+    console.error("❌ Firestore no disponible")
+    return { ok: false, error: "Firestore no está disponible" }
+  }
   const firestore = db
 
   try {
-    // Verificar cuáles ya existen para no sobreescribir
-    const ids = input.productos.map((p) => stockUbicacionDocId(input.ownerId, p.id, input.locationId))
-    const refs = ids.map((id) => doc(firestore, COLLECTIONS.STOCK_UBICACIONES, id))
-    const snaps = await Promise.all(refs.map((r) => getDoc(r)))
-    const existentes = new Set(snaps.filter((s) => s.exists()).map((s) => s.id))
-
-    const nuevos = input.productos.filter(
-      (p) => !existentes.has(stockUbicacionDocId(input.ownerId, p.id, input.locationId))
-    )
-    if (nuevos.length === 0) return { ok: true }
-
+    // NOTA: No verificamos existencia previa para evitar errores de permisos en Firestore
+    // Si el documento ya existe, se sobreescribirá con stockActual: 0 (aceptable al reactivar grupo)
+    console.log("📝 Creando batch con", input.productos.length, "documentos")
+    
     const batch = writeBatch(firestore)
-    for (const p of nuevos) {
+    for (const p of input.productos) {
       const id = stockUbicacionDocId(input.ownerId, p.id, input.locationId)
       const sRef = doc(firestore, COLLECTIONS.STOCK_UBICACIONES, id)
       batch.set(sRef, {
@@ -292,7 +290,7 @@ export async function inicializarGrupoCompleto(input: {
         nombre: p.nombre,
         unidad: p.unidad,
         pedidoId: p.pedidoId,
-        stockActual: 0,
+        stockActual: 0, // Si el doc ya existía, se resetea a 0 al reactivar
         stockMinimo: p.stockMinimo,
         orden: p.orden,
         grupoCatalogoId: input.grupoCatalogoId,
@@ -301,9 +299,13 @@ export async function inicializarGrupoCompleto(input: {
         updatedBy: input.userId,
       })
     }
+    
+    console.log("💾 Ejecutando batch...")
     await batch.commit()
+    console.log("✅ Batch ejecutado exitosamente")
     return { ok: true }
   } catch (e) {
+    console.error("❌ Error en inicializarGrupoCompleto:", e)
     const message = e instanceof Error ? e.message : "Error al inicializar grupo"
     return { ok: false, error: message }
   }

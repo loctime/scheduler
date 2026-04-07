@@ -1,9 +1,10 @@
 /* ===============================
-   HORARIOS – LECTURA PÚBLICA
+   HORARIOS – REGLAS ACTUALIZADAS
    =============================== */
 
-/* ========= HELPERS ========= */
+/* ========= HELPERS LOCALES ========= */
 
+// Obtiene el ownerId del usuario autenticado desde su documento
 function horariosUserOwnerId() {
   return isAuth()
     && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
@@ -11,6 +12,8 @@ function horariosUserOwnerId() {
     : null;
 }
 
+// Verifica si el usuario autenticado puede actuar en nombre de un ownerId dado.
+// Puede si: es el propio owner, o es un colaborador con ese ownerId, o tiene rol admin.
 function horariosCanActFor(ownerId) {
   return isAuth()
     && ownerId != null
@@ -18,18 +21,41 @@ function horariosCanActFor(ownerId) {
       uid() == ownerId
       || (
         exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
-        &&
-        get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId == ownerId
-      )
-      || (
-        exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
-        &&
-        get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role
-          in ['admin','manager','factory','maxdev']
+        && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId == ownerId
       )
     );
 }
 
+// Verifica si el usuario tiene rol admin dentro del sistema horarios
+function horariosIsAdmin() {
+  return isAuth()
+    && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+    && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'admin';
+}
+
+// Verifica si el usuario tiene rol operador dentro del sistema horarios
+function horariosIsOperador() {
+  return isAuth()
+    && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+    && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'operador';
+}
+
+// Verifica si el usuario tiene rol delivery dentro del sistema horarios
+function horariosIsDelivery() {
+  return isAuth()
+    && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+    && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'delivery';
+}
+
+// Shortcut: admin o operador (puede editar stock, hacer pedidos, etc.)
+function horariosIsAdminOrOperador() {
+  return horariosIsAdmin() || horariosIsOperador();
+}
+
+// Shortcut: cualquier rol activo del sistema (admin, operador, delivery)
+function horariosIsAnyRole() {
+  return horariosIsAdmin() || horariosIsOperador() || horariosIsDelivery();
+}
 
 
 /* ===============================
@@ -68,99 +94,32 @@ match /apps/horarios/publicOwners/{ownerId} {
 }
 
 /* ===============================
-   PRODUCTS
-   =============================== */
-
-match /apps/horarios/products/{docId} {
-  allow read: if true;
-
-  allow create: if horariosCanActFor(request.resource.data.ownerId);
-  allow update: if horariosCanActFor(
-    resource.data.ownerId != null
-      ? resource.data.ownerId
-      : request.resource.data.ownerId
-  );
-  allow delete: if horariosCanActFor(resource.data.ownerId);
-}
-
-/* ===============================
-   PEDIDOS
-   =============================== */
-
-match /apps/horarios/pedidos/{docId} {
-  allow read: if true;
-
-  allow create: if horariosCanActFor(request.resource.data.ownerId);
-  allow update: if horariosCanActFor(
-    resource.data.ownerId != null
-      ? resource.data.ownerId
-      : request.resource.data.ownerId
-  );
-  allow delete: if horariosCanActFor(resource.data.ownerId);
-}
-
-match /apps/horarios/pedidos/{docId}/{sub=**} {
-  allow read: if true;
-
-  allow create: if horariosCanActFor(request.resource.data.ownerId);
-  allow update: if horariosCanActFor(
-    resource.data.ownerId != null
-      ? resource.data.ownerId
-      : request.resource.data.ownerId
-  );
-  allow delete: if horariosCanActFor(resource.data.ownerId);
-}
-
-/* ===============================
-   STOCK ACTUAL
-   =============================== */
-
-match /apps/horarios/stock_actual/{docId} {
-  allow read: if true;
-
-  allow create: if horariosCanActFor(request.resource.data.ownerId);
-  allow update: if horariosCanActFor(
-    resource.data.ownerId != null
-      ? resource.data.ownerId
-      : request.resource.data.ownerId
-  );
-  allow delete: if horariosCanActFor(resource.data.ownerId);
-}
-
-/* ===============================
-   STOCK MOVIMIENTOS
-   =============================== */
-
-match /apps/horarios/stock_movimientos/{docId} {
-  allow read: if true;
-
-  allow create: if horariosCanActFor(request.resource.data.ownerId);
-  allow update: if horariosCanActFor(
-    resource.data.ownerId != null
-      ? resource.data.ownerId
-      : request.resource.data.ownerId
-  );
-  allow delete: if horariosCanActFor(resource.data.ownerId);
-}
-
-/* ===============================
    USERS
    =============================== */
 
 match /apps/horarios/users/{userId} {
+  // Un usuario puede leer su propio doc.
+  // Un admin puede leer todos los usuarios de su mismo ownerId.
   allow read: if isAuth()
     && (
       userId == uid()
-      || (
-        exists(/databases/$(db)/documents/apps/horarios/users/$(userId))
-        && horariosCanActFor(
+      || horariosCanActFor(
           get(/databases/$(db)/documents/apps/horarios/users/$(userId)).data.ownerId
         )
-      )
     );
 
+  // Permitir listar usuarios del mismo ownerId
+  allow list: if isAuth() && horariosCanActFor(
+    get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId != null
+      ? get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId
+      : uid()
+  );
+
+  // Cualquier usuario autenticado puede crear su propio doc (registro inicial o por invitación)
   allow create: if isAuth() && userId == uid();
 
+  // Un usuario puede actualizar su propio doc.
+  // Un admin puede actualizar docs de su ownerId.
   allow update: if isAuth()
     && (
       userId == uid()
@@ -170,6 +129,7 @@ match /apps/horarios/users/{userId} {
       )
     );
 
+  // Solo el propio usuario o el owner pueden borrar
   allow delete: if isAuth()
     && (
       userId == uid()
@@ -181,30 +141,32 @@ match /apps/horarios/users/{userId} {
     );
 }
 
+
 /* ===============================
    INVITACIONES
    =============================== */
 
 match /apps/horarios/invitaciones/{docId} {
+  // Lectura pública para validar tokens en el flujo de registro
   allow read: if true;
 
+  // Cualquier autenticado puede crear (el admin crea links para sus colaboradores)
   allow create: if isAuth();
 
+  // Solo el creador puede actualizar, O el usuario que usa el link (marca como usado)
   allow update: if isAuth()
     && (
-      resource.data.ownerId == uid()
-      ||
-      (
-        request.resource.data.usado == true
-        && request.resource.data.usadoPor == uid()
+      resource.data.createdBy == uid()
+      || (
+        request.resource.data.usedBy == uid()
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(["usado", "usadoPor", "usadoEn"])
+          .hasOnly(["usedBy", "usedAt"])
       )
     );
 
   allow delete: if isAuth()
-    && resource.data.ownerId != null
-    && horariosCanActFor(resource.data.ownerId);
+    && resource.data.createdBy != null
+    && horariosCanActFor(resource.data.createdBy);
 }
 
 /* ===============================
@@ -222,7 +184,6 @@ match /apps/horarios/employees/{docId} {
       : request.resource.data.ownerId
   );
 }
-
 
 /* ===============================
    SHIFTS
@@ -245,7 +206,6 @@ match /apps/horarios/shifts/{docId} {
    =============================== */
 
 match /apps/horarios/schedules/{docId} {
-
   allow read: if true;
 
   allow create: if horariosCanActFor(request.resource.data.ownerId);
@@ -254,7 +214,7 @@ match /apps/horarios/schedules/{docId} {
 }
 
 /* ===============================
-   WEEKS (base week + versions)
+   WEEKS (base + versiones)
    =============================== */
 
 match /apps/horarios/weeks/{baseWeekId} {
@@ -290,91 +250,7 @@ match /apps/horarios/historial/{historialId} {
    =============================== */
 
 match /apps/horarios/employee_fixed_rules/{ruleId} {
-
-  allow read: if isAuth() && (
-    resource.data.ownerId == uid()
-    ||
-    (
-      exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
-      &&
-      get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId
-        == resource.data.ownerId
-    )
-    ||
-    (
-      exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
-      &&
-      get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role
-        in ['admin', 'manager', 'factory', 'maxdev']
-    )
-  );
-
-  allow create: if horariosCanActFor(request.resource.data.ownerId);
-
-  allow update, delete: if horariosCanActFor(
-    resource.data.ownerId != null
-      ? resource.data.ownerId
-      : request.resource.data.ownerId
-  );
-}
-
-
-/* ===============================
-   DAILY ACTIONS
-   =============================== */
-
-match /apps/horarios/dailyActions/{ownerId} {
-  allow read: if true;
-
-  allow create: if horariosCanActFor(ownerId);
-
-  allow update: if horariosCanActFor(ownerId);
-
-  allow delete: if horariosCanActFor(ownerId);
-}
-
-/* ===============================
-   DAILY ACTION STATUS
-   =============================== */
-
-match /apps/horarios/dailyActionStatus/{docId} {
-  allow read: if true;
-
-  allow create, update: if true;
-
-  allow delete: if false;
-}
-
-/* ===============================
-   DAILY TASK STATUS
-   =============================== */
-
-match /apps/horarios/dailyTaskStatus/{docId} {
-  allow read: if true;
-
-  allow create, update: if true;
-
-  allow delete: if false;
-}
-
-/* ===============================
-   ENLACES PUBLICOS
-   =============================== */
-
-match /apps/horarios/enlaces_publicos/{ownerId} {
-  allow read: if true;
-
-  allow create, update: if isAuth() && horariosCanActFor(ownerId);
-
-  allow delete: if isAuth() && horariosCanActFor(ownerId);
-}
-
-/* ===============================
-   TASKS
-   =============================== */
-
-match /apps/horarios/tasks/{taskId} {
-  allow read: if true;
+  allow read: if horariosCanActFor(resource.data.ownerId);
 
   allow create: if horariosCanActFor(request.resource.data.ownerId);
 
@@ -399,4 +275,384 @@ match /apps/horarios/config/{docId} {
       ? resource.data.ownerId
       : request.resource.data.ownerId
   );
+}
+
+/* ===============================
+   TASKS
+   =============================== */
+
+match /apps/horarios/tasks/{taskId} {
+  allow read: if true;
+
+  allow create: if horariosCanActFor(request.resource.data.ownerId);
+
+  allow update, delete: if horariosCanActFor(
+    resource.data.ownerId != null
+      ? resource.data.ownerId
+      : request.resource.data.ownerId
+  );
+}
+
+/* ===============================
+   DAILY ACTIONS / STATUS
+   =============================== */
+
+match /apps/horarios/dailyActions/{ownerId} {
+  allow read: if true;
+  allow create, update, delete: if horariosCanActFor(ownerId);
+}
+
+match /apps/horarios/dailyActionStatus/{docId} {
+  allow read: if true;
+  allow create, update: if true;
+  allow delete: if false;
+}
+
+match /apps/horarios/dailyTaskStatus/{docId} {
+  allow read: if true;
+  allow create, update: if true;
+  allow delete: if false;
+}
+
+/* ===============================
+   ENLACES PUBLICOS (pedidos WhatsApp)
+   =============================== */
+
+match /apps/horarios/enlaces_publicos/{docId} {
+  allow read: if true;
+
+  allow create, update: if isAuth()
+    && horariosCanActFor(request.resource.data.ownerId);
+
+  allow delete: if isAuth()
+    && horariosCanActFor(resource.data.ownerId);
+}
+
+/* ===============================
+   PEDIDOS (grupos de productos)
+   =============================== */
+
+match /apps/horarios/pedidos/{docId} {
+  allow read: if true;
+
+  allow create: if horariosCanActFor(request.resource.data.ownerId);
+  allow update: if horariosCanActFor(
+    resource.data.ownerId != null
+      ? resource.data.ownerId
+      : request.resource.data.ownerId
+  );
+  allow delete: if horariosCanActFor(resource.data.ownerId);
+}
+
+match /apps/horarios/pedidos/{docId}/{sub=**} {
+  allow read: if true;
+
+  allow create: if horariosCanActFor(request.resource.data.ownerId);
+  allow update: if horariosCanActFor(
+    resource.data.ownerId != null
+      ? resource.data.ownerId
+      : request.resource.data.ownerId
+  );
+  allow delete: if horariosCanActFor(resource.data.ownerId);
+}
+
+/* ===============================
+   PRODUCTS (legacy — compatibilidad)
+   Solo lectura pública. Escritura solo para admin.
+   =============================== */
+
+match /apps/horarios/products/{docId} {
+  allow read: if true;
+
+  allow create: if horariosIsAdmin()
+    && horariosCanActFor(request.resource.data.ownerId);
+
+  allow update: if horariosIsAdmin()
+    && horariosCanActFor(
+      resource.data.ownerId != null
+        ? resource.data.ownerId
+        : request.resource.data.ownerId
+    );
+
+  allow delete: if horariosIsAdmin()
+    && horariosCanActFor(resource.data.ownerId);
+}
+
+/* ===============================
+   CATÁLOGO (productos del sistema nuevo)
+   Solo admin puede crear/editar el catálogo.
+   Todos los autenticados del mismo owner pueden leer.
+   =============================== */
+
+match /apps/horarios/catalogo/{docId} {
+  allow read: if horariosCanActFor(resource.data.ownerId);
+
+  allow create: if horariosIsAdmin()
+    && horariosCanActFor(request.resource.data.ownerId);
+
+  allow update: if horariosIsAdmin()
+    && horariosCanActFor(
+      resource.data.ownerId != null
+        ? resource.data.ownerId
+        : request.resource.data.ownerId
+    );
+
+  allow delete: if horariosIsAdmin()
+    && horariosCanActFor(resource.data.ownerId);
+}
+
+/* ===============================
+   STOCK UBICACIONES (stock por sucursal)
+   Cada usuario puede leer y editar solo el stock de su locationId.
+   Admin puede leer y editar todos.
+   =============================== */
+
+match /apps/horarios/stock_ubicaciones/{docId} {
+  // Admin ve todo el stock de su ownerId.
+  // Operador/delivery solo ve el stock de su locationId.
+  allow read: if isAuth()
+    && (
+      horariosIsAdmin()
+        && horariosCanActFor(resource.data.ownerId)
+      || (
+        horariosIsAdminOrOperador()
+        && horariosCanActFor(resource.data.ownerId)
+        && resource.data.locationId ==
+          get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.locationId
+      )
+    );
+
+  // Crear: admin o operador, dentro de su ownerId
+  allow create: if horariosIsAdminOrOperador()
+    && horariosCanActFor(request.resource.data.ownerId);
+
+  // Actualizar: admin (cualquier ubicación) o operador (solo su locationId)
+  allow update: if (
+    horariosIsAdmin()
+    && horariosCanActFor(resource.data.ownerId)
+  ) || (
+    horariosIsOperador()
+    && horariosCanActFor(resource.data.ownerId)
+    && resource.data.locationId ==
+      get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.locationId
+  );
+
+  // Borrar: admin o operador (solo su locationId)
+  allow delete: if horariosCanActFor(resource.data.ownerId)
+    && (
+      horariosIsAdmin()
+      || (
+        horariosIsOperador()
+        && resource.data.locationId ==
+          get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.locationId
+      )
+    );
+}
+
+/* ===============================
+   STOCK MOVIMIENTOS (log de movimientos)
+   =============================== */
+
+match /apps/horarios/stock_movimientos/{docId} {
+  allow read: if horariosCanActFor(resource.data.ownerId);
+
+  allow create: if horariosIsAdminOrOperador()
+    && horariosCanActFor(request.resource.data.ownerId);
+
+  allow update, delete: if false;
+}
+
+/* ===============================
+   PEDIDOS FÁBRICA (pedidos internos entre sucursales)
+   =============================== */
+
+match /apps/horarios/pedidos_fabrica/{docId} {
+  // Cualquier colaborador autenticado puede leer pedidos de su ownerId
+  allow read: if horariosCanActFor(resource.data.ownerId);
+
+  // Admin y operador pueden crear pedidos
+  allow create: if horariosIsAdminOrOperador()
+    && horariosCanActFor(request.resource.data.ownerId);
+
+  // Admin puede actualizar cualquier pedido (para cambiar estado a despachado/recibido)
+  // Operador puede actualizar solo pedidos que creó (para cancelar borradores)
+  allow update: if horariosCanActFor(
+    resource.data.ownerId != null
+      ? resource.data.ownerId
+      : request.resource.data.ownerId
+  ) && horariosIsAdminOrOperador();
+
+  allow delete: if horariosIsAdmin()
+    && horariosCanActFor(resource.data.ownerId);
+}
+
+/* ===============================
+   REMITOS LOG (documentos de envío)
+   =============================== */
+
+match /apps/horarios/remitos_log/{docId} {
+  // Todos los colaboradores pueden leer remitos de su ownerId (delivery también)
+  allow read: if horariosCanActFor(resource.data.ownerId);
+
+  // Solo admin puede crear remitos (es quien despacha desde fábrica)
+  allow create: if horariosIsAdmin()
+    && horariosCanActFor(request.resource.data.ownerId);
+
+  // Admin actualiza estado del remito (preparado → en_camino → entregado)
+  // Delivery puede marcar en_camino
+  allow update: if horariosCanActFor(resource.data.ownerId)
+    && (horariosIsAdmin() || horariosIsDelivery());
+
+  allow delete: if false;
+}
+
+/* ===============================
+   RECEPCIONES LOG (confirmaciones de entrega)
+   =============================== */
+
+match /apps/horarios/recepciones_log/{docId} {
+  // Todos los colaboradores del ownerId pueden leer recepciones
+  allow read: if horariosCanActFor(resource.data.ownerId);
+
+  // Admin y operador pueden confirmar recepciones
+  allow create: if horariosIsAdminOrOperador()
+    && horariosCanActFor(request.resource.data.ownerId);
+
+  // Una recepción es inmutable una vez creada
+  allow update, delete: if false;
+}
+
+/* ===============================
+   COUNTERS (numeración secuencial)
+   =============================== */
+
+match /apps/horarios/counters/{docId} {
+  allow read: if isAuth();
+
+  // Los counters se actualizan dentro de transacciones — cualquier autenticado puede
+  allow write: if isAuth();
+}
+
+/* ===============================
+   AUDIT LOGS
+   =============================== */
+
+match /apps/horarios/audit_logs/{docId} {
+  allow read: if horariosIsAdmin()
+    && horariosCanActFor(resource.data.ownerId);
+
+  allow create: if isAuth();
+
+  allow update, delete: if false;
+}
+
+/* ===============================
+   LOTS (vencimientos — VencApp)
+   =============================== */
+
+match /apps/horarios/lots/{docId} {
+  allow read: if horariosCanActFor(resource.data.ownerId);
+
+  allow create: if horariosIsAdminOrOperador()
+    && horariosCanActFor(request.resource.data.ownerId);
+
+  allow update: if horariosIsAdminOrOperador()
+    && horariosCanActFor(resource.data.ownerId);
+
+  allow delete: if horariosIsAdminOrOperador()
+    && horariosCanActFor(resource.data.ownerId);
+}
+
+/* ===============================
+   WAREHOUSE ZONES (zonas del depósito — VencApp)
+   =============================== */
+
+match /apps/horarios/warehouse_zones/{docId} {
+  allow read: if horariosCanActFor(resource.data.ownerId);
+
+  allow create: if horariosIsAdminOrOperador()
+    && horariosCanActFor(request.resource.data.ownerId);
+
+  allow update: if horariosIsAdminOrOperador()
+    && horariosCanActFor(resource.data.ownerId);
+
+  allow delete: if horariosIsAdmin()
+    && horariosCanActFor(resource.data.ownerId);
+}
+
+/* ===============================
+   GROUPS + CONVERSACIONES + MENSAJES
+   (sistema de mensajería interna)
+   =============================== */
+
+match /apps/horarios/groups/{groupId} {
+  allow read: if horariosCanActFor(resource.data.ownerId);
+
+  allow create: if horariosIsAdmin()
+    && horariosCanActFor(request.resource.data.ownerId);
+
+  allow update, delete: if horariosIsAdmin()
+    && horariosCanActFor(resource.data.ownerId);
+}
+
+match /apps/horarios/conversaciones/{convId} {
+  allow read: if horariosCanActFor(resource.data.ownerId);
+
+  allow create: if horariosIsAdminOrOperador()
+    && horariosCanActFor(request.resource.data.ownerId);
+
+  allow update: if horariosCanActFor(resource.data.ownerId);
+
+  allow delete: if horariosIsAdmin()
+    && horariosCanActFor(resource.data.ownerId);
+}
+
+match /apps/horarios/mensajes/{msgId} {
+  allow read: if horariosCanActFor(resource.data.ownerId);
+
+  allow create: if horariosIsAdminOrOperador()
+    && horariosCanActFor(request.resource.data.ownerId);
+
+  allow update, delete: if false;
+}
+
+/* ===============================
+   REMITOS LEGACY (solo lectura — datos históricos)
+   No se escribe más acá, solo se lee pedido-publico
+   =============================== */
+
+match /apps/horarios/remitos/{docId} {
+  allow read: if true;
+  allow create: if isAuth();
+  allow update, delete: if false;
+}
+/* ===============================
+   GRUPOS CATÁLOGO
+   =============================== */
+
+match /apps/horarios/grupos_catalogo/{docId} {
+  allow read: if horariosCanActFor(resource.data.ownerId);
+
+  allow create: if horariosIsAdmin()
+    && horariosCanActFor(request.resource.data.ownerId);
+
+  allow update, delete: if horariosIsAdmin()
+    && horariosCanActFor(resource.data.ownerId);
+}
+
+/* ===============================
+   STOCK ACTUAL (legacy)
+   =============================== */
+
+match /apps/horarios/stock_actual/{docId} {
+  allow read: if horariosCanActFor(resource.data.ownerId);
+  allow create: if horariosIsAdminOrOperador()
+    && horariosCanActFor(request.resource.data.ownerId);
+  allow update, delete: if horariosIsAdminOrOperador()
+    && horariosCanActFor(resource.data.ownerId);
+}
+match /apps/horarios/recepciones/{docId} {
+  allow read: if isAuth();
+  allow create: if isAuth();
+  allow update, delete: if false;
 }

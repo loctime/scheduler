@@ -11,6 +11,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
@@ -98,8 +99,7 @@ export default function MiStockPage() {
 
   const puede = useMemo(
     () =>
-      canUser({ uid: user?.uid, role: userData?.role, locationId: userData?.locationId }, "editar_stock") &&
-      (userData?.role === "operador" || userData?.role === "admin"),
+      canUser({ uid: user?.uid, role: userData?.role, locationId: userData?.locationId }, "editar_stock"),
     [user?.uid, userData?.role, userData?.locationId]
   )
 
@@ -181,7 +181,10 @@ export default function MiStockPage() {
   const [activando, setActivando] = useState(false)
 
   const activarGrupo = async (grupo: GrupoCatalogoUI) => {
+    console.log("🚀 Intentando activar grupo:", grupo.nombre)
+    
     if (!ownerId || !user?.uid) return
+    
     const productos = catalogoProductos
       .filter((p) => grupo.productosIds.includes(p.id) && p.activo)
       .map((p) => ({
@@ -198,22 +201,39 @@ export default function MiStockPage() {
       return
     }
 
-    setActivando(true)
-    const res = await inicializarGrupoCompleto({
+    console.log("📦 Llamando a inicializarGrupoCompleto con:", {
       ownerId,
       grupoCatalogoId: grupo.id,
-      productos,
+      productosCount: productos.length,
       locationId,
-      userId: user.uid,
+      userId: user.uid
     })
-    setActivando(false)
 
-    if (!res.ok) {
-      toast({ title: "Error al activar grupo", description: res.error, variant: "destructive" })
-      return
+    setActivando(true)
+    try {
+      const res = await inicializarGrupoCompleto({
+        ownerId,
+        grupoCatalogoId: grupo.id,
+        productos,
+        locationId,
+        userId: user.uid,
+      })
+      
+      console.log("📤 Resultado de inicializarGrupoCompleto:", res)
+      
+      if (!res.ok) {
+        toast({ title: "Error al activar grupo", description: res.error, variant: "destructive" })
+        return
+      }
+      
+      toast({ title: `Grupo "${grupo.nombre}" activado` })
+      setModalActivar(false)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido"
+      toast({ title: "Error inesperado", description: errorMessage, variant: "destructive" })
+    } finally {
+      setActivando(false)
     }
-    toast({ title: `Grupo "${grupo.nombre}" activado` })
-    setModalActivar(false)
   }
 
   // ── desactivar grupo ────────────────────────────────────────────────────────
@@ -445,6 +465,9 @@ export default function MiStockPage() {
           <DialogContent className="max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Activar grupo</DialogTitle>
+              <DialogDescription>
+                Selecciona un grupo para activarlo en tu sucursal. Se crearán registros de stock para todos los productos del grupo.
+              </DialogDescription>
             </DialogHeader>
             {gruposDisponibles.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4">Ya tenés todos los grupos activados.</p>
@@ -479,6 +502,9 @@ export default function MiStockPage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Desactivar grupo</DialogTitle>
+              <DialogDescription>
+                Esta acción eliminará todos los registros de stock de este grupo para tu sucursal.
+              </DialogDescription>
             </DialogHeader>
             <p className="text-sm">
               ¿Desactivar el grupo <strong>{confirmarDesactivar?.nombre}</strong>? Se eliminarán todos los registros de stock de este grupo para tu sucursal.

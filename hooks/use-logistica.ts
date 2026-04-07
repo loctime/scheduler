@@ -26,6 +26,7 @@ function docToPedidoFabrica(id: string, data: Record<string, unknown>): PedidoFa
     grupoPedidoNombre: String(data.grupoPedidoNombre ?? ""),
     estado: data.estado as PedidoFabrica["estado"],
     esPendiente: Boolean(data.esPendiente),
+    controlado: data.controlado === true,
     pedidoOrigenId: data.pedidoOrigenId ? String(data.pedidoOrigenId) : undefined,
     items: (data.items as PedidoFabrica["items"]) ?? [],
     observacion: data.observacion ? String(data.observacion) : undefined,

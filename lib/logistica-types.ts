@@ -10,6 +10,7 @@ export type PedidoFabrica = {
   grupoPedidoNombre: string
   estado: "borrador" | "enviado" | "despachado" | "recibido" | "cancelado"
   esPendiente: boolean
+  controlado?: boolean
   pedidoOrigenId?: string
   items: PedidoFabricaItem[]
   observacion?: string

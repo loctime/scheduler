@@ -188,6 +188,37 @@ service cloud.firestore {
           )
         );
     }
+
+    // Verifica si el usuario tiene rol admin dentro del sistema horarios
+    function horariosIsAdmin() {
+      return isAuth()
+        && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+        && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'admin';
+    }
+
+    // Verifica si el usuario tiene rol operador dentro del sistema horarios
+    function horariosIsOperador() {
+      return isAuth()
+        && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+        && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'operador';
+    }
+
+    // Verifica si el usuario tiene rol delivery dentro del sistema horarios
+    function horariosIsDelivery() {
+      return isAuth()
+        && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+        && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role == 'delivery';
+    }
+
+    // Shortcut: admin o operador (puede editar stock, hacer pedidos, etc.)
+    function horariosIsAdminOrOperador() {
+      return horariosIsAdmin() || horariosIsOperador();
+    }
+
+    // Shortcut: cualquier rol activo del sistema (admin, operador, delivery)
+    function horariosIsAnyRole() {
+      return horariosIsAdmin() || horariosIsOperador() || horariosIsDelivery();
+    }
     
     
     
@@ -501,6 +532,54 @@ service cloud.firestore {
       );
     }
     
+
+    /* ===============================
+       STOCK UBICACIONES (stock por sucursal)
+       Cada usuario puede leer y editar solo el stock de su locationId.
+       Admin puede leer y editar todos.
+       =============================== */
+
+    match /apps/horarios/stock_ubicaciones/{docId} {
+      // Admin ve todo el stock de su ownerId.
+      // Operador/delivery solo ve el stock de su locationId.
+      allow read: if isAuth()
+        && (
+          horariosIsAdmin()
+            && horariosCanActFor(resource.data.ownerId)
+          || (
+            horariosIsAdminOrOperador()
+            && horariosCanActFor(resource.data.ownerId)
+            && resource.data.locationId ==
+              get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.locationId
+          )
+        );
+
+      // Crear: admin o operador, dentro de su ownerId
+      allow create: if horariosIsAdminOrOperador()
+        && horariosCanActFor(request.resource.data.ownerId);
+
+      // Actualizar: admin (cualquier ubicación) o operador (solo su locationId)
+      allow update: if (
+        horariosIsAdmin()
+        && horariosCanActFor(resource.data.ownerId)
+      ) || (
+        horariosIsOperador()
+        && horariosCanActFor(resource.data.ownerId)
+        && resource.data.locationId ==
+          get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.locationId
+      );
+
+      // Borrar: admin o operador (solo su locationId)
+      allow delete: if horariosCanActFor(resource.data.ownerId)
+        && (
+          horariosIsAdmin()
+          || (
+            horariosIsOperador()
+            && resource.data.locationId ==
+              get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.locationId
+          )
+        );
+    }
 
     /* ========= DENY POR DEFECTO ========= */
 
