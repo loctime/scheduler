@@ -17,6 +17,7 @@ interface UserData {
   photoURL?: string
   role?: "operador" | "admin" | "delivery"
   locationId?: string
+  locationName?: string
   ownerId?: string
   grupoIds?: string[]
 }
@@ -117,6 +118,7 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
           photoURL: data.photoURL || user.photoURL,
           role: nextRole,
           locationId: nextLocationId,
+          locationName: data.locationName,
           ownerId: data.ownerId,
           grupoIds: data.grupoIds || [],
         })
@@ -136,6 +138,7 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
           photoURL: user.photoURL,
           role: "operador",
           locationId: user.uid,
+          locationName: undefined,
           grupoIds: [],
         })
       }
@@ -149,6 +152,7 @@ export function DataProvider({ children, user }: { children: React.ReactNode; us
         photoURL: user.photoURL,
         role: "operador",
         locationId: user.uid,
+        locationName: undefined,
         grupoIds: [],
       })
     }
