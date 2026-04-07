@@ -429,13 +429,17 @@ export default function LogisticaFabricaPage() {
         (p) => p.grupoPedidoId === grupo.id && 
              (p.estado === "enviado" || p.estado === "en_preparacion")
       )
+      const pedidosGestionados = pedidosRaw.filter(
+        (p) => p.grupoPedidoId === grupo.id && 
+             (p.estado === "despachado" || p.estado === "recibido")
+      )
       const autoPedidos = buildAutoPedidosPorOperador(
         grupo.id,
         grupo.nombre,
         despachadorLocationId,
         despachadorLocationId,
         stockFilas,
-        pedidosGrupo,
+        [...pedidosGrupo, ...pedidosGestionados],
         nombrePorLocationId
       )
       return { grupo, pedidos: pedidosGrupo, autoPedidos }
