@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { addDoc, collection, onSnapshot, query, serverTimestamp, where } from "firebase/firestore"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
   Dialog,
@@ -15,6 +15,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import { useData } from "@/contexts/data-context"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { canUser } from "@/lib/permissions"
@@ -30,7 +36,8 @@ import {
   setStockUbicacion,
 } from "@/lib/stock-ubicaciones-service"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2, Warehouse } from "lucide-react"
+import { ChevronDown, Loader2, Warehouse } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -41,22 +48,35 @@ function estadoBadge(actual: number, minimo: number) {
   return { label: "OK", variant: "default" as const }
 }
 
+// Retorna los 7 días de la semana actual (lunes a domingo) en fecha local
+function getSemanaActual(): Date[] {
+  const hoy = new Date()
+  const diaSemana = hoy.getDay() // 0 = domingo
+  const lunes = new Date(hoy)
+  lunes.setDate(hoy.getDate() - ((diaSemana + 6) % 7))
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(lunes)
+    d.setDate(lunes.getDate() + i)
+    return d
+  })
+}
+
+const DIAS_CORTOS = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"]
+const DIAS_LARGOS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+
 // ─── inline editable cell ────────────────────────────────────────────────────
 
 function EditableCell({
   value,
   onCommit,
-  disabled,
 }: {
   value: number
   onCommit: (v: number) => Promise<void>
-  disabled?: boolean
 }) {
   const [local, setLocal] = useState(String(value))
   const [saving, setSaving] = useState(false)
   const ref = useRef<HTMLInputElement>(null)
 
-  // keep in sync when value changes externally
   useEffect(() => {
     if (document.activeElement !== ref.current) {
       setLocal(String(value))
@@ -72,7 +92,7 @@ function EditableCell({
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1 justify-end">
       <Input
         ref={ref}
         type="number"
@@ -81,7 +101,7 @@ function EditableCell({
         onChange={(e) => setLocal(e.target.value)}
         onBlur={() => void commit()}
         onKeyDown={(e) => e.key === "Enter" && ref.current?.blur()}
-        disabled={disabled || saving}
+        disabled={saving}
         className="h-8 w-20 text-right"
       />
       {saving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
@@ -176,15 +196,34 @@ export default function MiStockPage() {
     return m
   }, [filas])
 
-  // ── activar grupo modal ─────────────────────────────────────────────────────
+  // ── grupos abiertos (colapsables) ───────────────────────────────────────────
+  const [gruposAbiertos, setGruposAbiertos] = useState<Set<string>>(new Set())
+
+  // Cuando llegan grupos activados, abrir el primero por defecto
+  useEffect(() => {
+    if (gruposActivados.length > 0) {
+      setGruposAbiertos((prev) => {
+        if (prev.size === 0) return new Set([gruposActivados[0].id])
+        return prev
+      })
+    }
+  }, [gruposActivados])
+
+  const toggleGrupo = (id: string) => {
+    setGruposAbiertos((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  // ── activar grupo ───────────────────────────────────────────────────────────
   const [modalActivar, setModalActivar] = useState(false)
   const [activando, setActivando] = useState(false)
 
   const activarGrupo = async (grupo: GrupoCatalogoUI) => {
-    console.log("🚀 Intentando activar grupo:", grupo.nombre)
-    
     if (!ownerId || !user?.uid) return
-    
     const productos = catalogoProductos
       .filter((p) => grupo.productosIds.includes(p.id) && p.activo)
       .map((p) => ({
@@ -197,17 +236,9 @@ export default function MiStockPage() {
       }))
 
     if (productos.length === 0) {
-      toast({ title: "Grupo sin productos activos", description: "Este grupo no tiene productos activos en el catálogo.", variant: "destructive" })
+      toast({ title: "Grupo sin productos activos", variant: "destructive" })
       return
     }
-
-    console.log("📦 Llamando a inicializarGrupoCompleto con:", {
-      ownerId,
-      grupoCatalogoId: grupo.id,
-      productosCount: productos.length,
-      locationId,
-      userId: user.uid
-    })
 
     setActivando(true)
     try {
@@ -218,19 +249,15 @@ export default function MiStockPage() {
         locationId,
         userId: user.uid,
       })
-      
-      console.log("📤 Resultado de inicializarGrupoCompleto:", res)
-      
       if (!res.ok) {
         toast({ title: "Error al activar grupo", description: res.error, variant: "destructive" })
         return
       }
-      
       toast({ title: `Grupo "${grupo.nombre}" activado` })
       setModalActivar(false)
+      setGruposAbiertos((prev) => new Set([...prev, grupo.id]))
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Error desconocido"
-      toast({ title: "Error inesperado", description: errorMessage, variant: "destructive" })
+      toast({ title: "Error inesperado", description: error instanceof Error ? error.message : "Error desconocido", variant: "destructive" })
     } finally {
       setActivando(false)
     }
@@ -253,7 +280,7 @@ export default function MiStockPage() {
     toast({ title: `Grupo "${grupo.nombre}" desactivado` })
   }
 
-  // ── edición inline de stock ─────────────────────────────────────────────────
+  // ── edición inline ──────────────────────────────────────────────────────────
   const handleStockActual = async (fila: StockUbicacion, val: number) => {
     if (!ownerId || !user) return
     const res = await setStockUbicacion({ ownerId, catalogoId: fila.catalogoId, locationId: fila.locationId, cantidad: val, user: { uid: user.uid } })
@@ -266,7 +293,7 @@ export default function MiStockPage() {
     if (!res.ok) toast({ title: "Error", description: res.error, variant: "destructive" })
   }
 
-  // ── pedido ──────────────────────────────────────────────────────────────────
+  // ── pedidos calculados ──────────────────────────────────────────────────────
   const itemsPedido = useMemo(() => {
     const result: Array<{ grupo: GrupoCatalogoUI; filas: StockUbicacion[] }> = []
     for (const grupo of gruposActivados) {
@@ -278,6 +305,22 @@ export default function MiStockPage() {
     return result
   }, [gruposActivados, filasPorGrupo])
 
+  // ── semana y días con pedido ────────────────────────────────────────────────
+  const semana = useMemo(() => getSemanaActual(), [])
+  const hoy = new Date()
+  const hoyIdx = semana.findIndex(
+    (d) => d.getDate() === hoy.getDate() && d.getMonth() === hoy.getMonth()
+  )
+
+  // Días con pedidos asignados: si hay itemsPedido, marcamos hoy
+  // (en el futuro esto podría venir de los días de envío del grupo)
+  const diasConPedido = useMemo(() => {
+    const s = new Set<number>()
+    if (itemsPedido.length > 0 && hoyIdx >= 0) s.add(hoyIdx)
+    return s
+  }, [itemsPedido, hoyIdx])
+
+  // ── enviar pedido ───────────────────────────────────────────────────────────
   const [modalPedido, setModalPedido] = useState(false)
   const [enviandoPedido, setEnviandoPedido] = useState(false)
 
@@ -310,7 +353,7 @@ export default function MiStockPage() {
           actualizadoEn: serverTimestamp(),
         })
       }
-      toast({ title: "Pedido enviado", description: `Se enviaron ${itemsPedido.length} pedido(s).` })
+      toast({ title: "Pedido enviado", description: `${itemsPedido.length} grupo(s) enviado(s).` })
       setModalPedido(false)
     } catch (e) {
       toast({ title: "Error al enviar pedido", description: e instanceof Error ? e.message : "Error desconocido", variant: "destructive" })
@@ -319,15 +362,12 @@ export default function MiStockPage() {
     }
   }
 
-  // ── render ──────────────────────────────────────────────────────────────────
+  // ── sin permiso ─────────────────────────────────────────────────────────────
   if (!puede) {
     return (
       <DashboardLayout user={user}>
         <Card>
-          <CardHeader>
-            <CardTitle>Mi stock</CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="py-8">
             <p className="text-sm text-muted-foreground">No tenés permiso para ver esta pantalla.</p>
           </CardContent>
         </Card>
@@ -335,6 +375,7 @@ export default function MiStockPage() {
     )
   }
 
+  // ── render ──────────────────────────────────────────────────────────────────
   return (
     <DashboardLayout user={user}>
       <div className="mx-auto flex max-w-4xl flex-col gap-6">
@@ -353,112 +394,217 @@ export default function MiStockPage() {
           </Button>
         </div>
 
-        {/* loading */}
-        {loadingStock && (
-          <div className="flex items-center gap-2 text-muted-foreground text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Cargando…
-          </div>
-        )}
+        {/* tabs */}
+        <Tabs defaultValue="stock">
+          <TabsList className="w-full sm:w-auto">
+            <TabsTrigger value="stock" className="flex-1 sm:flex-none">Stock</TabsTrigger>
+            <TabsTrigger value="pedidos" className="flex-1 sm:flex-none">
+              Pedidos
+              {itemsPedido.length > 0 && (
+                <span className="ml-2 rounded-full bg-destructive text-destructive-foreground text-xs px-1.5 py-0.5 leading-none">
+                  {itemsPedido.length}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-        {/* empty */}
-        {!loadingStock && gruposActivados.length === 0 && (
-          <Card>
-            <CardContent className="py-8 text-center text-sm text-muted-foreground">
-              No tenés grupos activados. Usá «Activar grupo» para empezar.
-            </CardContent>
-          </Card>
-        )}
+          {/* ── TAB STOCK ── */}
+          <TabsContent value="stock" className="mt-4 space-y-3">
+            {loadingStock && (
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Cargando…
+              </div>
+            )}
 
-        {/* grupos activados */}
-        {gruposActivados.map((grupo) => {
-          const rows = (filasPorGrupo.get(grupo.id) ?? []).slice().sort((a, b) => a.nombre.localeCompare(b.nombre))
-          const porPedir = rows.filter((f) => f.stockMinimo > 0 && f.stockActual < f.stockMinimo)
+            {!loadingStock && gruposActivados.length === 0 && (
+              <Card>
+                <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                  No tenés grupos activados. Usá «Activar grupo» para empezar.
+                </CardContent>
+              </Card>
+            )}
 
-          return (
-            <Card key={grupo.id}>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">{grupo.nombre}</CardTitle>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => setConfirmarDesactivar(grupo)}
-                    disabled={desactivandoId === grupo.id}
+            {gruposActivados.map((grupo) => {
+              const rows = (filasPorGrupo.get(grupo.id) ?? []).slice().sort((a, b) => a.nombre.localeCompare(b.nombre))
+              const bajosCount = rows.filter((f) => f.stockMinimo > 0 && f.stockActual < f.stockMinimo).length
+              const isOpen = gruposAbiertos.has(grupo.id)
+
+              return (
+                <Collapsible key={grupo.id} open={isOpen} onOpenChange={() => toggleGrupo(grupo.id)}>
+                  <div className="rounded-lg border border-border overflow-hidden">
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-3 text-left">
+                          <ChevronDown
+                            className={cn(
+                              "h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-200",
+                              isOpen && "rotate-180"
+                            )}
+                          />
+                          <div>
+                            <p className="font-medium text-sm">{grupo.nombre}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {rows.length} producto{rows.length !== 1 ? "s" : ""}
+                              {bajosCount > 0 && (
+                                <span className="ml-1 text-destructive">· {bajosCount} bajo stock</span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          className="text-xs text-destructive hover:underline ml-4 shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setConfirmarDesactivar(grupo)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setConfirmarDesactivar(grupo)
+                            }
+                          }}
+                          aria-disabled={desactivandoId === grupo.id}
+                        >
+                          {desactivandoId === grupo.id
+                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                            : "Desactivar"}
+                        </div>
+                      </div>
+                    </CollapsibleTrigger>
+
+                    <CollapsibleContent>
+                      <div className="border-t border-border px-4 pb-4">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm mt-3">
+                            <thead>
+                              <tr className="border-b text-muted-foreground">
+                                <th className="pb-2 text-left font-medium">Producto</th>
+                                <th className="pb-2 text-right font-medium">Stock actual</th>
+                                <th className="pb-2 text-right font-medium">Stock mínimo</th>
+                                <th className="pb-2 text-right font-medium">Estado</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rows.map((f) => {
+                                const st = estadoBadge(f.stockActual, f.stockMinimo)
+                                return (
+                                  <tr key={f.id} className="border-b last:border-0">
+                                    <td className="py-2 pr-4">
+                                      <div className="font-medium">{f.nombre}</div>
+                                      <div className="text-xs text-muted-foreground">{f.unidad}</div>
+                                    </td>
+                                    <td className="py-2 pr-2">
+                                      <EditableCell
+                                        value={f.stockActual}
+                                        onCommit={(v) => handleStockActual(f, v)}
+                                      />
+                                    </td>
+                                    <td className="py-2 pr-2">
+                                      <EditableCell
+                                        value={f.stockMinimo}
+                                        onCommit={(v) => handleStockMinimo(f, v)}
+                                      />
+                                    </td>
+                                    <td className="py-2 text-right">
+                                      <Badge variant={st.variant}>{st.label}</Badge>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </div>
+                </Collapsible>
+              )
+            })}
+          </TabsContent>
+
+          {/* ── TAB PEDIDOS ── */}
+          <TabsContent value="pedidos" className="mt-4 space-y-4">
+
+            {/* calendario semanal */}
+            <div className="grid grid-cols-7 gap-1.5">
+              {semana.map((dia, idx) => {
+                const esHoy = idx === hoyIdx
+                const tienePedido = diasConPedido.has(idx)
+                return (
+                  <div
+                    key={idx}
+                    className={cn(
+                      "flex flex-col items-center rounded-lg border py-2 px-1 text-center",
+                      esHoy
+                        ? "border-foreground bg-muted/50"
+                        : "border-border"
+                    )}
                   >
-                    {desactivandoId === grupo.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Desactivar"}
+                    <span className="text-[10px] font-medium text-muted-foreground">{DIAS_CORTOS[idx]}</span>
+                    <span className={cn(
+                      "mt-0.5 text-base font-semibold leading-none",
+                      esHoy ? "text-foreground" : "text-muted-foreground"
+                    )}>
+                      {dia.getDate()}
+                    </span>
+                    <div className={cn(
+                      "mt-1.5 h-1.5 w-1.5 rounded-full",
+                      tienePedido ? "bg-foreground" : "bg-transparent"
+                    )} />
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* pedidos del día */}
+            {hoyIdx >= 0 && (
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Hoy · {DIAS_LARGOS[hoyIdx]} {semana[hoyIdx].getDate()}
+              </p>
+            )}
+
+            {itemsPedido.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                  No hay productos bajo stock mínimo. Todo en orden.
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {itemsPedido.map(({ grupo, filas: rows }) => (
+                  <Card key={grupo.id}>
+                    <CardContent className="pt-4 pb-3 px-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium text-sm">{grupo.nombre}</p>
+                        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                          automático
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        {rows.map((f) => (
+                          <div key={f.id} className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">{f.nombre}</span>
+                            <span className="font-medium tabular-nums">× {f.stockMinimo - f.stockActual}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+
+                <div className="flex justify-end pt-2">
+                  <Button onClick={() => setModalPedido(true)}>
+                    Confirmar y enviar pedido
                   </Button>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* tabla */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-muted-foreground">
-                        <th className="py-2 text-left font-medium">Producto</th>
-                        <th className="py-2 text-right font-medium">Stock actual</th>
-                        <th className="py-2 text-right font-medium">Stock mínimo</th>
-                        <th className="py-2 text-right font-medium">Estado</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((f) => {
-                        const st = estadoBadge(f.stockActual, f.stockMinimo)
-                        return (
-                          <tr key={f.id} className="border-b last:border-0">
-                            <td className="py-2 pr-4">
-                              <div className="font-medium">{f.nombre}</div>
-                              <div className="text-xs text-muted-foreground">{f.unidad}</div>
-                            </td>
-                            <td className="py-2 pr-4 text-right">
-                              <EditableCell
-                                value={f.stockActual}
-                                onCommit={(v) => handleStockActual(f, v)}
-                              />
-                            </td>
-                            <td className="py-2 pr-4 text-right">
-                              <EditableCell
-                                value={f.stockMinimo}
-                                onCommit={(v) => handleStockMinimo(f, v)}
-                              />
-                            </td>
-                            <td className="py-2 text-right">
-                              <Badge variant={st.variant}>{st.label}</Badge>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* pedido sugerido */}
-                {porPedir.length > 0 && (
-                  <div className="rounded-md bg-muted/50 px-3 py-2 text-sm space-y-1">
-                    <p className="font-medium text-muted-foreground">Pedido sugerido</p>
-                    {porPedir.map((f) => (
-                      <div key={f.id} className="flex justify-between">
-                        <span>{f.nombre}</span>
-                        <span className="tabular-nums font-medium">× {f.stockMinimo - f.stockActual}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )
-        })}
-
-        {/* botón enviar pedido */}
-        {itemsPedido.length > 0 && (
-          <div className="flex justify-end">
-            <Button onClick={() => setModalPedido(true)}>
-              Confirmar y enviar pedido
-            </Button>
-          </div>
-        )}
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
 
         {/* ── modal activar grupo ── */}
         <Dialog open={modalActivar} onOpenChange={setModalActivar}>
@@ -466,7 +612,7 @@ export default function MiStockPage() {
             <DialogHeader>
               <DialogTitle>Activar grupo</DialogTitle>
               <DialogDescription>
-                Selecciona un grupo para activarlo en tu sucursal. Se crearán registros de stock para todos los productos del grupo.
+                Seleccioná un grupo para activarlo en tu sucursal.
               </DialogDescription>
             </DialogHeader>
             {gruposDisponibles.length === 0 ? (
@@ -503,11 +649,11 @@ export default function MiStockPage() {
             <DialogHeader>
               <DialogTitle>Desactivar grupo</DialogTitle>
               <DialogDescription>
-                Esta acción eliminará todos los registros de stock de este grupo para tu sucursal.
+                Se eliminarán todos los registros de stock de este grupo para tu sucursal.
               </DialogDescription>
             </DialogHeader>
             <p className="text-sm">
-              ¿Desactivar el grupo <strong>{confirmarDesactivar?.nombre}</strong>? Se eliminarán todos los registros de stock de este grupo para tu sucursal.
+              ¿Desactivar <strong>{confirmarDesactivar?.nombre}</strong>?
             </p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setConfirmarDesactivar(null)}>
@@ -537,8 +683,8 @@ export default function MiStockPage() {
                   <ul className="space-y-0.5 pl-2">
                     {rows.map((f) => (
                       <li key={f.id} className="flex justify-between">
-                        <span>{f.nombre}</span>
-                        <span className="tabular-nums">× {f.stockMinimo - f.stockActual}</span>
+                        <span className="text-muted-foreground">{f.nombre}</span>
+                        <span className="tabular-nums font-medium">× {f.stockMinimo - f.stockActual}</span>
                       </li>
                     ))}
                   </ul>
