@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useData } from "@/contexts/data-context"
 import { useLogistica } from "@/hooks/use-logistica"
 import { useToast } from "@/hooks/use-toast"
@@ -31,9 +33,23 @@ export default function RecepcionesLogisticaPage() {
     return base.filter((r) => r.estado === "preparado" || r.estado === "en_camino")
   }, [isAdmin, remitosRaw, remitosRecibidos])
 
+  const remitosEntregados = useMemo(() => {
+    const base = isAdmin ? remitosRaw : remitosRecibidos
+    return base
+      .filter((r) => r.estado === "entregado")
+      .sort((a, b) => {
+        const ts = (v: unknown) => {
+          if (v && typeof v === "object" && "toMillis" in v) return (v as { toMillis: () => number }).toMillis()
+          return 0
+        }
+        return ts(b.actualizadoEn) - ts(a.actualizadoEn)
+      })
+  }, [isAdmin, remitosRaw, remitosRecibidos])
+
   const [selId, setSelId] = useState<string | null>(null)
   const sel = useMemo(() => enTransito.find((r) => r.id === selId) ?? null, [enTransito, selId])
 
+  const [abiertosHistorial, setAbiertosHistorial] = useState<Set<string>>(new Set())
   const [recibido, setRecibido] = useState<Record<string, number>>({})
   const [coment, setComent] = useState<Record<string, string>>({})
   const [obs, setObs] = useState("")
@@ -118,86 +134,164 @@ export default function RecepcionesLogisticaPage() {
           </div>
         )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Remitos pendientes de recepción</CardTitle>
-            <CardDescription>Tocá un remito para cargar cantidades recibidas.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {enTransito.length === 0 && !loading && (
-              <p className="text-sm text-muted-foreground">No hay remitos para recepcionar.</p>
-            )}
-            {enTransito.map((r) => (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => setSelId(r.id)}
-                className={`w-full rounded-md border px-3 py-2 text-left text-sm transition-colors ${
-                  selId === r.id ? "border-primary bg-muted/40" : "border-border hover:bg-muted/30"
-                }`}
-              >
-                <span className="font-mono font-medium">{r.numero}</span>
-                <span className="text-muted-foreground"> · desde {r.origenNombre}</span>
-                <span className="block text-xs text-muted-foreground mt-0.5">
-                  {r.estado === "preparado" ? "Preparado" : "En camino"} · {r.items.length} ítem(s)
-                </span>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="pendientes">
+          <TabsList>
+            <TabsTrigger value="pendientes">Pendientes</TabsTrigger>
+            <TabsTrigger value="historial">Historial</TabsTrigger>
+          </TabsList>
 
-        {sel && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Remito {sel.numero}</CardTitle>
-              <CardDescription>¿Cuánto llegó de cada línea?</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {sel.items.map((it) => (
-                <div
-                  key={it.productoId}
-                  className="rounded-md border border-border p-3 space-y-2"
-                >
-                  <div className="font-medium text-sm">{it.productoNombre}</div>
-                  <div className="text-xs text-muted-foreground">Enviado: {it.cantidadEnviada}</div>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                    <div className="flex-1">
-                      <Label className="text-xs">Cantidad recibida</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={recibido[it.productoId] ?? it.cantidadEnviada}
-                        onChange={(e) =>
-                          setRecibido((s) => ({
-                            ...s,
-                            [it.productoId]: Math.max(0, Math.floor(Number(e.target.value) || 0)),
-                          }))
-                        }
-                      />
+          <TabsContent value="pendientes" className="space-y-6 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Remitos pendientes de recepción</CardTitle>
+                <CardDescription>Tocá un remito para cargar cantidades recibidas.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {enTransito.length === 0 && !loading && (
+                  <p className="text-sm text-muted-foreground">No hay remitos para recepcionar.</p>
+                )}
+                {enTransito.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => setSelId(r.id)}
+                    className={`w-full rounded-md border px-3 py-2 text-left text-sm transition-colors ${
+                      selId === r.id ? "border-primary bg-muted/40" : "border-border hover:bg-muted/30"
+                    }`}
+                  >
+                    <span className="font-mono font-medium">{r.numero}</span>
+                    <span className="text-muted-foreground"> · desde {r.origenNombre}</span>
+                    <span className="block text-xs text-muted-foreground mt-0.5">
+                      {r.estado === "preparado" ? "Preparado" : "En camino"} · {r.items.length} ítem(s)
+                    </span>
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
+
+            {sel && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Remito {sel.numero}</CardTitle>
+                  <CardDescription>¿Cuánto llegó de cada línea?</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {sel.items.map((it) => (
+                    <div
+                      key={it.productoId}
+                      className="rounded-md border border-border p-3 space-y-2"
+                    >
+                      <div className="font-medium text-sm">{it.productoNombre}</div>
+                      <div className="text-xs text-muted-foreground">Enviado: {it.cantidadEnviada}</div>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                        <div className="flex-1">
+                          <Label className="text-xs">Cantidad recibida</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={recibido[it.productoId] ?? it.cantidadEnviada}
+                            onChange={(e) =>
+                              setRecibido((s) => ({
+                                ...s,
+                                [it.productoId]: Math.max(0, Math.floor(Number(e.target.value) || 0)),
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <Label className="text-xs">Comentario</Label>
+                          <Input
+                            value={coment[it.productoId] ?? ""}
+                            onChange={(e) =>
+                              setComent((s) => ({ ...s, [it.productoId]: e.target.value }))
+                            }
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <Label className="text-xs">Comentario</Label>
-                      <Input
-                        value={coment[it.productoId] ?? ""}
-                        onChange={(e) =>
-                          setComent((s) => ({ ...s, [it.productoId]: e.target.value }))
-                        }
-                      />
-                    </div>
+                  ))}
+                  <div>
+                    <Label className="text-xs">Observación general</Label>
+                    <Textarea rows={2} value={obs} onChange={(e) => setObs(e.target.value)} />
                   </div>
-                </div>
-              ))}
-              <div>
-                <Label className="text-xs">Observación general</Label>
-                <Textarea rows={2} value={obs} onChange={(e) => setObs(e.target.value)} />
-              </div>
-              <Button onClick={() => void confirmar()} disabled={procesando}>
-                {procesando ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Confirmar recepción
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+                  <Button onClick={() => void confirmar()} disabled={procesando}>
+                    {procesando ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    Confirmar recepción
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="historial" className="space-y-3 mt-4">
+            {remitosEntregados.length === 0 && !loading && (
+              <p className="text-sm text-muted-foreground">No hay remitos entregados todavía.</p>
+            )}
+            {remitosEntregados.map((r) => {
+              const abierto = abiertosHistorial.has(r.id)
+              const actualizadoMs =
+                r.actualizadoEn && typeof r.actualizadoEn === "object" && "toMillis" in r.actualizadoEn
+                  ? (r.actualizadoEn as { toMillis: () => number }).toMillis()
+                  : 0
+              const fecha = actualizadoMs
+                ? new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(actualizadoMs))
+                : "—"
+              return (
+                <Card key={r.id}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAbiertosHistorial((prev) => {
+                        const next = new Set(prev)
+                        if (next.has(r.id)) next.delete(r.id)
+                        else next.add(r.id)
+                        return next
+                      })
+                    }
+                    className="w-full text-left"
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono font-medium">{r.numero}</span>
+                            <Badge className="bg-green-50 text-green-800 border border-green-200">Entregado</Badge>
+                          </div>
+                          <div className="text-sm text-muted-foreground mt-0.5">
+                            {r.origenNombre} → {r.destinoNombre}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {fecha}
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground shrink-0">
+                          {abierto ? "Ocultar" : "Ver items"}
+                        </div>
+                      </div>
+                    </CardHeader>
+                  </button>
+                  {abierto && (
+                    <CardContent className="space-y-2 pt-0">
+                      {r.items.map((it) => (
+                        <div key={it.productoId} className="flex items-start justify-between gap-3 text-sm">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{it.productoNombre}</div>
+                          </div>
+                          <div className="shrink-0 text-right tabular-nums">
+                            <div>Recibido: {it.cantidadEnviada}</div>
+                            {"cantidadPedida" in it && typeof (it as any).cantidadPedida === "number" ? (
+                              <div className="text-xs text-muted-foreground">Pedido: {(it as any).cantidadPedida}</div>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  )}
+                </Card>
+              )
+            })}
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   )
