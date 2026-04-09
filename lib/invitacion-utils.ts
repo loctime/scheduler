@@ -7,12 +7,12 @@ export interface InvitacionValidationResult {
   createdBy: string | null
 }
 
-const ALLOWED_ROLES = ["operador", "delivery", "admin"] as const
+const ALLOWED_ROLES = ["operador", "delivery", "admin", "colaborador"] as const
 
 type AllowedRole = (typeof ALLOWED_ROLES)[number]
 
 const isAllowedRole = (role: any): role is AllowedRole => {
-  return role === "operador" || role === "delivery" || role === "admin"
+  return role === "operador" || role === "delivery" || role === "admin" || role === "colaborador"
 }
 
 export async function validarTokenInvitacion(token: string | null): Promise<InvitacionValidationResult> {

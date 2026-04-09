@@ -15,7 +15,7 @@ interface UserData {
   email?: string
   displayName?: string
   photoURL?: string
-  role?: "operador" | "admin" | "delivery"
+  role?: "operador" | "admin" | "delivery" | "colaborador"
   locationId?: string
   locationName?: string
   ownerId?: string

@@ -6,7 +6,10 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { InvitacionLink } from "@/lib/types"
 
-export function useInvitaciones(user: any, userData?: { role?: "operador" | "admin" | "delivery"; locationId?: string | null } | null) {
+export function useInvitaciones(
+  user: any,
+  userData?: { role?: "operador" | "admin" | "delivery" | "colaborador"; locationId?: string | null } | null
+) {
   const { toast } = useToast()
   const [links, setLinks] = useState<InvitacionLink[]>([])
   const [loading, setLoading] = useState(true)
@@ -15,12 +18,12 @@ export function useInvitaciones(user: any, userData?: { role?: "operador" | "adm
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
   }
 
-  const crearLinkInvitacion = async (role?: "operador" | "admin" | "delivery", locationId?: string) => {
+  const crearLinkInvitacion = async (role?: "operador" | "admin" | "delivery" | "colaborador", locationId?: string) => {
     if (!user || !db) return null
-    if (!role || (role !== "operador" && role !== "delivery" && role !== "admin")) {
+    if (!role || (role !== "operador" && role !== "delivery" && role !== "admin" && role !== "colaborador")) {
       toast({
         title: "Error",
-        description: "Rol invalido. Solo se permite operador, delivery o admin.",
+        description: "Rol invalido. Solo se permite operador, delivery, admin o colaborador.",
         variant: "destructive",
       })
       return null

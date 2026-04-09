@@ -1,4 +1,4 @@
-export type UserRole = "operador" | "admin" | "delivery"
+export type UserRole = "operador" | "admin" | "delivery" | "colaborador"
 
 export type UserAction =
   | "ver_dashboard"
@@ -39,7 +39,7 @@ export function canUser(
   if (!user?.role) return false
 
   if (action === "ver_dashboard") {
-    return true
+    return user.role !== "colaborador"
   }
 
   if (user.role === "admin") {
@@ -49,6 +49,12 @@ export function canUser(
 
   if (user.role === "operador") {
     if (action === "ver_admin") return false
+    return true
+  }
+
+  if (user.role === "colaborador") {
+    if (action === "ver_admin") return false
+    if (action === "ver_dashboard") return false
     return true
   }
 
@@ -64,4 +70,3 @@ export function canUser(
 
   return false
 }
-

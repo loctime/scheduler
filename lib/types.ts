@@ -4,7 +4,7 @@ export interface InvitacionLink {
   id: string
   token: string // Token unico para el link
   createdBy: string // ID del usuario que creo el link
-  role: "operador" | "admin" | "delivery" // Rol asignado al usuario que use el link
+  role: "operador" | "admin" | "delivery" | "colaborador" // Rol asignado al usuario que use el link
   locationId: string
   createdAt?: any
   usedBy?: string // ID del usuario que uso el link

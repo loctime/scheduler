@@ -6,7 +6,7 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
 
-export type UserRole = "operador" | "admin" | "delivery"
+export type UserRole = "operador" | "admin" | "delivery" | "colaborador"
 
 export interface UserData {
   id: string

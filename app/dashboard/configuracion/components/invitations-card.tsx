@@ -27,7 +27,7 @@ import type { InvitacionLink } from "@/lib/types"
 function invitationFullLink(token: string) {
   return `${window.location.origin}/registro?token=${token}`
 }
-const ROLES_ADMIN = ["operador", "delivery", "admin"] as const
+const ROLES_ADMIN = ["operador", "delivery", "admin", "colaborador"] as const
 
 type Role = (typeof ROLES_ADMIN)[number]
 
@@ -59,7 +59,7 @@ export function InvitationsCard() {
 
   useEffect(() => {
     if (!isAdmin) {
-      setRolSeleccionado("operador")
+      setRolSeleccionado("colaborador")
     }
   }, [isAdmin])
 
@@ -102,7 +102,7 @@ export function InvitationsCard() {
     }
     setCreando(true)
     try {
-      const roleToInvite: Role = isAdmin ? rolSeleccionado : "operador"
+      const roleToInvite: Role = isAdmin ? rolSeleccionado : "colaborador"
       const link = await crearLinkInvitacion(roleToInvite, locationId.trim())
       if (link?.token) {
         const fullLink = invitationFullLink(link.token)
@@ -185,7 +185,7 @@ export function InvitationsCard() {
                 </SelectContent>
               </Select>
             ) : (
-              <Input value="operador" disabled />
+              <Input value="colaborador" disabled />
             )}
           </div>
           <div className="flex items-end">

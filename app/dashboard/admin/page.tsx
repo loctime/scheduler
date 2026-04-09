@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { useAdminUsers } from "@/hooks/use-admin-users"
 import { canUser } from "@/lib/permissions"
 
-const ROLES = ["operador", "admin", "delivery"] as const
+const ROLES = ["operador", "admin", "delivery", "colaborador"] as const
 
 export default function AdminPage() {
   const { user, userData } = useData()

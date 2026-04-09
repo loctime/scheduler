@@ -94,7 +94,7 @@ function ProtectedRoute({
       )
 
       if (!allowed) {
-        router.push("/")
+        router.push(userData.role === "colaborador" ? "/pwa" : "/")
         return
       }
       setChecking(false)
