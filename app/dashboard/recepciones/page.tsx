@@ -14,12 +14,35 @@ import { useLogistica } from "@/hooks/use-logistica"
 import { useToast } from "@/hooks/use-toast"
 import { canUser } from "@/lib/permissions"
 import type { RecepcionLogItem } from "@/lib/logistica-types"
-import { ClipboardCheck, Loader2 } from "lucide-react"
+import { CheckCircle, ClipboardCheck, Loader2, Package, Truck } from "lucide-react"
+
+function timestampToDate(ts: unknown): Date | null {
+  if (!ts || typeof ts !== "object") return null
+  if ("toDate" in ts && typeof (ts as { toDate?: unknown }).toDate === "function") {
+    const d = (ts as { toDate: () => Date }).toDate()
+    return d instanceof Date ? d : null
+  }
+  if ("toMillis" in ts && typeof (ts as { toMillis?: unknown }).toMillis === "function") {
+    const ms = (ts as { toMillis: () => number }).toMillis()
+    return Number.isFinite(ms) ? new Date(ms) : null
+  }
+  return null
+}
+
+function timestampToMillis(ts: unknown): number {
+  const d = timestampToDate(ts)
+  return d ? d.getTime() : 0
+}
 
 export default function RecepcionesLogisticaPage() {
   const { user, userData } = useData()
   const { toast } = useToast()
   const { remitosRaw, remitosRecibidos, confirmarRecepcion, loading, isAdmin } = useLogistica(user)
+
+  const formateadorFechaHora = useMemo(
+    () => new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }),
+    []
+  )
 
   const puede = useMemo(
     () =>
@@ -238,8 +261,16 @@ export default function RecepcionesLogisticaPage() {
                   ? (r.actualizadoEn as { toMillis: () => number }).toMillis()
                   : 0
               const fecha = actualizadoMs
-                ? new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(actualizadoMs))
+                ? formateadorFechaHora.format(new Date(actualizadoMs))
                 : "—"
+
+              const statusHistoryRaw = (r as unknown as { statusHistory?: unknown }).statusHistory
+              const statusHistory = Array.isArray(statusHistoryRaw) ? (statusHistoryRaw as any[]) : []
+              const statusHistoryOrdenado = statusHistory
+                .slice()
+                .sort((a, b) => timestampToMillis(a?.timestamp) - timestampToMillis(b?.timestamp))
+              const mostrarTimeline = statusHistoryOrdenado.length > 0
+
               return (
                 <Card key={r.id}>
                   <button
@@ -275,20 +306,93 @@ export default function RecepcionesLogisticaPage() {
                     </CardHeader>
                   </button>
                   {abierto && (
-                    <CardContent className="space-y-2 pt-0">
-                      {r.items.map((it) => (
-                        <div key={it.productoId} className="flex items-start justify-between gap-3 text-sm">
-                          <div className="min-w-0">
-                            <div className="font-medium truncate">{it.productoNombre}</div>
-                          </div>
-                          <div className="shrink-0 text-right tabular-nums">
-                            <div>Recibido: {it.cantidadEnviada}</div>
-                            {"cantidadPedida" in it && typeof (it as any).cantidadPedida === "number" ? (
-                              <div className="text-xs text-muted-foreground">Pedido: {(it as any).cantidadPedida}</div>
-                            ) : null}
+                    <CardContent className="space-y-4 pt-0">
+                      <div className="divide-y divide-border rounded-md border">
+                        {r.items.map((it) => {
+                          const enviado = it.cantidadEnviada
+                          const recibido =
+                            "cantidadRecibida" in (it as any) && typeof (it as any).cantidadRecibida === "number"
+                              ? (it as any).cantidadRecibida
+                              : it.cantidadEnviada
+                          const faltante = Math.max(0, enviado - recibido)
+                          const pedido = "cantidadPedida" in (it as any) && typeof (it as any).cantidadPedida === "number"
+                            ? ((it as any).cantidadPedida as number)
+                            : undefined
+
+                          return (
+                            <div
+                              key={it.productoId}
+                              className="flex items-start justify-between gap-3 px-3 py-2 text-sm"
+                            >
+                              <div className="min-w-0">
+                                <div className="font-medium truncate">{it.productoNombre}</div>
+                                {it.comentario ? (
+                                  <div className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">
+                                    {it.comentario}
+                                  </div>
+                                ) : null}
+                              </div>
+
+                              <div className="shrink-0 text-right tabular-nums">
+                                <div className="text-xs text-muted-foreground space-y-0.5">
+                                  {typeof pedido === "number" ? <div>Pedido: {pedido}</div> : null}
+                                  <div>Enviado: {enviado}</div>
+                                </div>
+                                <div className="mt-0.5">Recibido: {recibido}</div>
+                                {faltante > 0 ? (
+                                  <div className="mt-1 flex justify-end">
+                                    <Badge variant="destructive">⚠ Faltante: {faltante}</Badge>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {mostrarTimeline ? (
+                        <div className="rounded-md border px-3 py-2">
+                          <div className="text-sm font-medium">Línea de tiempo</div>
+                          <div className="mt-3 space-y-3">
+                            {statusHistoryOrdenado.map((h, idx) => {
+                              const status = String(h?.status ?? "")
+                              const meta =
+                                status === "preparado"
+                                  ? { label: "Preparado", Icon: Package }
+                                  : status === "en_camino"
+                                    ? { label: "En camino", Icon: Truck }
+                                    : status === "entregado"
+                                      ? { label: "Entregado", Icon: CheckCircle }
+                                      : { label: status || "—", Icon: Package }
+
+                              const d = timestampToDate(h?.timestamp)
+                              const fechaHora = d ? formateadorFechaHora.format(d) : "—"
+                              const userName = String(h?.userName ?? "")
+                              const role = String(h?.role ?? "")
+                              const nota = typeof h?.nota === "string" ? h.nota.trim() : ""
+
+                              return (
+                                <div key={`${String(h?.userId ?? "u")}-${String(h?.timestamp ?? idx)}-${idx}`} className="flex gap-3">
+                                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-muted/20">
+                                    <meta.Icon className="h-4 w-4" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                                      <span className="font-medium">{meta.label}</span>
+                                      <span className="text-muted-foreground">
+                                        {userName ? userName : "—"}
+                                        {role ? ` (${role})` : ""}
+                                      </span>
+                                      <span className="text-muted-foreground">· {fechaHora}</span>
+                                    </div>
+                                    {nota ? <div className="text-xs text-muted-foreground mt-0.5">{nota}</div> : null}
+                                  </div>
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
-                      ))}
+                      ) : null}
                     </CardContent>
                   )}
                 </Card>

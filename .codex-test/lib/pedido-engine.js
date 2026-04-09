@@ -48,6 +48,15 @@ function ejecutarPedidoEngine({ pedido, productos, stockActual, ajustesPedido = 
         texto = texto.replace(/{cantidadUnidades}/g, producto.cantidadUnidades.toString());
         texto = texto.replace(/{cantidadPacks}/g, producto.cantidadPacks.toString());
         texto = texto.replace(/{unidad}/g, producto.unidad);
+        // Si el formato no tiene placeholders específicos, usar formato inteligente
+        if (!texto.includes('{') && !texto.includes('}')) {
+            if ((0, unidades_utils_1.esModoPack)(producto)) {
+                texto = `${producto.nombre}: ${producto.cantidadPacks} pack${producto.cantidadPacks !== 1 ? 's' : ''} ${producto.unidad}`;
+            }
+            else {
+                texto = `${producto.nombre}: ${producto.cantidadUnidades} ${producto.unidad}`;
+            }
+        }
         return texto.trim();
     });
     const encabezado = pedido.mensajePrevio?.trim() || `[Pedido] ${pedido.nombre}`;

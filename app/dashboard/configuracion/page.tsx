@@ -6,7 +6,6 @@ import { db, COLLECTIONS } from "@/lib/firebase"
 import { Configuracion } from "@/lib/types"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { useData } from "@/contexts/data-context"
-import { canUser } from "@/lib/permissions"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -42,6 +41,7 @@ const getContrastColor = (hexColor: string): string => {
 export default function ConfiguracionPage() {
   const { user, userData, shifts } = useData()
   const ownerId = useMemo(() => getOwnerIdForActor(user, userData), [user, userData])
+  const canSeeAdminAndOperatorSettings = userData?.role === "admin" || userData?.role === "operador"
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -290,9 +290,7 @@ export default function ConfiguracionPage() {
         </Card>
 
         {/* Configuraciones del calendario - Usuarios con rol operador/admin o con permiso 'horarios' */}
-        {(() => {
-          return canUser({ uid: user?.uid, role: userData?.role, locationId: userData?.locationId }, "ver_admin")
-        })() && (
+        {canSeeAdminAndOperatorSettings && (
           <>
             <Card>
           <CardHeader>
@@ -773,9 +771,7 @@ export default function ConfiguracionPage() {
           </>
         )}
 
-        {(canUser({ uid: user?.uid, role: userData?.role, locationId: userData?.locationId }, "ver_admin")) ? (
-          <InvitationsCard />
-        ) : null}
+        {canSeeAdminAndOperatorSettings ? <InvitationsCard /> : null}
 
         <div className="flex justify-end">
           <Button onClick={handleSave} disabled={saving} size="lg">

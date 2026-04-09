@@ -24,8 +24,6 @@ import { cn } from "@/lib/utils"
 import { Copy, Trash2, UserX, Pencil, Check, X } from "lucide-react"
 import type { InvitacionLink } from "@/lib/types"
 
-const ROLES_BASE = ["operador", "delivery"] as const
-
 function invitationFullLink(token: string) {
   return `${window.location.origin}/registro?token=${token}`
 }
@@ -52,11 +50,18 @@ export function InvitationsCard() {
   const [editingLocationUserId, setEditingLocationUserId] = useState<string | null>(null)
   const [locationEditDraft, setLocationEditDraft] = useState("")
   const [guardandoUbicacion, setGuardandoUbicacion] = useState(false)
+  const isAdmin = userData?.role === "admin"
 
   const usedByIdsKey = useMemo(() => {
     const ids = [...new Set(links.map((l) => l.usedBy).filter(Boolean))] as string[]
     return ids.sort().join("|")
   }, [links])
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setRolSeleccionado("operador")
+    }
+  }, [isAdmin])
 
   useEffect(() => {
     if (!db || loading) return
@@ -86,10 +91,19 @@ export function InvitationsCard() {
 
   const handleCreate = async () => {
     if (!user) return
-    const fixedLocationId = `loc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
+    const locationId = userData?.locationId
+    if (!locationId || !locationId.trim()) {
+      toast({
+        title: "Error",
+        description: "No se pudo crear el link: tu usuario no tiene locationId asignado.",
+        variant: "destructive",
+      })
+      return
+    }
     setCreando(true)
     try {
-      const link = await crearLinkInvitacion(rolSeleccionado, fixedLocationId.trim())
+      const roleToInvite: Role = isAdmin ? rolSeleccionado : "operador"
+      const link = await crearLinkInvitacion(roleToInvite, locationId.trim())
       if (link?.token) {
         const fullLink = invitationFullLink(link.token)
         navigator.clipboard.writeText(fullLink).catch(() => null)
@@ -99,8 +113,6 @@ export function InvitationsCard() {
       setCreando(false)
     }
   }
-
-  const rolesDisponibles = userData?.role === "admin" ? ROLES_ADMIN : ROLES_BASE
 
   const handleConfirmDesactivar = async () => {
     if (!confirmDesactivar) return
@@ -114,6 +126,7 @@ export function InvitationsCard() {
   }
 
   const iniciarEdicionUbicacion = (userId: string) => {
+    if (!isAdmin) return
     setEditingLocationUserId(userId)
     setLocationEditDraft(locationNamesByUserId[userId] ?? "")
   }
@@ -124,6 +137,7 @@ export function InvitationsCard() {
   }
 
   const guardarUbicacion = async (userId: string) => {
+    if (!isAdmin) return
     if (!db) return
     const firestore = db
     const valor = locationEditDraft.trim()
@@ -157,18 +171,22 @@ export function InvitationsCard() {
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Rol</label>
-            <Select value={rolSeleccionado} onValueChange={(value) => setRolSeleccionado(value as Role)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {rolesDisponibles.map((rol) => (
-                  <SelectItem key={rol} value={rol}>
-                    {rol}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {isAdmin ? (
+              <Select value={rolSeleccionado} onValueChange={(value) => setRolSeleccionado(value as Role)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLES_ADMIN.map((rol) => (
+                    <SelectItem key={rol} value={rol}>
+                      {rol}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input value="operador" disabled />
+            )}
           </div>
           <div className="flex items-end">
             <Button onClick={handleCreate} disabled={creando || !user} className="w-full">
@@ -236,7 +254,7 @@ export function InvitationsCard() {
                       </div>
                       <div className="flex flex-wrap items-center gap-2 text-xs">
                         <span className="text-muted-foreground">Ubicación:</span>
-                        {editingLocationUserId === link.usedBy ? (
+                        {isAdmin && editingLocationUserId === link.usedBy ? (
                           <>
                             <Input
                               value={locationEditDraft}
@@ -280,16 +298,18 @@ export function InvitationsCard() {
                             >
                               {`[ ${(locationNamesByUserId[link.usedBy!] ?? "").trim() || "Sin nombre de ubicación"} ]`}
                             </span>
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              className="size-8 shrink-0 text-muted-foreground"
-                              onClick={() => iniciarEdicionUbicacion(link.usedBy!)}
-                              aria-label="Editar nombre de ubicación"
-                            >
-                              <Pencil className="size-4" />
-                            </Button>
+                            {isAdmin && (
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="size-8 shrink-0 text-muted-foreground"
+                                onClick={() => iniciarEdicionUbicacion(link.usedBy!)}
+                                aria-label="Editar nombre de ubicación"
+                              >
+                                <Pencil className="size-4" />
+                              </Button>
+                            )}
                           </>
                         )}
                       </div>
