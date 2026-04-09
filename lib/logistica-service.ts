@@ -1,10 +1,12 @@
 import {
   addDoc,
+  arrayUnion,
   collection,
   doc,
   getDoc,
   runTransaction,
   serverTimestamp,
+  Timestamp,
   updateDoc,
 } from "firebase/firestore"
 import type { DocumentData, DocumentReference, DocumentSnapshot } from "firebase/firestore"
@@ -14,6 +16,7 @@ import type {
   PedidoFabricaItem,
   RecepcionLogItem,
   RemitoLogItem,
+  StatusHistoryEntry,
 } from "@/lib/logistica-types"
 import { canUser, type PermissionUser } from "@/lib/permissions"
 
@@ -23,6 +26,22 @@ const REMITOS_COUNTER_DOC_ID = "remitos_log"
 
 function padNumber(value: number, size = 6) {
   return String(value).padStart(size, "0")
+}
+
+function makeHistoryEntry(
+  status: string,
+  user: LogisticaActor,
+  nota?: string
+): StatusHistoryEntry {
+  return {
+    status,
+    timestamp: Timestamp.now(),
+    userId: user.uid ?? "",
+    userName: user.email?.trim() ?? user.uid ?? "",
+    role: user.role ?? "",
+    locationId: user.locationId ?? "",
+    ...(nota?.trim() ? { nota: nota.trim() } : {}),
+  }
 }
 
 function stockActualUbicacion(data: Record<string, unknown>): number {
@@ -203,6 +222,7 @@ export async function crearRemito(input: {
         creadoPorEmail: input.user.email?.trim() ?? "",
         actualizadoEn: serverTimestamp(),
         stockDescontadoEn: serverTimestamp(),
+        statusHistory: [makeHistoryEntry("preparado", input.user)],
       })
 
       if (pedidoRef && pedidoSnap?.exists()) {
@@ -370,6 +390,7 @@ export async function confirmarRecepcion(input: {
       tx.update(remitoRef, {
         estado: "entregado",
         actualizadoEn: serverTimestamp(),
+        statusHistory: arrayUnion(makeHistoryEntry("entregado", input.user, input.observacion)),
       })
 
       if (pedidoFabricaId && pedidoOrigenSnap?.exists()) {
@@ -416,6 +437,7 @@ export async function confirmarRecepcion(input: {
           estado: "enviado",
           esPendiente: true,
           ...(pedidoFabricaId ? { pedidoOrigenId: pedidoFabricaId } : {}),
+          remitoOrigenId: input.remitoId,
           items: faltanteItems,
           observacion: `Generado automáticamente por faltante en recepción del remito ${remitoNumero}`,
           creadoEn: serverTimestamp(),
@@ -436,7 +458,7 @@ export async function confirmarRecepcion(input: {
 export async function marcarEnCamino(input: {
   remitoId: string
   ownerId: string
-  user: PermissionUser | null | undefined
+  user: LogisticaActor | null | undefined
 }): Promise<{ ok: boolean; error?: string }> {
   if (!db) {
     return { ok: false, error: "Firestore no está disponible" }
@@ -468,6 +490,7 @@ export async function marcarEnCamino(input: {
     await updateDoc(remitoRef, {
       estado: "en_camino",
       actualizadoEn: serverTimestamp(),
+      statusHistory: arrayUnion(makeHistoryEntry("en_camino", input.user as LogisticaActor)),
     })
     return { ok: true }
   } catch (e) {

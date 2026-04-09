@@ -12,6 +12,7 @@ export type PedidoFabrica = {
   esPendiente: boolean
   controlado?: boolean
   pedidoOrigenId?: string
+  remitoOrigenId?: string
   items: PedidoFabricaItem[]
   observacion?: string
   creadoEn: unknown
@@ -26,6 +27,16 @@ export type PedidoFabricaItem = {
   cantidadSugerida: number
   cantidadPedida: number
   comentario?: string
+}
+
+export type StatusHistoryEntry = {
+  status: string
+  timestamp: unknown
+  userId: string
+  userName: string
+  role: string
+  locationId: string
+  nota?: string
 }
 
 export type RemitoLog = {
@@ -45,6 +56,7 @@ export type RemitoLog = {
   creadoPorEmail: string
   actualizadoEn: unknown
   stockDescontadoEn?: unknown
+  statusHistory: StatusHistoryEntry[]
 }
 
 export type RemitoLogItem = {
