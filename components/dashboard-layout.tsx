@@ -21,7 +21,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, ShoppingCart, Shield, MessageSquare, AlertTriangle, Package, CheckSquare, ShoppingBag, Factory, ClipboardCheck, BookMarked, Warehouse } from "lucide-react"
+import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, Shield, MessageSquare, AlertTriangle, Package, CheckSquare, Factory, ClipboardCheck, BookMarked, Warehouse } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -51,8 +51,6 @@ const navGroups = [
     label: "Logística",
     icon: Package,
     items: [
-      { href: "/dashboard/pedidos", label: "Stock", icon: ShoppingCart, action: "ver_pedidos" },
-      { href: "/dashboard/pedir", label: "Pedir insumos", icon: ShoppingBag, action: "crear_pedido" },
       { href: "/dashboard/logistica-fabrica", label: "Fábrica", icon: Factory, action: "ver_logistica" },
       { href: "/dashboard/recepciones", label: "Recepciones", icon: ClipboardCheck, action: "recibir_pedido" },
       { href: "/dashboard/catalogo", label: "Catálogo", icon: BookMarked, action: "ver_admin" },
@@ -239,5 +237,3 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     </div>
   )
 }
-
-
