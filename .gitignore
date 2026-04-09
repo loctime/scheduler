@@ -6,7 +6,7 @@ node_modules/
 
 # Testing
 coverage/
-
+claude_files/
 # Next.js
 .next/
 out/

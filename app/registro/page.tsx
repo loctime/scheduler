@@ -117,7 +117,7 @@ function RegistroContent() {
 
       // Redirigir al dashboard
       setTimeout(() => {
-        router.push(redirectTo || "/dashboard/pedidos")
+        router.push(redirectTo || "/dashboard")
       }, 1000)
     } catch (error: any) {
       console.error("❌ Error en registro:", error)
@@ -137,7 +137,7 @@ function RegistroContent() {
           })
 
           setTimeout(() => {
-            router.push(redirectTo || "/dashboard/pedidos")
+            router.push(redirectTo || "/dashboard")
           }, 1000)
         } catch (signInError: any) {
           let errorMessage = "Este email ya está registrado"
@@ -221,7 +221,7 @@ function RegistroContent() {
 
       // Redirigir al dashboard
       setTimeout(() => {
-        router.push(redirectTo || "/dashboard/pedidos")
+        router.push(redirectTo || "/dashboard")
       }, 1000)
     } catch (error: any) {
       console.error("❌ Error en registro:", error)
