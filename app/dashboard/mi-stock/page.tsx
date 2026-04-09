@@ -6,6 +6,7 @@ import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import PedirInsumosContent from "@/components/pedir/pedir-insumos-content"
 import {
   Dialog,
   DialogContent,
@@ -278,6 +279,7 @@ export default function MiStockPage() {
 
   // ── activar grupo ───────────────────────────────────────────────────────────
   const [modalActivar, setModalActivar] = useState(false)
+  const [modalPedir, setModalPedir] = useState(false)
   const [activando, setActivando] = useState(false)
 
   const activarGrupo = async (grupo: GrupoCatalogoUI) => {
@@ -474,9 +476,14 @@ export default function MiStockPage() {
               <p className="text-sm text-muted-foreground">Stock de tu sucursal, agrupado por grupo.</p>
             </div>
           </div>
-          <Button onClick={() => setModalActivar(true)} disabled={gruposDisponibles.length === 0}>
-            Activar grupo
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setModalPedir(true)}>
+              Pedir insumos
+            </Button>
+            <Button onClick={() => setModalActivar(true)} disabled={gruposDisponibles.length === 0}>
+              Activar grupo
+            </Button>
+          </div>
         </div>
 
         {/* tabs */}
@@ -811,6 +818,15 @@ export default function MiStockPage() {
                 Activando…
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={modalPedir} onOpenChange={setModalPedir}>
+          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Pedir insumos</DialogTitle>
+            </DialogHeader>
+            <PedirInsumosContent user={user} userData={userData} />
           </DialogContent>
         </Dialog>
 

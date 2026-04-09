@@ -182,8 +182,12 @@ export default function RecepcionesLogisticaPage() {
                       className="rounded-md border border-border p-3 space-y-2"
                     >
                       <div className="font-medium text-sm">{it.productoNombre}</div>
-                      <div className="text-xs text-muted-foreground">Enviado: {it.cantidadEnviada}</div>
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+<div className="text-xs text-muted-foreground">Enviado: {it.cantidadEnviada}</div>
+{it.comentario && (
+  <div className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-1">
+    💬 {it.comentario}
+  </div>
+)}                      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                         <div className="flex-1">
                           <Label className="text-xs">Cantidad recibida</Label>
                           <Input
