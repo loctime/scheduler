@@ -2,144 +2,159 @@
 
 **Date:** 2026-04-11
 **Scope:** Medium cleanup (Option B from brainstorm)
-**Status:** Design approved, pending implementation plan
+**Status:** Design approved; revised 2026-04-11 after deeper audit
+**Environment:** dev (Firestore data loss acceptable)
 
 ## Context
 
-The `horarios simple` project has accumulated legacy code and duplicated
-architecture in the pedidos / remitos / stock subsystems. A prior audit
+The `horarios simple` project has accumulated legacy code in the
+pedidos / remitos / stock subsystems. A prior audit
 (`AUDITORIA_SISTEMA_PEDIDOS.md`) flagged several issues; a follow-up inventory
-(this session, 2026-04-11) found orphaned files and a half-finished migration
-from an old stock context to a newer ubicaciones-based service.
+(2026-04-11) plus a deeper read of the actual code produced the real picture:
 
-Environment is **dev**, so Firestore data loss is acceptable. There are no
-production users whose data needs to be preserved.
+- The "half-finished migration" from `contexts/stock-context.tsx` is actually
+  a **zombie**. `StockProvider` is wrapped around `app/dashboard/layout.tsx`
+  and subscribes to three Firestore collections (`pedidos`, `products`,
+  `stock_movimientos`), but **zero consumers call `useStock()`**. It was
+  replaced at some point; the file survived.
+- `src/services/pedidos/pedidosService.ts` has zero inbound imports. Its
+  dependencies (`pedidoState.ts`, `stockOperations.ts`,
+  `calcularPedido.ts`) are therefore also dead — only `pedidosService`
+  imports them.
+- `src/services/stock/movimientosService.ts` IS active (used by
+  `hooks/use-stock-console.ts` → `components/stock-console-content.tsx`).
+  Stock data already writes to the new `stock_ubicaciones` collection via
+  `stockUbicacionRef` from `lib/stock-ubicaciones-service.ts`. But **the
+  audit-log write on line ~113 still targets the legacy
+  `COLLECTIONS.STOCK_MOVIMIENTOS`**.
+- The `stock_movements_v2` collection exists but is backend-only
+  (`allow write: if false`) — per `docs/LOGISTICS_V2_BACKEND_CONTRACT.md` it's
+  written by the v2 backend, not the client. We cannot migrate the client's
+  audit-log write there without breaking the contract.
 
 ## Goals
 
-1. Delete confirmed orphan files that nothing imports.
-2. Complete the half-finished migration from `contexts/stock-context.tsx`
-   (which reads from the legacy `stock_movimientos` collection) to a new
-   provider built on `lib/stock-ubicaciones-service.ts`
-   (which uses `stock_ubicaciones` and `stock_movements_v2`).
-3. Remove the legacy Firestore collections' rules entries once no code touches
-   them.
-4. Leave the project in a state where there is exactly one source of truth for
-   stock reads/writes, and the remaining code under `components/pedidos/`,
-   `lib/`, and `src/domain/pedidos/` is all actively used.
+1. Delete confirmed dead files (zero inbound imports).
+2. Remove the zombie `StockProvider` from `app/dashboard/layout.tsx` and
+   delete `contexts/stock-context.tsx`.
+3. Stop writing to the legacy `stock_movimientos` collection. The
+   client-side audit log in `movimientosService.ts` is the only remaining
+   writer.
+4. Remove `STOCK_MOVIMIENTOS` from `lib/firebase.ts` COLLECTIONS and drop
+   the `stock_movimientos` + `stock_actual` rule blocks from
+   `firestore.rules`.
+5. Leave the project with no references to `stock_movimientos`,
+   `stock_actual`, `calcularPedido`, `pedidosService`, `pedidoState`,
+   `stockOperations`, or `remito-enlace-publico`.
 
 ## Non-goals
 
-- Consolidating the replicated `calcularPedido` logic into the domain layer.
-  (That was Option C in the brainstorm; the user chose B.)
+- Consolidating the replicated `calcularPedido` logic into the domain layer
+  (Option C in the brainstorm). The unused domain file is being deleted, not
+  adopted.
 - Splitting `components/pedidos/productos-table.tsx` (515 lines).
 - Fixing the orthogonal data-integrity issues flagged in the audit
   (stock-can-go-negative, non-atomic recepción → stock, permissive Firestore
-  rules on `apps/horarios/remitos`). Those are separate work.
-- Migrating or preserving any data currently in the legacy collections.
+  rules on `apps/horarios/remitos`).
+- Preserving any historical data in the legacy collections.
+- Replacing the deleted client-side audit log with a new one. The v2 backend
+  is expected to produce `stock_movements_v2` entries for stock operations it
+  handles; the `stock-console` path will no longer write its own log entry.
+  If this audit trail turns out to be needed, it will be a separate task.
+- Touching `rules/firestore.rules` or `rules/horarios.rules`. Only
+  `firestore.rules` at the project root is active (per `firebase.json`).
 
 ## Design
 
-### Phase 1 — Delete confirmed orphans
+### Phase 1 — Delete dead files
 
-These files and rule entries have zero inbound references and can be deleted
-without any code rewrites:
+Zero inbound references. Order inside the phase doesn't matter; each is
+safe independently.
 
+- `src/services/pedidos/pedidosService.ts`
 - `src/domain/pedidos/calcularPedido.ts`
+- `src/domain/pedidos/stockOperations.ts`
+- `src/domain/pedidos/pedidoState.ts`
 - `lib/remito-enlace-publico.ts`
-- In `firestore.rules`: the `match /apps/horarios/stock_actual/{docId}` block
-- Legacy docs under `docs/docs_v2/`:
-  - `ESQUEMA_REMITOS.md`
-  - `ARQUITECTURA_REMITOS.md`
-  - `FLUJO_REMITOS_BLINDADO.md`
-  - `ESTRUCTURA_REMITOS.md`
+- `docs/docs_v2/ESQUEMA_REMITOS.md`
+- `docs/docs_v2/ARQUITECTURA_REMITOS.md`
+- `docs/docs_v2/FLUJO_REMITOS_BLINDADO.md`
+- `docs/docs_v2/ESTRUCTURA_REMITOS.md`
 
-After Phase 1, `tsc --noEmit` must remain clean.
+After this phase, `tsc --noEmit` must remain clean.
 
-### Phase 2 — Migrate stock-context to stock-ubicaciones
+### Phase 2 — Remove the zombie StockProvider
 
-**Step 2.1 — API audit.** Before writing any new code, document:
+- Edit `app/dashboard/layout.tsx`: remove the `StockProvider` import and
+  unwrap its usage from the JSX tree. Leave surrounding providers
+  untouched.
+- Delete `contexts/stock-context.tsx`.
 
-- The exact surface of `contexts/stock-context.tsx`: every property and method
-  exposed by `useStock()` / `useStockChatContext()`.
-- Every call site in the codebase (the inventory estimated ~7 files).
-  For each, note which parts of the API it actually uses.
-- The current surface of `lib/stock-ubicaciones-service.ts`. Identify any gaps
-  between what consumers need and what the service provides.
+After this phase, grep for `StockProvider` and `useStock(` must return zero
+hits in application code.
 
-This audit lives in the implementation plan, not in this spec.
+### Phase 3 — Stop writing to `stock_movimientos`
 
-**Step 2.2 — New provider.** Create
-`contexts/stock-ubicaciones-context.tsx` that:
+- Edit `src/services/stock/movimientosService.ts`: inside `confirmarMovimientos`,
+  remove the block that builds `movimientoData` and calls
+  `transaction.set(movimientoRef, …)`, including the unused local variables
+  (`movimientoRef`, `movimientoData`, `movimientosGuardados`,
+  `movimientoGuardado`). Keep the `stock_ubicaciones` read/validate/update
+  flow exactly as-is. The function's return shape currently includes
+  `movimientos: MovimientoStock[]`; change it to `movimientos: []` or remove
+  that field after verifying consumers — see Step 3.x in the plan for the
+  exact approach.
+- If the `MovimientoStock[]` field is consumed by `use-stock-console.ts` or
+  `stock-console-content.tsx`, update those call sites to not depend on it.
+- Remove `STOCK_MOVIMIENTOS` from `lib/firebase.ts` COLLECTIONS.
+- Remove the `match /apps/horarios/stock_movimientos/{docId}` block from
+  `firestore.rules` (around lines 330–339).
+- Remove the `match /apps/horarios/stock_actual/{docId}` block from
+  `firestore.rules` (around lines 315–324).
 
-- Subscribes to the `stock_ubicaciones` collection with `onSnapshot`, scoped
-  by the same owner/location filter the old `stock-context.tsx` applied
-  (identified in Step 2.1).
-- Delegates all mutations to `lib/stock-ubicaciones-service.ts` — the context
-  is a thin React layer, not a second copy of business logic.
-- Exposes a hook `useStockUbicaciones()` whose shape matches what the
-  consumer audit in 2.1 showed is actually needed. No speculative methods.
-- Only adds methods to `stock-ubicaciones-service.ts` if the audit proves a
-  consumer needs them.
-
-**Step 2.3 — Incremental migration.** In this order:
-
-1. Wrap `app/dashboard/layout.tsx` with the new provider (alongside the old
-   one, temporarily, so nothing breaks mid-migration).
-2. Migrate each `useStock()` call site one at a time. After each file,
-   `tsc --noEmit` must pass.
-3. Once all call sites are migrated, remove the old provider from the layout.
-4. Delete `contexts/stock-context.tsx`.
-
-**Step 2.4 — movimientosService cleanup.** After Step 2.3:
-
-- Re-check imports of `src/services/stock/movimientosService.ts`.
-- If no imports remain: delete it.
-- If any imports remain: either migrate those call sites to write to
-  `stock_movements_v2` via the service layer, or (if the caller is itself
-  dead code) delete the caller.
-
-**Step 2.5 — Firestore rules.** Remove the
-`match /apps/horarios/stock_movimientos/{docId}` block from `firestore.rules`.
-
-### Phase 3 — Verification
-
-Before considering the cleanup complete:
+### Phase 4 — Verification
 
 - `tsc --noEmit` passes with zero errors.
 - `__tests__/stock-domain.test.js` still passes.
-- Smoke test by running the dev server and exercising:
-  - Dashboard loads.
-  - `/dashboard/mi-stock` shows stock data.
-  - Editing a stock value persists (reload the page, value is still there).
-  - Any pages in the 7-consumer list still render without runtime errors.
-- `grep` for `stock_movimientos`, `stock_actual`, `remito-enlace-publico`,
-  `calcularPedido` in the codebase returns zero hits.
+- `pnpm dev` starts the project; smoke test:
+  - `/dashboard` loads without runtime errors.
+  - `/dashboard/mi-stock` loads and displays stock.
+  - `/dashboard/stock-console` loads, and confirming a movement updates the
+    stock value in `stock_ubicaciones` (reload to verify persistence).
+- `grep -r stock_movimientos src/ lib/ app/ components/ hooks/ contexts/`
+  returns zero matches.
+- Same grep for: `stock_actual` (as a collection, not the `stockActual`
+  field), `remito-enlace-publico`, `calcularPedido`, `pedidosService`,
+  `pedidoState`, `stockOperations`.
 
 ## Risks and open questions
 
-1. **API parity.** `lib/stock-ubicaciones-service.ts` may not expose
-   everything the old context did. Step 2.1 surfaces this; the plan may need
-   to include a "extend the service" subtask. Mitigation: do the audit
-   before writing new code.
-2. **Unknown movimientosService callers.** Until we grep in Step 2.4, we
-   don't know how entangled this service is. If it turns out to be deeply
-   used by non-legacy code, the cleanup may need to extend into Phase 3 or
-   get split into its own follow-up.
-3. **Silent runtime breakage.** TypeScript won't catch everything — some
-   consumers may destructure properties that no longer exist, or depend on
-   real-time update timing. The smoke test in Phase 3 is the safety net.
-4. **Scope creep.** The audit flagged other issues (stock-can-go-negative,
-   permissive remitos rules, non-atomic recepción). Those are out of scope
-   for this cleanup and must not be mixed in. If they come up during
+1. **Runtime references to `useStock()` in files not grepped.** The grep was
+   over the repo root excluding `node_modules`. If there's a code path in
+   generated output or a file extension we missed, deleting `stock-context.tsx`
+   could break it. Mitigation: Phase 2 removes the provider wrapper first and
+   runs `tsc --noEmit` before deleting the file.
+2. **Audit trail loss.** Removing the client-side movement log means the
+   stock console will no longer produce `stock_movimientos` entries. If any
+   UI reads from that collection (it shouldn't — the old reader was
+   `stock-context.tsx` which is being deleted), the list will go empty. The
+   smoke test in Phase 4 covers the remaining UI paths.
+3. **TypeScript return type drift.** Removing the movement-log write changes
+   the return shape of `confirmarMovimientos`. Callers may rely on the
+   `movimientos` array. The plan must update callers in the same task that
+   changes the service, or the build breaks.
+4. **Scope creep.** The broader audit flagged other issues
+   (stock-can-go-negative, permissive remitos rules, non-atomic recepción).
+   Those are out of scope for this cleanup. If they come up during
    implementation, log them and move on.
 
 ## Success criteria
 
 - Every file in Phase 1 is deleted.
 - `contexts/stock-context.tsx` no longer exists.
-- No code imports from or writes to `stock_movimientos` or `stock_actual`.
-- `firestore.rules` has no entries for those two collections.
-- All Phase 3 verification steps pass.
-- The brainstorm's stated outcome — "el sistema de stock unificado en una
-  sola fuente" — is true.
+- `StockProvider` no longer wraps the dashboard layout.
+- `src/services/stock/movimientosService.ts` no longer writes to
+  `stock_movimientos`.
+- `lib/firebase.ts` no longer exposes `STOCK_MOVIMIENTOS` in COLLECTIONS.
+- `firestore.rules` has no entries for `stock_movimientos` or `stock_actual`.
+- All Phase 4 verification steps pass.
