@@ -49,7 +49,8 @@ export function PedidosHistorialView({ pedidos }: { pedidos: PedidoFabrica[] }) 
   const grupos = useMemo(() => {
     const map = new Map<string, string>()
     for (const p of pedidos) {
-      if (!map.has(p.grupoPedidoId)) map.set(p.grupoPedidoId, p.grupoPedidoNombre)
+      if (p.grupoPedidoId && !map.has(p.grupoPedidoId))
+        map.set(p.grupoPedidoId, p.grupoPedidoNombre)
     }
     return Array.from(map.entries())
       .map(([id, nombre]) => ({ id, nombre }))
@@ -61,7 +62,7 @@ export function PedidosHistorialView({ pedidos }: { pedidos: PedidoFabrica[] }) 
     if (!grupoId) return []
     const map = new Map<string, string>()
     for (const p of pedidos) {
-      if (p.grupoPedidoId === grupoId && !map.has(p.origenLocationId)) {
+      if (p.grupoPedidoId === grupoId && p.origenLocationId && !map.has(p.origenLocationId)) {
         map.set(p.origenLocationId, p.origenNombre)
       }
     }
