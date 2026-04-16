@@ -431,8 +431,13 @@ export default function LogisticaFabricaPage() {
              (p.estado === "enviado" || p.estado === "en_preparacion")
       )
       const pedidosGestionados = pedidosRaw.filter(
-        (p) => p.grupoPedidoId === grupo.id && 
+        (p) => p.grupoPedidoId === grupo.id &&
              (p.estado === "despachado" || p.estado === "recibido")
+      )
+      // Borradores: la sucursal está editando. No se muestran, pero sí cuentan
+      // en el cálculo de stock para evitar auto-pedidos fantasma durante la edición.
+      const pedidosBorrador = pedidosRaw.filter(
+        (p) => p.grupoPedidoId === grupo.id && p.estado === "borrador"
       )
       const despachadorNombre = nombrePorLocationId.get(despachadorLocationId) ?? despachadorLocationId
       const autoPedidos = buildAutoPedidosPorOperador(
@@ -441,7 +446,7 @@ export default function LogisticaFabricaPage() {
         despachadorLocationId,
         despachadorNombre,
         stockFilas,
-        [...pedidosGrupo, ...pedidosGestionados],
+        [...pedidosGrupo, ...pedidosGestionados, ...pedidosBorrador],
         nombrePorLocationId
       )
       return { grupo, pedidos: pedidosGrupo, autoPedidos }
