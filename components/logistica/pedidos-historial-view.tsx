@@ -34,7 +34,10 @@ function formatDia(date: Date): string {
 }
 
 function dayKey(date: Date): string {
-  return startOfDay(date).toISOString().slice(0, 10)
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const d = String(date.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
 }
 
 export function PedidosHistorialView({ pedidos }: { pedidos: PedidoFabrica[] }) {
@@ -227,10 +230,10 @@ export function PedidosHistorialView({ pedidos }: { pedidos: PedidoFabrica[] }) 
                       return (
                         <tr key={productoId}>
                           <td className="p-2 border font-medium">{productoNombre}</td>
-                          {cantidades.map((c, i) => (
-                            <td key={i} className="p-2 border text-center">
-                              {c !== null ? (
-                                c
+                          {dias.map((d, i) => (
+                            <td key={dayKey(d)} className="p-2 border text-center">
+                              {cantidades[i] !== null ? (
+                                cantidades[i]
                               ) : (
                                 <span className="text-muted-foreground">—</span>
                               )}
