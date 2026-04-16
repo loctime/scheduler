@@ -200,7 +200,7 @@ export function PedidosHistorialView({ pedidos }: { pedidos: PedidoFabrica[] }) 
                       <th className="text-left p-2 border bg-muted font-medium">Producto</th>
                       {dias.map((d) => (
                         <th
-                          key={d.toISOString()}
+                          key={dayKey(d)}
                           className="text-center p-2 border bg-muted font-medium min-w-[70px]"
                         >
                           {formatDia(d)}
