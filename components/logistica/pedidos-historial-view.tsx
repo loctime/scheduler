@@ -116,7 +116,7 @@ export function PedidosHistorialView({ pedidos }: { pedidos: PedidoFabrica[] }) 
       const date = timestampToDate(p.creadoEn)
       if (!date) continue
       const k = dayKey(date)
-      if (!map.has(k)) map.set(k, p)
+      if (!map.has(k)) map.set(k, p) // si hay >1 pedido el mismo día, se toma el primero (Firestore order)
     }
     return map
   }, [pedidosFiltrados])
