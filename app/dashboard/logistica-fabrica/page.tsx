@@ -629,7 +629,7 @@ export default function LogisticaFabricaPage() {
           </p>
         </div>
 
-        <Tabs defaultValue="pedidos">
+        <Tabs defaultValue="hoy">
           <TabsList>
             <TabsTrigger value="hoy">Hoy</TabsTrigger>
             <TabsTrigger value="historial">Historial</TabsTrigger>
