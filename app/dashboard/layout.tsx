@@ -88,13 +88,31 @@ function ProtectedRoute({
 
   useEffect(() => {
     if (userData) {
+      // Colaborador: puede entrar al dashboard pero solo a ciertas páginas
+      if (userData.role === "colaborador") {
+        // Solo puede estar en páginas permitidas para colaborador
+        const paginasPermitidas = [
+          "/dashboard/recepciones",
+          "/dashboard/historial", 
+          "/dashboard/mi-stock",
+          "/dashboard/configuracion",
+        ]
+        const estaEnPaginaPermitida = paginasPermitidas.some(p => pathname.startsWith(p))
+        if (!estaEnPaginaPermitida) {
+          router.push("/dashboard/recepciones")
+          return
+        }
+        setChecking(false)
+        return
+      }
+
+      // Resto de roles: lógica original
       const allowed = canUser(
         { uid: user?.uid, role: userData.role, locationId: userData.locationId },
         "ver_dashboard"
       )
-
       if (!allowed) {
-        router.push(userData.role === "colaborador" ? "/pwa" : "/")
+        router.push("/")
         return
       }
       setChecking(false)

@@ -28,6 +28,13 @@ export default function PwaEntryPage() {
     let cancelled = false
 
     const resolveEntry = async () => {
+      // Si el usuario tiene rol colaborador u operador, 
+      // mandarlo directo al dashboard
+      if (userData?.role === "colaborador" || userData?.role === "operador") {
+        router.replace("/dashboard/recepciones")
+        return
+      }
+
       const lastSlug = getPwaLastSlug()
       if (lastSlug) {
         router.replace(`/pwa/${lastSlug}/home`)
@@ -42,13 +49,24 @@ export default function PwaEntryPage() {
         return
       }
 
+      // Intentar primero con el ownerId del actor (admin: su propio uid)
       const ownerId = getOwnerIdForActor(user, userData) || user?.uid || null
-      if (!ownerId) {
-        if (!cancelled) setChecking(false)
-        return
+
+      // Si el usuario es colaborador/operador invitado, su ownerId
+      // apunta al admin que lo creó — intentar con ese también
+      const ownerIdAlternativo = userData?.ownerId ?? null
+
+      let slugs: string[] = []
+
+      if (ownerId) {
+        slugs = await listCompanySlugsFromOwnerId(ownerId)
       }
 
-      const slugs = await listCompanySlugsFromOwnerId(ownerId)
+      // Si no encontró nada, intentar con el ownerId del admin padre
+      if (slugs.length === 0 && ownerIdAlternativo && ownerIdAlternativo !== ownerId) {
+        slugs = await listCompanySlugsFromOwnerId(ownerIdAlternativo)
+      }
+
       if (cancelled) return
 
       if (slugs.length === 1) {

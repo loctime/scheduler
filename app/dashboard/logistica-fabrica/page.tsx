@@ -18,7 +18,6 @@ import { useToast } from "@/hooks/use-toast"
 import { canUser } from "@/lib/permissions"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import type { PedidoFabrica, RemitoLogItem } from "@/lib/logistica-types"
-import { PedidosHoyView } from "@/components/logistica/pedidos-hoy-view"
 import { PedidosHistorialView } from "@/components/logistica/pedidos-historial-view"
 import type { StockUbicacion } from "@/lib/stock-ubicaciones-types"
 import { ChevronDown, ChevronRight, Factory, Loader2, Truck } from "lucide-react"
@@ -633,20 +632,10 @@ export default function LogisticaFabricaPage() {
           <TabsList>
             <TabsTrigger value="hoy">Hoy</TabsTrigger>
             <TabsTrigger value="historial">Historial</TabsTrigger>
-            <TabsTrigger value="pedidos">Pedidos de hoy</TabsTrigger>
             <TabsTrigger value="activos">Remitos activos</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="hoy" className="mt-4">
-            <PedidosHoyView pedidos={pedidosRaw} />
-          </TabsContent>
-
-          <TabsContent value="historial" className="mt-4">
-            <PedidosHistorialView pedidos={pedidosRaw} />
-          </TabsContent>
-
-          {/* Tab pedidos de hoy - NUEVA ESTRUCTURA */}
-          <TabsContent value="pedidos" className="space-y-4 mt-4">
+          <TabsContent value="hoy" className="space-y-4 mt-4">
             {/* Header con toggle de vista */}
             <div className="flex items-center justify-between">
               <div>
@@ -768,6 +757,10 @@ export default function LogisticaFabricaPage() {
                 </Card>
               )
             })}
+          </TabsContent>
+
+          <TabsContent value="historial" className="mt-4">
+            <PedidosHistorialView pedidos={pedidosRaw} />
           </TabsContent>
 
           {/* Tab remitos activos (sin cambios) */}
