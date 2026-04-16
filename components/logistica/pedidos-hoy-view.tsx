@@ -79,10 +79,14 @@ export function PedidosHoyView({ pedidos }: { pedidos: PedidoFabrica[] }) {
               productosMap.set(item.productoId, item.productoNombre)
           }
         }
-        const productos = Array.from(productosMap.entries()).map(([id, nombre]) => ({
-          id,
-          nombre,
-        }))
+        const productos = Array.from(productosMap.entries())
+          .map(([id, nombre]) => ({ id, nombre }))
+          .sort((a, b) => a.nombre.localeCompare(b.nombre))
+
+        // Build a map for O(1) lookups instead of O(P) searches
+        const pedidoPorSucursal = new Map(
+          pedidosGrupoHoy.map((p) => [p.origenLocationId, p])
+        )
 
         const nConfirmadas = confirmadas.size
         const nTotal = sucursales.length
@@ -141,9 +145,7 @@ export function PedidosHoyView({ pedidos }: { pedidos: PedidoFabrica[] }) {
                         {productos.map(({ id: productoId, nombre: productoNombre }) => {
                           const total = sucursales.reduce((acc, s) => {
                             if (!confirmadas.has(s.id)) return acc
-                            const pedido = pedidosGrupoHoy.find(
-                              (p) => p.origenLocationId === s.id
-                            )
+                            const pedido = pedidoPorSucursal.get(s.id)
                             const item = pedido?.items.find((i) => i.productoId === productoId)
                             return acc + (item?.cantidadPedida ?? 0)
                           }, 0)
@@ -161,9 +163,7 @@ export function PedidosHoyView({ pedidos }: { pedidos: PedidoFabrica[] }) {
                                     </td>
                                   )
                                 }
-                                const pedido = pedidosGrupoHoy.find(
-                                  (p) => p.origenLocationId === s.id
-                                )
+                                const pedido = pedidoPorSucursal.get(s.id)
                                 const item = pedido?.items.find(
                                   (i) => i.productoId === productoId
                                 )
