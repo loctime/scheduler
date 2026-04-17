@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import React, { useEffect, useMemo, useRef, useState } from "react"
 import { addDoc, collection, onSnapshot, query, serverTimestamp, where } from "firebase/firestore"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useData } from "@/contexts/data-context"
 import { useLogistica } from "@/hooks/use-logistica"
 import { useGruposCatalogo } from "@/hooks/use-grupos-catalogo"
@@ -22,151 +24,41 @@ import { PedidosHistorialView } from "@/components/logistica/pedidos-historial-v
 import type { StockUbicacion } from "@/lib/stock-ubicaciones-types"
 import { ChevronDown, ChevronRight, Factory, Loader2, Truck } from "lucide-react"
 
-// Cambio 1 - Estado de vista
-type VistaType = "tarjetas" | "tabla"
-
-// Cambio 2 - Componente OperarioCardView (vista tarjetas)
-function OperarioCardView({
-  pedido,
-  cantSend,
-  comentSend,
-  obsRemito,
-  procesando,
-  onAceptar,
-  aceptando,
-  onCantChange,
-  onComentChange,
-  onObsChange,
-  onDespachar,
+// Componente GrupoTablaView con nueva funcionalidad
+function GrupoTablaView({ 
+  pedidos, 
   onTomarPedido,
+  modoDespacho,
+  cantidadesDespacho,
+  onCantidadDespachoChange,
+  onDespachar,
+  grupoId,
+  dialogAbierto,
+  setDialogAbierto,
+  opcionSeleccionada,
+  setOpcionSeleccionada,
+  sucursalesSeleccionadas,
+  setSucursalesSeleccionadas
 }: {
-  pedido: PedidoFabrica
-  cantSend: Record<string, number>
-  comentSend: Record<string, string>
-  obsRemito: string
-  procesando: boolean
-  onAceptar?: () => void
-  aceptando?: boolean
-  onCantChange: (productoId: string, val: number) => void
-  onComentChange: (productoId: string, val: string) => void
-  onObsChange: (val: string) => void
-  onDespachar: () => void
-  onTomarPedido: () => void
+  pedidos: PedidoFabrica[]
+  onTomarPedido: (grupoId: string, pedidos: PedidoFabrica[]) => void
+  modoDespacho: boolean
+  cantidadesDespacho: Record<string, number>
+  onCantidadDespachoChange: (productoId: string, sucursalId: string, cantidad: number) => void
+  onDespachar: (grupoId: string, pedidos: PedidoFabrica[], sucursalesAFiltrar?: string[]) => void
+  grupoId: string
+  dialogAbierto: boolean
+  setDialogAbierto: (open: boolean) => void
+  opcionSeleccionada: string
+  setOpcionSeleccionada: (value: string) => void
+  sucursalesSeleccionadas: string[]
+  setSucursalesSeleccionadas: (sucursales: string[]) => void
 }) {
-  const [expandido, setExpandido] = useState(false)
-  const esControlado = pedido.controlado === true
-  const esAuto = pedido.id.startsWith("auto_")
-  const sinConfirmar = esAuto && typeof onAceptar === "function"
+  // Estados locales para el diálogo de despachar
+  const [dialogDespacharAbierto, setDialogDespacharAbierto] = useState(false)
+  const [opcionDespacharSeleccionada, setOpcionDespacharSeleccionada] = useState("todos")
+  const [sucursalesDespacharSeleccionadas, setSucursalesDespacharSeleccionadas] = useState<string[]>([])
 
-  return (
-    <div className="bg-muted/50 rounded-lg p-3 space-y-3">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h4 className="font-medium">{pedido.origenNombre}</h4>
-        <div className="flex items-center gap-2">
-          {pedido.estado === "en_preparacion" && (
-            <Badge className="bg-blue-50 text-blue-800 border border-blue-200">En preparación</Badge>
-          )}
-          {sinConfirmar ? (
-            <Badge className="bg-yellow-50 text-yellow-800 border border-yellow-200">Sin confirmar</Badge>
-          ) : esControlado ? (
-            <Badge className="bg-green-50 text-green-800 border border-green-200">Controlado</Badge>
-          ) : (
-            <Badge className="bg-amber-50 text-amber-800 border border-amber-200">Automático</Badge>
-          )}
-        </div>
-      </div>
-
-      {/* Lista de items como pills */}
-      <div className="flex flex-wrap gap-1">
-        {pedido.items.map((item) => (
-          <span
-            key={item.productoId}
-            className="inline-block px-2 py-1 text-xs bg-background border rounded-md"
-          >
-            {item.productoNombre} × {item.cantidadPedida}
-          </span>
-        ))}
-      </div>
-
-      {/* Botón Tomar pedido */}
-      {!esAuto && pedido.estado === "enviado" && (
-        <Button
-          onClick={onTomarPedido}
-          variant="outline"
-          size="sm"
-          className="w-full"
-        >
-          Tomar pedido
-        </Button>
-      )}
-
-      {sinConfirmar && onAceptar && (
-        <Button onClick={onAceptar} disabled={aceptando === true} variant="outline" size="sm" className="w-full">
-          {aceptando ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-          Aceptar como está
-        </Button>
-      )}
-
-      {/* Botón de despachar */}
-      {!sinConfirmar && (
-        <Button onClick={() => setExpandido(!expandido)} variant="outline" size="sm" className="w-full">
-          {expandido ? "Cancelar" : "Despachar"}
-        </Button>
-      )}
-
-      {/* Contenido expandido */}
-      {!sinConfirmar && expandido && (
-        <div className="space-y-3 pt-3 border-t">
-          {pedido.items.map((item) => (
-            <div key={item.productoId} className="space-y-2">
-              <div className="text-sm font-medium">{item.productoNombre}</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-xs">Cantidad a enviar</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={cantSend[item.productoId] ?? item.cantidadPedida}
-                    onChange={(e) =>
-                      onCantChange(item.productoId, Math.max(0, Math.floor(Number(e.target.value) || 0)))
-                    }
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Comentario</Label>
-                  <Input
-                    placeholder="Opcional"
-                    value={comentSend[item.productoId] ?? ""}
-                    onChange={(e) => onComentChange(item.productoId, e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
-
-          <div>
-            <Label className="text-xs">Observación del remito</Label>
-            <Textarea
-              rows={2}
-              value={obsRemito}
-              onChange={(e) => onObsChange(e.target.value)}
-              placeholder="Observaciones del remito..."
-            />
-          </div>
-
-          <Button onClick={onDespachar} disabled={procesando} className="w-full">
-            {procesando ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Crear remito y despachar
-          </Button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Cambio 2 - Componente GrupoTablaView (vista tabla)
-function GrupoTablaView({ pedidos }: { pedidos: PedidoFabrica[] }) {
   // Recolectar todos los productos únicos
   const todosProductos = useMemo(() => {
     const productosMap = new Map<string, string>()
@@ -195,54 +87,293 @@ function GrupoTablaView({ pedidos }: { pedidos: PedidoFabrica[] }) {
     return totales
   }, [todosProductos, pedidos])
 
+  // Calcular totales de despacho
+  const totalesDespachoPorProducto = useMemo(() => {
+    const totales: Record<string, number> = {}
+    todosProductos.forEach(({ id }) => {
+      totales[id] = 0
+      pedidos.forEach((pedido) => {
+        const item = pedido.items.find((i) => i.productoId === id)
+        if (item) {
+          const cantidad = cantidadesDespacho[`${id}_${pedido.id}`] || 0
+          totales[id] += cantidad
+        }
+      })
+    })
+    return totales
+  }, [todosProductos, pedidos, cantidadesDespacho])
+
+  // Función para completar cantidades de un producto
+  const completarCantidadesProducto = (productoId: string) => {
+    pedidos.forEach((pedido) => {
+      const item = pedido.items.find((i) => i.productoId === productoId)
+      if (item) {
+        onCantidadDespachoChange(productoId, pedido.id, item.cantidadPedida)
+      }
+    })
+  }
+
   if (pedidos.length === 0) {
     return <p className="text-sm text-muted-foreground">Sin pedidos para mostrar</p>
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr>
-            <th className="text-left p-2 border bg-muted">Producto</th>
-            {pedidos.map((pedido) => (
-              <th key={pedido.id} className="text-left p-2 border bg-muted min-w-[120px]">
-                <div className="flex flex-col gap-1">
-                  <span>{pedido.origenNombre}</span>
-                  {pedido.controlado ? (
-                    <Badge className="bg-green-50 text-green-800 border border-green-200 text-xs">
-                      Controlado
-                    </Badge>
+    <div className="space-y-4">
+      {/* Diálogo para tomar pedidos */}
+      <Dialog open={dialogAbierto} onOpenChange={setDialogAbierto}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tomar pedido del grupo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <RadioGroup value={opcionSeleccionada} onValueChange={setOpcionSeleccionada}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="todos" id="todos" />
+                <label htmlFor="todos">Todos</label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="confirmados" id="confirmados" />
+                <label htmlFor="confirmados">Solo confirmados</label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="manual" id="manual" />
+                <label htmlFor="manual">Manual</label>
+              </div>
+            </RadioGroup>
+            
+            {opcionSeleccionada === "manual" && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Seleccionar sucursales:</p>
+                {pedidos.map((pedido) => {
+                  const esAuto = pedido.id.startsWith("auto_")
+                  return (
+                    <div 
+                      key={pedido.id} 
+                      className={`flex items-center space-x-2 p-2 rounded ${esAuto ? "bg-amber-50" : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        id={pedido.id}
+                        checked={sucursalesSeleccionadas.includes(pedido.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSucursalesSeleccionadas([...sucursalesSeleccionadas, pedido.id])
+                          } else {
+                            setSucursalesSeleccionadas(sucursalesSeleccionadas.filter(id => id !== pedido.id))
+                          }
+                        }}
+                      />
+                      <label htmlFor={pedido.id} className="text-sm">
+                        {pedido.origenNombre} {esAuto && "(automático)"}
+                      </label>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDialogAbierto(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={() => onTomarPedido(grupoId, pedidos)}>
+                Confirmar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo para despachar */}
+      <Dialog open={dialogDespacharAbierto} onOpenChange={setDialogDespacharAbierto}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Despachar pedidos del grupo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <RadioGroup value={opcionDespacharSeleccionada} onValueChange={setOpcionDespacharSeleccionada}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="todos" id="despachar-todos" />
+                <label htmlFor="despachar-todos">Todos</label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="manual" id="despachar-manual" />
+                <label htmlFor="despachar-manual">Manual</label>
+              </div>
+            </RadioGroup>
+            
+            {opcionDespacharSeleccionada === "manual" && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Seleccionar sucursales:</p>
+                {pedidos.map((pedido) => {
+                  const esAuto = pedido.id.startsWith("auto_")
+                  return (
+                    <div 
+                      key={pedido.id} 
+                      className={`flex items-center space-x-2 p-2 rounded ${esAuto ? "bg-amber-50" : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        id={`despachar-${pedido.id}`}
+                        checked={sucursalesDespacharSeleccionadas.includes(pedido.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSucursalesDespacharSeleccionadas([...sucursalesDespacharSeleccionadas, pedido.id])
+                          } else {
+                            setSucursalesDespacharSeleccionadas(sucursalesDespacharSeleccionadas.filter(id => id !== pedido.id))
+                          }
+                        }}
+                      />
+                      <label htmlFor={`despachar-${pedido.id}`} className="text-sm">
+                        {pedido.origenNombre} {esAuto && "(automático)"}
+                      </label>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDialogDespacharAbierto(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={() => {
+                // Determinar sucursales a despachar según la opción seleccionada
+                let sucursalesParaDespacho: string[] = []
+                if (opcionDespacharSeleccionada === "todos") {
+                  sucursalesParaDespacho = pedidos.map(p => p.id)
+                } else if (opcionDespacharSeleccionada === "manual") {
+                  sucursalesParaDespacho = sucursalesDespacharSeleccionadas
+                }
+                
+                // Llamar a handleDespacharGrupo con las sucursales seleccionadas
+                onDespachar(grupoId, pedidos, sucursalesParaDespacho)
+                setDialogDespacharAbierto(false)
+              }}>
+                Confirmar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Tabla */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr>
+              <th className="text-left px-2 py-1.5 border bg-muted">Producto</th>
+              {pedidos.map((pedido) => (
+                <th key={pedido.id} className="text-left px-2 py-1.5 border bg-muted min-w-[120px]">
+                  <div className="flex flex-col gap-1">
+                    <span>{pedido.origenNombre}</span>
+                    {pedido.controlado ? (
+                      <Badge className="bg-green-50 text-green-800 border border-green-200 text-xs">
+                        Controlado
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-amber-50 text-amber-800 border border-amber-200 text-xs">
+                        Automático
+                      </Badge>
+                    )}
+                  </div>
+                </th>
+              ))}
+              <th className="text-left px-2 py-1.5 border bg-muted font-semibold text-blue-600">
+                <div className="flex items-center gap-2">
+                  <span>Total</span>
+                  {!modoDespacho ? (
+                    <Button
+                      size="sm"
+                      onClick={() => setDialogAbierto(true)}
+                      className="h-6 px-2 text-xs"
+                    >
+                      Tomar
+                    </Button>
                   ) : (
-                    <Badge className="bg-amber-50 text-amber-800 border border-amber-200 text-xs">
-                      Automático
-                    </Badge>
+                    <Button
+                      size="sm"
+                      onClick={() => setDialogDespacharAbierto(true)}
+                      className="h-6 px-2 text-xs"
+                    >
+                      Despachar
+                    </Button>
                   )}
                 </div>
               </th>
-            ))}
-            <th className="text-left p-2 border bg-muted font-semibold text-blue-600">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {todosProductos.map(({ id, nombre }) => (
-            <tr key={id}>
-              <td className="p-2 border font-medium">{nombre}</td>
-              {pedidos.map((pedido) => {
-                const item = pedido.items.find((i) => i.productoId === id)
-                return (
-                  <td key={pedido.id} className="p-2 border text-center">
-                    {item ? item.cantidadPedida : " - "}
-                  </td>
-                )
-              })}
-              <td className="p-2 border text-center font-semibold text-blue-600">
-                {totalesPorProducto[id]}
-              </td>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {todosProductos.map(({ id, nombre }) => (
+              <tr key={id} className={modoDespacho ? "bg-muted/50" : ""}>
+                <td className="px-2 py-1.5 border font-medium">
+                  <div className="flex items-center gap-2">
+                    <span>{nombre}</span>
+                    {modoDespacho && (
+                      <Button
+                        size="sm"
+                        onClick={() => completarCantidadesProducto(id)}
+                        className="h-5 px-1 text-xs"
+                        variant="outline"
+                      >
+                        OK
+                      </Button>
+                    )}
+                  </div>
+                </td>
+                {pedidos.map((pedido) => {
+                  const item = pedido.items.find((i) => i.productoId === id)
+                  if (!item) {
+                    return (
+                      <td key={pedido.id} className="px-2 py-1.5 border text-center">
+                        -
+                      </td>
+                    )
+                  }
+
+                  if (modoDespacho) {
+                    // Modo despacho: mostrar pedido + input
+                    const cantidad = cantidadesDespacho[`${id}_${pedido.id}`] || 0
+                    const esMenor = cantidad < item.cantidadPedida
+                    const esMayorOIgual = cantidad >= item.cantidadPedida
+                    
+                    return (
+                      <td key={pedido.id} className="px-2 py-1.5 border">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">{item.cantidadPedida}</span>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={cantidad}
+                            onChange={(e) => onCantidadDespachoChange(id, pedido.id, Math.max(0, Number(e.target.value) || 0))}
+                            className={`w-20 h-6 text-xs ${
+                              esMenor ? "border-red-500 focus:border-red-500" : 
+                              esMayorOIgual ? "border-green-500 focus:border-green-500" : 
+                              ""
+                            }`}
+                          />
+                        </div>
+                      </td>
+                    )
+                  } else {
+                    // Modo normal: solo mostrar cantidad
+                    return (
+                      <td key={pedido.id} className="px-2 py-1.5 border text-center">
+                        {item.cantidadPedida}
+                      </td>
+                    )
+                  }
+                })}
+                <td className="px-2 py-1.5 border text-center font-semibold">
+                  <span className={modoDespacho ? "text-green-600" : "text-blue-600"}>
+                    {modoDespacho ? totalesDespachoPorProducto[id] : totalesPorProducto[id]}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
@@ -328,13 +459,17 @@ function buildAutoPedidosPorOperador(
 }
 
 export default function LogisticaFabricaPage() {
-  // Cambio 1 - Estado de vista
-  const [vista, setVista] = useState<VistaType>("tarjetas")
-  
   const { user, userData } = useData()
   const { toast } = useToast()
   const { pedidosRaw, remitosRaw, crearRemito, marcarEnCamino, tomarPedido, loading, ownerId } = useLogistica(user)
   const { gruposCatalogo } = useGruposCatalogo(ownerId)
+  
+  // Estados para el modo despacho
+  const [gruposEnModoDespacho, setGruposEnModoDespacho] = useState<Record<string, boolean>>({})
+  const [cantidadesDespacho, setCantidadesDespacho] = useState<Record<string, Record<string, number>>>({})
+  const [dialogTomarAbierto, setDialogTomarAbierto] = useState<string | null>(null)
+  const [opcionTomarSeleccionada, setOpcionTomarSeleccionada] = useState<string>("todos")
+  const [sucursalesSeleccionadas, setSucursalesSeleccionadas] = useState<string[]>([])
   const ownerIdsParaUsuarios = useMemo(() => {
     if (!ownerId) return null
     return [ownerId]
@@ -453,81 +588,108 @@ export default function LogisticaFabricaPage() {
     })
   }, [gruposVisibles, pedidosRaw, stockFilas, despachadorLocationId, nombrePorLocationId])
 
-  // ── despachar state ────────────────────────────────────────────────────────
-  const [abierto, setAbierto] = useState<string | null>(null)
-  const [cantSend, setCantSend] = useState<Record<string, Record<string, number>>>({})
-  const [comentSend, setComentSend] = useState<Record<string, Record<string, string>>>({})
-  const [obsRemito, setObsRemito] = useState<Record<string, string>>({})
-  const [procesando, setProcesando] = useState<string | null>(null)
-  const [aceptando, setAceptando] = useState<string | null>(null)
-
-  const togglePedido = (pedido: PedidoFabrica) => {
-    const id = pedido.id
-    setAbierto((prev) => (prev === id ? null : id))
-    if (!cantSend[id]) {
-      const c: Record<string, number> = {}
-      const cm: Record<string, string> = {}
-      for (const it of pedido.items) {
-        c[it.productoId] = it.cantidadPedida
-        cm[it.productoId] = ""
+  // Función para tomar pedidos
+  const handleTomarPedidos = async (grupoId: string, pedidos: PedidoFabrica[]) => {
+    let pedidosATomar: PedidoFabrica[] = []
+    
+    if (opcionTomarSeleccionada === "todos") {
+      pedidosATomar = pedidos
+    } else if (opcionTomarSeleccionada === "confirmados") {
+      pedidosATomar = pedidos.filter(p => !p.id.startsWith("auto_"))
+    } else if (opcionTomarSeleccionada === "manual") {
+      pedidosATomar = pedidos.filter(p => sucursalesSeleccionadas.includes(p.id))
+    }
+    
+    for (const pedido of pedidosATomar) {
+      if (pedido.id.startsWith("auto_")) {
+        // Registrar pedido automático primero
+        await aceptarAutoPedido(pedido)
       }
-      setCantSend((s) => ({ ...s, [id]: c }))
-      setComentSend((s) => ({ ...s, [id]: cm }))
+      // Tomar el pedido
+      const res = await tomarPedido(pedido.id)
+      if (!res.ok) {
+        toast({ title: "Error", description: res.error, variant: "destructive" })
+        return
+      }
     }
-  }
-
-  const despachar = async (pedido: PedidoFabrica) => {
-    const id = pedido.id
-    const cants = cantSend[id]
-    const coments = comentSend[id] ?? {}
-    if (!cants) {
-      toast({ title: "Abrí el pedido primero", variant: "destructive" })
-      return
-    }
-    const items: RemitoLogItem[] = []
-    for (const it of pedido.items) {
-      const env = Math.max(0, Math.floor(cants[it.productoId] ?? it.cantidadPedida))
-      if (env <= 0) continue
-      const com = coments[it.productoId]?.trim()
-      items.push({
-        productoId: it.productoId,
-        productoNombre: it.productoNombre,
-        cantidadPedida: it.cantidadPedida,
-        cantidadEnviada: env,
-        ...(com ? { comentario: com } : {}),
+    
+    // Activar modo despacho para este grupo
+    setGruposEnModoDespacho(prev => ({ ...prev, [grupoId]: true }))
+    
+    // Inicializar cantidades de despacho
+    const cantidadesIniciales: Record<string, number> = {}
+    pedidos.forEach(pedido => {
+      pedido.items.forEach(item => {
+        cantidadesIniciales[`${item.productoId}_${pedido.id}`] = 0
       })
-    }
-    if (!items.length) {
-      toast({
-        title: "Sin cantidades",
-        description: "Indicá al menos una cantidad a enviar mayor a cero.",
-        variant: "destructive",
-      })
-      return
-    }
-    const esAuto = id.startsWith("auto_")
-    setProcesando(id)
-    const res = await crearRemito({
-      origenLocationId: pedido.destinoLocationId,
-      origenNombre: nombrePorLocationId.get(pedido.destinoLocationId) ?? pedido.destinoNombre,
-      destinoLocationId: pedido.origenLocationId,
-      destinoNombre: nombrePorLocationId.get(pedido.origenLocationId) ?? pedido.origenNombre,
-      ...(esAuto ? {} : { pedidoFabricaId: id }),
-      items,
-      observacion: obsRemito[id]?.trim() || undefined,
     })
-    setProcesando(null)
-    if (!res.ok) {
-      toast({ title: "No se pudo crear el remito", description: res.error, variant: "destructive" })
-      return
+    setCantidadesDespacho(prev => ({ ...prev, [grupoId]: cantidadesIniciales }))
+    
+    setDialogTomarAbierto(null)
+    toast({ title: "Pedidos tomados", description: "Los pedidos están en preparación." })
+  }
+  
+  // Función para despachar grupo
+  const handleDespacharGrupo = async (grupoId: string, pedidos: PedidoFabrica[], sucursalesAFiltrar?: string[]) => {
+    const cantidadesGrupo = cantidadesDespacho[grupoId] || {}
+    
+    // Filtrar pedidos según selección
+    const pedidosADespachar = sucursalesAFiltrar 
+      ? pedidos.filter(p => sucursalesAFiltrar.includes(p.id))
+      : pedidos
+    
+    // Agrupar por sucursal para crear remitos
+    const remitosPorSucursal = new Map<string, any[]>()
+    
+    pedidosADespachar.forEach(pedido => {
+      const itemsRemito: any[] = []
+      pedido.items.forEach(item => {
+        const cantidad = cantidadesGrupo[`${item.productoId}_${pedido.id}`] || 0
+        if (cantidad > 0) {
+          itemsRemito.push({
+            productoId: item.productoId,
+            productoNombre: item.productoNombre,
+            cantidadPedida: item.cantidadPedida,
+            cantidadEnviada: cantidad
+          })
+        }
+      })
+      
+      if (itemsRemito.length > 0) {
+        remitosPorSucursal.set(pedido.id, itemsRemito)
+      }
+    })
+    
+    // Crear remitos
+    for (const [pedidoId, items] of remitosPorSucursal) {
+      const pedido = pedidosADespachar.find(p => p.id === pedidoId)
+      if (!pedido) continue
+      
+      const res = await crearRemito({
+        origenLocationId: pedido.destinoLocationId,
+        origenNombre: nombrePorLocationId.get(pedido.destinoLocationId) ?? pedido.destinoNombre,
+        destinoLocationId: pedido.origenLocationId,
+        destinoNombre: nombrePorLocationId.get(pedido.origenLocationId) ?? pedido.origenNombre,
+        pedidoFabricaId: pedido.id.startsWith("auto_") ? undefined : pedidoId,
+        items,
+        observacion: undefined
+      })
+      
+      if (!res.ok) {
+        toast({ title: "Error", description: res.error, variant: "destructive" })
+        return
+      }
     }
-    toast({ title: "Remito creado", description: "Stock descontado en origen y pedido marcado como despachado." })
-    setObsRemito((s) => ({ ...s, [id]: "" }))
+    
+    // Salir del modo despacho
+    setGruposEnModoDespacho(prev => ({ ...prev, [grupoId]: false }))
+    toast({ title: "Remitos creados", description: "Stock descontado y pedidos despachados." })
   }
 
+
+  // Función para aceptar pedidos automáticos
   const aceptarAutoPedido = async (pedido: PedidoFabrica) => {
     if (!db || !ownerId || !user) return
-    setAceptando(pedido.id)
     try {
       await addDoc(collection(db, COLLECTIONS.PEDIDOS_FABRICA), {
         ownerId,
@@ -553,12 +715,8 @@ export default function LogisticaFabricaPage() {
         description: e instanceof Error ? e.message : "Error desconocido",
         variant: "destructive",
       })
-    } finally {
-      setAceptando(null)
     }
   }
-
-  // ── remitos ────────────────────────────────────────────────────────────────
   const remitosEnCamino = useMemo(() => remitosRaw.filter((r) => r.estado === "en_camino"), [remitosRaw])
   const remitosPreparados = useMemo(() => remitosRaw.filter((r) => r.estado === "preparado"), [remitosRaw])
 
@@ -622,59 +780,40 @@ export default function LogisticaFabricaPage() {
 
   return (
     <DashboardLayout user={user}>
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <Factory className="h-7 w-7" />
+      <div className="mx-auto flex max-w-4xl flex-col gap-4">
+        <div className="flex items-center gap-3 flex-wrap">
+          <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
+            <Factory className="h-5 w-5" />
             Fábrica — pedidos internos
           </h2>
-          <p className="text-muted-foreground text-sm mt-1">
+          <span className="text-border select-none text-lg hidden sm:inline">|</span>
+          <p className="text-muted-foreground text-sm">
             Despachá pedidos del día y seguí remitos activos.
           </p>
         </div>
 
         <Tabs defaultValue="hoy">
-          <TabsList>
-            <TabsTrigger value="hoy">Hoy</TabsTrigger>
-            <TabsTrigger value="historial">Historial</TabsTrigger>
-            <TabsTrigger value="activos">Remitos activos</TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between gap-2">
+            <TabsList>
+              <TabsTrigger value="hoy">Hoy</TabsTrigger>
+              <TabsTrigger value="historial">Historial</TabsTrigger>
+              <TabsTrigger value="activos">Remitos activos</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="hoy" className="space-y-4 mt-4">
-            {/* Header con toggle de vista */}
-            <div className="flex items-center justify-between">
-              <div>
-                {loading && (
-                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Sincronizando...
-                  </div>
-                )}
-                {!loading && gruposVisibles.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    No hay grupos asignados a tu despacho para hoy.
-                  </p>
-                )}
+          </div>
+
+          <TabsContent value="hoy" className="space-y-3 mt-3">
+            {loading && (
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Sincronizando...
               </div>
-              
-              {/* Toggle de vista */}
-              <div className="flex gap-1">
-                <Button
-                  variant={vista === "tarjetas" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setVista("tarjetas")}
-                >
-                  Tarjetas
-                </Button>
-                <Button
-                  variant={vista === "tabla" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setVista("tabla")}
-                >
-                  Tabla
-                </Button>
-              </div>
-            </div>
+            )}
+            {!loading && gruposVisibles.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No hay grupos asignados a tu despacho para hoy.
+              </p>
+            )}
 
             {/* Grupos colapsables */}
             {pedidosDeHoy.map(({ grupo, pedidos, autoPedidos }) => {
@@ -692,70 +831,60 @@ export default function LogisticaFabricaPage() {
                     className="w-full text-left"
                     onClick={() => toggleGrupo(grupo.id)}
                   >
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="text-base">{grupo.nombre}</CardTitle>
-                          <CardDescription>
-                            {pedidos.length === 0 && autoPedidos.length === 0
-                              ? "Sin pedidos ni diferencias de stock"
-                              : pedidos.length === 0
-                              ? `${autoPedidos.length} sin confirmar`
-                              : `${pedidos.length} confirmado(s)${autoPedidos.length > 0 ? ` · ${autoPedidos.length} sin confirmar` : ""}`}
-                          </CardDescription>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">
-                            Días: {formatDiasEnvio(grupo.diasEnvio)}
-                          </span>
-                          {estaAbierto ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </div>
+                    <CardHeader className="py-2 px-4">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <CardTitle className="text-sm font-semibold shrink-0">{grupo.nombre}</CardTitle>
+                        <CardDescription className="text-xs shrink-0">
+                          {pedidos.length === 0 && autoPedidos.length === 0
+                            ? "Sin pedidos"
+                            : pedidos.length === 0
+                            ? `${autoPedidos.length} sin confirmar`
+                            : `${pedidos.length} confirmado(s)${autoPedidos.length > 0 ? ` · ${autoPedidos.length} sin confirmar` : ""}`}
+                        </CardDescription>
+                        <span className="ml-auto text-xs text-muted-foreground shrink-0">
+                          Días: {formatDiasEnvio(grupo.diasEnvio)}
+                        </span>
+                        {estaAbierto ? (
+                          <ChevronDown className="h-4 w-4 shrink-0" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 shrink-0" />
+                        )}
                       </div>
                     </CardHeader>
                   </button>
 
                   {/* Cuerpo del grupo */}
                   {estaAbierto && (
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-3 px-4 pb-3 pt-0">
                       {todosLosPedidos.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
                           Sin pedidos ni diferencias de stock
                         </p>
-                      ) : vista === "tarjetas" ? (
-                        // Vista tarjetas
-                        <div className="grid gap-3">
-                          {todosLosPedidos.map((pedido) => (
-                            <OperarioCardView
-                              key={pedido.id}
-                              pedido={pedido}
-                              cantSend={cantSend[pedido.id] ?? {}}
-                              comentSend={comentSend[pedido.id] ?? {}}
-                              obsRemito={obsRemito[pedido.id] ?? ""}
-                              procesando={procesando === pedido.id}
-                              onCantChange={(productoId: string, val: number) =>
-                                setCantSend((s) => ({ ...s, [pedido.id]: { ...(s[pedido.id] ?? {}), [productoId]: val } }))
-                              }
-                              onComentChange={(productoId: string, val: string) =>
-                                setComentSend((s) => ({ ...s, [pedido.id]: { ...(s[pedido.id] ?? {}), [productoId]: val } }))
-                              }
-                              onObsChange={(val: string) => setObsRemito((s) => ({ ...s, [pedido.id]: val }))}
-                              onDespachar={() => void despachar(pedido)}
-                              onTomarPedido={() => void tomarPedido(pedido.id).then(res => {
-                                if (!res.ok) toast({ title: "Error", description: res.error, variant: "destructive" })
-                                else toast({ title: "Pedido tomado", description: "El pedido está en preparación." })
-                              })}
-                              onAceptar={pedido.id.startsWith("auto_") ? () => void aceptarAutoPedido(pedido) : undefined}
-                              aceptando={aceptando === pedido.id}
-                            />
-                          ))}
-                        </div>
                       ) : (
-                        // Vista tabla
-                        <GrupoTablaView pedidos={todosLosPedidos} />
+                        // Solo vista tabla
+                        <GrupoTablaView 
+                          pedidos={todosLosPedidos} 
+                          onTomarPedido={handleTomarPedidos}
+                          modoDespacho={gruposEnModoDespacho[grupo.id] || false}
+                          cantidadesDespacho={cantidadesDespacho[grupo.id] || {}}
+                          onCantidadDespachoChange={(productoId: string, sucursalId: string, cantidad: number) => {
+                            setCantidadesDespacho(prev => ({
+                              ...prev,
+                              [grupo.id]: {
+                                ...(prev[grupo.id] || {}),
+                                [`${productoId}_${sucursalId}`]: cantidad
+                              }
+                            }))
+                          }}
+                          onDespachar={(grupoId: string, pedidos: PedidoFabrica[], sucursalesAFiltrar?: string[]) => handleDespacharGrupo(grupoId, pedidos, sucursalesAFiltrar)}
+                          grupoId={grupo.id}
+                          dialogAbierto={dialogTomarAbierto === grupo.id}
+                          setDialogAbierto={(open) => setDialogTomarAbierto(open ? grupo.id : null)}
+                          opcionSeleccionada={opcionTomarSeleccionada}
+                          setOpcionSeleccionada={setOpcionTomarSeleccionada}
+                          sucursalesSeleccionadas={sucursalesSeleccionadas}
+                          setSucursalesSeleccionadas={setSucursalesSeleccionadas}
+                        />
                       )}
                     </CardContent>
                   )}

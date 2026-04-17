@@ -115,7 +115,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
             <Button
               variant="ghost"
               className={cn(
-                "w-full justify-start md:w-auto flex items-center gap-2 rounded-none border-b-2 border-transparent px-4 py-5 text-muted-foreground hover:bg-transparent hover:text-foreground md:rounded-none",
+                "w-full justify-start md:w-auto flex items-center gap-2 rounded-none border-b-2 border-transparent px-3 py-2.5 text-muted-foreground hover:bg-transparent hover:text-foreground md:rounded-none",
                 isActive && "border-primary text-foreground",
               )}
             >
@@ -139,7 +139,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
             variant="ghost"
             onClick={() => onSelect(group.id)}
             className={cn(
-              "flex items-center gap-2 rounded-none border-b-2 border-transparent px-4 py-3 text-muted-foreground hover:bg-transparent hover:text-foreground",
+              "flex items-center gap-2 rounded-none border-b-2 border-transparent px-3 py-2.5 text-muted-foreground hover:bg-transparent hover:text-foreground",
               isActive && "border-primary text-foreground font-bold",
             )}
           >
@@ -155,7 +155,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-card">
-        <div className="flex h-16 items-center justify-between px-3 sm:px-6">
+        <div className="flex h-14 items-center justify-between px-3 sm:px-6">
           <div className="flex items-center gap-2">
             {/* Menú hamburguesa para móvil */}
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -191,7 +191,9 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
             <h1 className="text-base font-bold text-card-foreground sm:text-xl">Gestión de Horarios</h1>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Category tabs inline – desktop only */}
+          <div className="hidden md:flex items-center">
+            <CategoryNav activeId={currentGroupId} onSelect={setManualActiveGroupId} />
           </div>
 
           <DropdownMenu>
@@ -221,17 +223,14 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
           </DropdownMenu>
         </div>
 
-        {/* Navigation - Desktop only - Double Navbar */}
-        <nav className="hidden border-t border-border bg-card px-6 md:block">
-          <CategoryNav activeId={currentGroupId} onSelect={setManualActiveGroupId} />
-          <div className="border-t border-border/50">
-            <NavContent items={navGroupsFiltered.find(g => g.id === currentGroupId)?.items || []} />
-          </div>
+        {/* Sub-navigation - Desktop only */}
+        <nav className="hidden border-t border-border bg-card px-4 md:block">
+          <NavContent items={navGroupsFiltered.find(g => g.id === currentGroupId)?.items || []} />
         </nav>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 p-3 sm:p-4 md:p-6 transition-all duration-300">
+      <main className="flex-1 p-3 sm:p-4 md:p-5 transition-all duration-300">
         {children}
       </main>
     </div>
