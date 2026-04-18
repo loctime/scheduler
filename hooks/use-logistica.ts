@@ -58,6 +58,7 @@ function docToRemitoLog(id: string, data: Record<string, unknown>): RemitoLog {
     creadoPorEmail: String(data.creadoPorEmail ?? ""),
     actualizadoEn: data.actualizadoEn,
     stockDescontadoEn: data.stockDescontadoEn,
+    statusHistory: (data.statusHistory as RemitoLog["statusHistory"]) ?? [],
   }
 }
 
