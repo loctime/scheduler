@@ -65,27 +65,22 @@ export default function CatalogoAdminPage() {
     <DashboardLayout user={user}>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "grupos" | "productos")} className="gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-3">
-              <Package className="h-8 w-8 shrink-0" />
-              <h1 className="text-2xl font-semibold">Catálogo</h1>
-              <p className="text-sm text-muted-foreground">Todos los productos y sus grupos de pedido.</p>
+          <div className="flex items-center justify-between">
+              <div className="flex-1 flex justify-center">
+                <TabsList>
+                  <TabsTrigger value="grupos">Grupos</TabsTrigger>
+                  <TabsTrigger value="productos">Productos</TabsTrigger>
+                </TabsList>
+              </div>
+              <Button
+                className="ml-4"
+                disabled={activeTab !== "grupos"}
+                onClick={() => setShowNuevoGrupoForm((prev) => !prev)}
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                Nuevo grupo
+              </Button>
             </div>
-            <div className="flex-1 flex justify-center">
-              <TabsList>
-                <TabsTrigger value="grupos">Grupos</TabsTrigger>
-                <TabsTrigger value="productos">Productos</TabsTrigger>
-              </TabsList>
-            </div>
-            <Button
-              className="ml-auto"
-              disabled={activeTab !== "grupos"}
-              onClick={() => setShowNuevoGrupoForm((prev) => !prev)}
-            >
-              <Plus className="mr-1 h-4 w-4" />
-              Nuevo grupo
-            </Button>
-          </div>
 
           <TabsContent value="grupos" className="space-y-4">
             {gruposCatalogo.map((g) => (

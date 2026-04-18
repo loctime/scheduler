@@ -204,6 +204,16 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
                   <Warehouse className="h-5 w-5" />
                   Mi stock
                 </span>
+              ) : pathname === "/dashboard/catalogo" ? (
+                <span className="flex items-center gap-2">
+                  <BookMarked className="h-5 w-5" />
+                  Catálogo
+                </span>
+              ) : pathname === "/dashboard/configuracion" ? (
+                <span className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  Configuración
+                </span>
               ) : (
                 "Gestión de Horarios"
               )}
