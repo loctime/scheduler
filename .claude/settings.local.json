@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(ls -d __tests__)",
+      "Bash(ls jest* vitest*)",
+      "Bash(ls -d .worktrees)",
+      "Bash(ls -d worktrees)",
+      "Bash(npm install *)",
+      "Bash(grep -n \"no-scrollbar\" app/globals.css)",
+      "Bash(grep -rn \"no-scrollbar\" styles/)"
     ]
   }
 }

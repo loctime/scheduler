@@ -538,6 +538,74 @@ service cloud.firestore {
     }
     
     /* ===============================
+       GROUPS + CONVERSACIONES + MENSAJES
+       (sistema de mensajería interna)
+       =============================== */
+    
+    match /apps/horarios/groups/{groupId} {
+      allow read: if isAuth()
+        && (
+          resource.data.ownerId == uid()
+          || horariosCanActFor(resource.data.ownerId)
+        );
+    
+      allow create: if isAuth()
+        && (
+          request.resource.data.ownerId == uid()
+          || horariosCanActFor(request.resource.data.ownerId)
+        );
+    
+      allow update, delete: if isAuth()
+        && (
+          resource.data.ownerId == uid()
+          || horariosCanActFor(resource.data.ownerId)
+        );
+    }
+    
+    match /apps/horarios/conversaciones/{convId} {
+      allow read: if isAuth()
+        && (
+          resource.data.ownerId == uid()
+          || horariosCanActFor(resource.data.ownerId)
+        );
+    
+      allow create: if isAuth()
+        && (
+          request.resource.data.ownerId == uid()
+          || horariosCanActFor(request.resource.data.ownerId)
+        );
+    
+      allow update: if isAuth()
+        && (
+          resource.data.ownerId == uid()
+          || horariosCanActFor(resource.data.ownerId)
+        );
+    
+      allow delete: if isAuth()
+        && (
+          resource.data.ownerId == uid()
+          || horariosIsAdmin()
+          && horariosCanActFor(resource.data.ownerId)
+        );
+    }
+    
+    match /apps/horarios/mensajes/{msgId} {
+      allow read: if isAuth()
+        && (
+          resource.data.ownerId == uid()
+          || horariosCanActFor(resource.data.ownerId)
+        );
+    
+      allow create: if isAuth()
+        && (
+          request.resource.data.ownerId == uid()
+          || horariosCanActFor(request.resource.data.ownerId)
+        );
+    
+      allow update, delete: if false;
+    }
+    
+    /* ===============================
        GRUPOS CATÁLOGO
        =============================== */
     
