@@ -816,166 +816,148 @@ export default function LogisticaFabricaPage() {
   return (
     <DashboardLayout user={user}>
       <div className="mx-auto flex max-w-4xl flex-col gap-4">
-        <div className="flex items-center gap-3 flex-wrap">
-          <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
-            <Factory className="h-5 w-5" />
-            Fábrica — pedidos internos
-          </h2>
-          <span className="text-border select-none text-lg hidden sm:inline">|</span>
-          <p className="text-muted-foreground text-sm">
-            Despachá pedidos del día y seguí remitos activos.
-          </p>
-        </div>
-
         <Tabs defaultValue="hoy">
-          <div className="flex items-center justify-between gap-2">
-            <TabsList>
-              <TabsTrigger value="hoy">Hoy</TabsTrigger>
-              <TabsTrigger value="historial">Historial</TabsTrigger>
-              <TabsTrigger value="activos">Remitos activos</TabsTrigger>
-            </TabsList>
+              <TabsList>
+                <TabsTrigger value="hoy">Hoy</TabsTrigger>
+                <TabsTrigger value="historial">Historial</TabsTrigger>
+                <TabsTrigger value="activos">Remitos activos</TabsTrigger>
+              </TabsList>
+              <TabsContent value="hoy" className="space-y-3 mt-6">
+                {loading && (
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Sincronizando...
+                  </div>
+                )}
+                {!loading && gruposVisibles.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No hay grupos asignados a tu despacho para hoy.
+                  </p>
+                )}
 
-          </div>
+                {/* Grupos colapsables */}
+                {pedidosDeHoy.map(({ grupo, pedidos, autoPedidos }) => {
+                  const todosLosPedidos: PedidoFabrica[] = [
+                    ...pedidos,
+                    ...autoPedidos,
+                  ]
+                  const estaAbierto = gruposAbiertos[grupo.id] ?? true
 
-          <TabsContent value="hoy" className="space-y-3 mt-3">
-            {loading && (
-              <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Sincronizando...
-              </div>
-            )}
-            {!loading && gruposVisibles.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                No hay grupos asignados a tu despacho para hoy.
-              </p>
-            )}
+                  return (
+                    <Card key={grupo.id}>
+                      {/* Header clickeable del grupo */}
+                      <button
+                        type="button"
+                        className="w-full text-left"
+                        onClick={() => toggleGrupo(grupo.id)}
+                      >
+                        <CardHeader className="py-2 px-4">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <CardTitle className="text-sm font-semibold shrink-0">{grupo.nombre}</CardTitle>
+                            <CardDescription className="text-xs shrink-0">
+                              {pedidos.length === 0 && autoPedidos.length === 0
+                                ? "Sin pedidos"
+                                : pedidos.length === 0
+                                ? `${autoPedidos.length} sin confirmar`
+                                : `${pedidos.length} confirmado(s)${autoPedidos.length > 0 ? ` · ${autoPedidos.length} sin confirmar` : ""}`}
+                            </CardDescription>
+                            <span className="ml-auto text-xs text-muted-foreground shrink-0">
+                              Días: {formatDiasEnvio(grupo.diasEnvio)}
+                            </span>
+                            {estaAbierto ? (
+                              <ChevronDown className="h-4 w-4 shrink-0" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 shrink-0" />
+                            )}
+                          </div>
+                        </CardHeader>
+                      </button>
 
-            {/* Grupos colapsables */}
-            {pedidosDeHoy.map(({ grupo, pedidos, autoPedidos }) => {
-              const todosLosPedidos: PedidoFabrica[] = [
-                ...pedidos,
-                ...autoPedidos,
-              ]
-              const estaAbierto = gruposAbiertos[grupo.id] ?? true
-
-              return (
-                <Card key={grupo.id}>
-                  {/* Header clickeable del grupo */}
-                  <button
-                    type="button"
-                    className="w-full text-left"
-                    onClick={() => toggleGrupo(grupo.id)}
-                  >
-                    <CardHeader className="py-2 px-4">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <CardTitle className="text-sm font-semibold shrink-0">{grupo.nombre}</CardTitle>
-                        <CardDescription className="text-xs shrink-0">
-                          {pedidos.length === 0 && autoPedidos.length === 0
-                            ? "Sin pedidos"
-                            : pedidos.length === 0
-                            ? `${autoPedidos.length} sin confirmar`
-                            : `${pedidos.length} confirmado(s)${autoPedidos.length > 0 ? ` · ${autoPedidos.length} sin confirmar` : ""}`}
-                        </CardDescription>
-                        <span className="ml-auto text-xs text-muted-foreground shrink-0">
-                          Días: {formatDiasEnvio(grupo.diasEnvio)}
-                        </span>
-                        {estaAbierto ? (
-                          <ChevronDown className="h-4 w-4 shrink-0" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 shrink-0" />
-                        )}
-                      </div>
-                    </CardHeader>
-                  </button>
-
-                  {/* Cuerpo del grupo */}
-                  {estaAbierto && (
-                    <CardContent className="space-y-3 px-4 pb-3 pt-0">
-                      {todosLosPedidos.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                          Sin pedidos ni diferencias de stock
-                        </p>
-                      ) : (
-                        // Solo vista tabla
-                        <GrupoTablaView 
-                          pedidos={todosLosPedidos} 
-                          onTomarPedido={handleTomarPedidos}
-                          modoDespacho={gruposEnModoDespacho[grupo.id] || false}
-                          cantidadesDespacho={cantidadesDespacho[grupo.id] || {}}
-                          onCantidadDespachoChange={(productoId: string, sucursalId: string, cantidad: number) => {
-                            setCantidadesDespacho(prev => ({
-                              ...prev,
-                              [grupo.id]: {
-                                ...(prev[grupo.id] || {}),
-                                [`${productoId}_${sucursalId}`]: cantidad
-                              }
-                            }))
-                          }}
-                          onDespachar={(grupoId: string, pedidos: PedidoFabrica[], sucursalesAFiltrar?: string[]) => handleDespacharGrupo(grupoId, pedidos, sucursalesAFiltrar)}
-                          grupoId={grupo.id}
-                          dialogAbierto={dialogTomarAbierto === grupo.id}
-                          setDialogAbierto={(open) => setDialogTomarAbierto(open ? grupo.id : null)}
-                          opcionSeleccionada={opcionTomarSeleccionada}
-                          setOpcionSeleccionada={setOpcionTomarSeleccionada}
-                          sucursalesSeleccionadas={sucursalesSeleccionadas}
-                          setSucursalesSeleccionadas={setSucursalesSeleccionadas}
-                        />
+                      {/* Cuerpo del grupo */}
+                      {estaAbierto && (
+                        <CardContent className="space-y-3 px-4 pb-3 pt-0">
+                          {todosLosPedidos.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                              Sin pedidos ni diferencias de stock
+                            </p>
+                          ) : (
+                            // Solo vista tabla
+                            <GrupoTablaView 
+                              pedidos={todosLosPedidos} 
+                              onTomarPedido={handleTomarPedidos}
+                              modoDespacho={gruposEnModoDespacho[grupo.id] || false}
+                              cantidadesDespacho={cantidadesDespacho[grupo.id] || {}}
+                              onCantidadDespachoChange={(productoId: string, sucursalId: string, cantidad: number) => {
+                                setCantidadesDespacho(prev => ({
+                                  ...prev,
+                                  [grupo.id]: {
+                                    ...(prev[grupo.id] || {}),
+                                    [`${productoId}_${sucursalId}`]: cantidad
+                                  }
+                                }))
+                              }}
+                              onDespachar={(grupoId: string, pedidos: PedidoFabrica[], sucursalesAFiltrar?: string[]) => handleDespacharGrupo(grupoId, pedidos, sucursalesAFiltrar)}
+                              grupoId={grupo.id}
+                              dialogAbierto={dialogTomarAbierto === grupo.id}
+                              setDialogAbierto={(open) => setDialogTomarAbierto(open ? grupo.id : null)}
+                              opcionSeleccionada={opcionTomarSeleccionada}
+                              setOpcionSeleccionada={setOpcionTomarSeleccionada}
+                              sucursalesSeleccionadas={sucursalesSeleccionadas}
+                              setSucursalesSeleccionadas={setSucursalesSeleccionadas}
+                            />
+                          )}
+                        </CardContent>
                       )}
-                    </CardContent>
+                    </Card>
+                  )
+                })}
+              </TabsContent>
+              <TabsContent value="historial" className="mt-4">
+                <PedidosHistorialView pedidos={pedidosRaw} />
+              </TabsContent>
+              <TabsContent value="activos" className="space-y-6 mt-4">
+                <div>
+                  <h3 className="text-sm font-semibold flex items-center gap-2 mb-2">
+                    <Truck className="h-4 w-4" />
+                    En camino (repartidor)
+                  </h3>
+                  {remitosEnCamino.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No hay remitos en camino.</p>
+                  ) : (
+                    <ul className="space-y-2 text-sm">
+                      {remitosEnCamino.map((r) => (
+                        <li key={r.id} className="rounded-md border border-border px-3 py-2">
+                          <span className="font-mono">{r.numero}</span> · {r.destinoNombre} · {r.items.length} ítem(s)
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                </Card>
-              )
-            })}
-          </TabsContent>
-
-          <TabsContent value="historial" className="mt-4">
-            <PedidosHistorialView pedidos={pedidosRaw} />
-          </TabsContent>
-
-          {/* Tab remitos activos (sin cambios) */}
-          <TabsContent value="activos" className="space-y-6 mt-4">
-            <div>
-              <h3 className="text-sm font-semibold flex items-center gap-2 mb-2">
-                <Truck className="h-4 w-4" />
-                En camino (repartidor)
-              </h3>
-              {remitosEnCamino.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No hay remitos en camino.</p>
-              ) : (
-                <ul className="space-y-2 text-sm">
-                  {remitosEnCamino.map((r) => (
-                    <li key={r.id} className="rounded-md border border-border px-3 py-2">
-                      <span className="font-mono">{r.numero}</span> · {r.destinoNombre} · {r.items.length} ítem(s)
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold mb-2">Preparados (marcar salida)</h3>
-              {remitosPreparados.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No hay remitos preparados.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {remitosPreparados.map((r) => (
-                    <li
-                      key={r.id}
-                      className="flex flex-col gap-2 rounded-md border border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="text-sm">
-                        <span className="font-mono font-medium">{r.numero}</span> → {r.destinoNombre}
-                      </div>
-                      <Button size="sm" variant="secondary" onClick={() => void enCamino(r.id)}>
-                        Marcar en camino
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold mb-2">Preparados (marcar salida)</h3>
+                  {remitosPreparados.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No hay remitos preparados.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {remitosPreparados.map((r) => (
+                        <li
+                          key={r.id}
+                          className="flex flex-col gap-2 rounded-md border border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div className="text-sm">
+                            <span className="font-mono font-medium">{r.numero}</span> → {r.destinoNombre}
+                          </div>
+                          <Button size="sm" variant="secondary" onClick={() => void enCamino(r.id)}>
+                            Marcar en camino
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
+        </div>
     </DashboardLayout>
   )
 }

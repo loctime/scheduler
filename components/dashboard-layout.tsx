@@ -188,7 +188,26 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent sm:h-10 sm:w-10">
               <Calendar className="h-4 w-4 text-accent-foreground sm:h-6 sm:w-6" />
             </div>
-            <h1 className="text-base font-bold text-card-foreground sm:text-xl">Gestión de Horarios</h1>
+            <h1 className="text-base font-bold text-card-foreground sm:text-xl">
+              {pathname === "/dashboard/logistica-fabrica" ? (
+                <span className="flex items-center gap-2">
+                  <Factory className="h-5 w-5" />
+                  Fábrica — pedidos internos
+                </span>
+              ) : pathname === "/dashboard/recepciones" ? (
+                <span className="flex items-center gap-2">
+                  <ClipboardCheck className="h-5 w-5" />
+                  Recepciones internas
+                </span>
+              ) : pathname === "/dashboard/mi-stock" ? (
+                <span className="flex items-center gap-2">
+                  <Warehouse className="h-5 w-5" />
+                  Mi stock
+                </span>
+              ) : (
+                "Gestión de Horarios"
+              )}
+            </h1>
           </div>
 
           {/* Category tabs inline – desktop only */}

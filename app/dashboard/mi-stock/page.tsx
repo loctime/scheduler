@@ -468,14 +468,7 @@ export default function MiStockPage() {
       <div className="mx-auto flex max-w-4xl flex-col gap-6">
 
         {/* header */}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <Warehouse className="h-8 w-8" />
-            <div>
-              <h1 className="text-2xl font-semibold">Mi stock</h1>
-              <p className="text-sm text-muted-foreground">Stock de tu sucursal, agrupado por grupo.</p>
-            </div>
-          </div>
+        <div className="flex justify-end">
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => setModalPedir(true)}>
               Pedir insumos

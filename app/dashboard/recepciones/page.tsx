@@ -140,16 +140,7 @@ export default function RecepcionesLogisticaPage() {
   return (
     <DashboardLayout user={user}>
       <div className="mx-auto flex max-w-3xl flex-col gap-6">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <ClipboardCheck className="h-7 w-7" />
-            Recepciones internas
-          </h2>
-          <p className="text-muted-foreground text-sm mt-1">
-            Confirmá lo que llegó a tu sucursal. Los remitos en preparado o en camino aparecen abajo.
-          </p>
-        </div>
-
+        
         {loading && (
           <div className="flex items-center gap-2 text-muted-foreground text-sm">
             <Loader2 className="h-4 w-4 animate-spin" />
