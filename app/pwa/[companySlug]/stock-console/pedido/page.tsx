@@ -1,7 +1,7 @@
 "use client"
 
 import { useParams, useRouter } from "next/navigation"
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useData } from "@/contexts/data-context"
 import { useLogistica } from "@/hooks/use-logistica"
 import { LoginForm } from "@/components/login-form"
@@ -35,17 +35,22 @@ const ESTADO_BADGE: Record<string, { label: string; cls: string }> = {
 }
 
 export default function VerPedidoPage() {
-  const params = useParams()
   const router = useRouter()
   const { user } = useData()
   const { toast } = useToast()
-  const companySlug = params.companySlug as string
 
   const { pedidosPropios, loading, crearPedidoFabrica } = useLogistica(user)
 
   // cantidades editables: pedidoId → productoId → cantidad
   const [cantidades, setCantidades] = useState<Record<string, Record<string, number>>>({})
   const [enviando, setEnviando] = useState<string | null>(null)
+  // IDs de borradores ya enviados (ocultar localmente hasta que el listener los limpie)
+  const [enviados_ids, setEnviadosIds] = useState<Set<string>>(new Set())
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   if (!user) {
     return (
@@ -60,7 +65,7 @@ export default function VerPedidoPage() {
   }
 
   const pedidosHoy = pedidosPropios.filter((p) => esDeHoy(p.creadoEn))
-  const borradores = pedidosHoy.filter((p) => p.estado === "borrador")
+  const borradores = pedidosHoy.filter((p) => p.estado === "borrador" && !enviados_ids.has(p.id))
   const enviados = pedidosHoy.filter((p) => p.estado !== "borrador")
 
   const getCantidad = (pedidoId: string, productoId: string, fallback: number) =>
@@ -100,9 +105,13 @@ export default function VerPedidoPage() {
       grupoPedidoNombre: pedido.grupoPedidoNombre,
       items: itemsValidos,
     })
+
+    if (!mountedRef.current) return
     setEnviando(null)
 
     if (result.ok) {
+      // Ocultar el borrador localmente mientras el listener de Firestore se actualiza
+      setEnviadosIds((prev) => new Set([...prev, pedidoId]))
       toast({ title: "Pedido enviado", description: `Pedido a ${pedido.destinoNombre} enviado correctamente` })
     } else {
       toast({ title: "Error", description: result.error ?? "No se pudo enviar el pedido", variant: "destructive" })
@@ -142,7 +151,7 @@ export default function VerPedidoPage() {
         )}
 
         {/* Borradores: editables y enviables */}
-        {borradores.map((pedido) => (
+        {!loading && borradores.map((pedido) => (
           <div key={pedido.id} className="bg-white rounded-xl border border-[#ebebeb] mb-3 overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
               <div>
@@ -210,7 +219,7 @@ export default function VerPedidoPage() {
         ))}
 
         {/* Already sent: read-only */}
-        {enviados.map((pedido) => {
+        {!loading && enviados.map((pedido) => {
           const badge = ESTADO_BADGE[pedido.estado] ?? { label: pedido.estado, cls: "bg-gray-100 text-gray-500" }
           return (
             <div key={pedido.id} className="bg-white rounded-xl border border-[#ebebeb] mb-3 overflow-hidden">
