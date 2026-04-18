@@ -5,7 +5,7 @@ import { useData } from "@/contexts/data-context"
 import { useStockConsole } from "@/hooks/use-stock-console"
 import { LoginForm } from "@/components/login-form"
 import { Card, CardContent } from "@/components/ui/card"
-import { getStockStatus } from "@/lib/stock-status"
+import { getStockStatus, type StockStatus } from "@/lib/stock-status"
 import { ChevronLeft, Package } from "lucide-react"
 
 export default function ContarStockPage() {
@@ -42,10 +42,6 @@ export default function ContarStockPage() {
   const selectedPedido = pedidos.find((p) => p.id === state.selectedPedidoId)
   const hayMovimientos = Object.values(state.cantidades).some((v) => v !== 0)
 
-  const handleGuardar = async () => {
-    await confirmarMovimientos()
-  }
-
   return (
     <div className="min-h-screen bg-[#f5f5f3] flex flex-col">
       {/* Header */}
@@ -66,7 +62,7 @@ export default function ContarStockPage() {
 
       {/* Group chips */}
       <div className="bg-white border-b border-gray-100 px-4 py-2 shrink-0">
-        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
           {pedidos.map((pedido) => (
             <button
               key={pedido.id}
@@ -166,6 +162,7 @@ export default function ContarStockPage() {
         <button
           onClick={handleGuardar}
           disabled={state.loading || !hayMovimientos}
+          onClick={confirmarMovimientos}
           className="flex-1 py-2.5 rounded-xl bg-[#1D9E75] text-white text-sm font-medium disabled:opacity-40 active:bg-[#18886B]"
         >
           {state.loading ? "Guardando…" : "Guardar stock"}
@@ -175,7 +172,7 @@ export default function ContarStockPage() {
   )
 }
 
-function StockBadge({ status }: { status: "OK" | "LOW" | "CRITICAL" }) {
+function StockBadge({ status }: { status: StockStatus }) {
   if (status === "OK") {
     return (
       <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700 shrink-0">
