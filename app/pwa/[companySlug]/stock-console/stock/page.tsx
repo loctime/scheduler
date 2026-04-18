@@ -160,9 +160,8 @@ export default function ContarStockPage() {
           Limpiar
         </button>
         <button
-          onClick={handleGuardar}
-          disabled={state.loading || !hayMovimientos}
           onClick={confirmarMovimientos}
+          disabled={state.loading || !hayMovimientos}
           className="flex-1 py-2.5 rounded-xl bg-[#1D9E75] text-white text-sm font-medium disabled:opacity-40 active:bg-[#18886B]"
         >
           {state.loading ? "Guardando…" : "Guardar stock"}

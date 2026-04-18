@@ -7,7 +7,7 @@ import { useLogistica } from "@/hooks/use-logistica"
 import { LoginForm } from "@/components/login-form"
 import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
-import { ChevronLeft, PackageOpen } from "lucide-react"
+import { AlertTriangle, ChevronLeft, PackageOpen } from "lucide-react"
 
 export default function RecepcionPage() {
   const router = useRouter()
@@ -53,10 +53,7 @@ export default function RecepcionPage() {
   const setCantidad = (remitoId: string, productoId: string, value: number) => {
     setCantidades((prev) => ({
       ...prev,
-      [remitoId]: {
-        ...prev[remitoId],
-        [productoId]: value,
-      },
+      [remitoId]: { ...prev[remitoId], [productoId]: Math.max(0, value) },
     }))
   }
 
@@ -146,17 +143,18 @@ export default function RecepcionPage() {
                         type="number"
                         min="0"
                         value={cantidad}
-                        onChange={(e) =>
-                          setCantidad(remito.id, item.productoId, Number(e.target.value))
-                        }
+                        onChange={(e) => {
+                          const raw = e.target.value
+                          if (raw === "") return
+                          const n = Number(raw)
+                          if (!Number.isNaN(n)) setCantidad(remito.id, item.productoId, n)
+                        }}
                         className={`w-24 border rounded-lg px-2 py-1 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#1D9E75] ${
                           hayFaltante ? "border-red-400" : "border-gray-200"
                         }`}
                       />
                       {hayFaltante && (
-                        <span className="text-amber-500 text-sm" title="Cantidad menor a la enviada">
-                          ⚠
-                        </span>
+                        <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
                       )}
                     </div>
                   </div>
