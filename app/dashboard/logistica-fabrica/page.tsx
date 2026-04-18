@@ -601,15 +601,48 @@ export default function LogisticaFabricaPage() {
     }
     
     for (const pedido of pedidosATomar) {
+      // Solo procesar pedidos que están en estado 'enviado'
+      if (pedido.estado !== "enviado") {
+        toast({ 
+          title: "Advertencia", 
+          description: `Pedido ${pedido.id} está en estado «${pedido.estado}» y no puede ser tomado`,
+          variant: "destructive" 
+        })
+        continue
+      }
+      
       if (pedido.id.startsWith("auto_")) {
         // Registrar pedido automático primero
-        await aceptarAutoPedido(pedido)
-      }
-      // Tomar el pedido
-      const res = await tomarPedido(pedido.id)
-      if (!res.ok) {
-        toast({ title: "Error", description: res.error, variant: "destructive" })
-        return
+        const nuevoId = await aceptarAutoPedido(pedido)
+        if (nuevoId === null) {
+          toast({ 
+            title: "Error", 
+            description: "No se pudo registrar el pedido automático",
+            variant: "destructive" 
+          })
+          continue
+        }
+        // Tomar el pedido con el nuevo ID
+        const res = await tomarPedido(nuevoId)
+        if (!res.ok) {
+          toast({ 
+            title: "Error al tomar pedido", 
+            description: `${res.error} (Pedido: ${nuevoId})`, 
+            variant: "destructive" 
+          })
+          return
+        }
+      } else {
+        // Tomar el pedido normal
+        const res = await tomarPedido(pedido.id)
+        if (!res.ok) {
+          toast({ 
+            title: "Error al tomar pedido", 
+            description: `${res.error} (Pedido: ${pedido.id})`, 
+            variant: "destructive" 
+          })
+          return
+        }
       }
     }
     
@@ -688,10 +721,10 @@ export default function LogisticaFabricaPage() {
 
 
   // Función para aceptar pedidos automáticos
-  const aceptarAutoPedido = async (pedido: PedidoFabrica) => {
-    if (!db || !ownerId || !user) return
+  const aceptarAutoPedido = async (pedido: PedidoFabrica): Promise<string | null> => {
+    if (!db || !ownerId || !user) return null
     try {
-      await addDoc(collection(db, COLLECTIONS.PEDIDOS_FABRICA), {
+      const ref = await addDoc(collection(db, COLLECTIONS.PEDIDOS_FABRICA), {
         ownerId,
         origenLocationId: pedido.origenLocationId,
         origenNombre: pedido.origenNombre,
@@ -709,12 +742,14 @@ export default function LogisticaFabricaPage() {
         actualizadoEn: serverTimestamp(),
       })
       toast({ title: "Pedido aceptado", description: "El pedido automático fue registrado." })
+      return ref.id
     } catch (e) {
       toast({
         title: "Error",
         description: e instanceof Error ? e.message : "Error desconocido",
         variant: "destructive",
       })
+      return null
     }
   }
   const remitosEnCamino = useMemo(() => remitosRaw.filter((r) => r.estado === "en_camino"), [remitosRaw])
