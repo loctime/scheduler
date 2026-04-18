@@ -20,7 +20,7 @@ export default function DespacharPage() {
   const { pedidosParaMi, loading, locationId, crearRemito, marcarEnCamino } = useLogistica(user)
 
   const [despachando, setDespachando] = useState<string | null>(null)
-  const mountedRef = useRef(true)
+  const mountedRef = useRef(false)
   useEffect(() => {
     mountedRef.current = true
     return () => { mountedRef.current = false }
@@ -73,7 +73,13 @@ export default function DespacharPage() {
       return
     }
 
-    const enCaminoResult = await marcarEnCamino(remitoResult.remitoId!)
+    if (!remitoResult.remitoId) {
+      setDespachando(null)
+      toast({ title: "Error", description: "Remito creado sin ID", variant: "destructive" })
+      return
+    }
+
+    const enCaminoResult = await marcarEnCamino(remitoResult.remitoId)
 
     if (!mountedRef.current) return
     setDespachando(null)
