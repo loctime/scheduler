@@ -9,8 +9,10 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
 import { useData } from "@/contexts/data-context"
 import { useLogistica } from "@/hooks/use-logistica"
+import { useSettings } from "@/hooks/use-settings"
 import { useToast } from "@/hooks/use-toast"
 import { canUser } from "@/lib/permissions"
 import type { RecepcionLogItem } from "@/lib/logistica-types"
@@ -38,6 +40,7 @@ export default function RecepcionesLogisticaPage() {
   const { user, userData } = useData()
   const { toast } = useToast()
   const { remitosRaw, remitosRecibidos, confirmarRecepcion, loading, isAdmin } = useLogistica(user)
+  const { settings, updateCrearPedidoAutomatico } = useSettings()
 
   const formateadorFechaHora = useMemo(
     () => new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }),
@@ -77,6 +80,24 @@ export default function RecepcionesLogisticaPage() {
   const [coment, setComent] = useState<Record<string, string>>({})
   const [obs, setObs] = useState("")
   const [procesando, setProcesando] = useState(false)
+
+  const handleToggleCrearPedidoAutomatico = async (checked: boolean) => {
+    try {
+      await updateCrearPedidoAutomatico(checked)
+      toast({ 
+        title: checked ? "Pedidos automáticos activados" : "Pedidos automáticos desactivados",
+        description: checked 
+          ? "Se crearán pedidos automáticamente cuando haya faltantes" 
+          : "No se crearán pedidos automáticos por faltantes"
+      })
+    } catch (error) {
+      toast({ 
+        title: "Error", 
+        description: "No se pudo actualizar la configuración",
+        variant: "destructive" 
+      })
+    }
+  }
 
   useEffect(() => {
     if (!sel) {
@@ -147,6 +168,35 @@ export default function RecepcionesLogisticaPage() {
             Sincronizando…
           </div>
         )}
+
+        {/* Configuración de pedidos automáticos */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Configuración de Recepciones</CardTitle>
+            <CardDescription>
+              Controla si se crean automáticamente pedidos pendientes cuando hay faltantes
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label htmlFor="crear-pedido-automatico" className="text-sm font-medium">
+                  Crear pedido automático por faltantes
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {settings?.crearPedidoAutomaticoPorFaltante !== false
+                    ? "Se creará automáticamente un pedido pendiente cuando haya faltantes en la recepción"
+                    : "No se crearán pedidos automáticos. Deberás crearlos manualmente si es necesario."}
+                </p>
+              </div>
+              <Switch
+                id="crear-pedido-automatico"
+                checked={settings?.crearPedidoAutomaticoPorFaltante !== false}
+                onCheckedChange={handleToggleCrearPedidoAutomatico}
+              />
+            </div>
+          </CardContent>
+        </Card>
 
         <Tabs defaultValue="pendientes">
           <TabsList>

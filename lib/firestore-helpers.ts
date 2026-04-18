@@ -19,7 +19,7 @@ export function buildFirestorePath(basePath: string, ...segments: string[]): str
 
 /**
  * Helper para crear referencia de settings válida
- * Path: apps/horarios_settings/{ownerId}
+ * Path: apps/horarios/settings/{ownerId}
  */
 export function createSettingsRef(dbInstance: any, ownerId: string) {
   if (!dbInstance) {
@@ -31,14 +31,15 @@ export function createSettingsRef(dbInstance: any, ownerId: string) {
   }
 
   const normalizedOwnerId = normalizeFirestoreId(ownerId)
-  console.log("🔧 [createSettingsRef] Creating settings ref for ownerId:", ownerId, '→', normalizedOwnerId)
+  console.log("Creating settings ref for ownerId:", ownerId, '->', normalizedOwnerId)
   
   try {
-    const ref = doc(dbInstance, "apps", "horarios_settings", normalizedOwnerId)
-    console.log("🔧 [createSettingsRef] Settings reference created successfully: apps/horarios_settings/" + normalizedOwnerId)
+    // CORRECCIÓN: Usar la colección SETTINGS con el path completo de apps/horarios
+    const ref = doc(dbInstance, COLLECTIONS.SETTINGS, normalizedOwnerId)
+    console.log("Settings reference created successfully:", COLLECTIONS.SETTINGS + "/" + normalizedOwnerId)
     return ref
   } catch (error) {
-    console.error("🔧 [createSettingsRef] Failed to create settings reference:", error)
+    console.error("Failed to create settings reference:", error)
     throw new Error(`Failed to create settings reference: ${error}`)
   }
 }

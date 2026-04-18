@@ -511,6 +511,33 @@ service cloud.firestore {
     }
     
     /* ===============================
+       SETTINGS
+       =============================== */
+    
+    match /apps/horarios/settings/{ownerId} {
+      allow read: if isAuth()
+        && (
+          ownerId == uid()
+          || horariosCanActFor(ownerId)
+        );
+    
+      allow create: if isAuth()
+        && (
+          ownerId == uid()
+          || horariosCanActFor(ownerId)
+        );
+    
+      allow update: if isAuth()
+        && (
+          ownerId == uid()
+          || horariosCanActFor(ownerId)
+        )
+        && unchanged("ownerId");
+    
+      allow delete: if false;
+    }
+    
+    /* ===============================
        GRUPOS CATÁLOGO
        =============================== */
     

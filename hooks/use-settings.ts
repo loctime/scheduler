@@ -8,6 +8,8 @@ export interface Settings {
   publishedWeekId?: string
   updatedAt?: any
   updatedBy?: string
+  // Logistics: controlar creación automática de pedidos por faltantes
+  crearPedidoAutomaticoPorFaltante?: boolean
 }
 
 export interface UseSettingsReturn {
@@ -15,6 +17,7 @@ export interface UseSettingsReturn {
   isLoading: boolean
   updatePublishedWeek: (weekId: string) => Promise<void>
   refreshSettings: () => Promise<void>
+  updateCrearPedidoAutomatico: (enabled: boolean) => Promise<void>
 }
 
 export function useSettings(): UseSettingsReturn {
@@ -93,6 +96,35 @@ export function useSettings(): UseSettingsReturn {
     }
   }
 
+  const updateCrearPedidoAutomatico = async (enabled: boolean) => {
+    try {
+      if (!db) {
+        throw new Error("Firestore not available")
+      }
+
+      if (!ownerId) {
+        throw new Error("ownerId not available")
+      }
+
+      console.log("Updating crearPedidoAutomaticoPorFaltante:", enabled, "for ownerId:", ownerId)
+      
+      const settingsRef = createSettingsRef(db, ownerId)
+      
+      await updateDoc(settingsRef, {
+        crearPedidoAutomaticoPorFaltante: enabled,
+        updatedAt: serverTimestamp()
+      })
+      
+      console.log("crearPedidoAutomaticoPorFaltante updated successfully")
+      
+      // Actualizar estado local
+      setSettings(prev => prev ? { ...prev, crearPedidoAutomaticoPorFaltante: enabled } : { crearPedidoAutomaticoPorFaltante: enabled })
+    } catch (error) {
+      console.error("Error updating crearPedidoAutomaticoPorFaltante:", error)
+      throw error
+    }
+  }
+
   const refreshSettings = async () => {
     setIsLoading(true)
     await loadSettings()
@@ -102,6 +134,7 @@ export function useSettings(): UseSettingsReturn {
     settings,
     isLoading,
     updatePublishedWeek,
+    updateCrearPedidoAutomatico,
     refreshSettings
   }
 }

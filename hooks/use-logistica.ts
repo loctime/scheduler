@@ -5,6 +5,7 @@ import { collection, onSnapshot, query, where } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
 import { useData } from "@/contexts/data-context"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
+import { useSettings } from "@/hooks/use-settings"
 import type { PedidoFabrica, PedidoFabricaItem, RemitoLog } from "@/lib/logistica-types"
 import {
   actualizarItemsPedido as actualizarItemsPedidoSvc,
@@ -62,6 +63,7 @@ function docToRemitoLog(id: string, data: Record<string, unknown>): RemitoLog {
 
 export function useLogistica(user: { uid?: string; email?: string | null } | null) {
   const { userData } = useData()
+  const { settings } = useSettings()
   const [pedidosRaw, setPedidosRaw] = useState<PedidoFabrica[]>([])
   const [remitosRaw, setRemitosRaw] = useState<RemitoLog[]>([])
   const [loading, setLoading] = useState(true)
@@ -170,11 +172,16 @@ export function useLogistica(user: { uid?: string; email?: string | null } | nul
   )
 
   const confirmarRecepcion = useCallback(
-    async (input: Omit<Parameters<typeof confirmarRecepcionSvc>[0], "ownerId" | "user">) => {
+    async (input: Omit<Parameters<typeof confirmarRecepcionSvc>[0], "ownerId" | "user" | "crearPedidoAutomaticoPorFaltante">) => {
       if (!ownerId) return { ok: false as const, error: "No se pudo determinar el espacio de trabajo" }
-      return confirmarRecepcionSvc({ ...input, ownerId, user: actor })
+      return confirmarRecepcionSvc({ 
+        ...input, 
+        ownerId, 
+        user: actor,
+        crearPedidoAutomaticoPorFaltante: settings?.crearPedidoAutomaticoPorFaltante ?? true // Por defecto true (comportamiento actual)
+      })
     },
-    [ownerId, actor]
+    [ownerId, actor, settings?.crearPedidoAutomaticoPorFaltante]
   )
 
   const marcarEnCamino = useCallback(

@@ -70,6 +70,7 @@ export const COLLECTIONS = {
   SCHEDULES: getCollectionPath("schedules"),
   HISTORIAL: getCollectionPath("historial"),
   CONFIG: getCollectionPath("config"),
+  SETTINGS: getCollectionPath("settings"),
   PEDIDOS: getCollectionPath("pedidos"),
   PRODUCTS: getCollectionPath("products"),
   LOTS: getCollectionPath("lots"),

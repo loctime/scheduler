@@ -250,6 +250,8 @@ export async function confirmarRecepcion(input: {
   items: RecepcionLogItem[]
   observacion?: string
   user: LogisticaActor
+  // Opción para desactivar creación automática de pedidos por faltantes
+  crearPedidoAutomaticoPorFaltante?: boolean
 }): Promise<{ ok: boolean; recepcionId?: string; pendientesGenerados?: number; error?: string }> {
   if (!db) {
     return { ok: false, error: "Firestore no está disponible" }
@@ -418,7 +420,10 @@ export async function confirmarRecepcion(input: {
 
       pendientesCount = faltanteItems.length
 
-      if (faltanteItems.length > 0) {
+      // Solo crear pedido automático si está habilitado en la configuración
+      const debeCrearPedidoAutomatico = input.crearPedidoAutomaticoPorFaltante !== false // Por defecto true (comportamiento actual)
+      
+      if (faltanteItems.length > 0 && debeCrearPedidoAutomatico) {
         const pedidoPendienteRef = doc(collection(firestore, COLLECTIONS.PEDIDOS_FABRICA))
         const po = pedidoOrigenSnap?.exists()
           ? (pedidoOrigenSnap.data() as Record<string, unknown>)

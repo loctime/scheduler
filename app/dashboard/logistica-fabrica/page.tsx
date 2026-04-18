@@ -822,7 +822,7 @@ export default function LogisticaFabricaPage() {
                 <TabsTrigger value="historial">Historial</TabsTrigger>
                 <TabsTrigger value="activos">Remitos activos</TabsTrigger>
               </TabsList>
-              <TabsContent value="hoy" className="space-y-3 mt-6">
+              <TabsContent value="hoy" className="space-y-3">
                 {loading && (
                   <div className="flex items-center gap-2 text-muted-foreground text-sm">
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -912,10 +912,10 @@ export default function LogisticaFabricaPage() {
                   )
                 })}
               </TabsContent>
-              <TabsContent value="historial" className="mt-4">
+              <TabsContent value="historial">
                 <PedidosHistorialView pedidos={pedidosRaw} />
               </TabsContent>
-              <TabsContent value="activos" className="space-y-6 mt-4">
+              <TabsContent value="activos" className="space-y-6">
                 <div>
                   <h3 className="text-sm font-semibold flex items-center gap-2 mb-2">
                     <Truck className="h-4 w-4" />
