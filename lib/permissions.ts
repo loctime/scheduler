@@ -54,7 +54,6 @@ export function canUser(
 
   if (user.role === "colaborador") {
     if (action === "ver_admin") return false
-    if (action === "ver_dashboard") return false
     return true
   }
 
