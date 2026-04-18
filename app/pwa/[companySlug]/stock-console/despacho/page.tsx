@@ -1,6 +1,6 @@
 "use client"
 
-import { useParams, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { useState, useRef, useEffect } from "react"
 import { useData } from "@/contexts/data-context"
 import { useLogistica } from "@/hooks/use-logistica"
@@ -149,7 +149,10 @@ export default function DespacharPage() {
                     )}
                   </div>
                   <p className="text-xs text-gray-400 mb-2">{resumen}</p>
-                  {isListo && (
+                  {isListo && !locationId && (
+                    <p className="text-xs text-red-500 text-center py-1">Sin ubicación configurada</p>
+                  )}
+                  {isListo && locationId && (
                     <button
                       onClick={() => handleDespachar(pedido)}
                       disabled={despachando === pedido.id}
