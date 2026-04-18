@@ -1,11 +1,21 @@
 "use client"
 
 import { useParams, useRouter } from "next/navigation"
+import { ChevronRight } from "lucide-react"
 import { useData } from "@/contexts/data-context"
 import { LoginForm } from "@/components/login-form"
 import { Card, CardContent } from "@/components/ui/card"
 
-const ACTIONS = [
+type Action = {
+  href: string
+  icon: string
+  title: string
+  desc: string
+  iconBg: string
+  section: "tareas" | "fabrica"
+}
+
+const ACTIONS: Action[] = [
   {
     href: "stock-console/stock",
     icon: "📦",
@@ -106,7 +116,7 @@ function ActionCard({
   action,
   onClick,
 }: {
-  action: (typeof ACTIONS)[number]
+  action: Action
   onClick: () => void
 }) {
   return (
@@ -123,7 +133,7 @@ function ActionCard({
         <p className="text-[15px] font-medium text-gray-900">{action.title}</p>
         <p className="text-xs text-gray-400 mt-0.5">{action.desc}</p>
       </div>
-      <span className="text-gray-300 text-lg">›</span>
+      <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
     </button>
   )
 }
