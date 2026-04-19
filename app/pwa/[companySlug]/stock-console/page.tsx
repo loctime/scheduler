@@ -1,10 +1,11 @@
 "use client"
 
 import { useParams, useRouter } from "next/navigation"
-import { ChevronRight } from "lucide-react"
+import { ChevronRight, Package } from "lucide-react"
 import { useData } from "@/contexts/data-context"
 import { LoginForm } from "@/components/login-form"
 import { Card, CardContent } from "@/components/ui/card"
+import { PWA_THEMES } from "@/lib/pwa-themes"
 
 type Action = {
   href: string
@@ -72,12 +73,18 @@ export default function StockPedidosHome() {
   const fabrica = ACTIONS.filter((a) => a.section === "fabrica")
 
   return (
-    <div className="min-h-screen bg-[#f5f5f3] pb-20">
-      <div className="px-4 pt-6 pb-4">
-        <h1 className="text-xl font-semibold text-gray-900">Stock & Pedidos</h1>
+    <div className="min-h-screen bg-background">
+      <div className={`flex items-center gap-3 border-b border-border/50 px-4 pt-6 pb-4 ${PWA_THEMES.stock.soft}`}>
+        <div className={`flex h-10 w-10 items-center justify-center rounded-xl border-2 bg-background ${PWA_THEMES.stock.border}`}>
+          <Package className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl font-semibold text-foreground">Stock & Pedidos</h1>
+          <p className="text-xs text-muted-foreground">{companySlug}</p>
+        </div>
       </div>
 
-      <div className="px-4 space-y-6">
+      <div className="px-4 pt-4 space-y-6">
         <section>
           <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
             Mis tareas

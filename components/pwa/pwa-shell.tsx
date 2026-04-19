@@ -38,12 +38,6 @@ function PwaTabs() {
     if (companySlug) savePwaLastSlug(companySlug)
   }, [companySlug])
 
-  // Ocultar tabs en la página de stock-console
-  const isStockConsolePage = pathname?.includes("/stock-console")
-  if (isStockConsolePage) {
-    return null
-  }
-
   return (
     <nav className={cn("fixed bottom-0 left-0 right-0 border-t border-border backdrop-blur", softTheme)}>
       <div className="mx-auto flex max-w-lg items-center justify-around px-3 py-2">

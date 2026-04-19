@@ -56,7 +56,6 @@ const navGroups = [
       { href: "/dashboard/recepciones", label: "Recepciones", icon: ClipboardCheck, action: "recibir_pedido" },
       { href: "/dashboard/catalogo", label: "Catálogo", icon: BookMarked, action: "ver_admin" },
       { href: "/dashboard/mi-stock", label: "Mi stock", icon: Warehouse, action: "editar_stock" },
-      { href: "/dashboard/stock-console", label: "Stock rápido (PWA)", icon: Package, action: "editar_stock" },
     ],
   },
   {
@@ -236,20 +235,23 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
           {/* Category tabs inline – desktop only */}
           <div className="hidden md:flex items-center gap-2">
             <CategoryNav activeId={currentGroupId} onSelect={setManualActiveGroupId} />
+          </div>
+
+          <div className="flex items-center gap-1 sm:gap-2">
             {companySlug && (
-              <Link href={`/pwa/${companySlug}/`}>
+              <Link href={`/pwa/${companySlug}/`} className="hidden md:inline-flex">
                 <Button
                   variant="ghost"
-                  className="flex items-center gap-2 rounded-none border-b-2 border-transparent px-3 py-2.5 text-muted-foreground hover:bg-transparent hover:text-foreground"
+                  size="icon"
+                  className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                  title="Application"
                 >
-                  <Smartphone className="h-4 w-4" />
-                  <span className="text-sm uppercase tracking-wider">Application</span>
+                  <Smartphone className="h-5 w-5" />
+                  <span className="sr-only">Application</span>
                 </Button>
               </Link>
             )}
-          </div>
-
-          <DropdownMenu>
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-8 w-8 rounded-full sm:h-10 sm:w-10">
                 <Avatar className="h-8 w-8 sm:h-10 sm:w-10">
@@ -274,10 +276,11 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </div>
 
         {/* Sub-navigation - Desktop only */}
-        <nav className="hidden border-t border-border bg-card px-4 md:block">
+        <nav className="hidden border-t border-border bg-card px-4 md:flex md:justify-center">
           <NavContent items={navGroupsFiltered.find(g => g.id === currentGroupId)?.items || []} />
         </nav>
       </header>
