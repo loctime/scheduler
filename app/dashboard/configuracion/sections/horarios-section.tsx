@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
-import { Loader2, Save } from "lucide-react"
+import { Timer, Coffee, Calculator } from "lucide-react"
 import { Configuracion } from "@/lib/types"
+import { SectionFooter } from "./section-footer"
 
 type Props = {
   config: Configuracion
@@ -87,171 +86,188 @@ export function HorariosSection({ config, saveSection }: Props) {
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Horarios y cálculos</CardTitle>
-          <CardDescription>Límites, descansos y reglas para el cálculo de horas extra</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="horasMaximasPorDia">Horas máximas por día</Label>
-            <Input
-              id="horasMaximasPorDia"
-              type="number"
-              min="1"
-              max="24"
-              value={horasMaximasPorDia}
-              onChange={(e) =>
-                setHorasMaximasPorDia(Math.max(1, Math.min(24, parseInt(e.target.value) || 8)))
-              }
-            />
-            <p className="text-sm text-muted-foreground">
-              Número máximo de horas que un empleado puede trabajar en un día
-            </p>
-          </div>
+    <div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="shadow-md border-l-4 border-l-primary/60">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/15 ring-1 ring-primary/25 shadow-sm">
+                <Timer className="h-5 w-5 text-primary" />
+              </div>
+              <div className="space-y-0.5">
+                <CardTitle className="text-lg font-semibold text-foreground">Jornada diaria</CardTitle>
+                <CardDescription className="text-sm text-foreground/75 font-normal">Tope de horas por día</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <Label htmlFor="horasMaximasPorDia">Horas máximas por día</Label>
+              <Input
+                id="horasMaximasPorDia"
+                type="number"
+                min="1"
+                max="24"
+                value={horasMaximasPorDia}
+                onChange={(e) =>
+                  setHorasMaximasPorDia(Math.max(1, Math.min(24, parseInt(e.target.value) || 8)))
+                }
+              />
+              <p className="text-sm text-foreground/75">
+                Máximo de horas que un empleado puede trabajar en un día
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Separator />
+        <Card className="shadow-md border-l-4 border-l-primary/60">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/15 ring-1 ring-primary/25 shadow-sm">
+                <Coffee className="h-5 w-5 text-primary" />
+              </div>
+              <div className="space-y-0.5">
+                <CardTitle className="text-lg font-semibold text-foreground">Descansos</CardTitle>
+                <CardDescription className="text-sm text-foreground/75 font-normal">Tiempo descontado de los turnos</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="minutosDescanso">Minutos de descanso</Label>
+              <Input
+                id="minutosDescanso"
+                type="number"
+                min="0"
+                max="120"
+                value={minutosDescanso}
+                onChange={(e) =>
+                  setMinutosDescanso(Math.max(0, Math.min(120, parseInt(e.target.value) || 30)))
+                }
+              />
+              <p className="text-sm text-foreground/75">
+                Minutos que se restan de las horas trabajadas
+              </p>
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="minutosDescanso">Minutos de descanso</Label>
-            <Input
-              id="minutosDescanso"
-              type="number"
-              min="0"
-              max="120"
-              value={minutosDescanso}
-              onChange={(e) =>
-                setMinutosDescanso(Math.max(0, Math.min(120, parseInt(e.target.value) || 30)))
-              }
-            />
-            <p className="text-sm text-muted-foreground">
-              Minutos de descanso que se restan de las horas trabajadas. Solo aplica a turnos continuos que cumplan el mínimo de horas.
-            </p>
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="horasMinimasParaDescanso">Horas mínimas para aplicar</Label>
+              <Input
+                id="horasMinimasParaDescanso"
+                type="number"
+                min="1"
+                max="12"
+                step="0.5"
+                value={horasMinimasParaDescanso}
+                onChange={(e) =>
+                  setHorasMinimasParaDescanso(
+                    Math.max(1, Math.min(12, parseFloat(e.target.value) || 6)),
+                  )
+                }
+              />
+              <p className="text-sm text-foreground/75">
+                El turno debe ser continuo y tener al menos esta duración
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Separator />
+        <Card className="shadow-md border-l-4 border-l-primary/60 lg:col-span-2">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/15 ring-1 ring-primary/25 shadow-sm">
+                <Calculator className="h-5 w-5 text-primary" />
+              </div>
+              <div className="space-y-0.5">
+                <CardTitle className="text-lg font-semibold text-foreground">Reglas para horas extra</CardTitle>
+                <CardDescription className="text-sm text-foreground/75 font-normal">Umbrales para el cálculo automático de HE</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="horasNormalesPorDia">Horas normales por día</Label>
+                <Input
+                  id="horasNormalesPorDia"
+                  type="number"
+                  min="1"
+                  max="24"
+                  value={reglas.horasNormalesPorDia}
+                  onChange={(e) =>
+                    setReglas({
+                      ...reglas,
+                      horasNormalesPorDia: Math.max(1, Math.min(24, parseInt(e.target.value) || 8)),
+                    })
+                  }
+                />
+                <p className="text-sm text-foreground/75">
+                  Por encima de esto cuenta como hora extra
+                </p>
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="horasMinimasParaDescanso">Horas mínimas para descanso</Label>
-            <Input
-              id="horasMinimasParaDescanso"
-              type="number"
-              min="1"
-              max="12"
-              step="0.5"
-              value={horasMinimasParaDescanso}
-              onChange={(e) =>
-                setHorasMinimasParaDescanso(
-                  Math.max(1, Math.min(12, parseFloat(e.target.value) || 6)),
-                )
-              }
-            />
-            <p className="text-sm text-muted-foreground">
-              Un turno continuo debe tener al menos esta cantidad de horas para aplicar el descanso. Los turnos cortados no aplican descanso.
-            </p>
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="horasNormalesPorSemana">Horas normales por semana</Label>
+                <Input
+                  id="horasNormalesPorSemana"
+                  type="number"
+                  min="1"
+                  max="168"
+                  value={reglas.horasNormalesPorSemana}
+                  onChange={(e) =>
+                    setReglas({
+                      ...reglas,
+                      horasNormalesPorSemana: Math.max(1, Math.min(168, parseInt(e.target.value) || 48)),
+                    })
+                  }
+                />
+                <p className="text-sm text-foreground/75">
+                  Para cálculos semanales de horas extra
+                </p>
+              </div>
 
-          <Separator />
+              <div className="space-y-2">
+                <Label htmlFor="inicioHorarioNocturno">Inicio horario nocturno</Label>
+                <Input
+                  id="inicioHorarioNocturno"
+                  type="time"
+                  value={reglas.inicioHorarioNocturno}
+                  onChange={(e) =>
+                    setReglas({ ...reglas, inicioHorarioNocturno: e.target.value || "21:00" })
+                  }
+                />
+                <p className="text-sm text-foreground/75">
+                  Para futuros cálculos de HE nocturnas
+                </p>
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="horasNormalesPorDia">Horas normales por día</Label>
-            <Input
-              id="horasNormalesPorDia"
-              type="number"
-              min="1"
-              max="24"
-              value={reglas.horasNormalesPorDia}
-              onChange={(e) =>
-                setReglas({
-                  ...reglas,
-                  horasNormalesPorDia: Math.max(1, Math.min(24, parseInt(e.target.value) || 8)),
-                })
-              }
-            />
-            <p className="text-sm text-muted-foreground">
-              Horas normales de trabajo por día. Las horas trabajadas por encima de este valor se consideran horas extra.
-            </p>
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="limiteDiarioRecomendado">Límite diario recomendado</Label>
+                <Input
+                  id="limiteDiarioRecomendado"
+                  type="number"
+                  min="1"
+                  max="24"
+                  value={reglas.limiteDiarioRecomendado}
+                  onChange={(e) =>
+                    setReglas({
+                      ...reglas,
+                      limiteDiarioRecomendado: Math.max(1, Math.min(24, parseInt(e.target.value) || 10)),
+                    })
+                  }
+                />
+                <p className="text-sm text-foreground/75">
+                  Para alertas y validaciones futuras
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-          <Separator />
-
-          <div className="space-y-2">
-            <Label htmlFor="horasNormalesPorSemana">Horas normales por semana</Label>
-            <Input
-              id="horasNormalesPorSemana"
-              type="number"
-              min="1"
-              max="168"
-              value={reglas.horasNormalesPorSemana}
-              onChange={(e) =>
-                setReglas({
-                  ...reglas,
-                  horasNormalesPorSemana: Math.max(1, Math.min(168, parseInt(e.target.value) || 48)),
-                })
-              }
-            />
-            <p className="text-sm text-muted-foreground">
-              Horas normales de trabajo por semana. Útil para cálculos semanales de horas extra.
-            </p>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-2">
-            <Label htmlFor="inicioHorarioNocturno">Inicio horario nocturno</Label>
-            <Input
-              id="inicioHorarioNocturno"
-              type="time"
-              value={reglas.inicioHorarioNocturno}
-              onChange={(e) =>
-                setReglas({ ...reglas, inicioHorarioNocturno: e.target.value || "21:00" })
-              }
-            />
-            <p className="text-sm text-muted-foreground">
-              Hora de inicio del horario nocturno (para futuros cálculos de horas extra nocturnas).
-            </p>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-2">
-            <Label htmlFor="limiteDiarioRecomendado">Límite diario recomendado de horas</Label>
-            <Input
-              id="limiteDiarioRecomendado"
-              type="number"
-              min="1"
-              max="24"
-              value={reglas.limiteDiarioRecomendado}
-              onChange={(e) =>
-                setReglas({
-                  ...reglas,
-                  limiteDiarioRecomendado: Math.max(1, Math.min(24, parseInt(e.target.value) || 10)),
-                })
-              }
-            />
-            <p className="text-sm text-muted-foreground">
-              Límite diario recomendado de horas trabajadas (para alertas y validaciones futuras).
-            </p>
-          </div>
-
-          <div className="flex justify-end">
-            <Button onClick={handleSave} disabled={saving || !dirty}>
-              {saving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Guardar horarios
-                </>
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {dirty || saving ? (
+        <SectionFooter onSave={handleSave} saving={saving} dirty={dirty} label="Guardar horarios" />
+      ) : null}
     </div>
   )
 }

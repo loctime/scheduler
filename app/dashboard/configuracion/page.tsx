@@ -22,6 +22,8 @@ import {
   CreditCard,
   Shield,
   Database,
+  CalendarClock,
+  Sparkles,
 } from "lucide-react"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 import {
@@ -30,7 +32,7 @@ import {
   normalizeCompanySlug,
   isValidSlugFormat,
 } from "@/lib/public-companies"
-import { SettingsSidebar, SidebarItem } from "./components/settings-sidebar"
+import { SettingsSidebar, SidebarItem, flattenSidebarItems } from "./components/settings-sidebar"
 import { PerfilSection } from "./sections/perfil-section"
 import { EmpresaSection } from "./sections/empresa-section"
 import { CalendarioSection } from "./sections/calendario-section"
@@ -38,6 +40,7 @@ import { HorariosSection } from "./sections/horarios-section"
 import { MediosTurnosSection } from "./sections/medios-turnos-section"
 import { EquipoSection } from "./sections/equipo-section"
 import { ComingSoonSection } from "./sections/coming-soon-section"
+import { SectionHeader } from "./sections/section-header"
 
 const DEFAULT_CONFIG: Configuracion = {
   nombreEmpresa: "Empleado",
@@ -75,56 +78,82 @@ export default function ConfiguracionPage() {
 
   const sections: SidebarItem[] = useMemo(
     () => [
-      { key: "perfil", label: "Mi perfil", icon: User },
+      {
+        key: "perfil",
+        label: "Mi perfil",
+        icon: User,
+        description: "Tu información personal, credenciales y firma digital",
+      },
       {
         key: "empresa",
         label: "Empresa",
         icon: Building2,
+        description: "Identidad de la empresa y URL pública de la app",
         hidden: !canSeeAdminAndOperatorSettings,
       },
       {
-        key: "calendario",
-        label: "Calendario",
-        icon: Calendar,
-        hidden: !canSeeAdminAndOperatorSettings,
-      },
-      {
-        key: "horarios",
-        label: "Horarios y cálculos",
-        icon: Clock,
-        hidden: !canSeeAdminAndOperatorSettings,
-      },
-      {
-        key: "medios-turnos",
-        label: "Medios turnos",
-        icon: Coffee,
-        hidden: !canSeeAdminAndOperatorSettings,
+        key: "__group-calendario",
+        label: "Calendario y turnos",
+        icon: CalendarClock,
+        children: [
+          {
+            key: "calendario",
+            label: "Calendario",
+            icon: Calendar,
+            description: "Cómo se muestran y organizan los horarios en la grilla",
+            hidden: !canSeeAdminAndOperatorSettings,
+          },
+          {
+            key: "horarios",
+            label: "Horarios y cálculos",
+            icon: Clock,
+            description: "Límites, descansos y reglas para el cálculo de horas extra",
+            hidden: !canSeeAdminAndOperatorSettings,
+          },
+          {
+            key: "medios-turnos",
+            label: "Medios turnos",
+            icon: Coffee,
+            description: "Horarios predefinidos para los 1/2 francos",
+            hidden: !canSeeAdminAndOperatorSettings,
+          },
+        ],
       },
       {
         key: "equipo",
         label: "Equipo",
         icon: Users,
+        description: "Invitaciones y gestión de miembros",
         hidden: !canSeeAdminAndOperatorSettings,
       },
-      { key: "notificaciones", label: "Notificaciones", icon: Bell, disabled: true },
-      { key: "apariencia", label: "Apariencia", icon: Palette, disabled: true },
-      { key: "integraciones", label: "Integraciones", icon: Puzzle, disabled: true },
-      { key: "facturacion", label: "Facturación / Plan", icon: CreditCard, disabled: true },
-      { key: "seguridad", label: "Seguridad", icon: Shield, disabled: true },
-      { key: "datos-privacidad", label: "Datos y privacidad", icon: Database, disabled: true },
+      {
+        key: "__group-proximamente",
+        label: "Próximamente",
+        icon: Sparkles,
+        children: [
+          { key: "notificaciones", label: "Notificaciones", icon: Bell, description: "Configurá cuándo y cómo recibir avisos", disabled: true },
+          { key: "apariencia", label: "Apariencia", icon: Palette, description: "Tema, densidad y preferencias visuales", disabled: true },
+          { key: "integraciones", label: "Integraciones", icon: Puzzle, description: "Conectá tu cuenta con otras herramientas", disabled: true },
+          { key: "facturacion", label: "Facturación / Plan", icon: CreditCard, description: "Tu plan, facturas y método de pago", disabled: true },
+          { key: "seguridad", label: "Seguridad", icon: Shield, description: "Contraseña, 2FA y sesiones activas", disabled: true },
+          { key: "datos-privacidad", label: "Datos y privacidad", icon: Database, description: "Exportá tus datos o eliminá tu cuenta", disabled: true },
+        ],
+      },
     ],
     [canSeeAdminAndOperatorSettings],
   )
 
+  const flatSections = useMemo(() => flattenSidebarItems(sections), [sections])
+
   const resolveSection = useCallback(
     (key: string | null): string => {
       if (!key) return "perfil"
-      const found = sections.find((s) => s.key === key)
-      if (!found || found.hidden) return "perfil"
+      const found = flatSections.find((s) => s.key === key)
+      if (!found || found.hidden || found.disabled) return "perfil"
       if (ADMIN_SECTIONS.has(key) && !canSeeAdminAndOperatorSettings) return "perfil"
       return key
     },
-    [sections, canSeeAdminAndOperatorSettings],
+    [flatSections, canSeeAdminAndOperatorSettings],
   )
 
   const [activeSection, setActiveSection] = useState<string>(() =>
@@ -142,6 +171,8 @@ export default function ConfiguracionPage() {
     params.set("section", key)
     router.replace(`?${params.toString()}`, { scroll: false })
   }
+
+  const activeItem = flatSections.find((s) => s.key === activeSection) ?? flatSections[0]
 
   useEffect(() => {
     if (!user || !ownerId) return
@@ -349,7 +380,14 @@ export default function ConfiguracionPage() {
     <DashboardLayout user={user}>
       <div className="flex flex-col md:flex-row gap-6">
         <SettingsSidebar items={sections} active={activeSection} onChange={handleSectionChange} />
-        <div className="flex-1 min-w-0">{renderSection()}</div>
+        <div className="flex-1 min-w-0">
+          <SectionHeader
+            icon={activeItem.icon}
+            title={activeItem.label}
+            description={activeItem.description}
+          />
+          {renderSection()}
+        </div>
       </div>
     </DashboardLayout>
   )

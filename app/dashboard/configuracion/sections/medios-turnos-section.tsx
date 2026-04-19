@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, Plus, Save, Trash2 } from "lucide-react"
+import { Coffee, Plus, Trash2 } from "lucide-react"
 import { Configuracion, MedioTurno } from "@/lib/types"
 import { useData } from "@/contexts/data-context"
+import { SectionFooter } from "./section-footer"
 
 type Props = {
   config: Configuracion
@@ -78,136 +79,150 @@ export function MediosTurnosSection({ config, saveSection }: Props) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Medios Turnos (1/2 Franco)</CardTitle>
-        <CardDescription>Define horarios predefinidos para los medios francos</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-3">
-          {mediosTurnos.map((medioTurno, index) => (
-            <div key={medioTurno.id} className="flex items-center gap-3 p-3 border rounded-lg">
-              <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Nombre (opcional)</Label>
-                  <Input
-                    placeholder="Ej: Mañana"
-                    value={medioTurno.nombre || ""}
-                    onChange={(e) => updateMedioTurno(index, { nombre: e.target.value })}
-                    className="text-sm"
+    <div>
+      <Card className="shadow-md border-l-4 border-l-primary/60">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/15 ring-1 ring-primary/25 shadow-sm">
+              <Coffee className="h-5 w-5 text-primary" />
+            </div>
+            <div className="space-y-0.5">
+              <CardTitle className="text-lg font-semibold text-foreground">Medios Turnos (1/2 Franco)</CardTitle>
+              <CardDescription className="text-sm text-foreground/75 font-normal">
+                Horarios predefinidos que aparecerán al seleccionar "1/2 Franco"
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            {mediosTurnos.map((medioTurno, index) => (
+              <div
+                key={medioTurno.id}
+                className="group relative rounded-xl border border-border/60 bg-muted/20 p-4 transition-colors hover:bg-muted/40"
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <span
+                    className="h-3 w-3 rounded-full ring-2 ring-background"
+                    style={{ backgroundColor: medioTurno.color || "#22c55e" }}
                   />
+                  <span className="text-sm font-medium flex-1">
+                    {medioTurno.nombre || `Medio turno ${index + 1}`}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => removeMedioTurno(index)}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Hora Inicio</Label>
-                  <Input
-                    type="time"
-                    value={medioTurno.startTime}
-                    onChange={(e) => updateMedioTurno(index, { startTime: e.target.value })}
-                    className="text-sm"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Hora Fin</Label>
-                  <Input
-                    type="time"
-                    value={medioTurno.endTime}
-                    onChange={(e) => updateMedioTurno(index, { endTime: e.target.value })}
-                    className="text-sm"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Color</Label>
-                  <div className="flex gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-foreground/80">Nombre (opcional)</Label>
                     <Input
-                      type="color"
-                      value={medioTurno.color || "#22c55e"}
-                      onChange={(e) => updateMedioTurno(index, { color: e.target.value })}
-                      className="h-9 w-16 p-1 cursor-pointer"
-                    />
-                    <Input
-                      type="text"
-                      placeholder="#22c55e"
-                      value={medioTurno.color || ""}
-                      onChange={(e) => updateMedioTurno(index, { color: e.target.value })}
-                      className="text-sm flex-1"
+                      placeholder="Ej: Mañana"
+                      value={medioTurno.nombre || ""}
+                      onChange={(e) => updateMedioTurno(index, { nombre: e.target.value })}
+                      className="text-sm h-9"
                     />
                   </div>
-                  {shiftColorOptions.length > 0 && (
-                    <Select
-                      value={
-                        shiftColorOptions.find(
-                          (option) =>
-                            option.color.toLowerCase() === (medioTurno.color || "").toLowerCase(),
-                        )?.color || "custom"
-                      }
-                      onValueChange={(value) => {
-                        if (value === "custom") return
-                        updateMedioTurno(index, { color: value })
-                      }}
-                    >
-                      <SelectTrigger className="text-sm">
-                        <SelectValue placeholder="Colores de turnos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="custom">
-                          <span className="text-muted-foreground">Personalizado</span>
-                        </SelectItem>
-                        {shiftColorOptions.map((option) => (
-                          <SelectItem key={option.color} value={option.color}>
-                            <div className="flex items-center gap-2">
-                              <span
-                                className="h-3 w-3 rounded-full border border-border"
-                                style={{ backgroundColor: option.color }}
-                              />
-                              <span className="text-sm">{option.name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {option.color.toUpperCase()}
-                              </span>
-                            </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-foreground/80">Hora Inicio</Label>
+                    <Input
+                      type="time"
+                      value={medioTurno.startTime}
+                      onChange={(e) => updateMedioTurno(index, { startTime: e.target.value })}
+                      className="text-sm h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-foreground/80">Hora Fin</Label>
+                    <Input
+                      type="time"
+                      value={medioTurno.endTime}
+                      onChange={(e) => updateMedioTurno(index, { endTime: e.target.value })}
+                      className="text-sm h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-foreground/80">Color</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="color"
+                        value={medioTurno.color || "#22c55e"}
+                        onChange={(e) => updateMedioTurno(index, { color: e.target.value })}
+                        className="h-9 w-12 p-1 cursor-pointer shrink-0"
+                      />
+                      <Input
+                        type="text"
+                        placeholder="#22c55e"
+                        value={medioTurno.color || ""}
+                        onChange={(e) => updateMedioTurno(index, { color: e.target.value })}
+                        className="text-xs font-mono flex-1 h-9"
+                      />
+                    </div>
+                    {shiftColorOptions.length > 0 && (
+                      <Select
+                        value={
+                          shiftColorOptions.find(
+                            (option) =>
+                              option.color.toLowerCase() === (medioTurno.color || "").toLowerCase(),
+                          )?.color || "custom"
+                        }
+                        onValueChange={(value) => {
+                          if (value === "custom") return
+                          updateMedioTurno(index, { color: value })
+                        }}
+                      >
+                        <SelectTrigger className="text-xs h-8 mt-1">
+                          <SelectValue placeholder="Usar color de turno" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="custom">
+                            <span className="text-muted-foreground">Personalizado</span>
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
+                          {shiftColorOptions.map((option) => (
+                            <SelectItem key={option.color} value={option.color}>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="h-3 w-3 rounded-full border border-border"
+                                  style={{ backgroundColor: option.color }}
+                                />
+                                <span className="text-sm">{option.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
                 </div>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => removeMedioTurno(index)}>
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-            </div>
-          ))}
+            ))}
 
-          {mediosTurnos.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No hay medios turnos configurados. Agrega uno para empezar.
-            </p>
-          )}
-        </div>
-
-        <Button type="button" variant="outline" onClick={addMedioTurno} className="w-full">
-          <Plus className="mr-2 h-4 w-4" />
-          Agregar Medio Turno
-        </Button>
-        <p className="text-sm text-muted-foreground">
-          Estos horarios aparecerán como opciones cuando se seleccione "1/2 Franco" al asignar turnos.
-        </p>
-
-        <div className="flex justify-end pt-2 border-t">
-          <Button onClick={handleSave} disabled={saving || !dirty}>
-            {saving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Guardando...
-              </>
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                Guardar medios turnos
-              </>
+            {mediosTurnos.length === 0 && (
+              <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border py-10 text-center">
+                <Coffee className="h-8 w-8 text-muted-foreground/60" />
+                <p className="text-base font-medium text-foreground">
+                  No hay medios turnos configurados
+                </p>
+                <p className="text-sm text-foreground/70">Agregá uno para empezar</p>
+              </div>
             )}
+          </div>
+
+          <Button type="button" variant="outline" onClick={addMedioTurno} className="w-full">
+            <Plus className="mr-2 h-4 w-4" />
+            Agregar Medio Turno
           </Button>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      {dirty || saving ? (
+        <SectionFooter onSave={handleSave} saving={saving} dirty={dirty} label="Guardar medios turnos" />
+      ) : null}
+    </div>
   )
 }
