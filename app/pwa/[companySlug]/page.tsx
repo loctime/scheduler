@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation"
 
-export default function PwaCompanyEntryPage({
+export default async function PwaCompanyEntryPage({
   params,
 }: {
-  params: { companySlug: string }
+  params: Promise<{ companySlug: string }>
 }) {
-  redirect(`/pwa/${params.companySlug}/horario`)
+  const { companySlug } = await params
+  redirect(`/pwa/${companySlug}/horario`)
 }

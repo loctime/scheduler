@@ -21,12 +21,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, Shield, MessageSquare, AlertTriangle, Package, CheckSquare, Factory, ClipboardCheck, BookMarked, Warehouse } from "lucide-react"
+import { Calendar, Users, LogOut, Settings, CalendarDays, Menu, Shield, MessageSquare, AlertTriangle, Package, CheckSquare, Factory, ClipboardCheck, BookMarked, Warehouse, Smartphone } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useData } from "@/contexts/data-context"
 import { canUser, type UserAction } from "@/lib/permissions"
+import { useCompanySlug } from "@/hooks/use-company-slug"
 
 interface DashboardLayoutProps {
   children: ReactNode
@@ -74,6 +75,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { userData } = useData()
+  const { companySlug } = useCompanySlug()
 
   const handleSignOut = async () => {
     if (!auth) return
@@ -181,6 +183,17 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
                       <NavContent items={group.items} onItemClick={() => setMobileMenuOpen(false)} />
                     </div>
                   ))}
+                  {companySlug && (
+                    <div>
+                      <h3 className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">App</h3>
+                      <Link href={`/pwa/${companySlug}/`} onClick={() => setMobileMenuOpen(false)}>
+                        <Button variant="ghost" className="w-full justify-start flex items-center gap-2 rounded-none border-b-2 border-transparent px-3 py-2.5 text-muted-foreground hover:bg-transparent hover:text-foreground">
+                          <Smartphone className="h-4 w-4" />
+                          <span className="text-sm font-medium">Application</span>
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </SheetContent>
             </Sheet>
@@ -221,8 +234,19 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
           </div>
 
           {/* Category tabs inline – desktop only */}
-          <div className="hidden md:flex items-center">
+          <div className="hidden md:flex items-center gap-2">
             <CategoryNav activeId={currentGroupId} onSelect={setManualActiveGroupId} />
+            {companySlug && (
+              <Link href={`/pwa/${companySlug}/`}>
+                <Button
+                  variant="ghost"
+                  className="flex items-center gap-2 rounded-none border-b-2 border-transparent px-3 py-2.5 text-muted-foreground hover:bg-transparent hover:text-foreground"
+                >
+                  <Smartphone className="h-4 w-4" />
+                  <span className="text-sm uppercase tracking-wider">Application</span>
+                </Button>
+              </Link>
+            )}
           </div>
 
           <DropdownMenu>

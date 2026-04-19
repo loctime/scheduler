@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { Calendar, FileText, Users, UserCircle, CheckSquare } from "lucide-react"
@@ -12,6 +12,7 @@ import { PwaEmployeeSelectorModal } from "@/components/pwa/PwaEmployeeSelectorMo
 import { ActionCard } from "@/components/pwa/ActionCard"
 import { PWA_THEMES } from "@/lib/pwa-themes"
 import { useOwnerIdFromSlug, useEmployeesByOwnerId } from "@/hooks/use-owner-data"
+import { clearPwaLastSlug } from "@/components/pwa/pwa-company-selector"
 import { useToast } from "@/hooks/use-toast"
 import { DayCellContent } from "@/components/schedule-grid/components/day-cell-content"
 import { useTodayScheduleCellData } from "@/hooks/use-today-schedule-cell-data"
@@ -60,11 +61,19 @@ function getMensajeDelDia(): string {
 export default function PwaHomePage() {
   const params = useParams()
   const companySlug = params.companySlug as string
+  const router = useRouter()
   const viewer = useViewer()
   const [showEmployeeSelector, setShowEmployeeSelector] = useState(false)
   const { toast } = useToast()
-  const { ownerId } = useOwnerIdFromSlug(companySlug)
+  const { ownerId, loading: ownerLoading } = useOwnerIdFromSlug(companySlug)
   const { employees } = useEmployeesByOwnerId(ownerId)
+
+  useEffect(() => {
+    if (!ownerLoading && ownerId === null) {
+      clearPwaLastSlug()
+      router.replace("/pwa/")
+    }
+  }, [ownerLoading, ownerId, router])
   
   // Mensaje del día (memoizado para recalcular solo cuando cambia la fecha)
   const mensajeDelDia = useMemo(() => getMensajeDelDia(), [])

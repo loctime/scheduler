@@ -77,6 +77,7 @@ export interface Configuracion {
   mensajePrevio?: string
   nombreFirma?: string
   firmaDigital?: string
+  publicSlug?: string
   // Reglas horarias (para cálculo de horas extra)
   reglasHorarias?: {
     horasNormalesPorDia?: number // Ej: 8 horas normales por día

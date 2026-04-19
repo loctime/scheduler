@@ -4,10 +4,11 @@ import { redirect } from "next/navigation"
  * Redirección: /pwa/horario/[companySlug] → /pwa/[companySlug]/horario
  * Mantiene enlaces antiguos funcionando.
  */
-export default function PwaHorarioRedirectPage({
+export default async function PwaHorarioRedirectPage({
   params,
 }: {
-  params: { companySlug: string }
+  params: Promise<{ companySlug: string }>
 }) {
-  redirect(`/pwa/${params.companySlug}/horario`)
+  const { companySlug } = await params
+  redirect(`/pwa/${companySlug}/horario`)
 }

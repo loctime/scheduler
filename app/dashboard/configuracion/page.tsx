@@ -13,13 +13,14 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2, Save, Plus, Trash2 } from "lucide-react"
+import { Loader2, Save, Plus, Trash2, Globe, Pencil, Check, X } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { MedioTurno } from "@/lib/types"
 import { ProfileCard } from "./components/profile-card"
 import { InvitationsCard } from "./components/invitations-card"
 import { FirmaDigital } from "@/components/remitos/firma-digital"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
+import { createPublicCompanySlug, getCompanySlugFromOwnerId, changePublicCompanySlug, normalizeCompanySlug, isValidSlugFormat } from "@/lib/public-companies"
 
 // Función helper para determinar el color de texto según el contraste
 const getContrastColor = (hexColor: string): string => {
@@ -45,6 +46,9 @@ export default function ConfiguracionPage() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [editingSlug, setEditingSlug] = useState(false)
+  const [slugInput, setSlugInput] = useState("")
+  const [savingSlug, setSavingSlug] = useState(false)
   const [config, setConfig] = useState<Configuracion>({
     nombreEmpresa: "Empleado",
     colorEmpresa: undefined,
@@ -163,6 +167,32 @@ export default function ConfiguracionPage() {
     loadConfig()
   }, [user, ownerId, toast])
 
+  const handleSaveSlug = async () => {
+    if (!ownerId || !slugInput.trim()) return
+    const normalized = normalizeCompanySlug(slugInput.trim())
+    if (!isValidSlugFormat(normalized)) {
+      toast({ title: "Slug inválido", description: "Solo letras minúsculas, números y guiones. Entre 3 y 40 caracteres.", variant: "destructive" })
+      return
+    }
+    if (normalized === config.publicSlug) {
+      setEditingSlug(false)
+      return
+    }
+    try {
+      setSavingSlug(true)
+      await changePublicCompanySlug(normalized, ownerId, config.nombreEmpresa || "")
+      const configRef = doc(db!, COLLECTIONS.CONFIG, ownerId)
+      await setDoc(configRef, { publicSlug: normalized }, { merge: true })
+      setConfig((prev) => ({ ...prev, publicSlug: normalized }))
+      setEditingSlug(false)
+      toast({ title: "Slug actualizado", description: `La app ahora está en /pwa/${normalized}/` })
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "No se pudo cambiar el slug", variant: "destructive" })
+    } finally {
+      setSavingSlug(false)
+    }
+  }
+
   const handleSave = async () => {
     if (!user || !ownerId) {
       toast({
@@ -224,6 +254,27 @@ export default function ConfiguracionPage() {
       }
 
       await setDoc(configRef, { ...dataToSave, ownerId }, { merge: true })
+
+      // Crear slug público si aún no existe
+      if (!config.publicSlug && userData?.role === "admin") {
+        const companyName = config.nombreEmpresa?.trim()
+        const baseSlug = normalizeCompanySlug(companyName || "")
+        if (companyName && isValidSlugFormat(baseSlug)) {
+          try {
+            const existingSlug = await getCompanySlugFromOwnerId(ownerId)
+            if (!existingSlug) {
+              const newSlug = await createPublicCompanySlug(companyName, ownerId)
+              await setDoc(configRef, { publicSlug: newSlug }, { merge: true })
+              setConfig((prev) => ({ ...prev, publicSlug: newSlug }))
+            } else {
+              await setDoc(configRef, { publicSlug: existingSlug }, { merge: true })
+              setConfig((prev) => ({ ...prev, publicSlug: existingSlug }))
+            }
+          } catch (slugError) {
+            console.warn("No se pudo crear el slug público:", slugError)
+          }
+        }
+      }
 
       toast({
         title: "Configuración guardada",
@@ -334,6 +385,50 @@ export default function ConfiguracionPage() {
             </div>
           </CardContent>
         </Card>
+
+        {config.publicSlug && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Globe className="h-4 w-4" />URL de la aplicación</CardTitle>
+              <CardDescription>
+                Identificador público de tu empresa en la app. Si lo cambiás, los enlaces anteriores dejan de funcionar.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground shrink-0">/pwa/</span>
+                {editingSlug ? (
+                  <>
+                    <Input
+                      value={slugInput}
+                      onChange={(e) => setSlugInput(normalizeCompanySlug(e.target.value))}
+                      className="font-mono text-sm"
+                      placeholder="mi-empresa"
+                      autoFocus
+                    />
+                    <Button size="icon" variant="ghost" onClick={handleSaveSlug} disabled={savingSlug}>
+                      {savingSlug ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 text-green-600" />}
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={() => { setEditingSlug(false); setSlugInput(config.publicSlug || "") }}>
+                      <X className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <span className="font-mono text-sm font-medium">{config.publicSlug}</span>
+                    <Button size="icon" variant="ghost" onClick={() => { setSlugInput(config.publicSlug || ""); setEditingSlug(true) }}>
+                      <Pencil className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </>
+                )}
+                <span className="text-sm text-muted-foreground shrink-0">/</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Solo letras minúsculas, números y guiones. Ej: <code className="bg-muted px-1 rounded">mi-empresa</code>
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>

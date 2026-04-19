@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { doc, setDoc, serverTimestamp, getDoc, deleteField, collection, query, where, getDocs } from "firebase/firestore"
 import { db, COLLECTIONS } from "@/lib/firebase"
-import { createPublicCompanySlug } from "@/lib/public-companies"
+import { createPublicCompanySlug, getCompanySlugFromOwnerId } from "@/lib/public-companies"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
 
 export interface PublishPublicScheduleOptions {
@@ -71,8 +71,9 @@ export function usePublicPublisher(user: any): UsePublicPublisherReturn {
         throw new Error("El nombre de la empresa es requerido")
       }
 
-      // Crear slug único usando el nuevo sistema atómico
-      const companySlug = await createPublicCompanySlug(
+      // Reutilizar slug existente o crear uno nuevo
+      const existingSlug = await getCompanySlugFromOwnerId(ownerId)
+      const companySlug = existingSlug ?? await createPublicCompanySlug(
         options.companyName.trim(),
         ownerId
       )

@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
-import { getPwaLastSlug, savePwaLastSlug } from "@/components/pwa/pwa-company-selector"
+import { getPwaLastSlug, savePwaLastSlug, clearPwaLastSlug } from "@/components/pwa/pwa-company-selector"
 import { PwaCompanySelector } from "@/components/pwa/pwa-company-selector"
 import { useCompanySlug } from "@/hooks/use-company-slug"
 import { useData } from "@/contexts/data-context"
 import { getOwnerIdForActor } from "@/hooks/use-owner-id"
-import { listCompanySlugsFromOwnerId } from "@/lib/public-companies"
+import { listCompanySlugsFromOwnerId, resolvePublicCompany } from "@/lib/public-companies"
 
 /**
  * Pagina de entrada PWA (/pwa).
@@ -37,8 +37,12 @@ export default function PwaEntryPage() {
 
       const lastSlug = getPwaLastSlug()
       if (lastSlug) {
-        router.replace(`/pwa/${lastSlug}/home`)
-        return
+        const company = await resolvePublicCompany(lastSlug)
+        if (company) {
+          router.replace(`/pwa/${lastSlug}/home`)
+          return
+        }
+        clearPwaLastSlug()
       }
 
       if (slugLoading) return

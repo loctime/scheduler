@@ -26,6 +26,12 @@ export function savePwaLastSlug(slug: string) {
   }
 }
 
+export function clearPwaLastSlug() {
+  if (typeof window === "undefined") return
+  try { localStorage.removeItem(PWA_LAST_SLUG_KEY) } catch { }
+  try { document.cookie = `${PWA_LAST_SLUG_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax` } catch { }
+}
+
 export function getPwaLastSlug(): string | null {
   if (typeof window === "undefined") return null
   try {
