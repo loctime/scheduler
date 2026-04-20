@@ -64,9 +64,10 @@ export default function VerPedidoPage() {
     )
   }
 
-  const pedidosHoy = pedidosPropios.filter((p) => esDeHoy(p.creadoEn))
-  const borradores = pedidosHoy.filter((p) => p.estado === "borrador" && !enviados_ids.has(p.id))
-  const enviados = pedidosHoy.filter((p) => p.estado !== "borrador")
+  // Borradores: show all regardless of date (don't lose pending orders across days)
+  const borradores = pedidosPropios.filter((p) => p.estado === "borrador" && !enviados_ids.has(p.id))
+  // Sent orders: show today's history only
+  const enviados = pedidosPropios.filter((p) => p.estado !== "borrador" && esDeHoy(p.creadoEn))
 
   const getCantidad = (pedidoId: string, productoId: string, fallback: number) =>
     cantidades[pedidoId]?.[productoId] ?? fallback
@@ -139,7 +140,7 @@ export default function VerPedidoPage() {
           <p className="text-sm text-gray-400 text-center py-8">Cargando pedidos…</p>
         )}
 
-        {!loading && pedidosHoy.length === 0 && (
+        {!loading && borradores.length === 0 && enviados.length === 0 && (
           <div className="flex flex-col items-center justify-center gap-3 py-12 text-gray-400">
             <ClipboardList className="w-12 h-12" />
             <p className="text-sm text-center">

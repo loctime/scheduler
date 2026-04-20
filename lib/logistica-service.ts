@@ -468,9 +468,7 @@ export async function marcarEnCamino(input: {
   if (!db) {
     return { ok: false, error: "Firestore no está disponible" }
   }
-  const admin = canUser(input.user, "ver_admin")
-  const delivery = input.user?.role === "delivery"
-  if (!admin && !delivery) {
+  if (!canUser(input.user, "crear_pedido")) {
     return { ok: false, error: "No tenés permiso para marcar el remito en camino" }
   }
 

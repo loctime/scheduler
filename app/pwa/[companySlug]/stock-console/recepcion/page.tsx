@@ -78,7 +78,11 @@ export default function RecepcionPage() {
     setConfirmando(null)
 
     if (result.ok) {
-      toast({ title: "Recepción confirmada", description: `Remito de ${remito.origenNombre} recibido correctamente` })
+      const faltantes = (result as { pendientesGenerados?: number }).pendientesGenerados ?? 0
+      const desc = faltantes > 0
+        ? `Remito de ${remito.origenNombre} recibido. Se generó un pedido automático por ${faltantes} producto${faltantes !== 1 ? "s" : ""} faltante${faltantes !== 1 ? "s" : ""}.`
+        : `Remito de ${remito.origenNombre} recibido correctamente`
+      toast({ title: "Recepción confirmada", description: desc })
     } else {
       toast({
         title: "Error al confirmar recepción",
