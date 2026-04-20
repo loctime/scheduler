@@ -405,7 +405,7 @@ export default function VerPedidoPage() {
                 <div className="flex text-[11px] text-gray-400 uppercase tracking-wide py-1.5 gap-2">
                   <span className="flex-1">Producto</span>
                   <span className="w-14 text-center">Sugerido</span>
-                  <span className="w-24 text-center">Enviar</span>
+                  <span className="w-24 text-center">Pedir</span>
                 </div>
                 {rows.map((f) => {
                   const sugerida = Math.max(0, f.stockMinimo - f.stockActual)
@@ -481,7 +481,7 @@ export default function VerPedidoPage() {
                     disabled={estaEnviando}
                     className="w-full py-2.5 rounded-xl bg-[#1D9E75] text-white text-sm font-medium disabled:opacity-40 active:bg-[#18886B]"
                   >
-                    {estaEnviando ? "Enviando…" : enviado ? "Actualizar pedido" : "Confirmar y enviar"}
+                    {estaEnviando ? "Pidiendo…" : enviado ? "Actualizar pedido" : "Pedir"}
                   </button>
                 )}
               </div>
