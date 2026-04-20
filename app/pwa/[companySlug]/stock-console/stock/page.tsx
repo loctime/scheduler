@@ -227,7 +227,7 @@ export default function ContarStockPage() {
 
       <div className="px-4 pt-3 pb-1 shrink-0">
         <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
-          Sumá o restá unidades según el conteo real. Si no cambia, dejalo en 0.
+          Ajustá el número de cada producto al conteo real. Usá + y − para corregir.
         </p>
       </div>
 
@@ -295,7 +295,8 @@ export default function ContarStockPage() {
                 <div className="border-t border-gray-100">
                   {rows.map((f) => {
                     const cantidad = cantidades[f.catalogoId] ?? 0
-                    const bajo = f.stockMinimo > 0 && f.stockActual < f.stockMinimo
+                    const nuevoStock = f.stockActual + cantidad
+                    const bajo = f.stockMinimo > 0 && nuevoStock < f.stockMinimo
                     return (
                       <div
                         key={f.id}
@@ -306,7 +307,10 @@ export default function ContarStockPage() {
                             {f.nombre}
                           </p>
                           <p className="text-[11px] text-gray-400 mt-0.5">
-                            stock {f.stockActual} {f.unidad}
+                            {cantidad !== 0 && (
+                              <span>antes {f.stockActual} → </span>
+                            )}
+                            {nuevoStock} {f.unidad}
                             {f.stockMinimo > 0 && (
                               <span> · mín {f.stockMinimo}</span>
                             )}
@@ -327,16 +331,28 @@ export default function ContarStockPage() {
                           >
                             −
                           </button>
-                          <span
-                            className={cn(
-                              "w-8 text-center text-base font-semibold tabular-nums",
-                              cantidad > 0 && "text-[#1D9E75]",
-                              cantidad < 0 && "text-red-500",
-                              cantidad === 0 && "text-gray-800"
+                          <div className="flex flex-col items-center min-w-[2.5rem]">
+                            <span
+                              className={cn(
+                                "text-center text-base font-semibold tabular-nums leading-tight",
+                                cantidad > 0 && "text-[#1D9E75]",
+                                cantidad < 0 && "text-red-500",
+                                cantidad === 0 && "text-gray-800"
+                              )}
+                            >
+                              {nuevoStock}
+                            </span>
+                            {cantidad !== 0 && (
+                              <span
+                                className={cn(
+                                  "text-[10px] font-medium tabular-nums leading-tight",
+                                  cantidad > 0 ? "text-[#1D9E75]" : "text-red-500"
+                                )}
+                              >
+                                {cantidad > 0 ? `+${cantidad}` : cantidad}
+                              </span>
                             )}
-                          >
-                            {cantidad > 0 ? `+${cantidad}` : cantidad}
-                          </span>
+                          </div>
                           <button
                             onClick={() => incrementar(f.catalogoId)}
                             disabled={guardando}
@@ -366,9 +382,13 @@ export default function ContarStockPage() {
         <button
           onClick={guardar}
           disabled={guardando || !hayMovimientos}
-          className="flex-1 py-2.5 rounded-xl bg-[#1D9E75] text-white text-sm font-medium disabled:opacity-40 active:bg-[#18886B]"
+          className="flex-1 py-2.5 rounded-xl bg-[#1D9E75] text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed active:bg-[#18886B]"
         >
-          {guardando ? "Guardando…" : "Guardar stock"}
+          {guardando
+            ? "Guardando…"
+            : hayMovimientos
+            ? `Guardar (${totalMovimientos} producto${totalMovimientos !== 1 ? "s" : ""})`
+            : "Guardar stock"}
         </button>
       </div>
     </div>
