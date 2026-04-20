@@ -19,7 +19,35 @@ import type { CatalogoProducto, GrupoCatalogoUI } from "@/lib/catalogo-types"
 import { actualizarProductoCatalogo, crearProductoCatalogo, toggleProductoActivo } from "@/lib/catalogo-service"
 import { parseFactor, calcularEquivalencia } from "@/lib/catalogo-normalize"
 import { useToast } from "@/hooks/use-toast"
-import { Download, Loader2, Pencil, Plus, Upload, Wand2 } from "lucide-react"
+import { Download, Loader2, Pencil, Plus, Sparkles, Upload, Wand2 } from "lucide-react"
+
+const PRODUCTOS_DEMO: Array<{
+  nombre: string
+  unidad: string
+  unidadAlternativa?: string
+  factorConversion?: number
+  proveedor?: string
+}> = [
+  { nombre: "Leche entera", unidad: "L", proveedor: "La Serenísima" },
+  { nombre: "Pan lactal", unidad: "u", proveedor: "Bimbo" },
+  { nombre: "Queso cremoso", unidad: "kg", proveedor: "Sancor" },
+  { nombre: "Yogur natural", unidad: "u", proveedor: "La Serenísima" },
+  { nombre: "Manteca", unidad: "u", unidadAlternativa: "g", factorConversion: 200, proveedor: "Sancor" },
+  { nombre: "Huevos", unidad: "docena", proveedor: "Granja San Miguel" },
+  { nombre: "Azúcar", unidad: "kg", proveedor: "Ledesma" },
+  { nombre: "Harina 0000", unidad: "kg", proveedor: "Molinos" },
+  { nombre: "Aceite girasol", unidad: "L", proveedor: "Natura" },
+  { nombre: "Arroz largo fino", unidad: "kg", proveedor: "Gallo" },
+  { nombre: "Fideos spaghetti", unidad: "u", unidadAlternativa: "g", factorConversion: 500, proveedor: "Matarazzo" },
+  { nombre: "Tomate perita", unidad: "kg", proveedor: "Verdulería Central" },
+  { nombre: "Cebolla", unidad: "kg", proveedor: "Verdulería Central" },
+  { nombre: "Papa", unidad: "kg", proveedor: "Verdulería Central" },
+  { nombre: "Zanahoria", unidad: "kg", proveedor: "Verdulería Central" },
+  { nombre: "Pollo entero", unidad: "kg", proveedor: "Granja San Miguel" },
+  { nombre: "Carne picada", unidad: "kg", proveedor: "Carnicería Don José" },
+  { nombre: "Atún en lata", unidad: "u", unidadAlternativa: "g", factorConversion: 170, proveedor: "La Campagnola" },
+  { nombre: "Café molido", unidad: "u", unidadAlternativa: "g", factorConversion: 250, proveedor: "La Virginia" },
+]
 
 type TableMode = "editar" | "excel"
 type SortKey = "nombre" | "unidad" | "unidadAlternativa" | "factorConversion" | "resultado" | "proveedor" | "activo"
@@ -398,6 +426,18 @@ export function ProductosTable({ items, ownerId, userId, loadingItems, groupById
               <Button variant="outline" onClick={() => nuevaFilaNombreRef.current?.focus()}>
                 <Plus className="mr-1 h-4 w-4" />
                 Nuevo producto
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => void crearDesdeFilas(PRODUCTOS_DEMO)}
+                disabled={importandoMasivo}
+              >
+                {importandoMasivo ? (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-1 h-4 w-4" />
+                )}
+                Cargar 19 de prueba
               </Button>
               <Button variant="outline" onClick={() => setBulkDialogOpen(true)}>
                 Pegar desde Excel

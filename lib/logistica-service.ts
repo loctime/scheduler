@@ -88,6 +88,7 @@ export async function crearPedidoFabrica(input: {
       grupoPedidoNombre: input.grupoPedidoNombre,
       estado: "enviado",
       esPendiente: input.esPendiente ?? false,
+      controlado: true,
       ...(input.pedidoOrigenId ? { pedidoOrigenId: input.pedidoOrigenId } : {}),
       items: input.items,
       ...(input.observacion?.trim() ? { observacion: input.observacion.trim() } : {}),

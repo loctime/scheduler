@@ -237,8 +237,8 @@ export default function ContarStockPage() {
       </div>
 
       <div className="px-4 pt-3 pb-1 shrink-0">
-        <p className="text-sm text-gray-600 bg-white border-2 border-gray-200 rounded-xl px-4 py-2.5 font-medium">
-          Sumá o restá unidades según el conteo real. Si no cambia, dejalo en 0.
+        <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+          Ajustá el número de cada producto al conteo real. Usá + y − para corregir.
         </p>
       </div>
 
@@ -310,7 +310,8 @@ export default function ContarStockPage() {
                 <div className="border-t-2 border-gray-200">
                   {rows.map((f) => {
                     const cantidad = cantidades[f.catalogoId] ?? 0
-                    const bajo = f.stockMinimo > 0 && f.stockActual < f.stockMinimo
+                    const nuevoStock = f.stockActual + cantidad
+                    const bajo = f.stockMinimo > 0 && nuevoStock < f.stockMinimo
                     return (
                       <div
                         key={f.id}
@@ -323,8 +324,11 @@ export default function ContarStockPage() {
                           <p className="text-base font-semibold text-gray-900 truncate">
                             {f.nombre}
                           </p>
-                          <p className="text-xs text-gray-500 mt-0.5 font-medium">
-                            Stock actual: <span className="text-gray-700 font-semibold">{f.stockActual} {f.unidad}</span>
+                          <p className="text-[11px] text-gray-400 mt-0.5">
+                            {cantidad !== 0 && (
+                              <span>antes {f.stockActual} → </span>
+                            )}
+                            {nuevoStock} {f.unidad}
                             {f.stockMinimo > 0 && (
                               <span className="text-gray-500"> · mín {f.stockMinimo}</span>
                             )}
@@ -345,16 +349,28 @@ export default function ContarStockPage() {
                           >
                             −
                           </button>
-                          <span
-                            className={cn(
-                              "w-10 text-center text-lg font-bold tabular-nums",
-                              cantidad > 0 && "text-[#1D9E75]",
-                              cantidad < 0 && "text-red-600",
-                              cantidad === 0 && "text-gray-700"
+                          <div className="flex flex-col items-center min-w-[2.5rem]">
+                            <span
+                              className={cn(
+                                "text-center text-base font-semibold tabular-nums leading-tight",
+                                cantidad > 0 && "text-[#1D9E75]",
+                                cantidad < 0 && "text-red-500",
+                                cantidad === 0 && "text-gray-800"
+                              )}
+                            >
+                              {nuevoStock}
+                            </span>
+                            {cantidad !== 0 && (
+                              <span
+                                className={cn(
+                                  "text-[10px] font-medium tabular-nums leading-tight",
+                                  cantidad > 0 ? "text-[#1D9E75]" : "text-red-500"
+                                )}
+                              >
+                                {cantidad > 0 ? `+${cantidad}` : cantidad}
+                              </span>
                             )}
-                          >
-                            {cantidad > 0 ? `+${cantidad}` : cantidad}
-                          </span>
+                          </div>
                           <button
                             onClick={() => incrementar(f.catalogoId)}
                             disabled={guardando}
@@ -384,9 +400,13 @@ export default function ContarStockPage() {
         <button
           onClick={guardar}
           disabled={guardando || !hayMovimientos}
-          className="flex-1 py-3 rounded-xl bg-[#1D9E75] text-white text-base font-semibold disabled:opacity-40 active:bg-[#18886B]"
+          className="flex-1 py-2.5 rounded-xl bg-[#1D9E75] text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed active:bg-[#18886B]"
         >
-          {guardando ? "Guardando…" : "Guardar stock"}
+          {guardando
+            ? "Guardando…"
+            : hayMovimientos
+            ? `Guardar (${totalMovimientos} producto${totalMovimientos !== 1 ? "s" : ""})`
+            : "Guardar stock"}
         </button>
       </div>
     </div>
