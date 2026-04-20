@@ -196,6 +196,17 @@ export default function ContarStockPage() {
     }
   }
 
+  const GRUPO_COLORS = [
+    "border-l-[#1D9E75]",
+    "border-l-[#3B82F6]",
+    "border-l-[#F59E0B]",
+    "border-l-[#8B5CF6]",
+    "border-l-[#EF4444]",
+    "border-l-[#EC4899]",
+    "border-l-[#06B6D4]",
+    "border-l-[#84CC16]",
+  ]
+
   if (!user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -209,46 +220,46 @@ export default function ContarStockPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f5f3] flex flex-col">
-      <div className="bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3 shrink-0">
+    <div className="min-h-screen bg-[#f0f0ee] flex flex-col">
+      <div className="bg-white border-b-2 border-gray-200 px-4 py-3.5 flex items-center gap-3 shrink-0">
         <button
           onClick={() => router.back()}
-          className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600"
+          className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-700"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-base font-medium text-gray-900 flex-1">Contar stock</h1>
+        <h1 className="text-lg font-semibold text-gray-900 flex-1">Contar stock</h1>
         {totalMovimientos > 0 && (
-          <span className="text-xs font-medium bg-[#E1F5EE] text-[#0F6E56] px-2.5 py-1 rounded-full">
+          <span className="text-sm font-semibold bg-[#1D9E75] text-white px-3 py-1 rounded-full">
             {totalMovimientos}
           </span>
         )}
       </div>
 
       <div className="px-4 pt-3 pb-1 shrink-0">
-        <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+        <p className="text-sm text-gray-600 bg-white border-2 border-gray-200 rounded-xl px-4 py-2.5 font-medium">
           Sumá o restá unidades según el conteo real. Si no cambia, dejalo en 0.
         </p>
       </div>
 
-      <div className="flex-1 px-3 py-2 overflow-y-auto space-y-2">
+      <div className="flex-1 px-3 py-2 overflow-y-auto space-y-3">
         {loadingStock && (
-          <div className="flex flex-col items-center justify-center h-48 gap-3 text-gray-400">
+          <div className="flex flex-col items-center justify-center h-48 gap-3 text-gray-500">
             <Package className="w-12 h-12 animate-pulse" />
-            <p className="text-sm">Cargando stock…</p>
+            <p className="text-base font-medium">Cargando stock…</p>
           </div>
         )}
 
         {!loadingStock && gruposActivados.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-48 gap-3 text-gray-400 px-6 text-center">
+          <div className="flex flex-col items-center justify-center h-48 gap-3 text-gray-500 px-6 text-center">
             <Package className="w-12 h-12" />
-            <p className="text-sm">
+            <p className="text-base font-medium">
               No tenés grupos activados en esta sucursal. Activá grupos desde Mi stock.
             </p>
           </div>
         )}
 
-        {gruposActivados.map((grupo) => {
+        {gruposActivados.map((grupo, idx) => {
           const rows = filasPorGrupo.get(grupo.id) ?? []
           const bajos = rows.filter(
             (f) => f.stockMinimo > 0 && f.stockActual < f.stockMinimo
@@ -257,82 +268,89 @@ export default function ContarStockPage() {
           const cambiosEnGrupo = rows.filter(
             (f) => (cantidades[f.catalogoId] ?? 0) !== 0
           ).length
+          const colorClass = GRUPO_COLORS[idx % GRUPO_COLORS.length]
 
           return (
             <div
               key={grupo.id}
-              className="bg-white rounded-xl border border-gray-100 overflow-hidden"
+              className={cn(
+                "bg-white rounded-xl border-2 border-gray-200 overflow-hidden border-l-4",
+                colorClass
+              )}
             >
               <button
                 onClick={() => toggleGrupo(grupo.id)}
-                className="w-full flex items-center gap-3 px-4 py-3 active:bg-gray-50"
+                className="w-full flex items-center gap-3 px-4 py-3.5 active:bg-gray-50"
               >
                 <ChevronDown
                   className={cn(
-                    "w-4 h-4 text-gray-400 shrink-0 transition-transform",
+                    "w-5 h-5 text-gray-500 shrink-0 transition-transform",
                     isOpen && "rotate-180"
                   )}
                 />
                 <div className="flex-1 text-left min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className="text-base font-semibold text-gray-900 truncate">
                     {grupo.nombre}
                   </p>
-                  <p className="text-[11px] text-gray-400 mt-0.5">
+                  <p className="text-xs text-gray-500 mt-0.5 font-medium">
                     {rows.length} producto{rows.length !== 1 ? "s" : ""}
                     {bajos > 0 && (
-                      <span className="ml-1 text-red-500">· {bajos} bajo</span>
+                      <span className="ml-1 text-red-600 font-semibold">· {bajos} bajo stock</span>
                     )}
                   </p>
                 </div>
                 {cambiosEnGrupo > 0 && (
-                  <span className="text-[11px] font-medium bg-[#E1F5EE] text-[#0F6E56] px-2 py-0.5 rounded-full shrink-0">
+                  <span className="text-xs font-semibold bg-[#1D9E75] text-white px-2.5 py-1 rounded-full shrink-0">
                     {cambiosEnGrupo}
                   </span>
                 )}
               </button>
 
               {isOpen && (
-                <div className="border-t border-gray-100">
+                <div className="border-t-2 border-gray-200">
                   {rows.map((f) => {
                     const cantidad = cantidades[f.catalogoId] ?? 0
                     const bajo = f.stockMinimo > 0 && f.stockActual < f.stockMinimo
                     return (
                       <div
                         key={f.id}
-                        className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-b-0"
+                        className={cn(
+                          "flex items-center gap-3 px-4 py-3.5 border-b-2 border-gray-100 last:border-b-0",
+                          bajo && "bg-red-50/50"
+                        )}
                       >
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
+                          <p className="text-base font-semibold text-gray-900 truncate">
                             {f.nombre}
                           </p>
-                          <p className="text-[11px] text-gray-400 mt-0.5">
-                            stock {f.stockActual} {f.unidad}
+                          <p className="text-xs text-gray-500 mt-0.5 font-medium">
+                            Stock actual: <span className="text-gray-700 font-semibold">{f.stockActual} {f.unidad}</span>
                             {f.stockMinimo > 0 && (
-                              <span> · mín {f.stockMinimo}</span>
+                              <span className="text-gray-500"> · mín {f.stockMinimo}</span>
                             )}
                           </p>
                         </div>
 
                         {bajo && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 shrink-0">
-                            bajo
+                          <span className="text-xs px-2 py-1 rounded-lg bg-red-100 text-red-700 font-semibold shrink-0 border border-red-200">
+                            BAJO
                           </span>
                         )}
 
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex items-center gap-2 shrink-0">
                           <button
                             onClick={() => decrementar(f.catalogoId, f.stockActual)}
                             disabled={guardando}
-                            className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-700 text-lg active:bg-gray-100 disabled:opacity-40"
+                            className="w-10 h-10 rounded-full border-2 border-gray-300 bg-gray-100 flex items-center justify-center text-gray-800 text-xl font-bold active:bg-gray-200 disabled:opacity-40"
                           >
                             −
                           </button>
                           <span
                             className={cn(
-                              "w-8 text-center text-base font-semibold tabular-nums",
+                              "w-10 text-center text-lg font-bold tabular-nums",
                               cantidad > 0 && "text-[#1D9E75]",
-                              cantidad < 0 && "text-red-500",
-                              cantidad === 0 && "text-gray-800"
+                              cantidad < 0 && "text-red-600",
+                              cantidad === 0 && "text-gray-700"
                             )}
                           >
                             {cantidad > 0 ? `+${cantidad}` : cantidad}
@@ -340,7 +358,7 @@ export default function ContarStockPage() {
                           <button
                             onClick={() => incrementar(f.catalogoId)}
                             disabled={guardando}
-                            className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-700 text-lg active:bg-gray-100 disabled:opacity-40"
+                            className="w-10 h-10 rounded-full border-2 border-gray-300 bg-gray-100 flex items-center justify-center text-gray-800 text-xl font-bold active:bg-gray-200 disabled:opacity-40"
                           >
                             +
                           </button>
@@ -355,18 +373,18 @@ export default function ContarStockPage() {
         })}
       </div>
 
-      <div className="bg-white border-t border-gray-100 px-4 py-3 flex gap-2 shrink-0">
+      <div className="bg-white border-t-2 border-gray-200 px-4 py-3.5 flex gap-2 shrink-0">
         <button
           onClick={limpiar}
           disabled={guardando || !hayMovimientos}
-          className="px-4 py-2.5 rounded-xl bg-gray-100 text-gray-600 text-sm border border-gray-200 disabled:opacity-40"
+          className="px-5 py-3 rounded-xl bg-gray-100 text-gray-700 text-base font-semibold border-2 border-gray-200 disabled:opacity-40"
         >
           Limpiar
         </button>
         <button
           onClick={guardar}
           disabled={guardando || !hayMovimientos}
-          className="flex-1 py-2.5 rounded-xl bg-[#1D9E75] text-white text-sm font-medium disabled:opacity-40 active:bg-[#18886B]"
+          className="flex-1 py-3 rounded-xl bg-[#1D9E75] text-white text-base font-semibold disabled:opacity-40 active:bg-[#18886B]"
         >
           {guardando ? "Guardando…" : "Guardar stock"}
         </button>

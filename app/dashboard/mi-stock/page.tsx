@@ -44,6 +44,17 @@ import { cn } from "@/lib/utils"
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
+const GRUPO_COLORS = [
+  "border-l-[#1D9E75]",
+  "border-l-[#3B82F6]",
+  "border-l-[#F59E0B]",
+  "border-l-[#8B5CF6]",
+  "border-l-[#EF4444]",
+  "border-l-[#EC4899]",
+  "border-l-[#06B6D4]",
+  "border-l-[#84CC16]",
+]
+
 function estadoBadge(actual: number, minimo: number) {
   if (minimo === 0) return { label: "OK", variant: "default" as const }
   if (actual <= 0) return { label: "CRÍTICO", variant: "destructive" as const }
@@ -510,29 +521,30 @@ export default function MiStockPage() {
               </Card>
             )}
 
-            {gruposActivados.map((grupo) => {
+            {gruposActivados.map((grupo, idx) => {
               const rows = (filasPorGrupo.get(grupo.id) ?? []).slice().sort((a, b) => a.nombre.localeCompare(b.nombre))
               const bajosCount = rows.filter((f) => f.stockMinimo > 0 && f.stockActual < f.stockMinimo).length
               const isOpen = gruposAbiertos.has(grupo.id)
+              const colorClass = GRUPO_COLORS[idx % GRUPO_COLORS.length]
 
               return (
                 <Collapsible key={grupo.id} open={isOpen} onOpenChange={() => toggleGrupo(grupo.id)}>
-                  <div className="rounded-lg border border-border overflow-hidden">
+                  <div className={cn("rounded-lg border-2 border-gray-200 overflow-hidden border-l-4", colorClass)}>
                     <CollapsibleTrigger className="w-full">
-                      <div className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center justify-between px-4 py-3.5 hover:bg-muted/50 transition-colors">
                         <div className="flex items-center gap-3 text-left">
                           <ChevronDown
                             className={cn(
-                              "h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-200",
+                              "h-5 w-5 text-gray-500 shrink-0 transition-transform duration-200",
                               isOpen && "rotate-180"
                             )}
                           />
                           <div>
-                            <p className="font-medium text-sm">{grupo.nombre}</p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="font-semibold text-base text-gray-900">{grupo.nombre}</p>
+                            <p className="text-xs text-gray-500 font-medium mt-0.5">
                               {rows.length} producto{rows.length !== 1 ? "s" : ""}
                               {bajosCount > 0 && (
-                                <span className="ml-1 text-destructive">· {bajosCount} bajo stock</span>
+                                <span className="ml-1 text-red-600 font-semibold">· {bajosCount} bajo stock</span>
                               )}
                             </p>
                           </div>
@@ -540,7 +552,7 @@ export default function MiStockPage() {
                         <div
                           role="button"
                           tabIndex={0}
-                          className="text-xs text-destructive hover:underline ml-4 shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded"
+                          className="text-sm text-destructive font-medium hover:underline ml-4 shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded"
                           onClick={(e) => {
                             e.stopPropagation()
                             setConfirmarDesactivar(grupo)
@@ -562,40 +574,51 @@ export default function MiStockPage() {
                     </CollapsibleTrigger>
 
                     <CollapsibleContent>
-                      <div className="border-t border-border px-4 pb-4">
+                      <div className="border-t-2 border-gray-200 px-4 pb-4">
                         <div className="overflow-x-auto">
-                          <table className="w-full text-sm mt-3">
+                          <table className="w-full mt-3">
                             <thead>
-                              <tr className="border-b text-muted-foreground">
-                                <th className="pb-2 text-left font-medium">Producto</th>
-                                <th className="pb-2 text-right font-medium">Stock actual</th>
-                                <th className="pb-2 text-right font-medium">Stock mínimo</th>
-                                <th className="pb-2 text-right font-medium">Estado</th>
+                              <tr className="border-b-2 border-gray-200 text-gray-600">
+                                <th className="pb-2.5 text-left text-sm font-semibold">Producto</th>
+                                <th className="pb-2.5 text-right text-sm font-semibold">Stock actual</th>
+                                <th className="pb-2.5 text-right text-sm font-semibold">Stock mínimo</th>
+                                <th className="pb-2.5 text-right text-sm font-semibold">Estado</th>
                               </tr>
                             </thead>
                             <tbody>
                               {rows.map((f) => {
                                 const st = estadoBadge(f.stockActual, f.stockMinimo)
+                                const esBajo = f.stockMinimo > 0 && f.stockActual < f.stockMinimo
                                 return (
-                                  <tr key={f.id} className="border-b last:border-0">
-                                    <td className="py-2 pr-4">
-                                      <div className="font-medium">{f.nombre}</div>
-                                      <div className="text-xs text-muted-foreground">{f.unidad}</div>
+                                  <tr key={f.id} className={cn("border-b border-gray-100 last:border-0", esBajo && "bg-red-50/40")}>
+                                    <td className="py-2.5 pr-4">
+                                      <div className="font-semibold text-base text-gray-900">{f.nombre}</div>
+                                      <div className="text-xs text-gray-500 font-medium">{f.unidad}</div>
                                     </td>
-                                    <td className="py-2 pr-2">
+                                    <td className="py-2.5 pr-2">
                                       <EditableCell
                                         value={f.stockActual}
                                         onCommit={(v) => handleStockActual(f, v)}
                                       />
                                     </td>
-                                    <td className="py-2 pr-2">
+                                    <td className="py-2.5 pr-2">
                                       <EditableCell
                                         value={f.stockMinimo}
                                         onCommit={(v) => handleStockMinimo(f, v)}
                                       />
                                     </td>
-                                    <td className="py-2 text-right">
-                                      <Badge variant={st.variant}>{st.label}</Badge>
+                                    <td className="py-2.5 text-right">
+                                      <Badge
+                                        variant={st.variant}
+                                        className={cn(
+                                          "text-xs font-semibold px-2 py-0.5",
+                                          st.label === "BAJO" && "bg-red-100 text-red-700 border border-red-200",
+                                          st.label === "CRÍTICO" && "bg-red-600 text-white",
+                                          st.label === "OK" && "bg-green-100 text-green-700 border border-green-200"
+                                        )}
+                                      >
+                                        {st.label}
+                                      </Badge>
                                     </td>
                                   </tr>
                                 )

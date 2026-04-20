@@ -19,7 +19,7 @@ import type { CatalogoProducto, GrupoCatalogoUI } from "@/lib/catalogo-types"
 import { actualizarProductoCatalogo, crearProductoCatalogo, toggleProductoActivo } from "@/lib/catalogo-service"
 import { parseFactor, calcularEquivalencia } from "@/lib/catalogo-normalize"
 import { useToast } from "@/hooks/use-toast"
-import { Download, Loader2, Pencil, Plus, Upload } from "lucide-react"
+import { Download, Loader2, Pencil, Plus, Upload, Wand2 } from "lucide-react"
 
 type TableMode = "editar" | "excel"
 type SortKey = "nombre" | "unidad" | "unidadAlternativa" | "factorConversion" | "resultado" | "proveedor" | "activo"
@@ -54,6 +54,7 @@ export function ProductosTable({ items, ownerId, userId, loadingItems, groupById
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
   const [bulkTsv, setBulkTsv] = useState("")
   const [importandoMasivo, setImportandoMasivo] = useState(false)
+  const [generandoDemo, setGenerandoDemo] = useState(false)
 
   const nuevaFilaNombreRef = useRef<HTMLInputElement | null>(null)
   const xlsxInputRef = useRef<HTMLInputElement | null>(null)
@@ -103,6 +104,46 @@ export function ProductosTable({ items, ownerId, userId, loadingItems, groupById
       })
     } finally {
       setCreandoProducto(false)
+    }
+  }
+
+  const DEMO_PRODUCTS = [
+    { nombre: "Arroz", unidad: "kg" },
+    { nombre: "Aceite", unidad: "L" },
+    { nombre: "Harina", unidad: "kg" },
+    { nombre: "Azúcar", unidad: "kg" },
+    { nombre: "Sal", unidad: "kg" },
+    { nombre: "Fideos", unidad: "kg" },
+    { nombre: "Yerba", unidad: "kg" },
+    { nombre: "Café", unidad: "kg" },
+    { nombre: "Leche", unidad: "L" },
+    { nombre: "Galletitas", unidad: "u" },
+  ]
+
+  const generarDemo = async () => {
+    setGenerandoDemo(true)
+    try {
+      await Promise.all(
+        DEMO_PRODUCTS.map((p) =>
+          crearProductoCatalogo({
+            ownerId,
+            nombre: p.nombre,
+            unidad: p.unidad,
+            pedidoId: "",
+            stockMinimo: 0,
+            user: { uid: userId },
+          })
+        )
+      )
+      toast({ title: "10 productos de demo creados" })
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: e instanceof Error ? e.message : "No se pudo generar",
+        variant: "destructive",
+      })
+    } finally {
+      setGenerandoDemo(false)
     }
   }
 
@@ -360,6 +401,14 @@ export function ProductosTable({ items, ownerId, userId, loadingItems, groupById
               </Button>
               <Button variant="outline" onClick={() => setBulkDialogOpen(true)}>
                 Pegar desde Excel
+              </Button>
+              <Button variant="outline" onClick={() => void generarDemo()} disabled={generandoDemo}>
+                {generandoDemo ? (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                ) : (
+                  <Wand2 className="mr-1 h-4 w-4" />
+                )}
+                Generar demo
               </Button>
               <Button variant="outline" onClick={() => xlsxInputRef.current?.click()}>
                 <Upload className="mr-1 h-4 w-4" />
