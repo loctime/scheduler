@@ -4,7 +4,8 @@ import { useState, useMemo, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import { Calendar, FileText, Users, UserCircle, CheckSquare } from "lucide-react"
+import { Calendar, FileText, Users, UserCircle, CheckSquare, ExternalLink } from "lucide-react"
+import Link from "next/link"
 import { PwaTodayScheduleCard } from "@/components/pwa-today-schedule-card"
 import { UserStatusMenu } from "@/components/pwa/UserStatusMenu"
 import { PwaViewerBadge, useViewer, notifyViewerChanged } from "@/components/pwa/PwaViewerBadge"
@@ -85,9 +86,19 @@ export default function PwaHomePage() {
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <h1 className="text-3xl font-bold text-foreground">{companySlug}</h1>
-            <p className="text-muted-foreground">
-              Horarios y Stock
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-muted-foreground">
+                Horarios y Stock
+              </p>
+              <Link
+                href="/dashboard"
+                aria-label="Volver a la app"
+                title="Volver a la app"
+                className="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
             <div className="flex items-center gap-2">
