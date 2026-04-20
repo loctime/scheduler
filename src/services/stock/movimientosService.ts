@@ -106,8 +106,8 @@ export async function confirmarMovimientos(
           ownerId,
           userId,
           fecha: new Date(),
-          pedidoId: movimiento.pedidoId,
           origen: "stock_console",
+          ...(movimiento.pedidoId ? { pedidoId: movimiento.pedidoId } : {}),
         }
 
         const movimientoRef = doc(collection(firestore, COLLECTIONS.STOCK_MOVIMIENTOS))
