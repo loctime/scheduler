@@ -20,6 +20,7 @@ export default function DespacharPage() {
   const { pedidosParaMi, loading, locationId, crearRemito, marcarEnCamino } = useLogistica(user)
 
   const [despachando, setDespachando] = useState<string | null>(null)
+  const [observaciones, setObservaciones] = useState<Record<string, string>>({})
   const mountedRef = useRef(false)
   useEffect(() => {
     mountedRef.current = true
@@ -63,6 +64,7 @@ export default function DespacharPage() {
       destinoLocationId: pedido.origenLocationId,
       destinoNombre: pedido.origenNombre,
       items,
+      observacion: observaciones[pedido.id]?.trim() || undefined,
     })
 
     if (!mountedRef.current) return
@@ -155,6 +157,15 @@ export default function DespacharPage() {
                     )}
                   </div>
                   <p className="text-xs text-gray-400 mb-2">{resumen}</p>
+                  {isListo && (
+                    <textarea
+                      value={observaciones[pedido.id] ?? ""}
+                      onChange={(e) => setObservaciones((prev) => ({ ...prev, [pedido.id]: e.target.value }))}
+                      placeholder="Observaciones del envío (opcional)..."
+                      rows={2}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-[#1D9E75] resize-none mb-2"
+                    />
+                  )}
                   {isListo && !locationId && (
                     <p className="text-xs text-red-500 text-center py-1">Sin ubicación configurada</p>
                   )}

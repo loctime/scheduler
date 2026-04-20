@@ -43,6 +43,7 @@ export default function VerPedidoPage() {
 
   // cantidades editables: pedidoId → productoId → cantidad
   const [cantidades, setCantidades] = useState<Record<string, Record<string, number>>>({})
+  const [observaciones, setObservaciones] = useState<Record<string, string>>({})
   const [enviando, setEnviando] = useState<string | null>(null)
   // IDs de borradores ya enviados (ocultar localmente hasta que el listener los limpie)
   const [enviados_ids, setEnviadosIds] = useState<Set<string>>(new Set())
@@ -105,6 +106,7 @@ export default function VerPedidoPage() {
       grupoPedidoId: pedido.grupoPedidoId,
       grupoPedidoNombre: pedido.grupoPedidoNombre,
       items: itemsValidos,
+      observacion: observaciones[pedidoId]?.trim() || undefined,
     })
 
     if (!mountedRef.current) return
@@ -204,6 +206,17 @@ export default function VerPedidoPage() {
                   </div>
                 )
               })}
+            </div>
+
+            {/* Observaciones */}
+            <div className="px-4 pb-2">
+              <textarea
+                value={observaciones[pedido.id] ?? ""}
+                onChange={(e) => setObservaciones((prev) => ({ ...prev, [pedido.id]: e.target.value }))}
+                placeholder="Observaciones (opcional)..."
+                rows={2}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-[#1D9E75] resize-none"
+              />
             </div>
 
             {/* Send button */}

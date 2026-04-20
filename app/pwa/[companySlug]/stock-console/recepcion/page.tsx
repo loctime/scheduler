@@ -123,42 +123,58 @@ export default function RecepcionPage() {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-sm font-medium text-gray-900">{remito.origenNombre}</p>
-                <p className="text-xs text-gray-400">Remito #{remito.id.slice(-6)}</p>
+                <p className="text-xs text-gray-400">{remito.numero}</p>
               </div>
               <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
                 En camino
               </span>
             </div>
 
+            {/* Column headers */}
+            <div className="flex items-center gap-2 pb-1 mb-1 border-b border-gray-100">
+              <p className="flex-1 text-[11px] font-medium text-gray-400 uppercase tracking-wide">Producto</p>
+              <p className="w-14 text-center text-[11px] font-medium text-gray-400 uppercase tracking-wide">Pedido</p>
+              <p className="w-14 text-center text-[11px] font-medium text-gray-400 uppercase tracking-wide">Enviado</p>
+              <p className="w-20 text-center text-[11px] font-medium text-gray-400 uppercase tracking-wide">Recibido</p>
+            </div>
+
             {/* Items */}
-            <div className="space-y-3 mb-3">
+            <div className="space-y-2 mb-3">
               {remito.items.map((item) => {
-                const cantidad = getCantidad(remito.id, item.productoId, item.cantidadEnviada)
-                const hayFaltante = cantidad < item.cantidadEnviada
+                const recibido = getCantidad(remito.id, item.productoId, item.cantidadEnviada)
+                const hayFaltante = recibido < item.cantidadEnviada
 
                 return (
-                  <div key={item.productoId} className="flex flex-col gap-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-gray-800">{item.productoNombre}</p>
-                      <p className="text-xs text-gray-400">Enviado: {item.cantidadEnviada}</p>
+                  <div key={item.productoId} className="flex items-center gap-2 py-1">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-800 truncate">{item.productoNombre}</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    {/* Pedido (read-only) */}
+                    <p className="w-14 text-center text-sm text-gray-400 shrink-0">
+                      {item.cantidadPedida ?? "—"}
+                    </p>
+                    {/* Enviado (read-only) */}
+                    <p className="w-14 text-center text-sm text-gray-600 font-medium shrink-0">
+                      {item.cantidadEnviada}
+                    </p>
+                    {/* Recibido (editable) */}
+                    <div className="w-20 flex items-center gap-1 shrink-0">
                       <input
                         type="number"
                         min="0"
-                        value={cantidad}
+                        value={recibido}
                         onChange={(e) => {
                           const raw = e.target.value
                           if (raw === "") return
                           const n = Number(raw)
                           if (!Number.isNaN(n)) setCantidad(remito.id, item.productoId, n)
                         }}
-                        className={`w-24 border rounded-lg px-2 py-1 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#1D9E75] ${
-                          hayFaltante ? "border-red-400" : "border-gray-200"
+                        className={`w-16 border rounded-lg px-2 py-1 text-sm text-gray-900 text-center focus:outline-none focus:ring-1 focus:ring-[#1D9E75] ${
+                          hayFaltante ? "border-red-400 bg-red-50" : "border-gray-200"
                         }`}
                       />
                       {hayFaltante && (
-                        <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                       )}
                     </div>
                   </div>

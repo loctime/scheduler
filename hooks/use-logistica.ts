@@ -175,11 +175,11 @@ export function useLogistica(user: { uid?: string; email?: string | null } | nul
   const confirmarRecepcion = useCallback(
     async (input: Omit<Parameters<typeof confirmarRecepcionSvc>[0], "ownerId" | "user" | "crearPedidoAutomaticoPorFaltante">) => {
       if (!ownerId) return { ok: false as const, error: "No se pudo determinar el espacio de trabajo" }
-      return confirmarRecepcionSvc({ 
-        ...input, 
-        ownerId, 
+      return confirmarRecepcionSvc({
+        ...input,
+        ownerId,
         user: actor,
-        crearPedidoAutomaticoPorFaltante: settings?.crearPedidoAutomaticoPorFaltante ?? true // Por defecto true (comportamiento actual)
+        crearPedidoAutomaticoPorFaltante: false // No crear pedidos automáticos por faltantes
       })
     },
     [ownerId, actor, settings?.crearPedidoAutomaticoPorFaltante]
