@@ -10,7 +10,8 @@
       "Bash(grep -n \"no-scrollbar\" app/globals.css)",
       "Bash(grep -rn \"no-scrollbar\" styles/)",
       "Bash(npx firebase *)",
-      "Bash(grep -E \"^app[/\\\\\\\\\\\\\\\\]\\(dashboard[/\\\\\\\\\\\\\\\\]\\)?configuracion\")"
+      "Bash(grep -E \"^app[/\\\\\\\\\\\\\\\\]\\(dashboard[/\\\\\\\\\\\\\\\\]\\)?configuracion\")",
+      "Bash(grep -E \"\\\\.\\(tsx?|js\\)$\")"
     ]
   }
 }

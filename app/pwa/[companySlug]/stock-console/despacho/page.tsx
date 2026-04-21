@@ -373,6 +373,13 @@ function VistaTabla({ pedidos, modoDespacho, cantidades, onCantidadChange }: Vis
 }
 
 // ─── main page ────────────────────────────────────────────────────────────────
+const VISTA_LABEL: Record<Vista, string> = {
+  producto: "por producto",
+  sucursal: "por sucursal",
+  resumen: "resumen",
+  tabla: "tabla",
+}
+
 const VISTA_ICONS: Array<{ id: Vista; icon: React.ReactNode; label: string }> = [
   { id: "producto", icon: <LayoutList className="w-4 h-4" />, label: "Producto" },
   { id: "sucursal", icon: <Building2 className="w-4 h-4" />, label: "Sucursal" },
@@ -527,7 +534,10 @@ export default function DespacharPage() {
                   }
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{grupo.nombre}</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {grupo.nombre}
+                      <span className="font-normal text-gray-400"> · {VISTA_LABEL[vistaActiva]}</span>
+                    </p>
                     <p className="text-xs text-gray-400">{descripcion}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
