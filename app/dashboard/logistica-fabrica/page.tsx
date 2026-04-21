@@ -601,12 +601,11 @@ export default function LogisticaFabricaPage() {
     }
     
     for (const pedido of pedidosATomar) {
-      // Solo procesar pedidos que están en estado 'enviado'
-      if (pedido.estado !== "enviado") {
-        toast({ 
-          title: "Advertencia", 
+      if (pedido.estado !== "enviado" && pedido.estado !== "en_preparacion") {
+        toast({
+          title: "Advertencia",
           description: `Pedido ${pedido.id} está en estado «${pedido.estado}» y no puede ser tomado`,
-          variant: "destructive" 
+          variant: "destructive"
         })
         continue
       }

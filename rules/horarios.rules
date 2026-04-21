@@ -4,14 +4,6 @@
 
 /* ========= HELPERS LOCALES ========= */
 
-// Obtiene el ownerId del usuario autenticado desde su documento
-function horariosUserOwnerId() {
-  return isAuth()
-    && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
-    ? get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.ownerId
-    : null;
-}
-
 // Verifica si el usuario autenticado puede actuar en nombre de un ownerId dado.
 // Puede si: es el propio owner, o es un colaborador con ese ownerId, o tiene rol admin.
 function horariosCanActFor(ownerId) {
@@ -52,9 +44,12 @@ function horariosIsAdminOrOperador() {
   return horariosIsAdmin() || horariosIsOperador();
 }
 
-// Shortcut: cualquier rol activo del sistema (admin, operador, delivery)
-function horariosIsAnyRole() {
-  return horariosIsAdmin() || horariosIsOperador() || horariosIsDelivery();
+// Cualquier rol con acceso de escritura sobre stock (admin, operador, factory, manager, maxdev)
+function horariosIsStaff() {
+  return isAuth()
+    && exists(/databases/$(db)/documents/apps/horarios/users/$(uid()))
+    && get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.role
+      in ['admin', 'operador', 'factory', 'manager', 'maxdev'];
 }
 
 
@@ -278,6 +273,101 @@ match /apps/horarios/config/{docId} {
 }
 
 /* ===============================
+   SETTINGS
+   =============================== */
+
+match /apps/horarios/settings/{ownerId} {
+  allow read: if isAuth()
+    && (
+      ownerId == uid()
+      || horariosCanActFor(ownerId)
+    );
+
+  allow create: if isAuth()
+    && (
+      ownerId == uid()
+      || horariosCanActFor(ownerId)
+    );
+
+  allow update: if isAuth()
+    && (
+      ownerId == uid()
+      || horariosCanActFor(ownerId)
+    )
+    && unchanged("ownerId");
+
+  allow delete: if false;
+}
+
+/* ===============================
+   GROUPS + CONVERSACIONES + MENSAJES
+   (sistema de mensajería interna)
+   =============================== */
+
+match /apps/horarios/groups/{groupId} {
+  allow read: if isAuth()
+    && (
+      resource.data.ownerId == uid()
+      || horariosCanActFor(resource.data.ownerId)
+    );
+
+  allow create: if isAuth()
+    && (
+      request.resource.data.ownerId == uid()
+      || horariosCanActFor(request.resource.data.ownerId)
+    );
+
+  allow update, delete: if isAuth()
+    && (
+      resource.data.ownerId == uid()
+      || horariosCanActFor(resource.data.ownerId)
+    );
+}
+
+match /apps/horarios/conversaciones/{convId} {
+  allow read: if isAuth()
+    && (
+      resource.data.ownerId == uid()
+      || horariosCanActFor(resource.data.ownerId)
+    );
+
+  allow create: if isAuth()
+    && (
+      request.resource.data.ownerId == uid()
+      || horariosCanActFor(request.resource.data.ownerId)
+    );
+
+  allow update: if isAuth()
+    && (
+      resource.data.ownerId == uid()
+      || horariosCanActFor(resource.data.ownerId)
+    );
+
+  allow delete: if isAuth()
+    && (
+      resource.data.ownerId == uid()
+      || horariosIsAdmin()
+      && horariosCanActFor(resource.data.ownerId)
+    );
+}
+
+match /apps/horarios/mensajes/{msgId} {
+  allow read: if isAuth()
+    && (
+      resource.data.ownerId == uid()
+      || horariosCanActFor(resource.data.ownerId)
+    );
+
+  allow create: if isAuth()
+    && (
+      request.resource.data.ownerId == uid()
+      || horariosCanActFor(request.resource.data.ownerId)
+    );
+
+  allow update, delete: if false;
+}
+
+/* ===============================
    TASKS
    =============================== */
 
@@ -403,50 +493,12 @@ match /apps/horarios/catalogo/{docId} {
 
 /* ===============================
    STOCK UBICACIONES (stock por sucursal)
-   Cada usuario puede leer y editar solo el stock de su locationId.
-   Admin puede leer y editar todos.
+   Cualquier usuario autenticado puede leer y escribir.
+   El frontend controla los permisos por rol.
    =============================== */
 
 match /apps/horarios/stock_ubicaciones/{docId} {
-  // Admin ve todo el stock de su ownerId.
-  // Operador/delivery solo ve el stock de su locationId.
-  allow read: if isAuth()
-    && (
-      horariosIsAdmin()
-        && horariosCanActFor(resource.data.ownerId)
-      || (
-        horariosIsAdminOrOperador()
-        && horariosCanActFor(resource.data.ownerId)
-        && resource.data.locationId ==
-          get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.locationId
-      )
-    );
-
-  // Crear: admin o operador, dentro de su ownerId
-  allow create: if horariosIsAdminOrOperador()
-    && horariosCanActFor(request.resource.data.ownerId);
-
-  // Actualizar: admin (cualquier ubicación) o operador (solo su locationId)
-  allow update: if (
-    horariosIsAdmin()
-    && horariosCanActFor(resource.data.ownerId)
-  ) || (
-    horariosIsOperador()
-    && horariosCanActFor(resource.data.ownerId)
-    && resource.data.locationId ==
-      get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.locationId
-  );
-
-  // Borrar: admin o operador (solo su locationId)
-  allow delete: if horariosCanActFor(resource.data.ownerId)
-    && (
-      horariosIsAdmin()
-      || (
-        horariosIsOperador()
-        && resource.data.locationId ==
-          get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.locationId
-      )
-    );
+  allow read, write: if isAuth();
 }
 
 /* ===============================
@@ -491,17 +543,28 @@ match /apps/horarios/pedidos_fabrica/{docId} {
    =============================== */
 
 match /apps/horarios/remitos_log/{docId} {
-  // Todos los colaboradores pueden leer remitos de su ownerId (delivery también)
-  allow read: if horariosCanActFor(resource.data.ownerId);
+  // Owner, admin, operador, y delivery asignado pueden leer
+  allow read: if horariosCanActFor(resource.data.ownerId)
+    || (horariosIsDelivery() && resource.data.assignedDeliveryId == uid());
 
-  // Solo admin puede crear remitos (es quien despacha desde fábrica)
-  allow create: if horariosIsAdmin()
+  allow create: if horariosIsAdminOrOperador()
     && horariosCanActFor(request.resource.data.ownerId);
 
-  // Admin actualiza estado del remito (preparado → en_camino → entregado)
-  // Delivery puede marcar en_camino
+  // Validación por rol para actualizaciones específicas
   allow update: if horariosCanActFor(resource.data.ownerId)
-    && (horariosIsAdmin() || horariosIsDelivery());
+    && (
+      // Admin puede actualizar cualquier campo
+      (horariosIsAdmin() && true)
+      // Operador solo puede confirmar entrega
+      || (horariosIsOperador() 
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["estado", "entregadoAt"])
+          && request.resource.data.estado == "entregado")
+      // Delivery solo puede marcar "en_camino"
+      || (horariosIsDelivery() 
+          && resource.data.assignedDeliveryId == uid()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["estado", "enCaminoAt"])
+          && request.resource.data.estado == "en_camino")
+    );
 
   allow delete: if false;
 }
@@ -512,8 +575,10 @@ match /apps/horarios/remitos_log/{docId} {
 
 match /apps/horarios/recepciones_log/{docId} {
   // Todos los colaboradores del ownerId pueden leer recepciones
-  allow read: if horariosCanActFor(resource.data.ownerId);
-
+allow read: if isAuth() && (
+  resource == null
+  || horariosCanActFor(resource.data.ownerId)
+);
   // Admin y operador pueden confirmar recepciones
   allow create: if horariosIsAdminOrOperador()
     && horariosCanActFor(request.resource.data.ownerId);

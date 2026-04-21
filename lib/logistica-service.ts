@@ -519,7 +519,7 @@ export async function tomarPedido(input: {
     const data = snap.data() as Record<string, unknown>
     if (data.ownerId !== input.ownerId) return { ok: false, error: "El pedido no pertenece a tu espacio de trabajo" }
     console.log("Estado actual del pedido:", data.estado, "Pedido ID:", input.pedidoId)
-    if (data.estado !== "enviado") return { ok: false, error: `Solo se pueden tomar pedidos en estado «enviado». Estado actual: «${data.estado}»` }
+    if (data.estado !== "enviado" && data.estado !== "en_preparacion") return { ok: false, error: `Solo se pueden tomar pedidos en estado «enviado». Estado actual: «${data.estado}»` }
     await updateDoc(ref, { estado: "en_preparacion", actualizadoEn: serverTimestamp() })
     return { ok: true }
   } catch (e) {

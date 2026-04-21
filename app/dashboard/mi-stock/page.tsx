@@ -586,14 +586,13 @@ export default function MiStockPage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {rows.map((f) => {
+                              {rows.map((f, rowIdx) => {
                                 const st = estadoBadge(f.stockActual, f.stockMinimo)
                                 const esBajo = f.stockMinimo > 0 && f.stockActual < f.stockMinimo
                                 return (
-                                  <tr key={f.id} className={cn("border-b border-gray-100 last:border-0", esBajo && "bg-red-50/40")}>
+                                  <tr key={f.id} className={cn("border-b border-gray-100 last:border-0", esBajo && "bg-red-50/40", !esBajo && (rowIdx % 2 !== 0 ? "bg-gray-200" : "bg-white"))}>
                                     <td className="py-2.5 pr-4">
-                                      <div className="font-semibold text-base text-gray-900">{f.nombre}</div>
-                                      <div className="text-xs text-gray-500 font-medium">{f.unidad}</div>
+                                      <div className="font-semibold text-base text-gray-900">{f.nombre} <span className="text-xs text-gray-500 font-medium">({f.unidad})</span></div>
                                     </td>
                                     <td className="py-2.5 pr-2">
                                       <EditableCell

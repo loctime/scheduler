@@ -668,14 +668,14 @@ service cloud.firestore {
 
     match /apps/horarios/stock_ubicaciones/{docId} {
       // Admin ve todo el stock de su ownerId.
-      // Operador/delivery solo ve el stock de su locationId.
+      // Cualquier otro rol válido (operador, factory, manager, etc.) solo ve el stock de su locationId.
       allow read: if isAuth()
         && (
           horariosIsAdmin()
             && horariosCanActFor(resource.data.ownerId)
+          || uid() == resource.data.ownerId
           || (
-            horariosIsAdminOrOperador()
-            && horariosCanActFor(resource.data.ownerId)
+            horariosCanActFor(resource.data.ownerId)
             && resource.data.locationId ==
               get(/databases/$(db)/documents/apps/horarios/users/$(uid())).data.locationId
           )
