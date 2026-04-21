@@ -184,7 +184,7 @@ export function useDespachoHoy(user: User | null) {
 
     setGruposEnModoDespacho((prev) => ({ ...prev, [grupoId]: true }))
     const cantidadesIniciales: Record<string, number> = {}
-    pedidos.forEach((p) => p.items.forEach((item) => { cantidadesIniciales[`${item.productoId}_${p.id}`] = 0 }))
+    pedidosATomar.forEach((p) => p.items.forEach((item) => { cantidadesIniciales[`${item.productoId}_${p.id}`] = 0 }))
     setCantidadesDespachoState((prev) => ({ ...prev, [grupoId]: cantidadesIniciales }))
     toast({ title: "Pedidos tomados", description: "Los pedidos están en preparación." })
   }

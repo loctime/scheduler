@@ -513,6 +513,11 @@ export default function DespacharPage() {
             const modoDespacho = gruposEnModoDespacho[grupo.id] ?? false
             const cantidades = cantidadesDespacho[grupo.id] ?? {}
 
+            // En modo despacho solo mostrar los pedidos que fueron tomados (tienen entrada en cantidades)
+            const pedidosParaVista = modoDespacho
+              ? todosLosPedidos.filter((p) => p.items.some((item) => `${item.productoId}_${p.id}` in cantidades))
+              : todosLosPedidos
+
             const descripcion =
               todosLosPedidos.length === 0
                 ? "Sin pedidos"
@@ -565,7 +570,7 @@ export default function DespacharPage() {
                       <>
                         {vistaActiva === "producto" && (
                           <VistaProducto
-                            pedidos={todosLosPedidos}
+                            pedidos={pedidosParaVista}
                             modoDespacho={modoDespacho}
                             cantidades={cantidades}
                             onCantidadChange={(productoId, pedidoId, cantidad) =>
@@ -575,7 +580,7 @@ export default function DespacharPage() {
                         )}
                         {vistaActiva === "sucursal" && (
                           <VistaSucursal
-                            pedidos={todosLosPedidos}
+                            pedidos={pedidosParaVista}
                             modoDespacho={modoDespacho}
                             cantidades={cantidades}
                             onCantidadChange={(productoId, pedidoId, cantidad) =>
@@ -585,7 +590,7 @@ export default function DespacharPage() {
                         )}
                         {vistaActiva === "resumen" && (
                           <VistaResumen
-                            pedidos={todosLosPedidos}
+                            pedidos={pedidosParaVista}
                             modoDespacho={modoDespacho}
                             cantidades={cantidades}
                             onCantidadChange={(productoId, pedidoId, cantidad) =>
@@ -595,7 +600,7 @@ export default function DespacharPage() {
                         )}
                         {vistaActiva === "tabla" && (
                           <VistaTabla
-                            pedidos={todosLosPedidos}
+                            pedidos={pedidosParaVista}
                             modoDespacho={modoDespacho}
                             cantidades={cantidades}
                             onCantidadChange={(productoId, pedidoId, cantidad) =>
@@ -616,7 +621,7 @@ export default function DespacharPage() {
                         ) : (
                           <button
                             type="button"
-                            onClick={() => handleDespachar(grupo.id, todosLosPedidos)}
+                            onClick={() => handleDespachar(grupo.id, pedidosParaVista)}
                             disabled={despachando === grupo.id}
                             className="w-full py-3 rounded-xl bg-[#1D9E75] text-white text-sm font-medium disabled:opacity-40"
                           >
