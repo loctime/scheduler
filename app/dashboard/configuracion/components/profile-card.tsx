@@ -22,7 +22,7 @@ import { useData } from "@/contexts/data-context"
 import { db, auth, COLLECTIONS } from "@/lib/firebase"
 import { EmailAuthProvider, reauthenticateWithCredential, updateEmail, updatePassword } from "firebase/auth"
 import { collection, doc, getDoc, getDocs, query, serverTimestamp, updateDoc, where } from "firebase/firestore"
-import { Loader2, EyeOff, Eye, User, Mail, Lock, Key } from "lucide-react"
+import { Loader2, EyeOff, Eye, User, Mail, Lock, Key, MapPin } from "lucide-react"
 
 export function ProfileCard() {
   const { user, userData } = useData()
@@ -44,6 +44,8 @@ export function ProfileCard() {
   const [showLinkConfirmPassword, setShowLinkConfirmPassword] = useState(false)
   const [updatingProfile, setUpdatingProfile] = useState(false)
   const [ownerEmail, setOwnerEmail] = useState<string | null>(null)
+  const [locationName, setLocationName] = useState("")
+  const [savingLocationName, setSavingLocationName] = useState(false)
   
   // Detectar si el usuario tiene método de email/contraseña
   const hasEmailPassword = auth?.currentUser?.providerData?.some(
@@ -58,6 +60,27 @@ export function ProfileCard() {
 
   const loadAvailableOwners = async () => {
     return
+  }
+
+  useEffect(() => {
+    setLocationName(userData?.locationName ?? "")
+  }, [userData?.locationName])
+
+  const handleSaveLocationName = async () => {
+    if (!db || !user?.uid) return
+    setSavingLocationName(true)
+    try {
+      const userRef = doc(db, COLLECTIONS.USERS, user.uid)
+      await updateDoc(userRef, {
+        locationName: locationName.trim(),
+        updatedAt: serverTimestamp(),
+      })
+      toast({ title: "Nombre de despachador guardado" })
+    } catch {
+      toast({ title: "Error", description: "No se pudo guardar", variant: "destructive" })
+    } finally {
+      setSavingLocationName(false)
+    }
   }
 
   // Cargar email del referido (owner) para mostrar en el perfil
@@ -420,6 +443,35 @@ export function ProfileCard() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+          </div>
+        </div>
+
+        <Separator />
+
+        <div className="space-y-2">
+          <Label className="flex items-center gap-1.5">
+            <MapPin className="h-3.5 w-3.5" />
+            Nombre de despachador
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            Aparece en la lista de despachadores al crear grupos del catálogo.
+          </p>
+          <div className="flex items-center gap-2">
+            <Input
+              value={locationName}
+              onChange={(e) => setLocationName(e.target.value)}
+              placeholder="ej: admin, fabrica, ..."
+              className="flex-1"
+              disabled={savingLocationName}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleSaveLocationName()}
+              disabled={savingLocationName || locationName.trim() === (userData?.locationName ?? "")}
+            >
+              {savingLocationName ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
+            </Button>
           </div>
         </div>
 
